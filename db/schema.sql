@@ -259,14 +259,13 @@ INSERT INTO permissions (code, description)
 SELECT 'settings.update', 'Update system settings'
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'settings.update');
 
-INSERT INTO role_permissions (role_id, permission_id)
+INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
-INNER JOIN permissions p
-WHERE r.name = 'admin'
-ON DUPLICATE KEY UPDATE role_id = role_id;
+CROSS JOIN permissions p
+WHERE r.name = 'admin';
 
-CREATE TABLE system_settings (
+CREATE TABLE IF NOT EXISTS system_settings (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     setting_key     VARCHAR(100) NOT NULL UNIQUE,
     setting_value   TEXT NOT NULL,
