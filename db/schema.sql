@@ -196,4 +196,29 @@ CREATE TABLE who_weight_for_height (
     UNIQUE KEY uq_wfh (sex, height_cm)
 ) ENGINE=InnoDB;
 
+-- ----------------------------------------------------------------------------
+-- Initial access seed data
+-- ----------------------------------------------------------------------------
+INSERT INTO roles (name, description)
+SELECT 'admin', 'System administrator'
+WHERE NOT EXISTS (
+    SELECT 1 FROM roles WHERE name = 'admin'
+);
+
+INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay, status)
+SELECT
+    'System Administrator',
+    'admin@sukat.local',
+    'admin',
+    '$2y$10$QeU7O5MRHmHPRIcCxGxluewFYWG9XlLAjQekBTU/bTNufGHqPNTmC',
+    NULL,
+    r.id,
+    'All',
+    'active'
+FROM roles r
+WHERE r.name = 'admin'
+  AND NOT EXISTS (
+      SELECT 1 FROM users WHERE email = 'admin@sukat.local'
+  );
+
 SET FOREIGN_KEY_CHECKS = 1;

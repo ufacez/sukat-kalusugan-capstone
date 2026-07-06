@@ -1,0 +1,146 @@
+:root {
+  --bg: #f4f7f5;
+  --surface: #ffffff;
+  --surface-alt: #edf7f1;
+  --border: #d8e4dd;
+  --text: #173126;
+  --muted: #5f766c;
+  --primary: #0b6e4f;
+  --primary-strong: #07513a;
+  --accent: #f2a93b;
+  --error: #c93b3b;
+  --shadow: 0 30px 80px rgba(11, 110, 79, 0.12);
+  --radius-xl: 32px;
+  --radius-lg: 22px;
+  --radius-md: 14px;
+  --radius-sm: 10px;
+  --font-display: "Trebuchet MS", "Segoe UI", sans-serif;
+  --font-body: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  color: var(--text);
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(11, 110, 79, 0.16),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at right 20%,
+      rgba(242, 169, 59, 0.16),
+      transparent 28%
+    ),
+    linear-gradient(180deg, #f7faf8 0%, var(--bg) 100%);
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.eyebrow {
+  margin: 0 0 0.4rem;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.flash {
+  padding: 0.95rem 1rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 1rem;
+}
+
+.flash-error {
+  border-color: rgba(201, 59, 59, 0.24);
+  background: #fff4f4;
+  color: var(--error);
+}
+
+.flash-notice {
+  border-color: rgba(11, 110, 79, 0.18);
+  background: var(--surface-alt);
+}
+
+.field {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.field span {
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 0.95rem 1rem;
+  background: #fff;
+  color: var(--text);
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.field input::placeholder {
+  color: #8aa299;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: rgba(11, 110, 79, 0.45);
+  box-shadow: 0 0 0 4px rgba(11, 110, 79, 0.12);
+}
+
+.link {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.link:hover {
+  text-decoration: underline;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--muted);
+  user-select: none;
+}
+
+.checkbox input {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
