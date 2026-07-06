@@ -1,17 +1,13 @@
 <?php
 /**
  * config.php
- * Central configuration constants: DB credentials, Firebase config, app settings.
- * NEVER commit real credentials to Git — use environment-specific values here,
- * and add this file to .gitignore once you set up version control.
+ * Central configuration constants: DB credentials, app settings.
+ * NEVER commit real credentials to Git.
  */
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'nutrition_system');
+define('DB_NAME', 'sukat_kalusugan');
 define('DB_USER', 'root');
-define('DB_PASS', '');
-
-define('FIREBASE_DB_URL', 'https://your-project.firebaseio.com');
-define('FIREBASE_API_KEY', '');
+define('DB_PASS', '');   // XAMPP default root password is usually empty
 
 define('APP_ENV', 'development'); // 'development' | 'production'
