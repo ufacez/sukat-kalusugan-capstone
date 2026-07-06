@@ -1,0 +1,199 @@
+-- ============================================================================
+-- Web-Based Child Nutrition Monitoring System
+-- Phase 1: Core Database Schema
+-- Engine: InnoDB (foreign keys + transactions)
+-- ============================================================================
+
+SET NAMES utf8mb4;
+SET FOREIGN_KEY_CHECKS = 0;
+
+-- ----------------------------------------------------------------------------
+-- RBAC: roles, permissions, role_permissions
+-- ----------------------------------------------------------------------------
+CREATE TABLE roles (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(50) NOT NULL UNIQUE,       -- e.g. 'admin', 'nutritionist'
+    description     VARCHAR(255) NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE permissions (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    code            VARCHAR(100) NOT NULL UNIQUE,       -- e.g. 'children.create', 'users.delete'
+    description     VARCHAR(255) NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE role_permissions (
+    role_id         INT UNSIGNED NOT NULL,
+    permission_id   INT UNSIGNED NOT NULL,
+    PRIMARY KEY (role_id, permission_id),
+    CONSTRAINT fk_rp_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE CASCADE,
+    CONSTRAINT fk_rp_permission FOREIGN KEY (permission_id) REFERENCES permissions(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Staff users (admin, nutritionist)
+-- ----------------------------------------------------------------------------
+CREATE TABLE users (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(150) NOT NULL,
+    email           VARCHAR(150) NOT NULL UNIQUE,
+    username        VARCHAR(100) NOT NULL UNIQUE,
+    password_hash   VARCHAR(255) NOT NULL,
+    phone           VARCHAR(30) NULL,
+    role_id         INT UNSIGNED NOT NULL,
+    barangay        VARCHAR(100) NULL,                  -- scoping for nutritionists; NULL/'All' for admin
+    status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    last_login      TIMESTAMP NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_role FOREIGN KEY (role_id) REFERENCES roles(id) ON DELETE RESTRICT,
+    INDEX idx_users_role (role_id)
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Parents (separate auth domain from staff users)
+-- ----------------------------------------------------------------------------
+CREATE TABLE parents (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    name            VARCHAR(150) NOT NULL,
+    email           VARCHAR(150) NOT NULL UNIQUE,
+    password_hash   VARCHAR(255) NOT NULL,
+    phone           VARCHAR(30) NULL,
+    address         VARCHAR(255) NULL,
+    status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Children
+-- ----------------------------------------------------------------------------
+CREATE TABLE children (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    child_code      VARCHAR(20) NOT NULL UNIQUE,         -- e.g. CHD-0001
+    first_name      VARCHAR(100) NOT NULL,
+    last_name       VARCHAR(100) NOT NULL,
+    birthdate       DATE NOT NULL,
+    sex             ENUM('Male','Female') NOT NULL,
+    barangay        VARCHAR(100) NULL,
+    address         VARCHAR(255) NULL,
+    parent_id       INT UNSIGNED NOT NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_children_parent FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE RESTRICT,
+    INDEX idx_children_parent (parent_id),
+    INDEX idx_children_barangay (barangay)
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Devices (ESP32 kiosks / sensor units)
+-- ----------------------------------------------------------------------------
+CREATE TABLE devices (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    device_code         VARCHAR(50) NOT NULL UNIQUE,     -- e.g. ESP32-KIOSK-01
+    location            VARCHAR(150) NULL,               -- e.g. Barangay Health Center - Bagong Silang
+    last_calibration_at DATE NULL,
+    calibration_offset_height DECIMAL(6,2) DEFAULT 0.00,
+    calibration_offset_weight DECIMAL(6,3) DEFAULT 0.000,
+    status              ENUM('active','maintenance','offline') NOT NULL DEFAULT 'active',
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Measurements (the core clinical record)
+-- ----------------------------------------------------------------------------
+CREATE TABLE measurements (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    child_id            INT UNSIGNED NOT NULL,
+    height_cm           DECIMAL(5,2) NOT NULL,
+    weight_kg           DECIMAL(5,3) NOT NULL,
+    age_months          INT UNSIGNED NOT NULL,           -- snapshot at time of measurement, not recomputed later
+    measurement_date    DATE NOT NULL,
+    source_type         ENUM('kiosk','manual','mobile') NOT NULL DEFAULT 'kiosk',
+    waz                 DECIMAL(5,2) NULL,                -- weight-for-age z-score
+    haz                 DECIMAL(5,2) NULL,                -- height-for-age z-score
+    whz                 DECIMAL(5,2) NULL,                -- weight-for-height z-score
+    nutritional_status  ENUM('Normal','Underweight','Severely Underweight','Stunted','Wasted','Overweight') NULL,
+    device_id           INT UNSIGNED NULL,                -- which ESP32/kiosk took this reading
+    recorded_by         INT UNSIGNED NULL,                -- staff user, only set for manual entries
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_measurements_child FOREIGN KEY (child_id) REFERENCES children(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_measurements_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE SET NULL,
+    CONSTRAINT fk_measurements_user FOREIGN KEY (recorded_by) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_measurements_child (child_id),
+    INDEX idx_measurements_date (measurement_date)
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Appointments
+-- ----------------------------------------------------------------------------
+CREATE TABLE appointments (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    child_id            INT UNSIGNED NOT NULL,
+    parent_id           INT UNSIGNED NOT NULL,
+    nutritionist_id     INT UNSIGNED NOT NULL,
+    scheduled_at         DATETIME NOT NULL,
+    status              ENUM('pending','confirmed','completed','cancelled') NOT NULL DEFAULT 'pending',
+    notes               TEXT NULL,
+    created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_appt_child FOREIGN KEY (child_id) REFERENCES children(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appt_parent FOREIGN KEY (parent_id) REFERENCES parents(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_appt_user FOREIGN KEY (nutritionist_id) REFERENCES users(id) ON DELETE RESTRICT,
+    INDEX idx_appt_schedule (scheduled_at)
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- Audit logs
+-- ----------------------------------------------------------------------------
+CREATE TABLE audit_logs (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    user_id         INT UNSIGNED NULL,
+    action          VARCHAR(150) NOT NULL,
+    level           ENUM('info','warning','danger') NOT NULL DEFAULT 'info',
+    description     TEXT NULL,
+    ip_address      VARCHAR(45) NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    INDEX idx_audit_created (created_at)
+) ENGINE=InnoDB;
+
+-- ----------------------------------------------------------------------------
+-- WHO Child Growth Standards reference tables (LMS method)
+-- These are seeded from official WHO tables, not user-editable.
+-- ----------------------------------------------------------------------------
+CREATE TABLE who_weight_for_age (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    sex         ENUM('Male','Female') NOT NULL,
+    age_months  INT UNSIGNED NOT NULL,
+    L           DECIMAL(10,6) NOT NULL,
+    M           DECIMAL(10,6) NOT NULL,
+    S           DECIMAL(10,6) NOT NULL,
+    UNIQUE KEY uq_wfa (sex, age_months)
+) ENGINE=InnoDB;
+
+CREATE TABLE who_height_for_age (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    sex         ENUM('Male','Female') NOT NULL,
+    age_months  INT UNSIGNED NOT NULL,
+    L           DECIMAL(10,6) NOT NULL,
+    M           DECIMAL(10,6) NOT NULL,
+    S           DECIMAL(10,6) NOT NULL,
+    UNIQUE KEY uq_hfa (sex, age_months)
+) ENGINE=InnoDB;
+
+CREATE TABLE who_weight_for_height (
+    id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    sex         ENUM('Male','Female') NOT NULL,
+    height_cm   DECIMAL(4,1) NOT NULL,                   -- WHO tables step in 0.1/0.5 cm increments
+    L           DECIMAL(10,6) NOT NULL,
+    M           DECIMAL(10,6) NOT NULL,
+    S           DECIMAL(10,6) NOT NULL,
+    UNIQUE KEY uq_wfh (sex, height_cm)
+) ENGINE=InnoDB;
+
+SET FOREIGN_KEY_CHECKS = 1;
