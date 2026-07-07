@@ -102,6 +102,7 @@ $parents = admin_fetch_all(
 	"SELECT
 		p.id,
 		p.name,
+		p.parent_type,
 		p.email,
 		p.phone,
 		p.address,
@@ -109,7 +110,7 @@ $parents = admin_fetch_all(
 		COUNT(DISTINCT c.id) AS children_count,
 		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal', 'Overweight') THEN 1 ELSE 0 END) AS follow_up_count
 	 FROM parents p
-	 INNER JOIN children c ON c.parent_id = p.id
+	 LEFT JOIN children c ON c.parent_id = p.id AND {$parentsScope}
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m2.id
 		FROM measurements m2
@@ -117,8 +118,7 @@ $parents = admin_fetch_all(
 		ORDER BY m2.measurement_date DESC, m2.id DESC
 		LIMIT 1
 	 )
-	 WHERE {$parentsScope}
-	 GROUP BY p.id, p.name, p.email, p.phone, p.address, p.status
+	 GROUP BY p.id, p.name, p.parent_type, p.email, p.phone, p.address, p.status
 	 ORDER BY p.name ASC",
 	str_repeat('s', count($parentsParams)),
 	$parentsParams

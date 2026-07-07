@@ -94,14 +94,11 @@ $children = admin_fetch_all(
 );
 
 $parents = admin_fetch_all(
-	"SELECT p.id, p.name
+	"SELECT p.id, p.name, p.parent_type, p.status
 	 FROM parents p
-	 INNER JOIN children c ON c.parent_id = p.id
-	 WHERE {$childrenScope}
-	 GROUP BY p.id, p.name
 	 ORDER BY p.name ASC",
-	str_repeat('s', count($childrenParams)),
-	$childrenParams
+	'',
+	[]
 );
 
 $actions = '<a class="admin-btn-secondary" href="#appointment-form">New appointment</a>';
@@ -215,7 +212,7 @@ nutritionist_layout_start('Appointments', 'Schedule follow-ups and manage appoin
 			<select name="parent_id" required>
 				<option value="">-- Select Parent --</option>
 				<?php foreach ($parents as $parent): ?>
-					<option value="<?php echo (int)$parent['id']; ?>"><?php echo nutritionist_e($parent['name']); ?></option>
+						<option value="<?php echo (int)$parent['id']; ?>"><?php echo nutritionist_e($parent['name'] . ' · ' . $parent['parent_type'] . ' · ' . ($parent['status'] ?? 'unknown')); ?></option>
 				<?php endforeach; ?>
 			</select>
 		</label>

@@ -61,6 +61,7 @@ CREATE TABLE parents (
     name            VARCHAR(150) NOT NULL,
     email           VARCHAR(150) NOT NULL UNIQUE,
     password_hash   VARCHAR(255) NOT NULL,
+    parent_type     ENUM('Father','Mother','Guardian','Grandparent','Other') NOT NULL DEFAULT 'Guardian',
     phone           VARCHAR(30) NULL,
     address         VARCHAR(255) NULL,
     status          ENUM('active','inactive') NOT NULL DEFAULT 'active',
