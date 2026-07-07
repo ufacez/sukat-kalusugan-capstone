@@ -127,4 +127,20 @@ WHERE r.name = 'admin'
       SELECT 1 FROM users WHERE email = 'admin@sukat.local'
   );
 
+INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay, status)
+SELECT
+    'Nutritionist User',
+    'nutritionist@sukat.ph',
+    'nutritionist',
+    '$2y$10$mLbAvfFAvfm63tCDmfN/0ezjmtXt6zv.e0r.SAUgdBJXIbV.I1BKy',
+    NULL,
+    r.id,
+    'Bagong Silang',
+    'active'
+FROM roles r
+WHERE r.name = 'nutritionist'
+  AND NOT EXISTS (
+      SELECT 1 FROM users WHERE email = 'nutritionist@sukat.ph'
+  );
+
 SET FOREIGN_KEY_CHECKS = 1;
