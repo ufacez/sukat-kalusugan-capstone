@@ -107,8 +107,24 @@
     sidebarBarangay: document.querySelector("[data-kiosk-sidebar-barangay]"),
     sidebarResult: document.querySelector("[data-kiosk-sidebar-result]"),
     sidebarStatus: document.querySelector("[data-kiosk-sidebar-status]"),
+    sessionId: document.querySelector('[data-kiosk-session-id]'),
+    sessionStatus: document.querySelector('[data-kiosk-session-status]'),
+    sessionStarted: document.querySelector('[data-kiosk-session-started]'),
     childGrid: document.querySelector("[data-kiosk-child-grid]"),
   };
+
+  function updateSessionInfo(session) {
+    if (!session) {
+      if (refs.sessionId) refs.sessionId.textContent = '—';
+      if (refs.sessionStatus) refs.sessionStatus.textContent = 'Idle';
+      if (refs.sessionStarted) refs.sessionStarted.textContent = '—';
+      return;
+    }
+
+    if (refs.sessionId) refs.sessionId.textContent = String(session.session_id || session.sessionId || session.id || '—');
+    if (refs.sessionStatus) refs.sessionStatus.textContent = String(session.status || session.state || 'IDLE');
+    if (refs.sessionStarted) refs.sessionStarted.textContent = session.started_at ? new Date(session.started_at).toLocaleString() : '—';
+  }
 
   // Expose an API for external sensor feeds (Arduino / Firebase / ESP32)
   window.kioskUpdateSensor = function (payload = {}) {
@@ -178,6 +194,8 @@
         const json = await res.json();
         const payload = json && json.data ? json.data : {};
         const ok = json && json.success === true && (payload.status === 'online' || payload.connected === true);
+        // update live device online state for UI checks
+        state.deviceOnline = !!ok;
 
         setChip(pingChip, ok ? 'Device online' : 'Waiting for device', ok);
         if (payload.lidar_status != null) {
@@ -198,6 +216,7 @@
         setChip(pingChip, 'Waiting for device', false);
         setChip(lidarChip, 'Waiting for LiDAR', false);
         setChip(loadChip, 'Waiting for scale', false);
+        state.deviceOnline = false;
       }
     }
 
@@ -499,6 +518,7 @@
 
       state.session = payload;
       updateMeasurementPanel(payload);
+      updateSessionInfo(payload);
 
       if (payload.status === 'COMPLETE') {
         state.submitting = false;
@@ -545,6 +565,13 @@
       return false;
     }
 
+    // Quick client-side check: if ping endpoint is available and device is offline, block start
+    if (data.endpoints && data.endpoints.ping && state.deviceOnline === false) {
+      pushFeed('Device offline', 'Cannot start measurement: ESP32 is offline.', 'warn');
+      showSessionError('Device offline — please check ESP32 connection');
+      return false;
+    }
+
     state.submitting = true;
     syncStartButtonState();
     setStep('processing');
@@ -575,6 +602,7 @@
       }
 
       state.session = payload;
+      updateSessionInfo(payload);
       state.submitting = false;
       state.firebaseSessionId = Number(payload.session_id || 0) || null;
       state.awaitingLiveResult = true;
@@ -701,6 +729,7 @@
     if (refs.resultSource) refs.resultSource.textContent = 'Firebase live mirror';
     if (refs.sidebarStatus) refs.sidebarStatus.textContent = 'Waiting';
     if (refs.sidebarResult) refs.sidebarResult.textContent = '---';
+    updateSessionInfo(null);
     setStep('welcome');
     pushFeed('Kiosk reset', 'Ready for the next measurement');
   }
@@ -812,9 +841,36 @@
       button.addEventListener('click', () => {
         const action = button.getAttribute('data-kiosk-action');
 
+        // Primary start action on welcome / header
         if (action === 'start') {
           requestFullscreen();
           startMeasurementFlow();
+        }
+
+        // Continue from child selection: treat as Start Measurement
+        if (action === 'proceed-height') {
+          requestFullscreen();
+          startMeasurementFlow();
+        }
+
+        // Start scan buttons on height/weight screens should trigger the measurement
+        if (action === 'start-height' || action === 'start-weight') {
+          if (!isMeasurementActive()) {
+            // If no session has been requested yet, create one
+            requestFullscreen();
+            startMeasurementFlow();
+          } else {
+            pushFeed('Measurement active', 'Measurement already in progress.');
+          }
+        }
+
+        // Navigation/back actions - simple UI step changes (no server side effect)
+        if (action === 'back-select') {
+          setStep('select');
+        }
+
+        if (action === 'back-height') {
+          setStep('height');
         }
 
         if (action === 'reset') {

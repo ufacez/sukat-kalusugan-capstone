@@ -307,6 +307,15 @@ function kiosk_json(array $value): string
 				<h3>Activity</h3>
 				<div class="kiosk-feed" data-kiosk-feed></div>
 			</div>
+
+			<div class="kiosk-side-card">
+				<h3>Session</h3>
+				<div class="kiosk-session-info">
+					<div><strong>Session</strong> <span data-kiosk-session-id>—</span></div>
+					<div><strong>Status</strong> <span data-kiosk-session-status>Idle</span></div>
+					<div><strong>Started</strong> <span data-kiosk-session-started>—</span></div>
+				</div>
+			</div>
 		</aside>
 
 		<section class="kiosk-stepbar" aria-label="Kiosk progress" hidden>
