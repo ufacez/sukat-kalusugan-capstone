@@ -296,8 +296,8 @@
     }
 
     const status = String(payload.status || "").toUpperCase();
-    const weight = Number(payload.weight_kg);
-    const height = Number(payload.height_cm);
+    const weight = payload.weight_kg == null ? NaN : Number(payload.weight_kg);
+    const height = payload.height_cm == null ? NaN : Number(payload.height_cm);
 
     if (Number.isFinite(weight) && weight >= 0) setWeight(weight);
     if (Number.isFinite(height) && height >= 0) setHeight(height);
@@ -560,6 +560,19 @@
     state.height = null;
     state.weight = null;
     state.status = null;
+    state.child = null;
+
+    childCards.forEach((card) => card.classList.remove("is-selected"));
+    if (refs.currentChildLabel) refs.currentChildLabel.textContent = "Choose a child";
+    if (refs.sidebarChild) refs.sidebarChild.textContent = "None selected";
+    if (refs.sidebarParent) refs.sidebarParent.textContent = "---";
+    if (refs.sidebarBarangay) refs.sidebarBarangay.textContent = "---";
+
+    const selectContinueBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
+    if (selectContinueBtn) selectContinueBtn.disabled = true;
+
+    if (searchInput) searchInput.value = "";
+    childCards.forEach((card) => { card.hidden = false; });
 
     if (refs.weightReadout) refs.weightReadout.textContent = "--.--";
     if (refs.weightStatus) refs.weightStatus.textContent = "Ready to measure weight";
@@ -601,15 +614,6 @@
       });
     });
 
-    if (startButton) {
-      startButton.addEventListener("click", () => {
-        // Welcome button only opens child selection.
-        // It must NEVER create a measurement session.
-        setStep("select");
-        pushFeed("Measurement setup", "Select a child first.");
-      });
-    }
-
     if (resetButton) {
       resetButton.addEventListener("click", resetKioskToIdle);
     }
@@ -619,22 +623,24 @@
         const action = button.getAttribute("data-kiosk-action");
 
         if (action === "start") {
-          setStep("select");
-          pushFeed("Measurement setup", "Select a child first.");
+          if (!getSelectedChild()) {
+            setStep("select");
+            return;
+          }
+          startMeasurementFlow();
         }
 
-        // Child selection's Continue now only moves to the weight screen.
-        // It does NOT start a sensor session.
+        // Continue from Select Child actually starts the ESP32 session
+        // (creates the measurement_sessions row and begins Firebase polling).
         if (action === "proceed-height") {
-          if (getSelectedChild()) setStep("weight");
+          if (getSelectedChild()) startMeasurementFlow();
           else setStep("select");
         }
 
         // The ESP32 controls actual scanning after Start Measurement.
         // These buttons are informational/navigation only.
         if (action === "start-weight") {
-          // THIS is the only kiosk button that creates a server session.
-          startMeasurementFlow();
+          pushFeed("Waiting", "Press Start Measurement on the kiosk to begin.", "warn");
         }
 
         if (action === "start-height") {
@@ -666,9 +672,6 @@
   }
 
   bindEvents();
-
-  // Do not auto-select a child. The operator must choose one.
-  selectChild(null);
 
   setStep("welcome");
   if (heroNote) heroNote.textContent = "Select a child, then start the measurement.";

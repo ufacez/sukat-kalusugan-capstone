@@ -1,0 +1,29 @@
+# --- Secrets / local config ---
+public_html/includes/config.php
+.env
+.env.*
+
+# --- OS junk ---
+.DS_Store
+Thumbs.db
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+*.swp
+
+# --- AI agent / assistant local state ---
+.cursor/
+.claude/
+.windsurf/
+.aider*
+CLAUDE.md
+*.prompt.md
+
+# --- PHP / server local artifacts ---
+*.log
+vendor/
+composer.lock
+
+# --- Debug / throwaway scripts ---
+test_connection.php
