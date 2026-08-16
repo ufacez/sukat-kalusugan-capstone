@@ -35,16 +35,31 @@ if ($sessionId <= 0) {
     api_error('Session ID is required.', 400);
 }
 
-if ($heightCm <= 0 || $weightKg <= 0) {
-    api_error('Sensor readings are not ready yet. Please wait until the height and weight sensors return valid values above zero.', 400);
-}
+/**
+ * Marks the given (already-locked, already-confirmed-active) session as
+ * ERROR with a reason, commits that, and then sends the same message back
+ * as the HTTP error response. This makes an out-of-range submission a
+ * terminal failure for that session instead of leaving it stuck in
+ * MEASURING/START_REQUESTED, where the ESP32 would otherwise keep retrying
+ * the same session indefinitely.
+ */
+function fail_session(mysqli $conn, int $sessionId, string $message, int $statusCode = 400): void
+{
+    $stmt = mysqli_prepare(
+        $conn,
+        'UPDATE measurement_sessions
+         SET status = \'ERROR\', error_message = ?, updated_at = NOW()
+         WHERE id = ? AND status IN (\'START_REQUESTED\', \'MEASURING\')'
+    );
 
-if ($heightCm < 40 || $heightCm > 140) {
-    api_error('Height must be between 40 cm and 140 cm for a valid child measurement.', 400);
-}
+    if ($stmt !== false) {
+        mysqli_stmt_bind_param($stmt, 'si', $message, $sessionId);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+    }
 
-if ($weightKg < 2 || $weightKg > 80) {
-    api_error('Weight must be between 2 kg and 80 kg for a valid child measurement.', 400);
+    mysqli_commit($conn);
+    api_error($message, $statusCode);
 }
 
 $conn = get_db_connection();
@@ -132,6 +147,23 @@ if ($sessionStatus === 'COMPLETE' && $measurementId > 0) {
 if (!in_array($sessionStatus, ['START_REQUESTED', 'MEASURING'], true)) {
     mysqli_rollback($conn);
     api_error('This session is not active.', 409);
+}
+
+// From here on the session row is locked (FOR UPDATE) and confirmed active,
+// so any validation failure below can and should terminate this exact
+// session with a clear reason, instead of leaving it stuck for the ESP32
+// to keep retrying against.
+
+if ($heightCm <= 0 || $weightKg <= 0) {
+    fail_session($conn, $sessionId, 'Sensor readings are not ready yet. Please wait until the height and weight sensors return valid values above zero.');
+}
+
+if ($heightCm < 40 || $heightCm > 140) {
+    fail_session($conn, $sessionId, 'Height must be between 40 cm and 140 cm for a valid child measurement.');
+}
+
+if ($weightKg < 2 || $weightKg > 80) {
+    fail_session($conn, $sessionId, 'Weight must be between 2 kg and 80 kg for a valid child measurement.');
 }
 
 $childBirthdate = (string)($sessionRow['birthdate'] ?? '');

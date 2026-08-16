@@ -51,7 +51,10 @@ function push_latest_measurement(string $deviceId, array $measurementData): bool
 
     curl_setopt_array($ch, [
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_POST => true,
+        // Firebase REST semantics: POST appends a new child with a random push key
+        // under this path. PUT overwrites the value AT this exact path, which is
+        // what we need since the kiosk polls this path expecting a flat object.
+        CURLOPT_CUSTOMREQUEST => 'PUT',
         CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
         CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
         CURLOPT_TIMEOUT => 15,

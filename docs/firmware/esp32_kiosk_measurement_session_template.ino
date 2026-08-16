@@ -15,17 +15,18 @@ const char* WIFI_PASSWORD = "enz0p4o1931";
 // SERVER
 // =====================================================
 
+// Confirmed working Apache server
 const String SERVER_IP =
-  "http://192.168.100.164:8000";
+  "http://192.168.100.164/sukat-kalusugan-capstone/";
 
 const String DEVICE_ID =
   "ESP32-KIOSK-01";
 
 const String GET_COMMAND_PATH =
-  "/api/esp32/get_command.php";
+  "public_html/api/esp32/get_command.php";
 
 const String SUBMIT_MEASUREMENT_PATH =
-  "/api/esp32/submit_measurement.php";
+  "public_html/api/esp32/submit_measurement.php";
 
 
 // =====================================================
@@ -50,7 +51,6 @@ HX711_ADC LoadCell(
   HX711_SCK
 );
 
-
 // YOUR WORKING CALIBRATION VALUE
 const float HX711_CAL_FACTOR =
   -20892.50f;
@@ -67,20 +67,20 @@ HardwareSerial TF_Luna(2);
 
 
 // =====================================================
-// TEMPORARY TF-LUNA HEIGHT
+// TF-LUNA MOUNTING HEIGHT
 // =====================================================
 //
-// You are currently testing without mounting.
+// TEMPORARY TEST VALUE.
 //
-// Change this later to the actual physical height.
+// If sensor is mounted 210 cm above the platform,
+// change this to:
 //
-// Example:
-// 40 cm  -> MOUNTING_HEIGHT_CM = 40
-// 210 cm -> MOUNTING_HEIGHT_CM = 210
+// const float MOUNTING_HEIGHT_CM = 210.0f;
 //
+// =====================================================
 
 const float MOUNTING_HEIGHT_CM =
-  40.0f;
+  127.5f;
 
 const float HEIGHT_OFFSET_CM =
   0.0f;
@@ -205,13 +205,9 @@ String httpGet(
 
   HTTPClient http;
 
-  http.begin(
-    url
-  );
+  http.begin(url);
 
-  http.setTimeout(
-    5000
-  );
+  http.setTimeout(5000);
 
   httpCode =
     http.GET();
@@ -251,13 +247,9 @@ String httpPostJson(
 
   HTTPClient http;
 
-  http.begin(
-    url
-  );
+  http.begin(url);
 
-  http.setTimeout(
-    10000
-  );
+  http.setTimeout(10000);
 
   http.addHeader(
     "Content-Type",
@@ -266,6 +258,116 @@ String httpPostJson(
 
   httpCode =
     http.POST(
+      jsonBody
+    );
+
+  String response = "";
+
+  if (httpCode > 0) {
+
+    response =
+      http.getString();
+  }
+
+  http.end();
+
+  return response;
+}
+
+
+// =====================================================
+// HTTP POST FORM DATA
+// =====================================================
+//
+// This is used for submit_measurement.php.
+//
+// We tested this exact format successfully from
+// PowerShell:
+//
+// device_id
+// session_id
+// height_cm
+// weight_kg
+//
+// =====================================================
+
+String httpPostForm(
+  const String& url,
+  const String& formBody,
+  int& httpCode
+) {
+
+  httpCode = -1;
+
+  if (
+    WiFi.status() != WL_CONNECTED
+  ) {
+
+    return "";
+  }
+
+  HTTPClient http;
+
+  http.begin(url);
+
+  http.setTimeout(10000);
+
+  http.addHeader(
+    "Content-Type",
+    "application/x-www-form-urlencoded"
+  );
+
+  httpCode =
+    http.POST(
+      formBody
+    );
+
+  String response = "";
+
+  if (httpCode > 0) {
+
+    response =
+      http.getString();
+  }
+
+  http.end();
+
+  return response;
+}
+
+
+// =====================================================
+// HTTP PUT JSON
+// =====================================================
+
+String httpPutJson(
+  const String& url,
+  const String& jsonBody,
+  int& httpCode
+) {
+
+  httpCode = -1;
+
+  if (
+    WiFi.status() != WL_CONNECTED
+  ) {
+
+    return "";
+  }
+
+  HTTPClient http;
+
+  http.begin(url);
+
+  http.setTimeout(10000);
+
+  http.addHeader(
+    "Content-Type",
+    "application/json"
+  );
+
+  httpCode =
+    http.PUT(
       jsonBody
     );
 
@@ -302,23 +404,18 @@ void setupHX711() {
     "================================"
   );
 
-
   LoadCell.begin();
-
 
   unsigned long stabilizingTime =
     2000;
 
-
   bool tare =
     true;
-
 
   LoadCell.start(
     stabilizingTime,
     tare
   );
-
 
   if (
     LoadCell.getTareTimeoutFlag() ||
@@ -339,16 +436,13 @@ void setupHX711() {
     return;
   }
 
-
   LoadCell.setCalFactor(
     HX711_CAL_FACTOR
   );
 
-
   Serial.println(
     "HX711 startup complete"
   );
-
 
   Serial.print(
     "Calibration factor: "
@@ -358,7 +452,6 @@ void setupHX711() {
     LoadCell.getCalFactor()
   );
 
-
   while (
     !LoadCell.update()
   ) {
@@ -366,11 +459,9 @@ void setupHX711() {
     delay(1);
   }
 
-
   Serial.println(
     "HX711 ready"
   );
-
 
   hx711Ready =
     true;
@@ -421,14 +512,12 @@ bool readTFLunaDistanceCm(
 
   static uint8_t buffer[9];
 
-
   while (
     TF_Luna.available() >= 9
   ) {
 
     int first =
       TF_Luna.read();
-
 
     if (
       first != 0x59
@@ -437,10 +526,8 @@ bool readTFLunaDistanceCm(
       continue;
     }
 
-
     int second =
       TF_Luna.read();
-
 
     if (
       second != 0x59
@@ -449,13 +536,11 @@ bool readTFLunaDistanceCm(
       continue;
     }
 
-
     buffer[0] =
       0x59;
 
     buffer[1] =
       0x59;
-
 
     for (
       int i = 2;
@@ -466,7 +551,6 @@ bool readTFLunaDistanceCm(
       int value =
         TF_Luna.read();
 
-
       if (
         value < 0
       ) {
@@ -474,17 +558,16 @@ bool readTFLunaDistanceCm(
         return false;
       }
 
-
       buffer[i] =
         (uint8_t)value;
     }
 
-
+    // =================================================
     // CHECKSUM
+    // =================================================
 
     uint16_t checksum =
       0;
-
 
     for (
       int i = 0;
@@ -496,7 +579,6 @@ bool readTFLunaDistanceCm(
         buffer[i];
     }
 
-
     if (
       (checksum & 0xFF) !=
       buffer[8]
@@ -505,21 +587,19 @@ bool readTFLunaDistanceCm(
       continue;
     }
 
-
+    // =================================================
     // DISTANCE IN MM
+    // =================================================
 
     uint16_t distanceMm =
       buffer[2] |
       ((uint16_t)buffer[3] << 8);
 
-
     distanceCm =
       distanceMm / 10.0f;
 
-
     return true;
   }
-
 
   return false;
 }
@@ -535,7 +615,6 @@ bool getHeightReading(
 
   float distanceCm;
 
-
   if (
     !readTFLunaDistanceCm(
       distanceCm
@@ -545,12 +624,10 @@ bool getHeightReading(
     return false;
   }
 
-
   heightCm =
     MOUNTING_HEIGHT_CM
     - distanceCm
     + HEIGHT_OFFSET_CM;
-
 
   Serial.print(
     "TF-Luna distance: "
@@ -574,7 +651,6 @@ bool getHeightReading(
     " cm"
   );
 
-
   return true;
 }
 
@@ -597,13 +673,11 @@ bool updateFirebase(
     return false;
   }
 
-
   String url =
     FIREBASE_URL +
     "/latest_measurements/" +
     DEVICE_ID +
     ".json";
-
 
   if (
     FIREBASE_AUTH.length() > 0
@@ -616,10 +690,8 @@ bool updateFirebase(
       FIREBASE_AUTH;
   }
 
-
   StaticJsonDocument<512>
     doc;
-
 
   doc["device_id"] =
     DEVICE_ID;
@@ -632,7 +704,6 @@ bool updateFirebase(
 
   doc["source_type"] =
     "kiosk";
-
 
   if (
     heightCm >= 0
@@ -647,7 +718,6 @@ bool updateFirebase(
       nullptr;
   }
 
-
   if (
     weightKg >= 0
   ) {
@@ -661,10 +731,8 @@ bool updateFirebase(
       nullptr;
   }
 
-
   doc["timestamp"] =
     millis();
-
 
   String body;
 
@@ -673,16 +741,14 @@ bool updateFirebase(
     body
   );
 
-
   int httpCode;
 
   String response =
-    httpPostJson(
+    httpPutJson(
       url,
       body,
       httpCode
     );
-
 
   Serial.print(
     "Firebase HTTP: "
@@ -692,6 +758,19 @@ bool updateFirebase(
     httpCode
   );
 
+  if (
+    httpCode > 0 &&
+    response.length() > 0
+  ) {
+
+    Serial.print(
+      "Firebase response: "
+    );
+
+    Serial.println(
+      response
+    );
+  }
 
   return (
     httpCode >= 200 &&
@@ -702,6 +781,19 @@ bool updateFirebase(
 
 // =====================================================
 // SUBMIT FINAL MEASUREMENT TO SQL
+// =====================================================
+//
+// IMPORTANT:
+//
+// PHP endpoint was tested successfully using:
+//
+// device_id=ESP32-KIOSK-01
+// session_id=1
+// height_cm=90
+// weight_kg=13
+//
+// Therefore this function sends FORM DATA instead of JSON.
+//
 // =====================================================
 
 bool submitFinalMeasurement(
@@ -714,34 +806,19 @@ bool submitFinalMeasurement(
     SERVER_IP +
     SUBMIT_MEASUREMENT_PATH;
 
+  // ===================================================
+  // CREATE FORM BODY
+  // ===================================================
 
-  StaticJsonDocument<256>
-    doc;
-
-
-  doc["device_id"] =
-    DEVICE_ID;
-
-  doc["session_id"] =
-    sessionId;
-
-  doc["height_cm"] =
-    heightCm;
-
-  doc["weight_kg"] =
-    weightKg;
-
-  doc["source_type"] =
-    "kiosk";
-
-
-  String payload;
-
-  serializeJson(
-    doc,
-    payload
-  );
-
+  String payload =
+    "device_id=" +
+    DEVICE_ID +
+    "&session_id=" +
+    String(sessionId) +
+    "&height_cm=" +
+    String(heightCm, 1) +
+    "&weight_kg=" +
+    String(weightKg, 2);
 
   Serial.println();
   Serial.println(
@@ -756,21 +833,30 @@ bool submitFinalMeasurement(
     "================================"
   );
 
+  Serial.print(
+    "URL: "
+  );
+
+  Serial.println(
+    url
+  );
+
+  Serial.print(
+    "Payload: "
+  );
 
   Serial.println(
     payload
   );
 
-
   int httpCode;
 
   String response =
-    httpPostJson(
+    httpPostForm(
       url,
       payload,
       httpCode
     );
-
 
   Serial.print(
     "SQL HTTP: "
@@ -780,7 +866,6 @@ bool submitFinalMeasurement(
     httpCode
   );
 
-
   Serial.print(
     "SQL response: "
   );
@@ -789,9 +874,9 @@ bool submitFinalMeasurement(
     response
   );
 
-
   if (
-    httpCode != 200
+    httpCode < 200 ||
+    httpCode >= 300
   ) {
 
     Serial.println(
@@ -801,17 +886,18 @@ bool submitFinalMeasurement(
     return false;
   }
 
+  // ===================================================
+  // PARSE PHP RESPONSE
+  // ===================================================
 
   StaticJsonDocument<512>
     responseDoc;
-
 
   DeserializationError error =
     deserializeJson(
       responseDoc,
       response
     );
-
 
   if (
     error
@@ -824,18 +910,17 @@ bool submitFinalMeasurement(
     return false;
   }
 
-
   bool success =
     responseDoc["success"] |
     false;
 
-
-  if (!success) {
+  if (
+    !success
+  ) {
 
     const char* message =
       responseDoc["message"] |
       "Unknown server error";
-
 
     Serial.print(
       "PHP ERROR: "
@@ -845,15 +930,12 @@ bool submitFinalMeasurement(
       message
     );
 
-
     return false;
   }
-
 
   Serial.println(
     "SQL SUBMISSION SUCCESS"
   );
-
 
   return true;
 }
@@ -876,9 +958,15 @@ bool getMeasurementCommand(
     "?device_id=" +
     DEVICE_ID;
 
+  Serial.print(
+    "Command URL: "
+  );
+
+  Serial.println(
+    url
+  );
 
   int httpCode;
-
 
   String response =
     httpGet(
@@ -886,30 +974,39 @@ bool getMeasurementCommand(
       httpCode
     );
 
-
   if (
     httpCode != 200 ||
     response.length() == 0
   ) {
 
-    Serial.println(
-      "Unable to get command."
+    Serial.print(
+      "Unable to get command. HTTP: "
     );
+
+    Serial.println(
+      httpCode
+    );
+
+    if (
+      response.length() > 0
+    ) {
+
+      Serial.println(
+        response
+      );
+    }
 
     return false;
   }
 
-
   StaticJsonDocument<1024>
     doc;
-
 
   DeserializationError error =
     deserializeJson(
       doc,
       response
     );
-
 
   if (
     error
@@ -926,15 +1023,45 @@ bool getMeasurementCommand(
     return false;
   }
 
+  // =================================================
+  // UNWRAP "data"
+  // =================================================
+  //
+  // Fixed ArduinoJson compatibility issue.
+  //
+  // We no longer use:
+  //
+  // doc["data"].isNull()
+  //   ? doc.as<JsonVariant>()
+  //   : doc["data"];
+  //
+  // because ArduinoJson 7 can produce incompatible
+  // types in the ?: operator.
+  //
+  // =================================================
+
+  JsonVariant data;
+
+  if (
+    doc["data"].isNull()
+  ) {
+
+    data =
+      doc.as<JsonVariant>();
+
+  } else {
+
+    data =
+      doc["data"];
+  }
 
   // =================================================
   // READ SESSION ID
   // =================================================
 
   sessionId =
-    doc["session_id"] |
+    data["session_id"] |
     0;
-
 
   // =================================================
   // READ COMMAND
@@ -942,19 +1069,17 @@ bool getMeasurementCommand(
 
   command =
     String(
-      doc["command"] |
+      data["command"] |
       ""
     );
-
 
   // =================================================
   // READ SHOULD_MEASURE
   // =================================================
 
   shouldMeasure =
-    doc["should_measure"] |
+    data["should_measure"] |
     false;
-
 
   // =================================================
   // READ STATUS
@@ -962,10 +1087,9 @@ bool getMeasurementCommand(
 
   status =
     String(
-      doc["status"] |
+      data["status"] |
       "IDLE"
     );
-
 
   // =================================================
   // DEBUG
@@ -1014,7 +1138,6 @@ bool getMeasurementCommand(
     "============================="
   );
 
-
   return true;
 }
 
@@ -1033,10 +1156,8 @@ void runMeasurement(
   currentSessionId =
     sessionId;
 
-
   measurementStartedAt =
     millis();
-
 
   Serial.println();
   Serial.println(
@@ -1059,7 +1180,6 @@ void runMeasurement(
     "################################"
   );
 
-
   // =================================================
   // FIREBASE - MEASURING
   // =================================================
@@ -1071,7 +1191,6 @@ void runMeasurement(
     -1
   );
 
-
   // =================================================
   // COUNTDOWN
   // =================================================
@@ -1080,7 +1199,6 @@ void runMeasurement(
   Serial.println(
     "Please step on the platform."
   );
-
 
   for (
     int i = 3;
@@ -1100,10 +1218,8 @@ void runMeasurement(
       "..."
     );
 
-
     delay(1000);
   }
-
 
   // =================================================
   // COLLECT DATA
@@ -1114,13 +1230,11 @@ void runMeasurement(
     "COLLECTING SENSOR DATA..."
   );
 
-
   const int WEIGHT_SAMPLES =
     30;
 
   const int HEIGHT_SAMPLES =
     20;
-
 
   float weightSum =
     0;
@@ -1128,29 +1242,25 @@ void runMeasurement(
   int weightCount =
     0;
 
-
   float heightSum =
     0;
 
   int heightCount =
     0;
 
-
   unsigned long startTime =
     millis();
-
 
   while (
     millis() - startTime <
     5000
   ) {
 
-    // -----------------------------
+    // =================================================
     // HX711
-    // -----------------------------
+    // =================================================
 
     LoadCell.update();
-
 
     if (
       hx711Ready
@@ -1158,7 +1268,6 @@ void runMeasurement(
 
       float weight =
         LoadCell.getData();
-
 
       if (
         weight > MIN_WEIGHT_KG &&
@@ -1172,13 +1281,11 @@ void runMeasurement(
       }
     }
 
-
-    // -----------------------------
+    // =================================================
     // TF-LUNA
-    // -----------------------------
+    // =================================================
 
     float height;
-
 
     if (
       getHeightReading(
@@ -1198,10 +1305,9 @@ void runMeasurement(
       }
     }
 
-
-    // -----------------------------
+    // =================================================
     // FIREBASE LIVE UPDATE
-    // -----------------------------
+    // =================================================
 
     if (
       millis() -
@@ -1212,13 +1318,11 @@ void runMeasurement(
       lastFirebaseUpdate =
         millis();
 
-
       float liveWeight =
         -1;
 
       float liveHeight =
         -1;
-
 
       if (
         weightCount > 0
@@ -1229,7 +1333,6 @@ void runMeasurement(
           weightCount;
       }
 
-
       if (
         heightCount > 0
       ) {
@@ -1239,7 +1342,6 @@ void runMeasurement(
           heightCount;
       }
 
-
       updateFirebase(
         sessionId,
         "MEASURING",
@@ -1248,10 +1350,8 @@ void runMeasurement(
       );
     }
 
-
     delay(20);
   }
-
 
   // =================================================
   // CALCULATE FINAL VALUES
@@ -1263,7 +1363,6 @@ void runMeasurement(
   float finalHeight =
     -1;
 
-
   if (
     weightCount > 0
   ) {
@@ -1273,7 +1372,6 @@ void runMeasurement(
       weightCount;
   }
 
-
   if (
     heightCount > 0
   ) {
@@ -1282,7 +1380,6 @@ void runMeasurement(
       heightSum /
       heightCount;
   }
-
 
   // =================================================
   // DISPLAY RESULT
@@ -1310,7 +1407,6 @@ void runMeasurement(
     " kg"
   );
 
-
   Serial.print(
     "Height: "
   );
@@ -1328,7 +1424,6 @@ void runMeasurement(
     "================================"
   );
 
-
   // =================================================
   // VALIDATE
   // =================================================
@@ -1337,11 +1432,9 @@ void runMeasurement(
     finalWeight >= MIN_WEIGHT_KG &&
     finalWeight <= MAX_WEIGHT_KG;
 
-
   bool validHeight =
     finalHeight >= MIN_HEIGHT_CM &&
     finalHeight <= MAX_HEIGHT_CM;
-
 
   if (
     !validWeight ||
@@ -1353,7 +1446,6 @@ void runMeasurement(
       "INVALID MEASUREMENT"
     );
 
-
     Serial.print(
       "Weight: "
     );
@@ -1361,7 +1453,6 @@ void runMeasurement(
     Serial.println(
       finalWeight
     );
-
 
     Serial.print(
       "Height: "
@@ -1371,14 +1462,12 @@ void runMeasurement(
       finalHeight
     );
 
-
     updateFirebase(
       sessionId,
       "ERROR",
       finalHeight,
       finalWeight
     );
-
 
     measuring =
       false;
@@ -1388,7 +1477,6 @@ void runMeasurement(
 
     return;
   }
-
 
   // =================================================
   // SEND TO SQL
@@ -1400,7 +1488,6 @@ void runMeasurement(
       finalHeight,
       finalWeight
     );
-
 
   if (
     !sqlSuccess
@@ -1415,7 +1502,6 @@ void runMeasurement(
       "Firebase will remain ERROR."
     );
 
-
     updateFirebase(
       sessionId,
       "ERROR",
@@ -1423,13 +1509,11 @@ void runMeasurement(
       finalWeight
     );
 
-
     measuring =
       false;
 
     return;
   }
-
 
   // =================================================
   // SQL SUCCESS
@@ -1439,7 +1523,6 @@ void runMeasurement(
   Serial.println(
     "SQL SAVED SUCCESSFULLY"
   );
-
 
   // =================================================
   // FIREBASE COMPLETE
@@ -1452,7 +1535,6 @@ void runMeasurement(
     finalWeight
   );
 
-
   // =================================================
   // SESSION FINISHED
   // =================================================
@@ -1460,14 +1542,11 @@ void runMeasurement(
   lastSessionId =
     sessionId;
 
-
   currentSessionId =
     0;
 
-
   measuring =
     false;
-
 
   Serial.println();
   Serial.println(
@@ -1498,9 +1577,7 @@ void setup() {
     115200
   );
 
-
   delay(1000);
-
 
   Serial.println();
   Serial.println(
@@ -1519,13 +1596,11 @@ void setup() {
     "========================================"
   );
 
-
   // =================================================
   // HX711
   // =================================================
 
   setupHX711();
-
 
   // =================================================
   // TF-LUNA
@@ -1536,7 +1611,6 @@ void setup() {
     "Starting TF-Luna..."
   );
 
-
   TF_Luna.begin(
     115200,
     SERIAL_8N1,
@@ -1544,11 +1618,9 @@ void setup() {
     TF_LUNA_TX
   );
 
-
   Serial.println(
     "TF-Luna UART ready"
   );
-
 
   Serial.print(
     "Temporary mounting height: "
@@ -1562,13 +1634,11 @@ void setup() {
     " cm"
   );
 
-
   // =================================================
   // WIFI
   // =================================================
 
   connectWiFi();
-
 
   Serial.println();
   Serial.println(
@@ -1606,7 +1676,6 @@ void loop() {
     LoadCell.update();
   }
 
-
   // =================================================
   // WIFI
   // =================================================
@@ -1623,7 +1692,6 @@ void loop() {
     return;
   }
 
-
   // =================================================
   // ONLY POLL COMMAND WHEN NOT MEASURING
   // =================================================
@@ -1638,7 +1706,6 @@ void loop() {
     lastCommandPoll =
       millis();
 
-
     long sessionId =
       0;
 
@@ -1651,7 +1718,6 @@ void loop() {
     bool shouldMeasure =
       false;
 
-
     bool success =
       getMeasurementCommand(
         sessionId,
@@ -1659,7 +1725,6 @@ void loop() {
         shouldMeasure,
         status
       );
-
 
     if (
       !success
@@ -1670,27 +1735,18 @@ void loop() {
       return;
     }
 
-
     // =================================================
-    // IMPORTANT START CONDITION
+    // START CONDITION
     // =================================================
     //
-    // The PHP server can return:
-    //
-    // Status: MEASURING
-    // Command: NONE
-    // Should measure: NO
-    //
-    // This still means the session is active.
-    //
-    // Therefore we accept ALL THREE:
+    // Accept:
     //
     // 1. should_measure == true
     // 2. command == START
     // 3. status == MEASURING
     //
-    // But ONLY if the session is NEW.
-    //
+    // But only for a NEW session.
+    // =================================================
 
     bool startRequested =
       shouldMeasure ||
@@ -1700,7 +1756,6 @@ void loop() {
       status.equalsIgnoreCase(
         "MEASURING"
       );
-
 
     if (
       startRequested &&
@@ -1746,12 +1801,10 @@ void loop() {
         "################################"
       );
 
-
       runMeasurement(
         sessionId
       );
     }
-
 
     // =================================================
     // ALREADY PROCESSED
@@ -1775,7 +1828,6 @@ void loop() {
       );
     }
   }
-
 
   // =================================================
   // SMALL DELAY
