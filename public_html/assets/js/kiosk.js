@@ -13,10 +13,20 @@
   const feed = document.querySelector("[data-kiosk-feed]");
   const welcomeClock = document.querySelector("[data-kiosk-live-clock]");
   const welcomeDate = document.querySelector("[data-kiosk-live-date]");
+  const heroNote = document.querySelector(".kiosk-hero-note");
+  const heroSubcopy = document.querySelector(".kiosk-hero-subcopy");
+  const startButton = document.querySelector('[data-kiosk-action="start"]');
+  const resetButton = document.querySelector('[data-kiosk-action="reset"]');
+  const firebaseBaseUrl = typeof data?.firebase?.databaseUrl === 'string' ? data.firebase.databaseUrl.trim() : '';
+  const firebaseEnabled = !!data?.firebase?.enabled && firebaseBaseUrl !== '';
 
   const state = {
     step: "welcome",
     child: null,
+    session: null,
+    phase: "idle",
+    statusTimer: null,
+    firebaseTimer: null,
     height: null,
     weight: null,
     processTimer: null,
@@ -24,6 +34,11 @@
     weightTimer: null,
     status: null,
     progress: 0,
+    scanInFlight: false,
+    submitting: false,
+    awaitingLiveResult: false,
+    firebaseSessionId: null,
+    lastFirebaseTimestamp: '',
   };
 
   const stageLabels = [
@@ -35,9 +50,36 @@
     "Complete!",
   ];
 
-  const children = Array.isArray(data.children) ? data.children : [];
-  const deviceId = data?.defaults?.deviceId || "ESP32-KIOSK-01";
+  function buildChildrenFromDom() {
+    return Array.from(document.querySelectorAll('[data-kiosk-child-card]')).map((card) => {
+      const id = Number(card.dataset.childId || 0);
+      const nameNode = card.querySelector('.kiosk-child-name');
+      const metaNode = card.querySelector('.kiosk-child-meta');
+      const codeNode = card.querySelector('.kiosk-child-code');
+      const fullName = nameNode ? nameNode.textContent.trim() : '';
+      const nameParts = fullName.split(/\s+/).filter(Boolean);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ');
+      const metaText = metaNode ? metaNode.textContent.trim() : '';
+      const ageMatch = metaText.match(/(\d+)\s*months/i);
+      const sexMatch = metaText.match(/·\s*([^\n]+)/i);
 
+      return {
+        id,
+        child_code: codeNode ? codeNode.textContent.trim() : '',
+        first_name: firstName,
+        last_name: lastName,
+        sex: sexMatch ? sexMatch[1].trim() : 'Male',
+        age_months: ageMatch ? Number(ageMatch[1]) : 0,
+        barangay: '',
+        parent_name: '',
+        status: 'Pending',
+      };
+    }).filter((child) => child.id > 0);
+  }
+
+  const children = Array.isArray(data.children) && data.children.length ? data.children : buildChildrenFromDom();
+  const deviceId = data?.defaults?.deviceId || "ESP32-KIOSK-01";
   const refs = {
     currentChildLabel: document.querySelector("[data-kiosk-current-child-label]"),
     heightReadout: document.querySelector("[data-kiosk-height-readout]"),
@@ -59,6 +101,7 @@
     resultHaz: document.querySelector("[data-kiosk-result-haz]"),
     resultWhz: document.querySelector("[data-kiosk-result-whz]"),
     resultSource: document.querySelector("[data-kiosk-result-source]"),
+    processList: document.querySelector("[data-kiosk-process-list]"),
     sidebarChild: document.querySelector("[data-kiosk-sidebar-child]"),
     sidebarParent: document.querySelector("[data-kiosk-sidebar-parent]"),
     sidebarBarangay: document.querySelector("[data-kiosk-sidebar-barangay]"),
@@ -71,7 +114,13 @@
   window.kioskUpdateSensor = function (payload = {}) {
     try {
       if (payload.height != null) {
-        state.height = Number(payload.height);
+        const value = Number(payload.height);
+        if (!Number.isFinite(value) || value < 40 || value > 140) {
+          if (refs.heightStatus) refs.heightStatus.textContent = 'Invalid height — retry scan';
+          return;
+        }
+
+        state.height = value;
         if (refs.heightReadout) refs.heightReadout.textContent = state.height.toFixed(1);
         if (refs.heightFinal) refs.heightFinal.textContent = `${state.height.toFixed(1)} cm`;
         if (refs.heightStatus) refs.heightStatus.textContent = 'Height received';
@@ -79,7 +128,13 @@
       }
 
       if (payload.weight != null) {
-        state.weight = Number(payload.weight);
+        const value = Number(payload.weight);
+        if (!Number.isFinite(value) || value < 2 || value > 80) {
+          if (refs.weightStatus) refs.weightStatus.textContent = 'Invalid weight — retry scan';
+          return;
+        }
+
+        state.weight = value;
         if (refs.weightReadout) refs.weightReadout.textContent = state.weight.toFixed(2);
         if (refs.weightStatus) refs.weightStatus.textContent = 'Weight received';
         pushFeed('Sensor', `Weight ${state.weight.toFixed(2)} kg`);
@@ -88,8 +143,6 @@
       if (payload.device_id) {
         // update device id used in results/source label
         // note: not persisted; prepared for future integration
-        // eslint-disable-next-line no-param-reassign
-        // deviceId = String(payload.device_id);
       }
     } catch (e) {
       // noop
@@ -103,6 +156,15 @@
     chipEl.classList.toggle('is-success', !!ok);
   }
 
+  function firebaseLatestMeasurementUrl() {
+    if (!firebaseEnabled) {
+      return '';
+    }
+
+    const normalizedBase = firebaseBaseUrl.replace(/\/$/, '');
+    return `${normalizedBase}/latest_measurements/${encodeURIComponent(deviceId)}.json`;
+  }
+
   // Poll the ESP32 ping endpoint (if provided) to update connection status and optionally receive sensor readings
   if (data.endpoints && data.endpoints.ping) {
     const pingUrl = data.endpoints.ping;
@@ -114,17 +176,28 @@
       try {
         const res = await fetch(pingUrl + '?device=' + encodeURIComponent(deviceId), { cache: 'no-store' });
         const json = await res.json();
-        const ok = json && (json.status === 'ok' || json.connected === true);
-        setChip(pingChip, ok ? 'Connected' : 'Disconnected', ok);
-        if (json.lidar_status != null) setChip(lidarChip, json.lidar_status === 'ok' ? 'LiDAR Active' : 'LiDAR', json.lidar_status === 'ok');
-        if (json.loadcell_status != null) setChip(loadChip, json.loadcell_status === 'ok' ? 'Load Cell OK' : 'Load Cell', json.loadcell_status === 'ok');
+        const payload = json && json.data ? json.data : {};
+        const ok = json && json.success === true && (payload.status === 'online' || payload.connected === true);
 
-        // If the ping returned sensor values, push them into the UI
-        if (json.height || json.weight) {
-          window.kioskUpdateSensor({ height: json.height, weight: json.weight, device_id: json.device_id });
+        setChip(pingChip, ok ? 'Device online' : 'Waiting for device', ok);
+        if (payload.lidar_status != null) {
+          setChip(lidarChip, payload.lidar_status === 'ready' ? 'LiDAR ready' : 'Waiting for LiDAR', payload.lidar_status === 'ready');
+        } else {
+          setChip(lidarChip, 'Waiting for LiDAR', false);
+        }
+        if (payload.loadcell_status != null) {
+          setChip(loadChip, payload.loadcell_status === 'ready' ? 'Scale ready' : 'Waiting for scale', payload.loadcell_status === 'ready');
+        } else {
+          setChip(loadChip, 'Waiting for scale', false);
+        }
+
+        if (payload.height != null || payload.weight != null) {
+          window.kioskUpdateSensor({ height: payload.height, weight: payload.weight, device_id: payload.device_id });
         }
       } catch (e) {
-        setChip(pingChip, 'Disconnected', false);
+        setChip(pingChip, 'Waiting for device', false);
+        setChip(lidarChip, 'Waiting for LiDAR', false);
+        setChip(loadChip, 'Waiting for scale', false);
       }
     }
 
@@ -232,27 +305,404 @@
     return state.child || children[0] || null;
   }
 
+  function syncContinueButton() {
+    const continueBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
+    if (!continueBtn) return;
+    continueBtn.disabled = !getSelectedChild();
+  }
+
   function selectChild(childId) {
+    if (isMeasurementActive() && state.child && String(state.child.id) !== String(childId)) {
+      pushFeed('Selection locked', 'Wait for the current measurement to finish before choosing another child.', 'warn');
+      return;
+    }
+
     state.child = children.find((entry) => String(entry.id) === String(childId)) || null;
 
     childCards.forEach((card) => {
-      card.classList.toggle("is-selected", String(card.dataset.childId) === String(childId));
+      card.classList.toggle('is-selected', String(card.dataset.childId) === String(childId));
     });
 
     const child = getSelectedChild();
+    syncContinueButton();
 
     if (refs.currentChildLabel) refs.currentChildLabel.textContent = formatLabel(child);
-    if (refs.sidebarChild) refs.sidebarChild.textContent = formatLabel(child) || "None selected";
-    if (refs.sidebarParent) refs.sidebarParent.textContent = child?.parent_name || "---";
-    if (refs.sidebarBarangay) refs.sidebarBarangay.textContent = child?.barangay || "---";
-    if (refs.sidebarStatus) refs.sidebarStatus.textContent = child ? "Ready" : "Waiting";
-    if (refs.sidebarResult) refs.sidebarResult.textContent = child?.status || "---";
+    if (refs.sidebarChild) refs.sidebarChild.textContent = formatLabel(child) || 'None selected';
+    if (refs.sidebarParent) refs.sidebarParent.textContent = child?.parent_name || '---';
+    if (refs.sidebarBarangay) refs.sidebarBarangay.textContent = child?.barangay || '---';
+    if (refs.sidebarStatus) refs.sidebarStatus.textContent = child ? 'Ready' : 'Waiting';
+    if (refs.sidebarResult) refs.sidebarResult.textContent = child?.status || '---';
     if (refs.resultChild && child) refs.resultChild.textContent = formatLabel(child);
     if (refs.resultMeta && child) refs.resultMeta.textContent = `${child.age_months} months old`;
 
     if (child) {
-      pushFeed("Child selected", `${child.child_code} · ${formatLabel(child)}`);
+      pushFeed('Child selected', `${child.child_code || 'Child'} · ${formatLabel(child)}`);
     }
+  }
+
+  window.kioskSelectChild = selectChild;
+
+  function isMeasurementActive(session = state.session) {
+    return !!session && ['START_REQUESTED', 'MEASURING'].includes(String(session.status || ''));
+  }
+
+  function isWaitingForLiveResult() {
+    return !!state.awaitingLiveResult;
+  }
+
+  function syncStartButtonState() {
+    if (!startButton) {
+      return;
+    }
+
+    startButton.disabled = state.submitting || isMeasurementActive();
+    startButton.textContent = state.submitting ? 'Starting...' : 'Start Measurement';
+  }
+
+  function clearStatusTimer() {
+    if (state.statusTimer) {
+      clearTimeout(state.statusTimer);
+      state.statusTimer = null;
+    }
+  }
+
+  function setProgress(progress, message) {
+    const nextProgress = Math.max(0, Math.min(100, Number(progress) || 0));
+    state.progress = nextProgress;
+
+    if (refs.progressValue) {
+      refs.progressValue.textContent = `${Math.round(nextProgress)}%`;
+    }
+
+    if (refs.progressRing) {
+      refs.progressRing.style.strokeDashoffset = `${427 - (nextProgress * 4.27)}`;
+    }
+
+    if (refs.processStage && message) {
+      refs.processStage.textContent = message;
+    }
+
+    if (heroNote && message) {
+      heroNote.textContent = message;
+    }
+  }
+
+  function updateMeasurementPanel(sessionData) {
+    const status = String(sessionData?.status || 'IDLE');
+
+    if (status === 'START_REQUESTED') {
+      state.phase = 'starting';
+      setStep('processing');
+      setProgress(28, 'Please stand on the platform.');
+      if (refs.resultSource) refs.resultSource.textContent = 'waiting for ESP32';
+      return;
+    }
+
+    if (status === 'MEASURING') {
+      state.phase = 'measuring';
+      setStep('processing');
+      setProgress(68, 'Measuring...');
+      if (refs.resultSource) refs.resultSource.textContent = 'measuring on ESP32';
+      return;
+    }
+
+    if (status === 'COMPLETE') {
+      state.phase = 'complete';
+      setProgress(100, 'Measurement complete');
+      if (refs.resultSource) refs.resultSource.textContent = 'Firebase live mirror';
+      return;
+    }
+
+    if (status === 'ERROR' || status === 'CANCELLED') {
+      state.phase = 'error';
+      setProgress(100, sessionData?.error_message || 'Measurement error');
+      if (refs.resultSource) refs.resultSource.textContent = 'session error';
+      return;
+    }
+
+    if (status === 'IDLE' && isWaitingForLiveResult()) {
+      state.phase = 'measuring';
+      setStep('processing');
+      setProgress(84, 'Waiting for live result...');
+      if (refs.resultSource) refs.resultSource.textContent = 'Firebase live mirror';
+      return;
+    }
+
+    state.phase = 'idle';
+    setProgress(0, 'Ready to measure');
+  }
+
+  function applyMeasurementResult(payload) {
+    const measurement = payload?.measurement || payload || {};
+    const childName = payload?.child_name || formatLabel(getSelectedChild());
+    const childMonths = getSelectedChild()?.age_months || 0;
+    const status = measurement.nutritional_status || payload?.nutritional_status || 'Normal';
+    const height = Number(measurement.height_cm ?? payload?.height_cm ?? 0);
+    const weight = Number(measurement.weight_kg ?? payload?.weight_kg ?? 0);
+
+    state.status = status;
+    state.height = Number.isFinite(height) ? height : null;
+    state.weight = Number.isFinite(weight) ? weight : null;
+
+    if (refs.resultChild) refs.resultChild.textContent = childName || 'Name';
+    if (refs.resultMeta) refs.resultMeta.textContent = `${childMonths} months old`;
+    if (refs.resultStatus) refs.resultStatus.textContent = status;
+    if (refs.resultHeight) refs.resultHeight.textContent = Number.isFinite(height) ? `${height.toFixed(1)} cm` : '--.- cm';
+    if (refs.resultWeight) refs.resultWeight.textContent = Number.isFinite(weight) ? `${weight.toFixed(2)} kg` : '--.-- kg';
+    if (refs.resultWaz) refs.resultWaz.textContent = measurement.waz != null ? Number(measurement.waz).toFixed(2) : '--';
+    if (refs.resultHaz) refs.resultHaz.textContent = measurement.haz != null ? Number(measurement.haz).toFixed(2) : '--';
+    if (refs.resultWhz) refs.resultWhz.textContent = measurement.whz != null ? Number(measurement.whz).toFixed(2) : '--';
+    if (refs.resultSource) refs.resultSource.textContent = `Firebase live mirror → ${deviceId}`;
+    if (refs.sidebarResult) refs.sidebarResult.textContent = status;
+    if (refs.sidebarStatus) refs.sidebarStatus.textContent = 'Complete';
+
+    if (heroNote) {
+      heroNote.textContent = 'Measurement complete';
+    }
+
+    pushFeed('Measurement complete', `${payload?.child_code || 'Child'} classified as ${status}`);
+    setStep('results');
+  }
+
+  function showSessionError(message) {
+    state.phase = 'error';
+    state.submitting = false;
+    clearStatusTimer();
+    if (state.firebaseTimer) {
+      clearInterval(state.firebaseTimer);
+      state.firebaseTimer = null;
+    }
+    syncStartButtonState();
+    setProgress(100, message || 'Measurement error');
+    if (refs.resultStatus) refs.resultStatus.textContent = 'Error';
+    if (refs.resultSource) refs.resultSource.textContent = 'session error';
+    if (heroNote) heroNote.textContent = message || 'Measurement error';
+    if (refs.sidebarStatus) refs.sidebarStatus.textContent = 'Error';
+    setStep('processing');
+  }
+
+  async function refreshMeasurementStatus(scheduleNext = true) {
+    clearStatusTimer();
+
+    try {
+      const endpoint = data?.endpoints?.measurementStatus || '../api/kiosk/measurement_status.php';
+      const url = new URL(endpoint, window.location.href);
+      url.searchParams.set('device_id', deviceId);
+
+      const response = await fetch(url.toString(), { cache: 'no-store' });
+      const json = await response.json().catch(() => ({}));
+      const payload = json?.data || {};
+
+      if (!response.ok || json?.success !== true) {
+        throw new Error(json?.message || 'Unable to load measurement status');
+      }
+
+      state.session = payload;
+      updateMeasurementPanel(payload);
+
+      if (payload.status === 'COMPLETE') {
+        state.submitting = false;
+        return payload;
+      }
+
+      if (payload.status === 'ERROR' || payload.status === 'CANCELLED') {
+        showSessionError(payload.error_message || 'Measurement failed');
+        return payload;
+      }
+
+      if (scheduleNext && isMeasurementActive(payload)) {
+        state.statusTimer = setTimeout(() => refreshMeasurementStatus(true), Number(data?.defaults?.pollSeconds || 2) * 1000);
+      }
+
+      if (state.awaitingLiveResult && !state.firebaseTimer) {
+        startFirebasePolling();
+      }
+
+      syncStartButtonState();
+      return payload;
+    } catch (error) {
+      if (scheduleNext && isMeasurementActive(state.session)) {
+        state.statusTimer = setTimeout(() => refreshMeasurementStatus(true), Number(data?.defaults?.pollSeconds || 2) * 1000);
+      }
+
+      if (!isMeasurementActive(state.session)) {
+        showSessionError(error.message || 'Unable to load measurement status');
+      }
+
+      return null;
+    }
+  }
+
+  async function startMeasurementFlow() {
+    const child = getSelectedChild();
+    if (!child) {
+      pushFeed('Start blocked', 'Choose a child before starting.', 'warn');
+      return false;
+    }
+
+    if (isMeasurementActive()) {
+      pushFeed('Start blocked', 'A measurement session is already active.', 'warn');
+      return false;
+    }
+
+    state.submitting = true;
+    syncStartButtonState();
+    setStep('processing');
+    setProgress(10, 'Starting measurement...');
+    if (refs.sidebarStatus) refs.sidebarStatus.textContent = 'Starting';
+    state.awaitingLiveResult = false;
+    state.firebaseSessionId = null;
+    state.lastFirebaseTimestamp = '';
+
+    try {
+      const endpoint = data?.endpoints?.startMeasurement || '../api/kiosk/start_measurement.php';
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          device_id: deviceId,
+          child_id: child.id,
+          location: 'Kiosk',
+        }),
+        cache: 'no-store',
+      });
+
+      const json = await response.json().catch(() => ({}));
+      const payload = json?.data || {};
+
+      if (!response.ok || json?.success !== true) {
+        throw new Error(json?.message || 'Could not start measurement');
+      }
+
+      state.session = payload;
+      state.submitting = false;
+      state.firebaseSessionId = Number(payload.session_id || 0) || null;
+      state.awaitingLiveResult = true;
+      syncStartButtonState();
+
+      pushFeed('Start queued', payload.duplicate ? 'Measurement already in progress.' : `${child.child_code} queued for measurement`);
+      updateMeasurementPanel(payload);
+      startFirebasePolling();
+      await refreshMeasurementStatus(true);
+      return true;
+    } catch (error) {
+      state.submitting = false;
+      syncStartButtonState();
+      showSessionError(error.message || 'Unable to contact the server');
+      pushFeed('Start failed', error.message || 'Unable to contact the server', 'error');
+      return false;
+    }
+  }
+
+  async function refreshFirebaseLatestMeasurement() {
+    if (!firebaseEnabled || !state.awaitingLiveResult) {
+      return null;
+    }
+
+    const url = firebaseLatestMeasurementUrl();
+    if (!url) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) {
+        return null;
+      }
+
+      const payload = await response.json().catch(() => null);
+      if (!payload || typeof payload !== 'object') {
+        return null;
+      }
+
+      const payloadSessionId = Number(payload.session_id || 0) || null;
+      if (state.firebaseSessionId && payloadSessionId && payloadSessionId !== state.firebaseSessionId) {
+        return null;
+      }
+
+      const timestamp = String(payload.timestamp || '');
+      if (timestamp && timestamp === state.lastFirebaseTimestamp) {
+        return null;
+      }
+
+      const height = Number(payload.height_cm);
+      const weight = Number(payload.weight_kg);
+      if (!Number.isFinite(height) || !Number.isFinite(weight) || height <= 0 || weight <= 0) {
+        return null;
+      }
+
+      state.lastFirebaseTimestamp = timestamp;
+      applyMeasurementResult(payload);
+      state.awaitingLiveResult = false;
+      state.submitting = false;
+      syncStartButtonState();
+
+      if (state.firebaseTimer) {
+        clearInterval(state.firebaseTimer);
+        state.firebaseTimer = null;
+      }
+
+      return payload;
+    } catch (error) {
+      return null;
+    }
+  }
+
+  function startFirebasePolling() {
+    if (!firebaseEnabled) {
+      return;
+    }
+
+    if (state.firebaseTimer) {
+      clearInterval(state.firebaseTimer);
+      state.firebaseTimer = null;
+    }
+
+    state.firebaseTimer = setInterval(() => {
+      refreshFirebaseLatestMeasurement();
+    }, Number(data?.defaults?.pollSeconds || 2) * 1000);
+
+    refreshFirebaseLatestMeasurement();
+  }
+
+  function resetKioskToIdle() {
+    if (isMeasurementActive()) {
+      pushFeed('Reset blocked', 'Wait for the active session to finish.', 'warn');
+      return;
+    }
+
+    clearStatusTimer();
+    if (state.firebaseTimer) {
+      clearInterval(state.firebaseTimer);
+      state.firebaseTimer = null;
+    }
+    state.session = null;
+    state.phase = 'idle';
+    state.submitting = false;
+    state.awaitingLiveResult = false;
+    state.firebaseSessionId = null;
+    state.lastFirebaseTimestamp = '';
+    state.height = null;
+    state.weight = null;
+    state.status = null;
+    state.progress = 0;
+    syncStartButtonState();
+
+    if (heroNote) heroNote.textContent = 'Ready to measure';
+    if (refs.processStage) refs.processStage.textContent = 'Ready to measure';
+    if (refs.progressValue) refs.progressValue.textContent = '0%';
+    if (refs.progressRing) refs.progressRing.style.strokeDashoffset = '427';
+    if (refs.resultStatus) refs.resultStatus.textContent = 'Normal';
+    if (refs.resultHeight) refs.resultHeight.textContent = '--.- cm';
+    if (refs.resultWeight) refs.resultWeight.textContent = '--.-- kg';
+    if (refs.resultWaz) refs.resultWaz.textContent = '--';
+    if (refs.resultHaz) refs.resultHaz.textContent = '--';
+    if (refs.resultWhz) refs.resultWhz.textContent = '--';
+    if (refs.resultSource) refs.resultSource.textContent = 'Firebase live mirror';
+    if (refs.sidebarStatus) refs.sidebarStatus.textContent = 'Waiting';
+    if (refs.sidebarResult) refs.sidebarResult.textContent = '---';
+    setStep('welcome');
+    pushFeed('Kiosk reset', 'Ready for the next measurement');
   }
 
   function resetScanState() {
@@ -266,6 +716,9 @@
     state.weight = null;
     state.progress = 0;
     state.status = null;
+
+    const continueBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
+    if (continueBtn) continueBtn.disabled = true;
 
     if (refs.heightReadout) refs.heightReadout.textContent = "--.-";
     if (refs.weightReadout) refs.weightReadout.textContent = "--.--";
@@ -283,171 +736,15 @@
     if (refs.resultWaz) refs.resultWaz.textContent = "--";
     if (refs.resultHaz) refs.resultHaz.textContent = "--";
     if (refs.resultWhz) refs.resultWhz.textContent = "--";
-    if (refs.resultSource) refs.resultSource.textContent = "demo";
+    if (refs.resultSource) refs.resultSource.textContent = "live";
     if (refs.sidebarResult) refs.sidebarResult.textContent = "---";
     if (refs.progressRing) refs.progressRing.style.strokeDashoffset = "427";
     setStep("welcome");
     selectChild(state.child?.id || (children[0] && children[0].id));
   }
 
-  function computeAssessment(weight, height, ageMonths) {
-    const wazMedian = 3.5 + ageMonths * 0.24;
-    const hazMedian = 49 + ageMonths * 0.82;
-    const whzMedian = 10.5 + (height - 65) * 0.09;
-    const waz = ((weight - wazMedian) / 1.08).toFixed(2);
-    const haz = ((height - hazMedian) / 2.3).toFixed(2);
-    const whz = ((weight - whzMedian) / 1.05).toFixed(2);
-
-    let status = "Normal";
-
-    if (parseFloat(waz) < -3 || parseFloat(whz) < -3) {
-      status = "Severely Underweight";
-    } else if (parseFloat(waz) < -2 || parseFloat(whz) < -2) {
-      status = "Underweight";
-    } else if (parseFloat(haz) < -2) {
-      status = "Stunted";
-    } else if (parseFloat(whz) > 2) {
-      status = "Overweight";
-    }
-
-    return { waz, haz, whz, status };
-  }
-
-  function simulateHeightScan() {
-    const child = getSelectedChild();
-    if (!child) return;
-
-    clearInterval(state.heightTimer);
-    state.heightTimer = null;
-    let ticks = 0;
-    const base = 55 + child.age_months * 0.9 + (Math.random() * 4 - 2);
-
-    if (refs.heightStatus) refs.heightStatus.textContent = "Scanning... stand still";
-    pushFeed("TF-Luna scan", `${child.child_code} height scan started`);
-
-    state.heightTimer = setInterval(() => {
-      ticks += 1;
-      const noise = ticks < 20 ? (Math.random() * 4 - 2) : ticks < 40 ? (Math.random() * 1.2 - 0.6) : (Math.random() * 0.2 - 0.1);
-      const reading = base + noise;
-      state.height = Number(reading.toFixed(1));
-
-      if (refs.heightReadout) refs.heightReadout.textContent = state.height.toFixed(1);
-      if (refs.heightBar) refs.heightBar.style.width = `${Math.min((ticks / 45) * 100, 100)}%`;
-
-      if (ticks === 25 && refs.heightStatus) refs.heightStatus.textContent = "Locking reading...";
-
-      if (ticks >= 45) {
-        clearInterval(state.heightTimer);
-        state.heightTimer = null;
-        state.height = Number(base.toFixed(1));
-        if (refs.heightReadout) refs.heightReadout.textContent = state.height.toFixed(1);
-        if (refs.heightStatus) refs.heightStatus.textContent = `Height locked at ${state.height.toFixed(1)} cm`;
-        if (refs.heightFinal) refs.heightFinal.textContent = `${state.height.toFixed(1)} cm`;
-        pushFeed("Height locked", `${child.child_code} · ${state.height.toFixed(1)} cm`);
-      }
-    }, 70);
-  }
-
-  function simulateWeightScan() {
-    const child = getSelectedChild();
-    if (!child) return;
-
-    clearInterval(state.weightTimer);
-    state.weightTimer = null;
-    const bars = [];
-    const base = 3.8 + child.age_months * 0.24 + (Math.random() * 1.1 - 0.55);
-    let ticks = 0;
-
-    if (refs.weightStatus) refs.weightStatus.textContent = "Stabilizing load cell...";
-    if (refs.weightBars) {
-      refs.weightBars.innerHTML = "";
-      for (let i = 0; i < 12; i += 1) {
-        const bar = document.createElement("span");
-        bar.style.height = `${8 + Math.floor(Math.random() * 22)}%`;
-        bar.style.animationDelay = `${i * 0.05}s`;
-        refs.weightBars.appendChild(bar);
-        bars.push(bar);
-      }
-    }
-
-    pushFeed("HX711 sample", `${child.child_code} weight scan started`);
-
-    state.weightTimer = setInterval(() => {
-      ticks += 1;
-      const noise = ticks < 18 ? (Math.random() * 1.6 - 0.8) : ticks < 34 ? (Math.random() * 0.45 - 0.22) : (Math.random() * 0.06 - 0.03);
-      const reading = base + noise;
-      state.weight = Number(reading.toFixed(2));
-
-      if (refs.weightReadout) refs.weightReadout.textContent = state.weight.toFixed(2);
-
-      if (ticks === 24 && refs.weightStatus) refs.weightStatus.textContent = "Locking value...";
-
-      if (ticks >= 36) {
-        clearInterval(state.weightTimer);
-        state.weightTimer = null;
-        state.weight = Number(base.toFixed(2));
-        if (refs.weightReadout) refs.weightReadout.textContent = state.weight.toFixed(2);
-        if (refs.weightStatus) refs.weightStatus.textContent = `Weight locked at ${state.weight.toFixed(2)} kg`;
-        pushFeed("Weight locked", `${child.child_code} · ${state.weight.toFixed(2)} kg`);
-      }
-    }, 80);
-  }
-
-  function simulateProcessing() {
-    const child = getSelectedChild();
-    if (!child || state.height === null || state.weight === null) return;
-
-    clearInterval(state.processTimer);
-    state.progress = 0;
-    let index = 0;
-
-    if (refs.processStage) refs.processStage.textContent = stageLabels[0];
-    pushFeed("Processing", `${child.child_code} preparing WHO result`);
-    setStep("processing");
-
-    state.processTimer = setInterval(() => {
-      state.progress += 100 / 45;
-      index = Math.min(Math.floor((state.progress / 100) * stageLabels.length), stageLabels.length - 1);
-
-      if (refs.progressValue) refs.progressValue.textContent = `${Math.min(Math.round(state.progress), 100)}%`;
-      if (refs.processStage) refs.processStage.textContent = stageLabels[index];
-      if (refs.progressRing) refs.progressRing.style.strokeDashoffset = `${427 - Math.min(state.progress, 100) * 4.27}`;
-
-      if (state.progress >= 100) {
-        clearInterval(state.processTimer);
-        state.processTimer = null;
-
-        const result = computeAssessment(state.weight, state.height, child.age_months);
-        state.status = result.status;
-
-        if (refs.resultChild) refs.resultChild.textContent = `${child.first_name} ${child.last_name}`;
-        if (refs.resultMeta) refs.resultMeta.textContent = `${child.age_months} months old · ${child.child_code}`;
-        if (refs.resultStatus) refs.resultStatus.textContent = result.status;
-        if (refs.resultHeight) refs.resultHeight.textContent = `${state.height.toFixed(1)} cm`;
-        if (refs.resultWeight) refs.resultWeight.textContent = `${state.weight.toFixed(2)} kg`;
-        if (refs.resultWaz) refs.resultWaz.textContent = result.waz;
-        if (refs.resultHaz) refs.resultHaz.textContent = result.haz;
-        if (refs.resultWhz) refs.resultWhz.textContent = result.whz;
-        if (refs.resultSource) refs.resultSource.textContent = `demo → ${deviceId}`;
-        if (refs.sidebarResult) refs.sidebarResult.textContent = result.status;
-        if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Complete";
-
-        pushFeed("Result ready", `${child.child_code} classified as ${result.status}`);
-        setTimeout(() => setStep("results"), 450);
-      }
-    }, 110);
-  }
-
-  function beginSession() {
-    const child = getSelectedChild();
-    if (child && refs.sidebarStatus) refs.sidebarStatus.textContent = "Ready";
-    setStep("select");
-    pushFeed("Kiosk ready", `Demo mode active for ${deviceId}`);
-  }
-
   function copyPayload() {
     const child = getSelectedChild();
-    const result = state.status ? computeAssessment(state.weight, state.height, child?.age_months || 0) : null;
     const payload = {
       device_id: deviceId,
       child_id: child?.id || null,
@@ -455,12 +752,12 @@
       height_cm: state.height,
       weight_kg: state.weight,
       age_months: child?.age_months || null,
-      waz: result?.waz || null,
-      haz: result?.haz || null,
-      whz: result?.whz || null,
-      nutritional_status: result?.status || null,
+      waz: null,
+      haz: null,
+      whz: null,
+      nutritional_status: null,
       source_type: "kiosk",
-      demo_mode: true,
+      demo_mode: false,
     };
 
     const text = JSON.stringify(payload, null, 2);
@@ -486,78 +783,55 @@
     }
 
     childCards.forEach((card) => {
-      card.addEventListener("click", () => {
+      card.addEventListener('click', () => {
         selectChild(card.dataset.childId);
-        const nextBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
-        if (nextBtn) nextBtn.disabled = false;
-      });
-    });
-
-    stepButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const step = button.getAttribute("data-kiosk-step-jump");
-        if (step === "select") {
-          setStep("select");
-        } else if (step === "height" && state.child) {
-          setStep("height");
-        } else if (step === "weight" && state.height !== null) {
-          setStep("weight");
-        } else if (step === "processing" && state.weight !== null) {
-          setStep("processing");
-        } else if (step === "results" && state.status) {
-          setStep("results");
-        }
-      });
-    });
-
-    actionButtons.forEach((button) => {
-      button.addEventListener("click", () => {
-        const action = button.getAttribute("data-kiosk-action");
-
-        if (action === "start") {
-          requestFullscreen();
-          setStep("select");
-        }
-
-        if (action === "demo-reset") {
-          requestFullscreen();
-          resetScanState();
-          beginSession();
-        }
-
-        if (action === "proceed-height" && getSelectedChild()) {
-          requestFullscreen();
-          setStep("height");
-        }
-
-        if (action === "start-height") {
-          simulateHeightScan();
-        }
-
-        if (action === "back-select") {
-          setStep("select");
-        }
-
-        if (action === "start-weight") {
-          if (state.height !== null) {
-            simulateWeightScan();
+        if (refs.currentChildLabel) {
+          const selectedName = card.querySelector('.kiosk-child-name');
+          if (selectedName) {
+            refs.currentChildLabel.textContent = selectedName.textContent.trim();
           }
         }
+        syncStartButtonState();
+      });
+    });
 
-        if (action === "back-height") {
-          setStep("height");
+    if (startButton) {
+      startButton.addEventListener('click', () => {
+        requestFullscreen();
+        startMeasurementFlow();
+      });
+    }
+
+    if (resetButton) {
+      resetButton.addEventListener('click', () => {
+        resetKioskToIdle();
+      });
+    }
+
+    actionButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const action = button.getAttribute('data-kiosk-action');
+
+        if (action === 'start') {
+          requestFullscreen();
+          startMeasurementFlow();
         }
 
-        if (action === "reset") {
-          resetScanState();
-          beginSession();
+        if (action === 'reset') {
+          resetKioskToIdle();
         }
 
-        if (action === "export") {
+        if (action === 'export') {
           copyPayload();
         }
       });
     });
+
+    if (refs.sidebarStatus) {
+      refs.sidebarStatus.textContent = 'Waiting';
+    }
+
+    syncStartButtonState();
   }
 
   if (clock) {
@@ -582,7 +856,9 @@
   }
 
   bindEvents();
-  resetScanState();
   selectChild(children[0]?.id);
-  beginSession();
+  syncStartButtonState();
+  if (heroNote) heroNote.textContent = 'Ready to measure';
+  if (refs.resultSource) refs.resultSource.textContent = firebaseEnabled ? 'Firebase live mirror' : 'Live backend';
+  refreshMeasurementStatus(true);
 })();

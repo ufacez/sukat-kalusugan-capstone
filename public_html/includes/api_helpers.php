@@ -157,17 +157,42 @@ function api_measurement_classification(float $waz, float $haz, float $whz): str
     return 'Normal';
 }
 
+function api_device_is_online(?array $device, int $heartbeatSeconds = 30): bool
+{
+    if (!is_array($device)) {
+        return false;
+    }
+
+    $status = strtolower((string)($device['status'] ?? 'offline'));
+    if ($status === 'maintenance') {
+        return false;
+    }
+
+    $lastSeen = trim((string)($device['last_seen_at'] ?? $device['updated_at'] ?? ''));
+    if ($lastSeen === '' || $lastSeen === 'n/a' || $lastSeen === '0000-00-00 00:00:00') {
+        return false;
+    }
+
+    $timestamp = strtotime($lastSeen);
+    if ($timestamp === false) {
+        return false;
+    }
+
+    return (time() - $timestamp) <= $heartbeatSeconds;
+}
+
 function api_device_upsert(string $deviceCode, ?string $location = null, ?string $status = null): ?array
 {
     $conn = get_db_connection();
     $stmt = mysqli_prepare(
         $conn,
-        'INSERT INTO devices (device_code, location, last_seen_at, status)
-         VALUES (?, ?, CURRENT_TIMESTAMP, ?)
+        'INSERT INTO devices (device_code, location, last_seen_at, status, updated_at)
+         VALUES (?, ?, CURRENT_TIMESTAMP, ?, CURRENT_TIMESTAMP)
          ON DUPLICATE KEY UPDATE
              location = COALESCE(VALUES(location), location),
              status = COALESCE(VALUES(status), status),
-             last_seen_at = CURRENT_TIMESTAMP'
+             last_seen_at = CURRENT_TIMESTAMP,
+             updated_at = CURRENT_TIMESTAMP'
     );
 
     if ($stmt === false) {

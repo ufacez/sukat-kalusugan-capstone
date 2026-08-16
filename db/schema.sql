@@ -100,8 +100,48 @@ CREATE TABLE devices (
     calibration_offset_height DECIMAL(6,2) DEFAULT 0.00,
     calibration_offset_weight DECIMAL(6,3) DEFAULT 0.000,
     status              ENUM('active','maintenance','offline') NOT NULL DEFAULT 'active',
+    last_seen_at        TIMESTAMP NULL,
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE measurement_sessions (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    device_id       INT UNSIGNED NOT NULL,
+    child_id        INT UNSIGNED NOT NULL,
+    status          ENUM('IDLE','START_REQUESTED','MEASURING','COMPLETE','ERROR','CANCELLED') NOT NULL DEFAULT 'IDLE',
+    command         VARCHAR(20) NOT NULL DEFAULT 'START',
+    started_at      TIMESTAMP NULL,
+    completed_at    TIMESTAMP NULL,
+    expires_at      TIMESTAMP NULL,
+    height_cm       DECIMAL(6,2) NULL,
+    weight_kg       DECIMAL(6,3) NULL,
+    measurement_id  INT UNSIGNED NULL,
+    error_message   VARCHAR(255) NULL,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_measurement_sessions_device FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+    CONSTRAINT fk_measurement_sessions_child FOREIGN KEY (child_id) REFERENCES children(id) ON DELETE RESTRICT,
+    CONSTRAINT fk_measurement_sessions_measurement FOREIGN KEY (measurement_id) REFERENCES measurements(id) ON DELETE SET NULL,
+    UNIQUE KEY uq_measurement_sessions_measurement (measurement_id),
+    INDEX idx_measurement_sessions_device_status (device_id, status, id),
+    INDEX idx_measurement_sessions_device_created (device_id, created_at)
+) ENGINE=InnoDB;
+
+CREATE TABLE device_sensor_settings (
+    id                          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    device_code                 VARCHAR(50) NOT NULL UNIQUE,
+    hx711_calibration_factor    DECIMAL(12,4) NOT NULL DEFAULT 0.0000,
+    hx711_tare_offset          DECIMAL(10,3) NOT NULL DEFAULT 0.000,
+    tf_luna_offset_cm          DECIMAL(6,2) NOT NULL DEFAULT 0.00,
+    tf_luna_scale_factor       DECIMAL(8,4) NOT NULL DEFAULT 1.0000,
+    height_offset_cm           DECIMAL(6,2) NOT NULL DEFAULT 0.00,
+    weight_offset_kg           DECIMAL(8,4) NOT NULL DEFAULT 0.0000,
+    last_calibration_at        TIMESTAMP NULL,
+    created_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at                 TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    CONSTRAINT fk_sensor_settings_device FOREIGN KEY (device_code) REFERENCES devices(device_code) ON DELETE CASCADE ON UPDATE CASCADE,
+    INDEX idx_sensor_settings_device (device_code)
 ) ENGINE=InnoDB;
 
 -- ----------------------------------------------------------------------------

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/db.php';
+require_once __DIR__ . '/../includes/firebase_sync.php';
 
 function kiosk_e(string $value): string
 {
@@ -158,77 +159,6 @@ $audit = kiosk_fetch_all(
 	['KIOSK%', 'ESP32%']
 );
 
-if ($children === []) {
-	$children = [
-		[
-			'id' => 1,
-			'child_code' => 'CHD-0001',
-			'first_name' => 'Maria',
-			'last_name' => 'Santos',
-			'birthdate' => '2022-03-15',
-			'sex' => 'Female',
-			'barangay' => 'Bagong Silang',
-			'address' => '123 Rizal St.',
-			'parent_name' => 'Ana Santos',
-			'parent_type' => 'Mother',
-			'parent_status' => 'active',
-			'measurement_date' => '2026-07-31',
-			'height_cm' => 84.2,
-			'weight_kg' => 11.5,
-			'waz' => 0.4,
-			'haz' => 0.2,
-			'whz' => 0.5,
-			'nutritional_status' => 'Normal',
-		],
-		[
-			'id' => 2,
-			'child_code' => 'CHD-0002',
-			'first_name' => 'Juan',
-			'last_name' => 'Dela Cruz',
-			'birthdate' => '2022-09-20',
-			'sex' => 'Male',
-			'barangay' => 'Poblacion',
-			'address' => '45 Mabini Ave.',
-			'parent_name' => 'Rosa Dela Cruz',
-			'parent_type' => 'Mother',
-			'parent_status' => 'active',
-			'measurement_date' => '2026-07-31',
-			'height_cm' => 76.1,
-			'weight_kg' => 8.2,
-			'waz' => -2.1,
-			'haz' => -1.3,
-			'whz' => -1.8,
-			'nutritional_status' => 'Underweight',
-		],
-	];
-}
-
-if ($devices === []) {
-	$devices = [
-		['device_code' => 'KIOSK-01', 'location' => 'Bagong Silang BHC', 'status' => 'active', 'last_calibration_at' => 'n/a', 'calibration_offset_height' => '0', 'calibration_offset_weight' => '0', 'updated_at' => 'Demo mode'],
-		['device_code' => 'KIOSK-02', 'location' => 'Poblacion BHC', 'status' => 'maintenance', 'last_calibration_at' => 'n/a', 'calibration_offset_height' => '0', 'calibration_offset_weight' => '0', 'updated_at' => 'Demo mode'],
-	];
-}
-
-if ($measurements === []) {
-	$measurements = array_map(static function (array $child): array {
-		return [
-			'measurement_date' => date('Y-m-d'),
-			'height_cm' => $child['height_cm'],
-			'weight_kg' => $child['weight_kg'],
-			'waz' => $child['waz'],
-			'haz' => $child['haz'],
-			'whz' => $child['whz'],
-			'nutritional_status' => $child['nutritional_status'],
-			'source_type' => 'demo',
-			'child_code' => $child['child_code'],
-			'first_name' => $child['first_name'],
-			'last_name' => $child['last_name'],
-			'barangay' => $child['barangay'],
-		];
-	}, array_slice($children, 0, 4));
-}
-
 $childrenPayload = array_map(static function (array $child): array {
 	return [
 		'id' => (int)$child['id'],
@@ -278,15 +208,24 @@ $appData = [
 	'children' => $childrenPayload,
 	'devices' => $devicePayload,
 	'measurements' => $recentPayload,
-	'demoMode' => true,
+	'demoMode' => false,
 	'company' => 'Sukat Kalusugan',
+	'firebase' => [
+		'databaseUrl' => firebase_database_url(),
+		'enabled' => firebase_database_url() !== '',
+	],
 	'endpoints' => [
 		'ping' => '../api/esp32/device_ping.php',
+		'command' => '../api/esp32/get_command.php',
+		'startMeasurement' => '../api/kiosk/start_measurement.php',
+		'measurementStatus' => '../api/kiosk/measurement_status.php',
 		'measurement' => '../api/esp32/submit_measurement.php',
 	],
 	'defaults' => [
 		'deviceId' => 'ESP32-KIOSK-01',
 		'syncSeconds' => 15,
+		'pollSeconds' => 2,
+		'sessionTimeoutSeconds' => 180,
 	],
 ];
 
@@ -317,9 +256,9 @@ function kiosk_json(array $value): string
 				</div>
 			</div>
 			<div class="kiosk-topbar-meta">
-				<span class="kiosk-chip is-success" data-kiosk-chip-lidar><span class="kiosk-dot"></span> LiDAR Active</span>
-				<span class="kiosk-chip is-success" data-kiosk-chip-loadcell><span class="kiosk-dot"></span> Load Cell OK</span>
-				<span class="kiosk-chip is-success" data-kiosk-chip-connected><span class="kiosk-dot"></span> Connected</span>
+				<span class="kiosk-chip" data-kiosk-chip-lidar><span class="kiosk-dot"></span> Waiting for LiDAR</span>
+				<span class="kiosk-chip" data-kiosk-chip-loadcell><span class="kiosk-dot"></span> Waiting for scale</span>
+				<span class="kiosk-chip" data-kiosk-chip-connected><span class="kiosk-dot"></span> Waiting for device</span>
 				<span class="kiosk-chip" data-kiosk-clock>--:--:--</span>
 			</div>
 		</header>
@@ -332,9 +271,9 @@ function kiosk_json(array $value): string
 					<p class="kiosk-hero-subcopy">A simple guided measurement flow for each child in the community.</p>
 					<p class="kiosk-hero-note">Select a child, scan height and weight, and review the nutritional status in a few clear steps.</p>
 					<div class="kiosk-hero-status-row">
-						<span><strong>LiDAR</strong> Active</span>
-						<span><strong>Load Cell</strong> Ready</span>
-						<span><strong>Wi-Fi</strong> Connected</span>
+						<span><strong>LiDAR</strong> Waiting</span>
+						<span><strong>Load Cell</strong> Waiting</span>
+						<span><strong>Wi-Fi</strong> Ready</span>
 					</div>
 					<div class="kiosk-hero-actions">
 						<button class="kiosk-button is-primary kiosk-touch-button" type="button" data-kiosk-action="start">Start Measurement</button>
