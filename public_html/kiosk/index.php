@@ -401,7 +401,7 @@ function kiosk_json(array $value): string
 
             <div class="kiosk-panel-actions">
                 <button class="kiosk-button is-secondary" type="button" data-kiosk-action="start-weight">
-                    Weight runs automatically
+                    Start Measurement
                 </button>
             </div>
         </article>

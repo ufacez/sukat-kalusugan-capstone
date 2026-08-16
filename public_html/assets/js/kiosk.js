@@ -603,11 +603,10 @@
 
     if (startButton) {
       startButton.addEventListener("click", () => {
-        if (!getSelectedChild()) {
-          setStep("select");
-          return;
-        }
-        startMeasurementFlow();
+        // Welcome button only opens child selection.
+        // It must NEVER create a measurement session.
+        setStep("select");
+        pushFeed("Measurement setup", "Select a child first.");
       });
     }
 
@@ -619,7 +618,10 @@
       button.addEventListener("click", () => {
         const action = button.getAttribute("data-kiosk-action");
 
-        if (action === "start") startMeasurementFlow();
+        if (action === "start") {
+          setStep("select");
+          pushFeed("Measurement setup", "Select a child first.");
+        }
 
         // Child selection's Continue now only moves to the weight screen.
         // It does NOT start a sensor session.
@@ -631,7 +633,8 @@
         // The ESP32 controls actual scanning after Start Measurement.
         // These buttons are informational/navigation only.
         if (action === "start-weight") {
-          pushFeed("Waiting", "Press Start Measurement on the kiosk to begin.", "warn");
+          // THIS is the only kiosk button that creates a server session.
+          startMeasurementFlow();
         }
 
         if (action === "start-height") {
@@ -664,9 +667,8 @@
 
   bindEvents();
 
-  if (children.length) {
-    selectChild(children[0].id);
-  }
+  // Do not auto-select a child. The operator must choose one.
+  selectChild(null);
 
   setStep("welcome");
   if (heroNote) heroNote.textContent = "Select a child, then start the measurement.";
