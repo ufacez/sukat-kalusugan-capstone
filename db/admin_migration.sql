@@ -73,6 +73,10 @@ INSERT INTO permissions (code, description)
 SELECT 'settings.update', 'Update system settings'
 WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'settings.update');
 
+INSERT INTO permissions (code, description)
+SELECT 'parents.view', 'View parent accounts and linked children'
+WHERE NOT EXISTS (SELECT 1 FROM permissions WHERE code = 'parents.view');
+
 INSERT IGNORE INTO role_permissions (role_id, permission_id)
 SELECT r.id, p.id
 FROM roles r
