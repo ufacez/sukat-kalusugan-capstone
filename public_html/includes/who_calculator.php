@@ -19,14 +19,40 @@ function who_lookup_reference(string $table, string $sex, string $column, float 
 {
 	$conn = get_db_connection();
 	$normalizedSex = $sex === 'Female' ? 'Female' : 'Male';
-	$normalizedValue = $column === 'height_cm' ? round($value, 1) : (int)round($value);
-	$stmt = mysqli_prepare($conn, 'SELECT L, M, S FROM ' . $table . ' WHERE sex = ? AND ' . $column . ' = ? LIMIT 1');
 
-	if ($stmt === false) {
-		return null;
+	// age_months is always a whole number, and the age-based tables (WFA, HFA)
+	// have one row per integer month, so an exact match is correct there.
+	// height_cm is a continuous measurement (e.g. 92.3cm) but the WFH table is
+	// only stepped every 0.5cm (45.0, 45.5, 46.0, ...). An exact-match lookup
+	// after round($value, 1) would miss almost every real submitted height and
+	// silently fall through to who_fallback_reference() instead. So for
+	// height_cm we find the closest row in the table rather than requiring an
+	// exact match.
+	if ($column === 'height_cm') {
+		$stmt = mysqli_prepare(
+			$conn,
+			'SELECT L, M, S FROM ' . $table . '
+			 WHERE sex = ?
+			 ORDER BY ABS(height_cm - ?) ASC
+			 LIMIT 1'
+		);
+
+		if ($stmt === false) {
+			return null;
+		}
+
+		mysqli_stmt_bind_param($stmt, 'sd', $normalizedSex, $value);
+	} else {
+		$normalizedValue = (int)round($value);
+		$stmt = mysqli_prepare($conn, 'SELECT L, M, S FROM ' . $table . ' WHERE sex = ? AND ' . $column . ' = ? LIMIT 1');
+
+		if ($stmt === false) {
+			return null;
+		}
+
+		mysqli_stmt_bind_param($stmt, 'si', $normalizedSex, $normalizedValue);
 	}
 
-	mysqli_stmt_bind_param($stmt, 'sd', $normalizedSex, $normalizedValue);
 	mysqli_stmt_execute($stmt);
 	$result = mysqli_stmt_get_result($stmt);
 	$row = $result instanceof mysqli_result ? mysqli_fetch_assoc($result) : null;
@@ -93,14 +119,42 @@ function calculate_whz(float $weight_kg, float $height_cm, string $sex): float
 	return round(who_lms_z_score($weight_kg, $reference['L'], $reference['M'], $reference['S']), 2);
 }
 
+/**
+ * WHO treats underweight (WAZ), stunting (HAZ), and wasting (WHZ) as three
+ * independent classifications -- a child can be stunted with a healthy
+ * weight-for-height, or wasted without being underweight-for-age. The
+ * `measurements.nutritional_status` column is a single-value ENUM
+ * ('Normal','Underweight','Severely Underweight','Stunted','Wasted',
+ * 'Overweight'), so this returns the single most clinically severe label
+ * that applies, evaluating each axis independently -- WHZ no longer feeds
+ * into the underweight check, which was the original bug (it meant 'Wasted'
+ * could never actually be returned, and a low WHZ could mislabel a child as
+ * 'Underweight' based on the wrong indicator).
+ *
+ * If your program wants a child's full status (e.g. stunted AND wasted
+ * shown together), that needs a schema change -- either separate columns
+ * per axis, or widening the ENUM -- since one ENUM column can only hold one
+ * value. Worth raising with your adviser; this fix keeps today's schema
+ * working correctly without requiring that migration yet.
+ *
+ * NOTE: BMI-for-age is not implemented here -- flag for adviser review.
+ */
 function classify_nutritional_status(float $waz, float $haz, float $whz): string
 {
-	if ($waz < -3 || $whz < -3) {
+	if ($waz < -3) {
 		return 'Severely Underweight';
 	}
 
-	if ($waz < -2 || $whz < -2) {
+	if ($whz < -3) {
+		return 'Wasted';
+	}
+
+	if ($waz < -2) {
 		return 'Underweight';
+	}
+
+	if ($whz < -2) {
+		return 'Wasted';
 	}
 
 	if ($haz < -2) {
