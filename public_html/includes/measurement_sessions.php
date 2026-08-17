@@ -166,3 +166,60 @@ function measurement_session_fetch_active_for_device(mysqli $conn, string $devic
 
     return is_array($row) ? $row : null;
 }
+
+function measurement_session_fetch_by_id_for_device(
+    mysqli $conn,
+    int $sessionId,
+    string $deviceCode
+): ?array {
+    $stmt = mysqli_prepare(
+        $conn,
+        'SELECT
+            s.id AS session_id,
+            s.device_id AS device_db_id,
+            d.device_code,
+            s.child_id,
+            c.child_code,
+            c.first_name AS child_first_name,
+            c.last_name AS child_last_name,
+            s.status,
+            s.command,
+            s.started_at,
+            s.completed_at,
+            s.expires_at,
+            s.height_cm,
+            s.weight_kg,
+            s.measurement_id,
+            s.error_message,
+            s.created_at,
+            s.updated_at,
+            m.height_cm AS measurement_height_cm,
+            m.weight_kg AS measurement_weight_kg,
+            m.age_months AS measurement_age_months,
+            m.waz AS measurement_waz,
+            m.haz AS measurement_haz,
+            m.whz AS measurement_whz,
+            m.nutritional_status AS measurement_status_text,
+            m.source_type AS measurement_source_type,
+            m.created_at AS measurement_created_at
+         FROM measurement_sessions s
+         INNER JOIN devices d ON d.id = s.device_id
+         INNER JOIN children c ON c.id = s.child_id
+         LEFT JOIN measurements m ON m.id = s.measurement_id
+         WHERE s.id = ?
+           AND d.device_code = ?
+         LIMIT 1'
+    );
+
+    if ($stmt === false) {
+        return null;
+    }
+
+    mysqli_stmt_bind_param($stmt, 'is', $sessionId, $deviceCode);
+    mysqli_stmt_execute($stmt);
+    $result = mysqli_stmt_get_result($stmt);
+    $row = $result instanceof mysqli_result ? mysqli_fetch_assoc($result) : null;
+    mysqli_stmt_close($stmt);
+
+    return is_array($row) ? $row : null;
+}
