@@ -31,6 +31,7 @@
     phase: "idle",
     statusTimer: null,
     firebaseTimer: null,
+    processingTimer: null,
     height: null,
     weight: null,
     status: null,
@@ -39,6 +40,15 @@
     firebaseSessionId: null,
     lastFirebaseTimestamp: "",
     deviceOnline: null,
+    // Live Measurement (Step 2) stability tracking. Weight and Height are
+    // captured together in the same session by the ESP32, so both are
+    // tracked independently but shown on one combined screen.
+    weightLocked: false,
+    heightLocked: false,
+    lastWeightRaw: null,
+    lastHeightRaw: null,
+    weightStableCount: 0,
+    heightStableCount: 0,
   };
 
   const refs = {
@@ -46,7 +56,6 @@
     heightReadout: document.querySelector("[data-kiosk-height-readout]"),
     heightStatus: document.querySelector("[data-kiosk-height-status]"),
     heightBar: document.querySelector("[data-kiosk-height-bar]"),
-    heightFinal: document.querySelector("[data-kiosk-height-final]"),
     weightReadout: document.querySelector("[data-kiosk-weight-readout]"),
     weightStatus: document.querySelector("[data-kiosk-weight-status]"),
     weightBars: document.querySelector("[data-kiosk-weight-bars]"),
@@ -188,6 +197,32 @@
     if (heroNote && message) heroNote.textContent = message;
   }
 
+  // Tracks whether a live reading has settled ("locked") by comparing
+  // consecutive Firebase updates. The ESP32 streams a running average while
+  // it collects samples, so once a value stops moving beyond a small
+  // tolerance for a couple of updates in a row, we treat it as stable.
+  function updateStability(kind, value) {
+    const isWeight = kind === "weight";
+    const epsilon = isWeight ? 0.05 : 0.5;
+    const lastKey = isWeight ? "lastWeightRaw" : "lastHeightRaw";
+    const countKey = isWeight ? "weightStableCount" : "heightStableCount";
+    const lockedKey = isWeight ? "weightLocked" : "heightLocked";
+
+    const last = state[lastKey];
+    if (last != null && Math.abs(value - last) <= epsilon) {
+      state[countKey] += 1;
+    } else {
+      state[countKey] = 0;
+    }
+    state[lastKey] = value;
+
+    if (state[countKey] >= 2) {
+      state[lockedKey] = true;
+    }
+
+    return state[lockedKey];
+  }
+
   function setWeight(value, message = "Weight received") {
     const weight = Number(value);
     if (!Number.isFinite(weight) || weight < 0 || weight > 300) return false;
@@ -259,7 +294,7 @@
     if (refs.sidebarStatus)
       refs.sidebarStatus.textContent = child ? "Ready" : "Waiting";
 
-    const continueBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
+    const continueBtn = document.querySelector('[data-kiosk-action="proceed-live"]');
     if (continueBtn) continueBtn.disabled = !child;
 
     if (child) {
@@ -298,65 +333,98 @@
     const status = String(payload.status || "").toUpperCase();
     const weight = payload.weight_kg == null ? NaN : Number(payload.weight_kg);
     const height = payload.height_cm == null ? NaN : Number(payload.height_cm);
+    const hasWeight = Number.isFinite(weight) && weight >= 0;
+    const hasHeight = Number.isFinite(height) && height >= 0;
 
-    if (Number.isFinite(weight) && weight >= 0) setWeight(weight);
-    if (Number.isFinite(height) && height >= 0) setHeight(height);
+    // The ESP32 measures weight (HX711) and height (TF-Luna) together during
+    // the same 5-second sampling window and streams both readings under a
+    // single "MEASURING" status. The kiosk shows them on one combined Live
+    // Measurement screen instead of separate steps. Older firmware strings
+    // are still accepted here for backward compatibility.
+    if (
+      status === "MEASURING" ||
+      status === "WEIGHT_MEASURING" ||
+      status === "HEIGHT_MEASURING"
+    ) {
+      state.phase = "live";
+      setStep("live");
+      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Measuring";
 
-    if (status === "MEASURING" || status === "WEIGHT_MEASURING") {
-      state.phase = "weight";
-      setStep("weight");
-      setProgress(25, "Scanning weight...");
-      if (refs.weightStatus) refs.weightStatus.textContent = "Place both feet on the platform.";
-      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Measuring weight";
-      return;
-    }
+      if (hasWeight) {
+        const locked = updateStability("weight", weight);
+        setWeight(weight, locked ? "Weight locked" : "Reading weight...");
+      } else if (refs.weightStatus && !state.weightLocked) {
+        refs.weightStatus.textContent = "Waiting for sensor...";
+      }
 
-    if (status === "HEIGHT_MEASURING") {
-      state.phase = "height";
-      setStep("height");
-      setProgress(50, "Scanning height...");
-      if (refs.heightStatus) refs.heightStatus.textContent = "Stand straight and look forward.";
-      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Measuring height";
-      return;
-    }
+      if (hasHeight) {
+        const locked = updateStability("height", height);
+        setHeight(height, locked ? "Height locked" : "Reading height...");
+      } else if (refs.heightStatus && !state.heightLocked) {
+        refs.heightStatus.textContent = "Waiting for sensor...";
+      }
 
-    if (status === "PROCESSING") {
-      state.phase = "processing";
-      setStep("processing");
-      setProgress(80, "Calculating nutritional indicators...");
-      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Calculating";
+      const progress =
+        20 + (state.weightLocked ? 15 : 0) + (state.heightLocked ? 15 : 0);
+      setProgress(progress, "Capturing weight and height...");
       return;
     }
 
     if (status === "COMPLETE") {
-      if (Number.isFinite(weight)) setWeight(weight, "Weight locked");
-      if (Number.isFinite(height)) setHeight(height, "Height locked");
+      if (hasWeight) {
+        state.weightLocked = true;
+        setWeight(weight, "Weight locked");
+      }
+      if (hasHeight) {
+        state.heightLocked = true;
+        setHeight(height, "Height locked");
+      }
 
-      state.phase = "complete";
+      state.phase = "processing";
       state.submitting = false;
       state.awaitingLiveResult = false;
-
-      if (refs.resultChild) refs.resultChild.textContent = payload.child_name || formatLabel(getSelectedChild());
-      if (refs.resultMeta) refs.resultMeta.textContent = `${getSelectedChild()?.age_months || 0} months old`;
-      if (refs.resultHeight) refs.resultHeight.textContent = Number.isFinite(height) ? `${height.toFixed(1)} cm` : "--.- cm";
-      if (refs.resultWeight) refs.resultWeight.textContent = Number.isFinite(weight) ? `${weight.toFixed(2)} kg` : "--.-- kg";
-      if (refs.resultStatus) refs.resultStatus.textContent = payload.nutritional_status || "Pending";
-      if (refs.resultWaz) refs.resultWaz.textContent = payload.waz != null ? Number(payload.waz).toFixed(2) : "--";
-      if (refs.resultHaz) refs.resultHaz.textContent = payload.haz != null ? Number(payload.haz).toFixed(2) : "--";
-      if (refs.resultWhz) refs.resultWhz.textContent = payload.whz != null ? Number(payload.whz).toFixed(2) : "--";
-      if (refs.resultSource) refs.resultSource.textContent = `ESP32 → Firebase → SQL`;
-
-      setProgress(100, "Measurement complete");
-      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Complete";
-      if (refs.sidebarResult) refs.sidebarResult.textContent = payload.nutritional_status || "Complete";
-
-      setStep("results");
-      pushFeed("Measurement complete", `${payload.child_code || "Child"} · ${Number.isFinite(weight) ? weight.toFixed(2) : "--"} kg · ${Number.isFinite(height) ? height.toFixed(1) : "--"} cm`);
 
       if (state.firebaseTimer) {
         clearInterval(state.firebaseTimer);
         state.firebaseTimer = null;
       }
+
+      // Both readings are captured and the ESP32 has already finished
+      // saving the measurement. Move to Processing, then automatically
+      // reveal the Result screen without any manual step navigation.
+      setStep("processing");
+      setProgress(85, "Calculating nutritional indicators...");
+      if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Calculating";
+      pushFeed(
+        "Measurement captured",
+        `${payload.child_code || "Child"} · ${hasWeight ? weight.toFixed(2) : "--"} kg · ${hasHeight ? height.toFixed(1) : "--"} cm`
+      );
+
+      if (state.processingTimer) clearTimeout(state.processingTimer);
+      state.processingTimer = setTimeout(() => {
+        state.processingTimer = null;
+        setProgress(100, "Measurement complete");
+
+        if (refs.resultChild) refs.resultChild.textContent = payload.child_name || formatLabel(getSelectedChild());
+        if (refs.resultMeta) refs.resultMeta.textContent = `${getSelectedChild()?.age_months || 0} months old`;
+        if (refs.resultHeight) refs.resultHeight.textContent = hasHeight ? `${height.toFixed(1)} cm` : "--.- cm";
+        if (refs.resultWeight) refs.resultWeight.textContent = hasWeight ? `${weight.toFixed(2)} kg` : "--.-- kg";
+        if (refs.resultStatus) refs.resultStatus.textContent = payload.nutritional_status || "Pending";
+        if (refs.resultWaz) refs.resultWaz.textContent = payload.waz != null ? Number(payload.waz).toFixed(2) : "--";
+        if (refs.resultHaz) refs.resultHaz.textContent = payload.haz != null ? Number(payload.haz).toFixed(2) : "--";
+        if (refs.resultWhz) refs.resultWhz.textContent = payload.whz != null ? Number(payload.whz).toFixed(2) : "--";
+        if (refs.resultSource) refs.resultSource.textContent = `ESP32 → Firebase → SQL`;
+
+        if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Complete";
+        if (refs.sidebarResult) refs.sidebarResult.textContent = payload.nutritional_status || "Complete";
+
+        setStep("results");
+        pushFeed(
+          "Measurement complete",
+          `${payload.child_code || "Child"} · ${hasWeight ? weight.toFixed(2) : "--"} kg · ${hasHeight ? height.toFixed(1) : "--"} cm`
+        );
+      }, 1200);
+
       return;
     }
 
@@ -516,11 +584,13 @@
       updateSessionInfo(payload);
       syncStartButtonState();
 
-      // The actual sensor sequence begins in the ESP32.
-      // The kiosk now waits for Firebase's WEIGHT_MEASURING state.
-      setStep("weight");
-      setProgress(20, "Starting weight measurement...");
-      if (refs.weightStatus) refs.weightStatus.textContent = "Waiting for the scale...";
+      // The actual sensor sequence begins in the ESP32, which captures
+      // weight and height together in one pass. The kiosk now waits for
+      // Firebase's MEASURING state and shows both live on Step 2.
+      setStep("live");
+      setProgress(20, "Starting live measurement...");
+      if (refs.weightStatus) refs.weightStatus.textContent = "Waiting for sensor...";
+      if (refs.heightStatus) refs.heightStatus.textContent = "Waiting for sensor...";
       if (refs.sidebarStatus) refs.sidebarStatus.textContent = "Starting";
 
       pushFeed(
@@ -548,9 +618,11 @@
 
     if (state.statusTimer) clearTimeout(state.statusTimer);
     if (state.firebaseTimer) clearInterval(state.firebaseTimer);
+    if (state.processingTimer) clearTimeout(state.processingTimer);
 
     state.statusTimer = null;
     state.firebaseTimer = null;
+    state.processingTimer = null;
     state.session = null;
     state.phase = "idle";
     state.submitting = false;
@@ -561,6 +633,12 @@
     state.weight = null;
     state.status = null;
     state.child = null;
+    state.weightLocked = false;
+    state.heightLocked = false;
+    state.lastWeightRaw = null;
+    state.lastHeightRaw = null;
+    state.weightStableCount = 0;
+    state.heightStableCount = 0;
 
     childCards.forEach((card) => card.classList.remove("is-selected"));
     if (refs.currentChildLabel) refs.currentChildLabel.textContent = "Choose a child";
@@ -568,17 +646,16 @@
     if (refs.sidebarParent) refs.sidebarParent.textContent = "---";
     if (refs.sidebarBarangay) refs.sidebarBarangay.textContent = "---";
 
-    const selectContinueBtn = document.querySelector('[data-kiosk-action="proceed-height"]');
+    const selectContinueBtn = document.querySelector('[data-kiosk-action="proceed-live"]');
     if (selectContinueBtn) selectContinueBtn.disabled = true;
 
     if (searchInput) searchInput.value = "";
     childCards.forEach((card) => { card.hidden = false; });
 
     if (refs.weightReadout) refs.weightReadout.textContent = "--.--";
-    if (refs.weightStatus) refs.weightStatus.textContent = "Ready to measure weight";
+    if (refs.weightStatus) refs.weightStatus.textContent = "Waiting for sensor...";
     if (refs.heightReadout) refs.heightReadout.textContent = "--.-";
-    if (refs.heightStatus) refs.heightStatus.textContent = "Ready to measure height";
-    if (refs.heightFinal) refs.heightFinal.textContent = "--.- cm";
+    if (refs.heightStatus) refs.heightStatus.textContent = "Waiting for sensor...";
     if (refs.resultHeight) refs.resultHeight.textContent = "--.- cm";
     if (refs.resultWeight) refs.resultWeight.textContent = "--.-- kg";
     if (refs.resultWaz) refs.resultWaz.textContent = "--";
@@ -632,23 +709,19 @@
 
         // Continue from Select Child actually starts the ESP32 session
         // (creates the measurement_sessions row and begins Firebase polling).
-        if (action === "proceed-height") {
+        if (action === "proceed-live") {
           if (getSelectedChild()) startMeasurementFlow();
           else setStep("select");
         }
 
         // The ESP32 controls actual scanning after Start Measurement.
-        // These buttons are informational/navigation only.
-        if (action === "start-weight") {
+        // Weight and height are captured together automatically, so this
+        // button is informational/navigation only.
+        if (action === "start-live") {
           pushFeed("Waiting", "Press Start Measurement on the kiosk to begin.", "warn");
         }
 
-        if (action === "start-height") {
-          pushFeed("Waiting", "Height starts automatically after weight is locked.", "info");
-        }
-
         if (action === "back-select") setStep("select");
-        if (action === "back-height") setStep("height");
         if (action === "reset") resetKioskToIdle();
       });
     });

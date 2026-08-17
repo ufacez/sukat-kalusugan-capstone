@@ -150,9 +150,9 @@ $appData = [
                 </p>
 
                 <div class="kiosk-hero-status-row">
-                    <span><strong>1</strong> Select child</span>
-                    <span><strong>2</strong> Weight</span>
-                    <span><strong>3</strong> Height</span>
+                    <span><strong>1</strong> Select Child</span>
+                    <span><strong>2</strong> Live Measurement</span>
+                    <span><strong>3</strong> Processing</span>
                     <span><strong>4</strong> Result</span>
                 </div>
 
@@ -215,20 +215,16 @@ $appData = [
             <span>1</span>Select Child
         </button>
 
-        <button type="button" class="kiosk-step" data-kiosk-step-jump="weight">
-            <span>2</span>Weight
-        </button>
-
-        <button type="button" class="kiosk-step" data-kiosk-step-jump="height">
-            <span>3</span>Height
+        <button type="button" class="kiosk-step" data-kiosk-step-jump="live">
+            <span>2</span>Live Measurement
         </button>
 
         <button type="button" class="kiosk-step" data-kiosk-step-jump="processing">
-            <span>4</span>Calculate
+            <span>3</span>Processing
         </button>
 
         <button type="button" class="kiosk-step" data-kiosk-step-jump="results">
-            <span>5</span>Result
+            <span>4</span>Result
         </button>
     </section>
 
@@ -298,21 +294,21 @@ $appData = [
                 <button
                     class="kiosk-button is-primary"
                     type="button"
-                    data-kiosk-action="proceed-height"
+                    data-kiosk-action="proceed-live"
                     disabled
                 >
-                    Continue to Weight
+                    Continue to Live Measurement
                 </button>
             </div>
         </article>
 
-        <!-- WEIGHT -->
-        <article class="kiosk-panel" data-kiosk-screen="weight" hidden>
+        <!-- LIVE MEASUREMENT (Weight + Height, simultaneous) -->
+        <article class="kiosk-panel" data-kiosk-screen="live" hidden>
             <div class="kiosk-panel-head">
                 <div>
                     <p class="kiosk-section-kicker">Step 2</p>
-                    <h2>Measuring Weight</h2>
-                    <p>Stand still on the platform. The scale will stabilize automatically.</p>
+                    <h2>Live Measurement</h2>
+                    <p>Stand still on the platform and look forward. Weight and height are captured together automatically.</p>
                 </div>
 
                 <div class="kiosk-locked-chip">
@@ -321,65 +317,46 @@ $appData = [
                 </div>
             </div>
 
-            <div class="kiosk-sensor-card">
-                <div class="kiosk-sensor-visual is-weight">
-                    <div class="kiosk-bars" data-kiosk-weight-bars></div>
-                    <div class="kiosk-sensor-readout" data-kiosk-weight-readout>--.--</div>
-                    <div class="kiosk-sensor-unit">kg</div>
+            <div class="kiosk-live-grid">
+                <div class="kiosk-sensor-card">
+                    <div class="kiosk-sensor-visual is-weight">
+                        <div class="kiosk-bars" data-kiosk-weight-bars></div>
+                        <div class="kiosk-sensor-readout" data-kiosk-weight-readout>--.--</div>
+                        <div class="kiosk-sensor-unit">kg</div>
+                    </div>
+
+                    <div class="kiosk-sensor-status" data-kiosk-weight-status>
+                        Waiting for sensor...
+                    </div>
                 </div>
 
-                <div class="kiosk-sensor-status" data-kiosk-weight-status>
-                    Waiting for the scale...
-                </div>
-            </div>
+                <div class="kiosk-sensor-card">
+                    <div class="kiosk-sensor-visual is-height">
+                        <div class="kiosk-wave"></div>
+                        <div class="kiosk-sensor-readout" data-kiosk-height-readout>--.-</div>
+                        <div class="kiosk-sensor-unit">cm</div>
+                    </div>
 
-            <div class="kiosk-panel-actions">
-                <button class="kiosk-button is-secondary" type="button" data-kiosk-action="start-weight">
-                    Weight runs automatically
-                </button>
-            </div>
-        </article>
+                    <div class="kiosk-sensor-status" data-kiosk-height-status>
+                        Waiting for sensor...
+                    </div>
 
-        <!-- HEIGHT -->
-        <article class="kiosk-panel" data-kiosk-screen="height" hidden>
-            <div class="kiosk-panel-head">
-                <div>
-                    <p class="kiosk-section-kicker">Step 3</p>
-                    <h2>Measuring Height</h2>
-                    <p>Stand straight and look forward. The TF-Luna will read the distance.</p>
-                </div>
-
-                <div class="kiosk-locked-chip">
-                    <span>Weight locked</span>
-                    <strong data-kiosk-height-final>--.-- kg</strong>
-                </div>
-            </div>
-
-            <div class="kiosk-sensor-card">
-                <div class="kiosk-sensor-visual is-height">
-                    <div class="kiosk-wave"></div>
-                    <div class="kiosk-sensor-readout" data-kiosk-height-readout>--.-</div>
-                    <div class="kiosk-sensor-unit">cm</div>
-                </div>
-
-                <div class="kiosk-sensor-status" data-kiosk-height-status>
-                    Waiting for height measurement...
-                </div>
-
-                <div class="kiosk-sensor-bar">
-                    <span data-kiosk-height-bar></span>
+                    <div class="kiosk-sensor-bar">
+                        <span data-kiosk-height-bar></span>
+                    </div>
                 </div>
             </div>
 
             <div class="kiosk-panel-actions">
-                <button class="kiosk-button is-secondary" type="button" data-kiosk-action="start-height">
-                    Height runs automatically
+                <button class="kiosk-button is-secondary" type="button" data-kiosk-action="start-live">
+                    Weight and height run automatically
                 </button>
             </div>
         </article>
 
         <!-- PROCESSING -->
         <article class="kiosk-panel" data-kiosk-screen="processing" hidden>
+            <p class="kiosk-section-kicker" style="text-align:center;">Step 3</p>
             <div class="kiosk-processing-ring">
                 <svg viewBox="0 0 160 160" aria-hidden="true">
                     <circle cx="80" cy="80" r="68" class="kiosk-ring-track"></circle>
@@ -406,7 +383,7 @@ $appData = [
         <article class="kiosk-panel" data-kiosk-screen="results" hidden>
             <div class="kiosk-panel-head">
                 <div>
-                    <p class="kiosk-section-kicker">Step 5</p>
+                    <p class="kiosk-section-kicker">Step 4</p>
                     <h2>Measurement Result</h2>
                     <p>The final measurement has been saved.</p>
                 </div>
