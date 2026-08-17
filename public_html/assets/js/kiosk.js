@@ -34,12 +34,20 @@
     Number(data?.defaults?.sessionTimeoutSeconds || 180)
   );
 
+  const STORAGE_KEY =
+    "sukat_kalusugan_kiosk_session";
+
+  const CHILD_STORAGE_KEY =
+    "sukat_kalusugan_kiosk_child";
+
   // ============================================================
   // DOM
   // ============================================================
 
   const welcomeScreen =
-    document.querySelector('[data-kiosk-screen="welcome"]');
+    document.querySelector(
+      '[data-kiosk-screen="welcome"]'
+    );
 
   const stepBar =
     document.querySelector(".kiosk-stepbar");
@@ -49,41 +57,61 @@
 
   const screens =
     Array.from(
-      document.querySelectorAll("[data-kiosk-screen]")
+      document.querySelectorAll(
+        "[data-kiosk-screen]"
+      )
     );
 
   const stepButtons =
     Array.from(
-      document.querySelectorAll("[data-kiosk-step-jump]")
+      document.querySelectorAll(
+        "[data-kiosk-step-jump]"
+      )
     );
 
   const actionButtons =
     Array.from(
-      document.querySelectorAll("[data-kiosk-action]")
+      document.querySelectorAll(
+        "[data-kiosk-action]"
+      )
     );
 
   const childCards =
     Array.from(
-      document.querySelectorAll("[data-kiosk-child-card]")
+      document.querySelectorAll(
+        "[data-kiosk-child-card]"
+      )
     );
 
   const searchInput =
-    document.querySelector("[data-kiosk-search]");
+    document.querySelector(
+      "[data-kiosk-search]"
+    );
 
   const clock =
-    document.querySelector("[data-kiosk-clock]");
+    document.querySelector(
+      "[data-kiosk-clock]"
+    );
 
   const welcomeClock =
-    document.querySelector("[data-kiosk-live-clock]");
+    document.querySelector(
+      "[data-kiosk-live-clock]"
+    );
 
   const welcomeDate =
-    document.querySelector("[data-kiosk-live-date]");
+    document.querySelector(
+      "[data-kiosk-live-date]"
+    );
 
   const heroNote =
-    document.querySelector(".kiosk-hero-note");
+    document.querySelector(
+      ".kiosk-hero-note"
+    );
 
   const feed =
-    document.querySelector("[data-kiosk-feed]");
+    document.querySelector(
+      "[data-kiosk-feed]"
+    );
 
   const startButton =
     document.querySelector(
@@ -96,7 +124,7 @@
     );
 
   // ============================================================
-  // SENSOR STATUS CHIPS
+  // SENSOR CHIPS
   // ============================================================
 
   const lidarChip =
@@ -231,7 +259,7 @@
   };
 
   // ============================================================
-  // CHILD DATA
+  // CHILDREN
   // ============================================================
 
   const children =
@@ -259,6 +287,8 @@
     firebaseSessionId: null,
 
     lastFirebaseTimestamp: "",
+
+    lastFirebaseSignature: "",
 
     firebaseTimer: null,
 
@@ -292,18 +322,16 @@
 
     processingStarted: false,
 
-    restoredSession: false
+    restoredSession: false,
+
+    startRequestInProgress: false,
+
+    firebaseRequestInProgress: false,
+
+    statusRequestInProgress: false,
+
+    destroyed: false
   };
-
-  // ============================================================
-  // STORAGE
-  // ============================================================
-
-  const STORAGE_KEY =
-    "sukat_kalusugan_kiosk_session";
-
-  const CHILD_STORAGE_KEY =
-    "sukat_kalusugan_kiosk_child";
 
   // ============================================================
   // HELPERS
@@ -319,21 +347,27 @@
   }
 
   function formatNow(date = new Date()) {
-    return new Intl.DateTimeFormat("en-PH", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true
-    }).format(date);
+    return new Intl.DateTimeFormat(
+      "en-PH",
+      {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: true
+      }
+    ).format(date);
   }
 
   function formatDate(date = new Date()) {
-    return new Intl.DateTimeFormat("en-PH", {
-      weekday: "long",
-      year: "numeric",
-      month: "long",
-      day: "numeric"
-    }).format(date);
+    return new Intl.DateTimeFormat(
+      "en-PH",
+      {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+      }
+    ).format(date);
   }
 
   function formatChildName(child) {
@@ -341,9 +375,10 @@
       return "Choose a child";
     }
 
-    return `${child.first_name || ""} ${
-      child.last_name || ""
-    }`.trim();
+    return (
+      `${child.first_name || ""} ` +
+      `${child.last_name || ""}`
+    ).trim();
   }
 
   function getSelectedChild() {
@@ -364,7 +399,37 @@
     return id > 0 ? id : null;
   }
 
-  function pushFeed(action, detail, level = "info") {
+  function normalizeStatus(value) {
+    return String(value || "")
+      .trim()
+      .toUpperCase();
+  }
+
+  function isValidWeight(value) {
+    const n = Number(value);
+
+    return (
+      Number.isFinite(n) &&
+      n >= 0 &&
+      n <= 300
+    );
+  }
+
+  function isValidHeight(value) {
+    const n = Number(value);
+
+    return (
+      Number.isFinite(n) &&
+      n >= 0 &&
+      n <= 300
+    );
+  }
+
+  function pushFeed(
+    action,
+    detail,
+    level = "info"
+  ) {
     if (!feed) {
       return;
     }
@@ -401,7 +466,7 @@
   }
 
   // ============================================================
-  // SESSION STORAGE
+  // STORAGE
   // ============================================================
 
   function saveSessionToStorage() {
@@ -416,9 +481,11 @@
         childId:
           state.child?.id || null,
 
-        weight: state.weight,
+        weight:
+          state.weight,
 
-        height: state.height,
+        height:
+          state.height,
 
         weightLocked:
           state.weightLocked,
@@ -455,7 +522,7 @@
       }
     } catch (error) {
       console.warn(
-        "[SukatKalusugan] Unable to save session storage",
+        "[SukatKalusugan] saveSessionToStorage failed",
         error
       );
     }
@@ -486,13 +553,14 @@
           sessionTimeoutSeconds * 1000
       ) {
         clearSessionStorage();
+
         return null;
       }
 
       return saved;
     } catch (error) {
       console.warn(
-        "[SukatKalusugan] Session storage parse failed",
+        "[SukatKalusugan] loadSessionFromStorage failed",
         error
       );
 
@@ -511,7 +579,7 @@
       );
     } catch (error) {
       console.warn(
-        "[SukatKalusugan] Unable to clear storage",
+        "[SukatKalusugan] clearSessionStorage failed",
         error
       );
     }
@@ -532,7 +600,7 @@
   }
 
   // ============================================================
-  // SESSION INFORMATION
+  // SESSION UI
   // ============================================================
 
   function updateSessionInfo(session) {
@@ -542,11 +610,13 @@
       }
 
       if (refs.sessionStatus) {
-        refs.sessionStatus.textContent = "Idle";
+        refs.sessionStatus.textContent =
+          "Idle";
       }
 
       if (refs.sessionStarted) {
-        refs.sessionStarted.textContent = "—";
+        refs.sessionStarted.textContent =
+          "—";
       }
 
       return;
@@ -585,7 +655,7 @@
   // ============================================================
 
   function setStep(step) {
-    const allowedSteps = [
+    const allowed = [
       "welcome",
       "select",
       "live",
@@ -593,37 +663,27 @@
       "results"
     ];
 
-    if (!allowedSteps.includes(step)) {
+    if (!allowed.includes(step)) {
       return;
     }
-
-    /*
-     * Processing can ONLY be entered by
-     * processMeasurement().
-     */
 
     if (
       step === "processing" &&
       !state.processingStarted
     ) {
       console.warn(
-        "[SukatKalusugan] Processing blocked."
+        "[SukatKalusugan] Processing navigation blocked."
       );
 
       return;
     }
-
-    /*
-     * Results can ONLY be entered after
-     * processing has started.
-     */
 
     if (
       step === "results" &&
       !state.processingStarted
     ) {
       console.warn(
-        "[SukatKalusugan] Results blocked."
+        "[SukatKalusugan] Results navigation blocked."
       );
 
       return;
@@ -695,7 +755,10 @@
   // PROGRESS
   // ============================================================
 
-  function setProgress(progress, message) {
+  function setProgress(
+    progress,
+    message
+  ) {
     const value =
       Math.max(
         0,
@@ -715,11 +778,14 @@
         2 * Math.PI * 68;
 
       refs.progressRing.style.strokeDasharray =
-        circumference;
+        String(circumference);
 
       refs.progressRing.style.strokeDashoffset =
-        circumference -
-        (circumference * value) / 100;
+        String(
+          circumference -
+            (circumference * value) /
+              100
+        );
     }
 
     if (
@@ -752,8 +818,8 @@
     const ready =
       state.measurementReady &&
       !state.processingStarted &&
-      Number.isFinite(state.weight) &&
-      Number.isFinite(state.height);
+      isValidWeight(state.weight) &&
+      isValidHeight(state.height);
 
     button.disabled = !ready;
 
@@ -771,17 +837,22 @@
 
   function markMeasurementReady() {
     if (
-      !Number.isFinite(state.weight) ||
-      !Number.isFinite(state.height)
+      !isValidWeight(state.weight) ||
+      !isValidHeight(state.height)
     ) {
-      state.measurementReady = false;
+      state.measurementReady =
+        false;
 
       updateProcessButton();
 
-      return;
+      return false;
     }
 
-    state.measurementReady = true;
+    state.measurementReady =
+      true;
+
+    state.awaitingLiveResult =
+      true;
 
     if (refs.weightStatus) {
       refs.weightStatus.textContent =
@@ -811,6 +882,8 @@
     );
 
     saveSessionToStorage();
+
+    return true;
   }
 
   // ============================================================
@@ -870,7 +943,9 @@
     if (child) {
       pushFeed(
         "Child selected",
-        `${child.child_code || "Child"} · ${formatChildName(child)}`
+        `${
+          child.child_code || "Child"
+        } · ${formatChildName(child)}`
       );
 
       try {
@@ -899,9 +974,9 @@
     }
 
     const status =
-      String(
-        session.status || ""
-      ).toUpperCase();
+      normalizeStatus(
+        session.status
+      );
 
     return [
       "START_REQUESTED",
@@ -920,13 +995,18 @@
       return;
     }
 
-    startButton.disabled =
+    const disabled =
       state.submitting ||
+      state.startRequestInProgress ||
       isMeasurementActive() ||
       state.processingStarted;
 
+    startButton.disabled =
+      disabled;
+
     startButton.textContent =
-      state.submitting
+      state.submitting ||
+      state.startRequestInProgress
         ? "Starting..."
         : "Start Measurement";
   }
@@ -941,7 +1021,10 @@
     }
 
     return (
-      firebaseBaseUrl.replace(/\/$/, "") +
+      firebaseBaseUrl.replace(
+        /\/$/,
+        ""
+      ) +
       "/latest_measurements/" +
       encodeURIComponent(deviceId) +
       ".json"
@@ -996,7 +1079,7 @@
   }
 
   // ============================================================
-  // LIVE SENSOR UI
+  // SENSOR UI
   // ============================================================
 
   function setWeight(
@@ -1006,15 +1089,12 @@
     const weight =
       Number(value);
 
-    if (
-      !Number.isFinite(weight) ||
-      weight < 0 ||
-      weight > 300
-    ) {
+    if (!isValidWeight(weight)) {
       return false;
     }
 
-    state.weight = weight;
+    state.weight =
+      weight;
 
     if (refs.weightReadout) {
       refs.weightReadout.textContent =
@@ -1075,15 +1155,12 @@
     const height =
       Number(value);
 
-    if (
-      !Number.isFinite(height) ||
-      height < 0 ||
-      height > 300
-    ) {
+    if (!isValidHeight(height)) {
       return false;
     }
 
-    state.height = height;
+    state.height =
+      height;
 
     if (refs.heightReadout) {
       refs.heightReadout.textContent =
@@ -1101,7 +1178,7 @@
           100,
           Math.max(
             0,
-            height / 2.5
+            (height / 250) * 100
           )
         );
 
@@ -1154,17 +1231,26 @@
 
     if (
       last !== null &&
-      Math.abs(value - last) <=
-        epsilon
+      Math.abs(
+        Number(value) -
+          Number(last)
+      ) <= epsilon
     ) {
       state[countKey] += 1;
     } else {
       state[countKey] = 0;
     }
 
-    state[lastKey] = value;
+    state[lastKey] =
+      Number(value);
 
-    if (state[countKey] >= 2) {
+    /*
+     * Require several consistent readings.
+     * This prevents one accidental identical
+     * reading from locking immediately.
+     */
+
+    if (state[countKey] >= 3) {
       state[lockedKey] = true;
     }
 
@@ -1180,47 +1266,43 @@
   ) {
     if (
       !payload ||
-      typeof payload !==
-        "object"
+      typeof payload !== "object"
     ) {
       return;
     }
 
     const status =
-      String(
-        payload.status || ""
-      ).toUpperCase();
+      normalizeStatus(
+        payload.status
+      );
 
     const weight =
-      payload.weight_kg == null
-        ? NaN
-        : Number(
+      payload.weight_kg != null
+        ? Number(
             payload.weight_kg
-          );
+          )
+        : NaN;
 
     const height =
-      payload.height_cm == null
-        ? NaN
-        : Number(
+      payload.height_cm != null
+        ? Number(
             payload.height_cm
-          );
+          )
+        : NaN;
 
     const hasWeight =
-      Number.isFinite(weight) &&
-      weight >= 0 &&
-      weight <= 300;
+      isValidWeight(weight);
 
     const hasHeight =
-      Number.isFinite(height) &&
-      height >= 0 &&
-      height <= 300;
+      isValidHeight(height);
 
     console.log(
-      "[SukatKalusugan] Firebase update",
+      "[SukatKalusugan] Firebase payload:",
       payload
     );
 
-    state.firebaseOnline = true;
+    state.firebaseOnline =
+      true;
 
     setChip(
       connectedChip,
@@ -1228,18 +1310,22 @@
       true
     );
 
-    // ========================================================
+    // ==========================================================
     // MEASURING
-    // ========================================================
+    // ==========================================================
 
     if (
-      status === "MEASURING" ||
-      status === "WEIGHT_MEASURING" ||
-      status === "HEIGHT_MEASURING"
+      [
+        "START_REQUESTED",
+        "MEASURING",
+        "WEIGHT_MEASURING",
+        "HEIGHT_MEASURING"
+      ].includes(status)
     ) {
       state.phase = "live";
 
       if (
+        !state.processingStarted &&
         state.step !== "live"
       ) {
         setStep("live");
@@ -1277,15 +1363,11 @@
 
       let progress = 20;
 
-      if (
-        state.weightLocked
-      ) {
+      if (state.weightLocked) {
         progress += 20;
       }
 
-      if (
-        state.heightLocked
-      ) {
+      if (state.heightLocked) {
         progress += 20;
       }
 
@@ -1293,12 +1375,6 @@
         progress,
         "Stand still while the sensors capture your measurement..."
       );
-
-      /*
-       * IMPORTANT:
-       *
-       * Never automatically process.
-       */
 
       if (
         state.weightLocked &&
@@ -1312,9 +1388,9 @@
       return;
     }
 
-    // ========================================================
+    // ==========================================================
     // COMPLETE
-    // ========================================================
+    // ==========================================================
 
     if (status === "COMPLETE") {
       if (hasWeight) {
@@ -1337,30 +1413,16 @@
         );
       }
 
-      /*
-       * ESP32 COMPLETE only means
-       * the sensors are finished.
-       *
-       * It does NOT mean the kiosk
-       * should enter Processing.
-       */
-
       state.phase = "live";
 
-      state.submitting = false;
+      state.submitting =
+        false;
 
       state.awaitingLiveResult =
         true;
 
-      state.measurementReady =
-        Number.isFinite(
-          state.weight
-        ) &&
-        Number.isFinite(
-          state.height
-        );
-
       if (
+        !state.processingStarted &&
         state.step !== "live"
       ) {
         setStep("live");
@@ -1378,20 +1440,24 @@
       return;
     }
 
-    // ========================================================
+    // ==========================================================
     // ERROR
-    // ========================================================
+    // ==========================================================
 
     if (
       status === "ERROR" ||
       status === "CANCELLED"
     ) {
-      state.phase = "error";
+      state.phase =
+        "error";
 
-      state.submitting = false;
+      state.submitting =
+        false;
 
       state.awaitingLiveResult =
         false;
+
+      updateProcessButton();
 
       setProgress(
         100,
@@ -1402,11 +1468,820 @@
       pushFeed(
         "Measurement failed",
         payload.error_message ||
-          "Unknown measurement error",
+          "Unknown measurement error.",
         "error"
       );
 
       saveSessionToStorage();
+    }
+  }
+
+  // ============================================================
+  // FIREBASE POLLING
+  // ============================================================
+
+  async function refreshFirebaseLatestMeasurement() {
+    if (
+      !firebaseEnabled ||
+      !state.awaitingLiveResult ||
+      state.firebaseRequestInProgress
+    ) {
+      return null;
+    }
+
+    const url =
+      firebaseLatestMeasurementUrl();
+
+    if (!url) {
+      return null;
+    }
+
+    state.firebaseRequestInProgress =
+      true;
+
+    try {
+      const response =
+        await fetch(
+          url,
+          {
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+      if (!response.ok) {
+        state.firebaseOnline =
+          false;
+
+        setChip(
+          connectedChip,
+          "Device: Offline",
+          false
+        );
+
+        return null;
+      }
+
+      const payload =
+        await response
+          .json()
+          .catch(() => null);
+
+      if (
+        !payload ||
+        typeof payload !== "object"
+      ) {
+        return null;
+      }
+
+      state.firebaseOnline =
+        true;
+
+      setChip(
+        connectedChip,
+        "Device: Connected",
+        true
+      );
+
+      // ========================================================
+      // SESSION PROTECTION
+      // ========================================================
+
+      const payloadSessionId =
+        Number(
+          payload.session_id ||
+          payload.sessionId ||
+          0
+        );
+
+      const expectedSessionId =
+        Number(
+          state.firebaseSessionId ||
+          getCurrentSessionId() ||
+          0
+        );
+
+      /*
+       * If Firebase contains a session ID,
+       * it MUST match our SQL session.
+       */
+
+      if (
+        expectedSessionId > 0 &&
+        payloadSessionId > 0 &&
+        payloadSessionId !==
+          expectedSessionId
+      ) {
+        console.warn(
+          "[SukatKalusugan] Ignoring Firebase session mismatch",
+          {
+            expected:
+              expectedSessionId,
+            received:
+              payloadSessionId
+          }
+        );
+
+        return null;
+      }
+
+      /*
+       * If Firebase has a session ID of 0/missing,
+       * allow live sensor values.
+       *
+       * This is important because your current
+       * ESP32 firmware may not always send
+       * session_id.
+       *
+       * However, COMPLETE is only trusted when
+       * our current SQL session is active.
+       */
+
+      // ========================================================
+      // DUPLICATE DETECTION
+      // ========================================================
+
+      const timestamp =
+        String(
+          payload.timestamp ||
+          payload.updated_at ||
+          payload.updatedAt ||
+          ""
+        );
+
+      /*
+       * IMPORTANT FIX:
+       *
+       * The previous code used:
+       *
+       * timestamp === lastTimestamp
+       *
+       * When ESP32 did not provide a timestamp,
+       * both values were "" and the payload was
+       * ignored forever.
+       *
+       * We now generate a signature from the
+       * actual payload values.
+       */
+
+      const signature =
+        JSON.stringify({
+          status:
+            payload.status || "",
+          session_id:
+            payload.session_id ||
+            payload.sessionId ||
+            "",
+          weight_kg:
+            payload.weight_kg ?? "",
+          height_cm:
+            payload.height_cm ?? "",
+          timestamp
+        });
+
+      if (
+        signature ===
+        state.lastFirebaseSignature
+      ) {
+        return payload;
+      }
+
+      state.lastFirebaseSignature =
+        signature;
+
+      if (timestamp) {
+        state.lastFirebaseTimestamp =
+          timestamp;
+      }
+
+      applyFirebaseStatus(
+        payload
+      );
+
+      return payload;
+    } catch (error) {
+      console.error(
+        "[SukatKalusugan] Firebase polling error",
+        error
+      );
+
+      state.firebaseOnline =
+        false;
+
+      setChip(
+        connectedChip,
+        "Device: Offline",
+        false
+      );
+
+      return null;
+    } finally {
+      state.firebaseRequestInProgress =
+        false;
+    }
+  }
+
+  function startFirebasePolling() {
+    if (!firebaseEnabled) {
+      setChip(
+        connectedChip,
+        "Device: Firebase Off",
+        false
+      );
+
+      pushFeed(
+        "Firebase unavailable",
+        "Firebase is not configured.",
+        "warn"
+      );
+
+      return;
+    }
+
+    stopFirebasePolling();
+
+    state.firebaseTimer =
+      setInterval(
+        () => {
+          refreshFirebaseLatestMeasurement();
+        },
+        pollIntervalMs
+      );
+
+    refreshFirebaseLatestMeasurement();
+  }
+
+  function stopFirebasePolling() {
+    if (state.firebaseTimer) {
+      clearInterval(
+        state.firebaseTimer
+      );
+
+      state.firebaseTimer =
+        null;
+    }
+  }
+
+  // ============================================================
+  // BACKEND STATUS
+  // ============================================================
+
+  async function refreshMeasurementStatus(
+    scheduleNext = true
+  ) {
+    if (
+      !state.session ||
+      state.statusRequestInProgress
+    ) {
+      return null;
+    }
+
+    const expectedSessionId =
+      getCurrentSessionId();
+
+    if (!expectedSessionId) {
+      return null;
+    }
+
+    state.statusRequestInProgress =
+      true;
+
+    try {
+      const endpoint =
+        data?.endpoints
+          ?.measurementStatus ||
+        "../api/kiosk/measurement_status.php";
+
+      const url =
+        new URL(
+          endpoint,
+          window.location.href
+        );
+
+      url.searchParams.set(
+        "device_id",
+        deviceId
+      );
+
+      url.searchParams.set(
+        "session_id",
+        String(
+          expectedSessionId
+        )
+      );
+
+      const response =
+        await fetch(
+          url.toString(),
+          {
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (
+        !response.ok ||
+        json?.success !== true
+      ) {
+        throw new Error(
+          json?.message ||
+            "Unable to load measurement status."
+        );
+      }
+
+      const payload =
+        json?.data || {};
+
+      // ========================================================
+      // EXACT SESSION VALIDATION
+      // ========================================================
+
+      const returnedSessionId =
+        Number(
+          payload.session_id ||
+          payload.id ||
+          0
+        );
+
+      if (
+        returnedSessionId !==
+        expectedSessionId
+      ) {
+        console.error(
+          "[SukatKalusugan] SQL SESSION MISMATCH",
+          {
+            expected:
+              expectedSessionId,
+            received:
+              returnedSessionId
+          }
+        );
+
+        pushFeed(
+          "Session mismatch",
+          `Expected SQL session #${expectedSessionId}, but server returned #${
+            returnedSessionId || "unknown"
+          }.`,
+          "error"
+        );
+
+        /*
+         * NEVER replace our current session
+         * with another session returned by SQL.
+         */
+
+        return state.session;
+      }
+
+      state.session =
+        payload;
+
+      updateSessionInfo(
+        payload
+      );
+
+      saveSessionToStorage();
+
+      const status =
+        normalizeStatus(
+          payload.status
+        );
+
+      // ========================================================
+      // ERROR
+      // ========================================================
+
+      if (
+        status === "ERROR" ||
+        status === "CANCELLED"
+      ) {
+        processingFailed(
+          payload.error_message ||
+            "Measurement failed."
+        );
+
+        return payload;
+      }
+
+      // ========================================================
+      // ACTIVE
+      // ========================================================
+
+      if (
+        isMeasurementActive(
+          payload
+        )
+      ) {
+        if (
+          !state.processingStarted &&
+          state.step !== "live"
+        ) {
+          setStep("live");
+        }
+
+        if (scheduleNext) {
+          scheduleStatusRefresh();
+        }
+
+        return payload;
+      }
+
+      // ========================================================
+      // COMPLETE
+      // ========================================================
+
+      if (
+        status === "COMPLETE"
+      ) {
+        /*
+         * COMPLETE is NOT Results.
+         *
+         * If the operator hasn't clicked
+         * Process Measurement, stay on Live.
+         */
+
+        if (
+          !state.processingStarted
+        ) {
+          if (
+            isValidWeight(
+              state.weight
+            ) &&
+            isValidHeight(
+              state.height
+            )
+          ) {
+            state.measurementReady =
+              true;
+
+            state.awaitingLiveResult =
+              true;
+
+            setStep("live");
+
+            markMeasurementReady();
+          }
+        }
+
+        return payload;
+      }
+
+      if (scheduleNext) {
+        scheduleStatusRefresh();
+      }
+
+      return payload;
+    } catch (error) {
+      console.warn(
+        "[SukatKalusugan] Session status error",
+        error
+      );
+
+      if (
+        scheduleNext &&
+        isMeasurementActive(
+          state.session
+        )
+      ) {
+        scheduleStatusRefresh();
+      }
+
+      return null;
+    } finally {
+      state.statusRequestInProgress =
+        false;
+    }
+  }
+
+  function scheduleStatusRefresh() {
+    if (state.statusTimer) {
+      clearTimeout(
+        state.statusTimer
+      );
+    }
+
+    state.statusTimer =
+      setTimeout(
+        () => {
+          refreshMeasurementStatus(
+            true
+          );
+        },
+        pollIntervalMs
+      );
+  }
+
+  // ============================================================
+  // START MEASUREMENT
+  // ============================================================
+
+  async function startMeasurementFlow() {
+    const child =
+      getSelectedChild();
+
+    if (!child) {
+      pushFeed(
+        "Start blocked",
+        "Choose a child first.",
+        "warn"
+      );
+
+      setStep("select");
+
+      return false;
+    }
+
+    if (
+      state.startRequestInProgress
+    ) {
+      return false;
+    }
+
+    if (
+      isMeasurementActive()
+    ) {
+      pushFeed(
+        "Start blocked",
+        "A measurement is already active.",
+        "warn"
+      );
+
+      return false;
+    }
+
+    if (
+      state.processingStarted
+    ) {
+      pushFeed(
+        "Start blocked",
+        "The current measurement is still being processed.",
+        "warn"
+      );
+
+      return false;
+    }
+
+    state.startRequestInProgress =
+      true;
+
+    state.submitting =
+      true;
+
+    syncStartButtonState();
+
+    try {
+      const endpoint =
+        data?.endpoints
+          ?.startMeasurement ||
+        "../api/kiosk/start_measurement.php";
+
+      const response =
+        await fetch(
+          endpoint,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Accept:
+                "application/json"
+            },
+
+            body: JSON.stringify({
+              device_id:
+                deviceId,
+
+              child_id:
+                child.id,
+
+              location:
+                "Kiosk"
+            }),
+
+            cache: "no-store"
+          }
+        );
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      if (
+        !response.ok ||
+        json?.success !== true
+      ) {
+        throw new Error(
+          json?.message ||
+            "Could not start measurement."
+        );
+      }
+
+      const payload =
+        json?.data || {};
+
+      const newSessionId =
+        Number(
+          payload.session_id ||
+          payload.id ||
+          0
+        );
+
+      if (
+        newSessionId <= 0
+      ) {
+        throw new Error(
+          "Server did not return a valid measurement session ID."
+        );
+      }
+
+      // ========================================================
+      // RESET MEASUREMENT VALUES
+      // ========================================================
+
+      state.session =
+        payload;
+
+      state.firebaseSessionId =
+        newSessionId;
+
+      state.awaitingLiveResult =
+        true;
+
+      state.lastFirebaseTimestamp =
+        "";
+
+      state.lastFirebaseSignature =
+        "";
+
+      state.submitting =
+        false;
+
+      state.processingStarted =
+        false;
+
+      state.measurementReady =
+        false;
+
+      state.weight =
+        null;
+
+      state.height =
+        null;
+
+      state.weightLocked =
+        false;
+
+      state.heightLocked =
+        false;
+
+      state.lastWeightRaw =
+        null;
+
+      state.lastHeightRaw =
+        null;
+
+      state.weightStableCount =
+        0;
+
+      state.heightStableCount =
+        0;
+
+      state.phase =
+        "live";
+
+      state.restoredSession =
+        false;
+
+      updateSessionInfo(
+        payload
+      );
+
+      saveSessionToStorage();
+
+      syncStartButtonState();
+
+      // ========================================================
+      // LIVE SCREEN
+      // ========================================================
+
+      setStep("live");
+
+      setProgress(
+        20,
+        "Starting live measurement..."
+      );
+
+      if (refs.weightReadout) {
+        refs.weightReadout.textContent =
+          "--.--";
+      }
+
+      if (refs.heightReadout) {
+        refs.heightReadout.textContent =
+          "--.-";
+      }
+
+      if (refs.weightStatus) {
+        refs.weightStatus.textContent =
+          "Waiting for HX711...";
+      }
+
+      if (refs.heightStatus) {
+        refs.heightStatus.textContent =
+          "Waiting for TF-Luna...";
+      }
+
+      if (refs.weightBars) {
+        refs.weightBars.innerHTML =
+          "";
+      }
+
+      if (refs.heightBar) {
+        refs.heightBar.style.width =
+          "0%";
+      }
+
+      setChip(
+        connectedChip,
+        "Device: Waiting",
+        false
+      );
+
+      setChip(
+        loadCellChip,
+        "Scale: Waiting",
+        false
+      );
+
+      setChip(
+        lidarChip,
+        "LiDAR: Waiting",
+        false
+      );
+
+      pushFeed(
+        "Measurement started",
+        `${
+          child.child_code || "Child"
+        } · Session #${newSessionId} · waiting for ESP32`
+      );
+
+      startFirebasePolling();
+
+      await refreshMeasurementStatus(
+        true
+      );
+
+      return true;
+    } catch (error) {
+      console.error(
+        "[SukatKalusugan] Start measurement failed",
+        error
+      );
+
+      state.submitting =
+        false;
+
+      state.startRequestInProgress =
+        false;
+
+      state.awaitingLiveResult =
+        false;
+
+      syncStartButtonState();
+
+      pushFeed(
+        "Start failed",
+        error.message ||
+          "Unable to contact server.",
+        "error"
+      );
+
+      setStep("select");
+
+      return false;
+    } finally {
+      state.startRequestInProgress =
+        false;
+
+      state.submitting =
+        false;
+
+      syncStartButtonState();
     }
   }
 
@@ -1432,10 +2307,10 @@
     }
 
     if (
-      !Number.isFinite(
+      !isValidWeight(
         state.weight
       ) ||
-      !Number.isFinite(
+      !isValidHeight(
         state.height
       )
     ) {
@@ -1458,10 +2333,6 @@
       return;
     }
 
-    /*
-     * Make sure the session ID exists.
-     */
-
     const sessionId =
       getCurrentSessionId();
 
@@ -1476,10 +2347,7 @@
     }
 
     /*
-     * IMPORTANT:
-     *
-     * This is the ONLY place where
-     * processingStarted becomes true.
+     * This is the ONLY place processing starts.
      */
 
     state.processingStarted =
@@ -1487,6 +2355,9 @@
 
     state.phase =
       "processing";
+
+    state.awaitingLiveResult =
+      false;
 
     updateProcessButton();
 
@@ -1499,7 +2370,10 @@
 
     pushFeed(
       "Processing started",
-      `${state.child.child_code || "Child"} · Session #${sessionId} · calculating growth indicators`
+      `${
+        state.child.child_code ||
+        "Child"
+      } · Session #${sessionId} · calculating growth indicators`
     );
 
     const stages = [
@@ -1536,9 +2410,7 @@
 
     let index = 0;
 
-    if (
-      state.processingTimer
-    ) {
+    if (state.processingTimer) {
       clearInterval(
         state.processingTimer
       );
@@ -1548,7 +2420,8 @@
       setInterval(
         async () => {
           if (
-            index < stages.length
+            index <
+            stages.length
           ) {
             const stageData =
               stages[index];
@@ -1577,10 +2450,9 @@
 
           if (
             status &&
-            String(
-              status.status || ""
-            ).toUpperCase() ===
-              "COMPLETE"
+            normalizeStatus(
+              status.status
+            ) === "COMPLETE"
           ) {
             finishResults(
               status,
@@ -1598,15 +2470,21 @@
   }
 
   // ============================================================
-  // WAIT FOR BACKEND COMPLETION
+  // BACKEND COMPLETION
   // ============================================================
 
   async function waitForBackendCompletion() {
     let attempts = 0;
 
-    const maxAttempts = 20;
+    const maxAttempts = 30;
 
     const check = async () => {
+      if (
+        !state.processingStarted
+      ) {
+        return;
+      }
+
       attempts++;
 
       const status =
@@ -1616,10 +2494,9 @@
 
       if (
         status &&
-        String(
-          status.status || ""
-        ).toUpperCase() ===
-          "COMPLETE"
+        normalizeStatus(
+          status.status
+        ) === "COMPLETE"
       ) {
         finishResults(
           status,
@@ -1636,9 +2513,9 @@
           "ERROR",
           "CANCELLED"
         ].includes(
-          String(
-            status.status || ""
-          ).toUpperCase()
+          normalizeStatus(
+            status.status
+          )
         )
       ) {
         processingFailed(
@@ -1650,7 +2527,8 @@
       }
 
       if (
-        attempts >= maxAttempts
+        attempts >=
+        maxAttempts
       ) {
         processingFailed(
           "The server did not confirm the completed measurement."
@@ -1661,9 +2539,9 @@
 
       setProgress(
         Math.min(
-          96,
-          90 +
-            attempts * 0.3
+          98,
+          94 +
+            attempts * 0.15
         ),
         "Waiting for SQL to confirm the measurement..."
       );
@@ -1753,12 +2631,6 @@
     state.phase =
       "results";
 
-    /*
-     * Keep processingStarted true
-     * so user cannot manually jump
-     * around the flow.
-     */
-
     state.processingStarted =
       true;
 
@@ -1770,20 +2642,22 @@
 
     if (refs.resultMeta) {
       refs.resultMeta.textContent =
-        `${child?.age_months || 0} months old`;
+        `${
+          child?.age_months || 0
+        } months old`;
     }
 
     if (refs.resultHeight) {
       refs.resultHeight.textContent =
-        Number.isFinite(height)
-          ? `${height.toFixed(1)} cm`
+        isValidHeight(height)
+          ? `${Number(height).toFixed(1)} cm`
           : "--.- cm";
     }
 
     if (refs.resultWeight) {
       refs.resultWeight.textContent =
-        Number.isFinite(weight)
-          ? `${weight.toFixed(2)} kg`
+        isValidWeight(weight)
+          ? `${Number(weight).toFixed(2)} kg`
           : "--.-- kg";
     }
 
@@ -1833,9 +2707,19 @@
 
     pushFeed(
       "Measurement complete",
-      `${payload.child_code || child?.child_code || "Child"} · ` +
-        `${Number.isFinite(weight) ? weight.toFixed(2) : "--"} kg · ` +
-        `${Number.isFinite(height) ? height.toFixed(1) : "--"} cm`
+      `${
+        payload.child_code ||
+        child?.child_code ||
+        "Child"
+      } · ${
+        isValidWeight(weight)
+          ? Number(weight).toFixed(2)
+          : "--"
+      } kg · ${
+        isValidHeight(height)
+          ? Number(height).toFixed(1)
+          : "--"
+      } cm`
     );
 
     stopFirebasePolling();
@@ -1861,758 +2745,15 @@
     }
 
     /*
-     * IMPORTANT:
-     *
-     * We clear the browser session ONLY
-     * after the measurement has actually
-     * reached the Results page.
+     * Only clear the browser session AFTER
+     * results are successfully displayed.
      */
 
     clearSessionStorage();
   }
 
   // ============================================================
-  // FIREBASE POLLING
-  // ============================================================
-
-  async function refreshFirebaseLatestMeasurement() {
-    if (
-      !firebaseEnabled ||
-      !state.awaitingLiveResult
-    ) {
-      return null;
-    }
-
-    const url =
-      firebaseLatestMeasurementUrl();
-
-    if (!url) {
-      return null;
-    }
-
-    try {
-      const response =
-        await fetch(url, {
-          cache: "no-store",
-
-          headers: {
-            Accept:
-              "application/json"
-          }
-        });
-
-      if (!response.ok) {
-        state.firebaseOnline =
-          false;
-
-        setChip(
-          connectedChip,
-          "Device: Offline",
-          false
-        );
-
-        return null;
-      }
-
-      const payload =
-        await response.json();
-
-      if (
-        !payload ||
-        typeof payload !==
-          "object"
-      ) {
-        return null;
-      }
-
-      state.firebaseOnline =
-        true;
-
-      setChip(
-        connectedChip,
-        "Device: Connected",
-        true
-      );
-
-      /*
-       * ========================================================
-       * EXACT SESSION CHECK
-       * ========================================================
-       */
-
-      const payloadSessionId =
-        Number(
-          payload.session_id ||
-          payload.sessionId ||
-          0
-        );
-
-      const expectedSessionId =
-        Number(
-          state.firebaseSessionId ||
-          getCurrentSessionId() ||
-          0
-        );
-
-      /*
-       * If Firebase provides a session ID,
-       * it MUST match the active SQL session.
-       */
-
-      if (
-        expectedSessionId > 0 &&
-        payloadSessionId > 0 &&
-        payloadSessionId !==
-          expectedSessionId
-      ) {
-        console.warn(
-          "[SukatKalusugan] Ignoring Firebase session mismatch",
-          {
-            expected:
-              expectedSessionId,
-            received:
-              payloadSessionId
-          }
-        );
-
-        return null;
-      }
-
-      /*
-       * If our kiosk has a known session but
-       * Firebase has no session_id at all,
-       * do NOT trust COMPLETE/old readings.
-       *
-       * We still allow live values because
-       * some existing ESP32 payloads may not
-       * contain session_id.
-       */
-
-      const timestamp =
-        String(
-          payload.timestamp || ""
-        );
-
-      if (
-        timestamp &&
-        timestamp ===
-          state.lastFirebaseTimestamp
-      ) {
-        return payload;
-      }
-
-      state.lastFirebaseTimestamp =
-        timestamp;
-
-      applyFirebaseStatus(
-        payload
-      );
-
-      return payload;
-    } catch (error) {
-      console.error(
-        "[SukatKalusugan] Firebase polling error",
-        error
-      );
-
-      state.firebaseOnline =
-        false;
-
-      setChip(
-        connectedChip,
-        "Device: Offline",
-        false
-      );
-
-      return null;
-    }
-  }
-
-  function startFirebasePolling() {
-    if (!firebaseEnabled) {
-      pushFeed(
-        "Firebase unavailable",
-        "Firebase is not configured.",
-        "warn"
-      );
-
-      return;
-    }
-
-    stopFirebasePolling();
-
-    state.firebaseTimer =
-      setInterval(
-        refreshFirebaseLatestMeasurement,
-        pollIntervalMs
-      );
-
-    refreshFirebaseLatestMeasurement();
-  }
-
-  function stopFirebasePolling() {
-    if (
-      state.firebaseTimer
-    ) {
-      clearInterval(
-        state.firebaseTimer
-      );
-
-      state.firebaseTimer =
-        null;
-    }
-  }
-
-  // ============================================================
-  // BACKEND SESSION STATUS
-  // ============================================================
-
-  async function refreshMeasurementStatus(
-    scheduleNext = true
-  ) {
-    if (!state.session) {
-      return null;
-    }
-
-    const expectedSessionId =
-      getCurrentSessionId();
-
-    if (!expectedSessionId) {
-      console.warn(
-        "[SukatKalusugan] Cannot refresh session without session ID."
-      );
-
-      return null;
-    }
-
-    try {
-      const endpoint =
-        data?.endpoints
-          ?.measurementStatus ||
-        "../api/kiosk/measurement_status.php";
-
-      const url =
-        new URL(
-          endpoint,
-          window.location.href
-        );
-
-      url.searchParams.set(
-        "device_id",
-        deviceId
-      );
-
-      /*
-       * ALWAYS send exact session_id.
-       */
-
-      url.searchParams.set(
-        "session_id",
-        String(
-          expectedSessionId
-        )
-      );
-
-      const response =
-        await fetch(
-          url.toString(),
-          {
-            cache: "no-store",
-
-            headers: {
-              Accept:
-                "application/json"
-            }
-          }
-        );
-
-      const json =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      const payload =
-        json?.data || {};
-
-      if (
-        !response.ok ||
-        json?.success !== true
-      ) {
-        throw new Error(
-          json?.message ||
-            "Unable to load measurement status"
-        );
-      }
-
-      /*
-       * ========================================================
-       * EXACT SQL SESSION VALIDATION
-       * ========================================================
-       */
-
-      const returnedSessionId =
-        Number(
-          payload.session_id ||
-          payload.id ||
-          0
-        );
-
-      if (
-        returnedSessionId <= 0 ||
-        returnedSessionId !==
-          expectedSessionId
-      ) {
-        console.error(
-          "[SukatKalusugan] SQL SESSION MISMATCH",
-          {
-            expected:
-              expectedSessionId,
-            received:
-              returnedSessionId
-          }
-        );
-
-        pushFeed(
-          "Session mismatch",
-          `Expected SQL session #${expectedSessionId}, but server returned #${returnedSessionId || "unknown"}.`,
-          "error"
-        );
-
-        /*
-         * DO NOT replace state.session.
-         */
-
-        return state.session;
-      }
-
-      /*
-       * ========================================================
-       * UPDATE ONLY OUR SESSION
-       * ========================================================
-       */
-
-      state.session =
-        payload;
-
-      updateSessionInfo(
-        payload
-      );
-
-      saveSessionToStorage();
-
-      const status =
-        String(
-          payload.status || ""
-        ).toUpperCase();
-
-      /*
-       * ========================================================
-       * ERROR
-       * ========================================================
-       */
-
-      if (
-        status === "ERROR" ||
-        status === "CANCELLED"
-      ) {
-        /*
-         * Do not allow the error handler
-         * to accidentally change to results.
-         */
-
-        processingFailed(
-          payload.error_message ||
-            "Measurement failed."
-        );
-
-        return payload;
-      }
-
-      /*
-       * ========================================================
-       * ACTIVE MEASUREMENT
-       * ========================================================
-       */
-
-      if (
-        isMeasurementActive(
-          payload
-        )
-      ) {
-        /*
-         * If we are not processing,
-         * stay on live screen.
-         */
-
-        if (
-          !state.processingStarted &&
-          state.step !== "live"
-        ) {
-          setStep("live");
-        }
-
-        if (
-          scheduleNext
-        ) {
-          if (
-            state.statusTimer
-          ) {
-            clearTimeout(
-              state.statusTimer
-            );
-          }
-
-          state.statusTimer =
-            setTimeout(
-              () =>
-                refreshMeasurementStatus(
-                  true
-                ),
-              pollIntervalMs
-            );
-        }
-
-        return payload;
-      }
-
-      /*
-       * ========================================================
-       * SQL COMPLETE
-       * ========================================================
-       *
-       * COMPLETE means sensor/session finished.
-       *
-       * It does NOT mean:
-       *
-       *      Processing
-       *
-       * It does NOT mean:
-       *
-       *      Results
-       *
-       * The operator must click:
-       *
-       *      Process Measurement
-       */
-
-      if (
-        status === "COMPLETE" &&
-        !state.processingStarted
-      ) {
-        if (
-          Number.isFinite(
-            state.weight
-          ) &&
-          Number.isFinite(
-            state.height
-          )
-        ) {
-          state.measurementReady =
-            true;
-
-          state.awaitingLiveResult =
-            true;
-
-          if (
-            state.step !== "live"
-          ) {
-            setStep("live");
-          }
-
-          markMeasurementReady();
-        }
-      }
-
-      /*
-       * IMPORTANT:
-       *
-       * If processingStarted is true,
-       * COMPLETE is handled by
-       * processMeasurement() polling.
-       */
-
-      return payload;
-    } catch (error) {
-      console.warn(
-        "[SukatKalusugan] Session status error",
-        error
-      );
-
-      if (
-        scheduleNext &&
-        isMeasurementActive(
-          state.session
-        )
-      ) {
-        state.statusTimer =
-          setTimeout(
-            () =>
-              refreshMeasurementStatus(
-                true
-              ),
-            pollIntervalMs
-          );
-      }
-
-      return null;
-    }
-  }
-
-  // ============================================================
-  // START MEASUREMENT
-  // ============================================================
-
-  async function startMeasurementFlow() {
-    const child =
-      getSelectedChild();
-
-    if (!child) {
-      pushFeed(
-        "Start blocked",
-        "Choose a child first.",
-        "warn"
-      );
-
-      setStep("select");
-
-      return false;
-    }
-
-    if (
-      isMeasurementActive()
-    ) {
-      pushFeed(
-        "Start blocked",
-        "A measurement is already active.",
-        "warn"
-      );
-
-      return false;
-    }
-
-    if (
-      state.processingStarted
-    ) {
-      pushFeed(
-        "Start blocked",
-        "The current measurement is still being processed.",
-        "warn"
-      );
-
-      return false;
-    }
-
-    state.submitting = true;
-
-    syncStartButtonState();
-
-    try {
-      const endpoint =
-        data?.endpoints
-          ?.startMeasurement ||
-        "../api/kiosk/start_measurement.php";
-
-      const response =
-        await fetch(
-          endpoint,
-          {
-            method: "POST",
-
-            headers: {
-              "Content-Type":
-                "application/json",
-
-              Accept:
-                "application/json"
-            },
-
-            body: JSON.stringify({
-              device_id:
-                deviceId,
-
-              child_id:
-                child.id,
-
-              location:
-                "Kiosk"
-            }),
-
-            cache: "no-store"
-          }
-        );
-
-      const json =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      const payload =
-        json?.data || {};
-
-      if (
-        !response.ok ||
-        json?.success !== true
-      ) {
-        throw new Error(
-          json?.message ||
-            "Could not start measurement"
-        );
-      }
-
-      /*
-       * ========================================================
-       * NEW SESSION
-       * ========================================================
-       */
-
-      const newSessionId =
-        Number(
-          payload.session_id ||
-          payload.id ||
-          0
-        );
-
-      if (
-        newSessionId <= 0
-      ) {
-        throw new Error(
-          "Server did not return a valid measurement session ID."
-        );
-      }
-
-      /*
-       * Save the exact session.
-       */
-
-      state.session =
-        payload;
-
-      state.firebaseSessionId =
-        newSessionId;
-
-      state.awaitingLiveResult =
-        true;
-
-      state.lastFirebaseTimestamp =
-        "";
-
-      state.submitting =
-        false;
-
-      state.processingStarted =
-        false;
-
-      state.measurementReady =
-        false;
-
-      state.weight =
-        null;
-
-      state.height =
-        null;
-
-      state.weightLocked =
-        false;
-
-      state.heightLocked =
-        false;
-
-      state.lastWeightRaw =
-        null;
-
-      state.lastHeightRaw =
-        null;
-
-      state.weightStableCount =
-        0;
-
-      state.heightStableCount =
-        0;
-
-      state.phase =
-        "live";
-
-      state.restoredSession =
-        false;
-
-      updateSessionInfo(
-        payload
-      );
-
-      saveSessionToStorage();
-
-      syncStartButtonState();
-
-      /*
-       * ========================================================
-       * STEP 2
-       * ========================================================
-       */
-
-      setStep("live");
-
-      setProgress(
-        20,
-        "Starting live measurement..."
-      );
-
-      if (refs.weightStatus) {
-        refs.weightStatus.textContent =
-          "Waiting for HX711...";
-      }
-
-      if (refs.heightStatus) {
-        refs.heightStatus.textContent =
-          "Waiting for TF-Luna...";
-      }
-
-      setChip(
-        connectedChip,
-        "Device: Waiting",
-        false
-      );
-
-      pushFeed(
-        "Measurement started",
-        `${child.child_code || "Child"} · Session #${newSessionId} · waiting for ESP32`
-      );
-
-      startFirebasePolling();
-
-      await refreshMeasurementStatus(
-        true
-      );
-
-      return true;
-    } catch (error) {
-      console.error(
-        "[SukatKalusugan] Start measurement failed",
-        error
-      );
-
-      state.submitting =
-        false;
-
-      state.awaitingLiveResult =
-        false;
-
-      syncStartButtonState();
-
-      pushFeed(
-        "Start failed",
-        error.message ||
-          "Unable to contact server.",
-        "error"
-      );
-
-      setStep("select");
-
-      return false;
-    }
-  }
-
-  // ============================================================
-  // RESTORE ACTIVE SESSION AFTER REFRESH
+  // RESTORE ACTIVE SESSION
   // ============================================================
 
   async function restoreActiveSession() {
@@ -2643,32 +2784,24 @@
     if (
       savedSessionId <= 0
     ) {
-      console.warn(
-        "[SukatKalusugan] Stored session has no valid ID."
-      );
-
       clearSessionStorage();
 
       return false;
     }
 
     const savedStatus =
-      String(
-        savedSession.status ||
-          ""
-      ).toUpperCase();
-
-    /*
-     * Completed/failed sessions are
-     * not restored as active kiosk sessions.
-     */
+      normalizeStatus(
+        savedSession.status
+      );
 
     if (
       [
         "COMPLETE",
         "ERROR",
         "CANCELLED"
-      ].includes(savedStatus)
+      ].includes(
+        savedStatus
+      )
     ) {
       clearSessionStorage();
 
@@ -2686,11 +2819,9 @@
       return false;
     }
 
-    /*
-     * ========================================================
-     * RESTORE EXACT SESSION
-     * ========================================================
-     */
+    // ==========================================================
+    // RESTORE EXACT SESSION
+    // ==========================================================
 
     state.child =
       child;
@@ -2702,15 +2833,15 @@
       savedSessionId;
 
     state.weight =
-      Number.isFinite(
-        Number(saved.weight)
+      isValidWeight(
+        saved.weight
       )
         ? Number(saved.weight)
         : null;
 
     state.height =
-      Number.isFinite(
-        Number(saved.height)
+      isValidHeight(
+        saved.height
       )
         ? Number(saved.height)
         : null;
@@ -2742,11 +2873,12 @@
     state.restoredSession =
       true;
 
-    /*
-     * ========================================================
-     * VISUAL CHILD RESTORE
-     * ========================================================
-     */
+    state.lastFirebaseSignature =
+      "";
+
+    // ==========================================================
+    // CHILD UI
+    // ==========================================================
 
     childCards.forEach(card => {
       card.classList.toggle(
@@ -2768,14 +2900,12 @@
         false;
     }
 
-    /*
-     * ========================================================
-     * RESTORE SENSOR VALUES
-     * ========================================================
-     */
+    // ==========================================================
+    // SENSOR UI
+    // ==========================================================
 
     if (
-      Number.isFinite(
+      isValidWeight(
         state.weight
       )
     ) {
@@ -2788,7 +2918,7 @@
     }
 
     if (
-      Number.isFinite(
+      isValidHeight(
         state.height
       )
     ) {
@@ -2804,30 +2934,18 @@
       state.session
     );
 
-    /*
-     * ========================================================
-     * CRITICAL:
-     *
-     * ALWAYS return to LIVE after refresh
-     * for an active session.
-     *
-     * Never return to Welcome.
-     * Never return to Select.
-     * Never automatically enter Processing.
-     * ========================================================
-     */
+    // ==========================================================
+    // ALWAYS RETURN TO LIVE
+    // ==========================================================
 
     setStep("live");
 
     if (
-      state.measurementReady ||
-      (
-        Number.isFinite(
-          state.weight
-        ) &&
-        Number.isFinite(
-          state.height
-        )
+      isValidWeight(
+        state.weight
+      ) &&
+      isValidHeight(
+        state.height
       )
     ) {
       state.measurementReady =
@@ -2843,67 +2961,49 @@
 
     pushFeed(
       "Session restored",
-      `${child.child_code || "Child"} · Session #${savedSessionId}`
+      `${
+        child.child_code ||
+        "Child"
+      } · Session #${savedSessionId}`
     );
 
     startFirebasePolling();
 
-    /*
-     * Ask SQL for THIS EXACT SESSION.
-     */
+    // ==========================================================
+    // VERIFY EXACT SQL SESSION
+    // ==========================================================
 
     const latest =
       await refreshMeasurementStatus(
         false
       );
 
-    /*
-     * If the exact session is still active,
-     * continue polling it.
-     */
+    if (!latest) {
+      /*
+       * Keep the restored session.
+       * Firebase may still be available even
+       * if PHP temporarily fails.
+       */
 
-    if (
-      latest &&
-      isMeasurementActive(
-        latest
-      )
-    ) {
-      if (
-        state.statusTimer
-      ) {
-        clearTimeout(
-          state.statusTimer
-        );
-      }
+      scheduleStatusRefresh();
 
-      state.statusTimer =
-        setTimeout(
-          () =>
-            refreshMeasurementStatus(
-              true
-            ),
-          pollIntervalMs
-        );
+      return true;
     }
 
-    /*
-     * If SQL says COMPLETE and we have
-     * the sensor values, keep the user
-     * on Live and show Process button.
-     */
+    const latestStatus =
+      normalizeStatus(
+        latest.status
+      );
 
     if (
-      latest &&
-      String(
-        latest.status || ""
-      ).toUpperCase() ===
-        "COMPLETE"
+      latestStatus ===
+      "COMPLETE"
     ) {
       if (
-        Number.isFinite(
+        isValidWeight(
           state.weight
         ) &&
-        Number.isFinite(
+        isValidHeight(
           state.height
         )
       ) {
@@ -2914,6 +3014,12 @@
 
         markMeasurementReady();
       }
+    } else if (
+      isMeasurementActive(
+        latest
+      )
+    ) {
+      scheduleStatusRefresh();
     }
 
     syncStartButtonState();
@@ -2926,11 +3032,6 @@
   // ============================================================
 
   function resetKioskToIdle() {
-    /*
-     * Do not reset while the ESP32 is
-     * actively measuring.
-     */
-
     if (
       isMeasurementActive()
     ) {
@@ -2942,10 +3043,6 @@
 
       return;
     }
-
-    /*
-     * Do not reset while processing.
-     */
 
     if (
       state.processingStarted &&
@@ -2960,17 +3057,13 @@
       return;
     }
 
-    if (
-      state.statusTimer
-    ) {
+    if (state.statusTimer) {
       clearTimeout(
         state.statusTimer
       );
     }
 
-    if (
-      state.processingTimer
-    ) {
+    if (state.processingTimer) {
       clearInterval(
         state.processingTimer
       );
@@ -3004,6 +3097,9 @@
     state.submitting =
       false;
 
+    state.startRequestInProgress =
+      false;
+
     state.awaitingLiveResult =
       false;
 
@@ -3011,6 +3107,9 @@
       null;
 
     state.lastFirebaseTimestamp =
+      "";
+
+    state.lastFirebaseSignature =
       "";
 
     state.weight =
@@ -3054,12 +3153,11 @@
 
     clearSessionStorage();
 
-    childCards.forEach(
-      card =>
-        card.classList.remove(
-          "is-selected"
-        )
-    );
+    childCards.forEach(card => {
+      card.classList.remove(
+        "is-selected"
+      );
+    });
 
     if (refs.currentChildLabel) {
       refs.currentChildLabel.textContent =
@@ -3075,11 +3173,9 @@
       searchInput.value = "";
     }
 
-    childCards.forEach(
-      card => {
-        card.hidden = false;
-      }
-    );
+    childCards.forEach(card => {
+      card.hidden = false;
+    });
 
     if (refs.weightReadout) {
       refs.weightReadout.textContent =
@@ -3153,7 +3249,9 @@
 
     if (refs.resultSource) {
       refs.resultSource.textContent =
-        "ESP32 → Firebase → SQL";
+        firebaseEnabled
+          ? "ESP32 → Firebase → SQL"
+          : "Firebase unavailable";
     }
 
     setProgress(
@@ -3175,7 +3273,9 @@
 
     setChip(
       connectedChip,
-      "Device: Waiting",
+      firebaseEnabled
+        ? "Device: Waiting"
+        : "Device: Firebase Off",
       false
     );
 
@@ -3208,17 +3308,24 @@
         false
       );
 
-      return;
+      return false;
     }
 
     const url =
       firebaseLatestMeasurementUrl();
 
+    if (!url) {
+      return false;
+    }
+
     try {
       const response =
-        await fetch(url, {
-          cache: "no-store"
-        });
+        await fetch(
+          url,
+          {
+            cache: "no-store"
+          }
+        );
 
       if (response.ok) {
         state.firebaseOnline =
@@ -3229,24 +3336,33 @@
           "Device: Firebase Ready",
           true
         );
-      } else {
-        setChip(
-          connectedChip,
-          "Device: Firebase Error",
-          false
-        );
+
+        return true;
       }
+
+      setChip(
+        connectedChip,
+        "Device: Firebase Error",
+        false
+      );
+
+      return false;
     } catch (error) {
       console.warn(
         "[SukatKalusugan] Firebase unavailable",
         error
       );
 
+      state.firebaseOnline =
+        false;
+
       setChip(
         connectedChip,
         "Device: Offline",
         false
       );
+
+      return false;
     }
   }
 
@@ -3256,7 +3372,7 @@
 
   function bindEvents() {
     // ----------------------------------------------------------
-    // Search
+    // SEARCH
     // ----------------------------------------------------------
 
     if (searchInput) {
@@ -3268,212 +3384,193 @@
               .trim()
               .toLowerCase();
 
-          childCards.forEach(
-            card => {
-              const text =
-                (
-                  card.dataset
-                    .filterText || ""
-                ).toLowerCase();
+          childCards.forEach(card => {
+            const text =
+              (
+                card.dataset
+                  .filterText || ""
+              ).toLowerCase();
 
-              card.hidden =
-                !text.includes(
-                  term
-                );
-            }
-          );
+            card.hidden =
+              !text.includes(term);
+          });
         }
       );
     }
 
     // ----------------------------------------------------------
-    // Child cards
+    // CHILD CARDS
     // ----------------------------------------------------------
 
-    childCards.forEach(
-      card => {
-        card.addEventListener(
-          "click",
-          () => {
-            selectChild(
-              card.dataset.childId
+    childCards.forEach(card => {
+      card.addEventListener(
+        "click",
+        () => {
+          selectChild(
+            card.dataset.childId
+          );
+        }
+      );
+    });
+
+    // ----------------------------------------------------------
+    // ACTION BUTTONS
+    // ----------------------------------------------------------
+
+    actionButtons.forEach(button => {
+      button.addEventListener(
+        "click",
+        event => {
+          const action =
+            button.getAttribute(
+              "data-kiosk-action"
             );
-          }
-        );
-      }
-    );
 
-    // ----------------------------------------------------------
-    // Actions
-    // ----------------------------------------------------------
+          // ====================================================
+          // START
+          // ====================================================
 
-    actionButtons.forEach(
-      button => {
-        button.addEventListener(
-          "click",
-          () => {
-            const action =
-              button.getAttribute(
-                "data-kiosk-action"
-              );
-
-            // ----------------------------------------------
-            // START
-            // ----------------------------------------------
+          if (
+            action === "start"
+          ) {
+            event.preventDefault();
 
             if (
-              action === "start"
+              !getSelectedChild()
             ) {
-              if (
-                !getSelectedChild()
-              ) {
-                setStep("select");
+              setStep("select");
 
-                pushFeed(
-                  "Select child",
-                  "Choose a child before starting."
-                );
-
-                return;
-              }
-
-              startMeasurementFlow();
-
-              return;
-            }
-
-            // ----------------------------------------------
-            // PROCEED TO LIVE
-            // ----------------------------------------------
-
-            if (
-              action ===
-              "proceed-live"
-            ) {
-              if (
-                !getSelectedChild()
-              ) {
-                return;
-              }
-
-              startMeasurementFlow();
-
-              return;
-            }
-
-            // ----------------------------------------------
-            // PROCESS MEASUREMENT
-            // ----------------------------------------------
-
-            if (
-              action ===
-              "process-measurement"
-            ) {
-              processMeasurement();
-
-              return;
-            }
-
-            // ----------------------------------------------
-            // RESET
-            // ----------------------------------------------
-
-            if (
-              action === "reset"
-            ) {
-              resetKioskToIdle();
-
-              return;
-            }
-          }
-        );
-      }
-    );
-
-    // ----------------------------------------------------------
-    // Step buttons
-    // ----------------------------------------------------------
-
-    stepButtons.forEach(
-      button => {
-        button.addEventListener(
-          "click",
-          () => {
-            const target =
-              button.getAttribute(
-                "data-kiosk-step-jump"
-              );
-
-            // ----------------------------------------------
-            // SELECT
-            // ----------------------------------------------
-
-            if (
-              target === "select"
-            ) {
-              if (
-                !isMeasurementActive() &&
-                !state.processingStarted
-              ) {
-                setStep("select");
-              }
-
-              return;
-            }
-
-            // ----------------------------------------------
-            // LIVE
-            // ----------------------------------------------
-
-            if (
-              target === "live"
-            ) {
-              if (
-                state.session &&
-                !state.processingStarted
-              ) {
-                setStep("live");
-              }
-
-              return;
-            }
-
-            // ----------------------------------------------
-            // PROCESSING
-            // ----------------------------------------------
-
-            if (
-              target ===
-              "processing"
-            ) {
               pushFeed(
-                "Step locked",
-                "Click Process Measurement to continue.",
-                "warn"
+                "Select child",
+                "Choose a child before starting."
               );
 
               return;
             }
 
-            // ----------------------------------------------
-            // RESULTS
-            // ----------------------------------------------
+            startMeasurementFlow();
+
+            return;
+          }
+
+          // ====================================================
+          // PROCEED LIVE
+          // ====================================================
+
+          if (
+            action ===
+            "proceed-live"
+          ) {
+            event.preventDefault();
 
             if (
-              target === "results"
+              !getSelectedChild()
             ) {
-              pushFeed(
-                "Step locked",
-                "Results are available after processing.",
-                "warn"
-              );
-
               return;
             }
+
+            startMeasurementFlow();
+
+            return;
           }
-        );
-      }
-    );
+
+          // ====================================================
+          // PROCESS
+          // ====================================================
+
+          if (
+            action ===
+            "process-measurement"
+          ) {
+            event.preventDefault();
+
+            processMeasurement();
+
+            return;
+          }
+
+          // ====================================================
+          // RESET
+          // ====================================================
+
+          if (
+            action === "reset"
+          ) {
+            event.preventDefault();
+
+            resetKioskToIdle();
+
+            return;
+          }
+        }
+      );
+    });
+
+    // ----------------------------------------------------------
+    // STEP BUTTONS
+    // ----------------------------------------------------------
+
+    stepButtons.forEach(button => {
+      button.addEventListener(
+        "click",
+        () => {
+          const target =
+            button.getAttribute(
+              "data-kiosk-step-jump"
+            );
+
+          if (
+            target === "select"
+          ) {
+            if (
+              !isMeasurementActive() &&
+              !state.processingStarted
+            ) {
+              setStep("select");
+            }
+
+            return;
+          }
+
+          if (
+            target === "live"
+          ) {
+            if (
+              state.session &&
+              !state.processingStarted
+            ) {
+              setStep("live");
+            }
+
+            return;
+          }
+
+          if (
+            target === "processing"
+          ) {
+            pushFeed(
+              "Step locked",
+              "Click Process Measurement to continue.",
+              "warn"
+            );
+
+            return;
+          }
+
+          if (
+            target === "results"
+          ) {
+            pushFeed(
+              "Step locked",
+              "Results are available after processing.",
+              "warn"
+            );
+
+            return;
+          }
+        }
+      );
+    });
   }
 
   // ============================================================
@@ -3507,7 +3604,7 @@
   }
 
   // ============================================================
-  // PAGE VISIBILITY
+  // VISIBILITY
   // ============================================================
 
   function bindVisibilityHandling() {
@@ -3515,30 +3612,26 @@
       "visibilitychange",
       () => {
         if (
-          document.visibilityState ===
+          document.visibilityState !==
           "visible"
         ) {
-          /*
-           * When Chrome/tab comes back,
-           * immediately verify the exact
-           * SQL session again.
-           */
+          return;
+        }
 
-          if (
-            state.session &&
-            !state.processingStarted
-          ) {
-            refreshMeasurementStatus(
-              true
-            );
-          }
+        if (
+          state.session &&
+          !state.processingStarted
+        ) {
+          refreshMeasurementStatus(
+            true
+          );
+        }
 
-          if (
-            state.awaitingLiveResult &&
-            firebaseEnabled
-          ) {
-            refreshFirebaseLatestMeasurement();
-          }
+        if (
+          state.awaitingLiveResult &&
+          firebaseEnabled
+        ) {
+          refreshFirebaseLatestMeasurement();
         }
       }
     );
@@ -3555,11 +3648,8 @@
         /*
          * NEVER clear sessionStorage here.
          *
-         * This is important.
-         *
-         * Refreshing the kiosk must NOT destroy
-         * the browser's knowledge of the current
-         * measurement session.
+         * Refreshing Chrome must preserve
+         * the current kiosk measurement.
          */
 
         if (
@@ -3585,24 +3675,17 @@
 
     startClock();
 
+    /*
+     * Check Firebase but do not block
+     * kiosk initialization on Firebase.
+     */
+
     checkFirebaseConnection();
 
     /*
-     * ========================================================
-     * CRITICAL REFRESH LOGIC
-     * ========================================================
+     * FIRST restore browser session.
      *
-     * First try to restore the exact browser session.
-     *
-     * We DO NOT do:
-     *
-     *     setStep("welcome")
-     *
-     * before restoration.
-     *
-     * Otherwise refreshing the kiosk would show
-     * the Welcome screen while SQL still contains
-     * the active session.
+     * Do not immediately force Welcome.
      */
 
     const restored =
@@ -3610,10 +3693,11 @@
 
     if (restored) {
       console.log(
-        "[SukatKalusugan] Active session restored after refresh.",
+        "[SukatKalusugan] Active session restored.",
         {
           sessionId:
             state.firebaseSessionId,
+
           child:
             state.child?.child_code
         }
@@ -3622,11 +3706,9 @@
       return;
     }
 
-    /*
-     * ========================================================
-     * NO ACTIVE SESSION
-     * ========================================================
-     */
+    // ==========================================================
+    // NO ACTIVE SESSION
+    // ==========================================================
 
     setStep("welcome");
 
@@ -3641,6 +3723,8 @@
           ? "ESP32 → Firebase → SQL"
           : "Firebase unavailable";
     }
+
+    updateProcessButton();
 
     syncStartButtonState();
 
@@ -3664,4 +3748,5 @@
   // ============================================================
 
   initialize();
+
 })();

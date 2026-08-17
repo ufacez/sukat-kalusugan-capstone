@@ -10,12 +10,10 @@
 const char* WIFI_SSID = "La Familia";
 const char* WIFI_PASSWORD = "enz0p4o1931";
 
-
 // =====================================================
 // SERVER
 // =====================================================
 
-// Confirmed working Apache server
 const String SERVER_IP =
   "http://192.168.100.164/sukat-kalusugan-capstone/";
 
@@ -28,7 +26,6 @@ const String GET_COMMAND_PATH =
 const String SUBMIT_MEASUREMENT_PATH =
   "public_html/api/esp32/submit_measurement.php";
 
-
 // =====================================================
 // FIREBASE
 // =====================================================
@@ -37,7 +34,6 @@ const String FIREBASE_URL =
   "https://sukatkalusugan-default-rtdb.firebaseio.com";
 
 const String FIREBASE_AUTH = "";
-
 
 // =====================================================
 // HX711
@@ -51,10 +47,8 @@ HX711_ADC LoadCell(
   HX711_SCK
 );
 
-// YOUR WORKING CALIBRATION VALUE
 const float HX711_CAL_FACTOR =
   -20892.50f;
-
 
 // =====================================================
 // TF-LUNA
@@ -65,18 +59,8 @@ const float HX711_CAL_FACTOR =
 
 HardwareSerial TF_Luna(2);
 
-
 // =====================================================
-// TF-LUNA MOUNTING HEIGHT
-// =====================================================
-//
-// TEMPORARY TEST VALUE.
-//
-// If sensor is mounted 210 cm above the platform,
-// change this to:
-//
-// const float MOUNTING_HEIGHT_CM = 210.0f;
-//
+// HEIGHT
 // =====================================================
 
 const float MOUNTING_HEIGHT_CM =
@@ -85,9 +69,8 @@ const float MOUNTING_HEIGHT_CM =
 const float HEIGHT_OFFSET_CM =
   0.0f;
 
-
 // =====================================================
-// VALID MEASUREMENT RANGE
+// VALID RANGE
 // =====================================================
 
 const float MIN_HEIGHT_CM = 0.0f;
@@ -96,39 +79,29 @@ const float MAX_HEIGHT_CM = 250.0f;
 const float MIN_WEIGHT_KG = 0.1f;
 const float MAX_WEIGHT_KG = 300.0f;
 
-
 // =====================================================
 // TIMING
 // =====================================================
 
-const unsigned long COMMAND_POLL_INTERVAL =
-  2000;
-
-const unsigned long FIREBASE_UPDATE_INTERVAL =
-  500;
-
-const unsigned long MEASUREMENT_TIMEOUT =
-  30000;
-
+const unsigned long COMMAND_POLL_INTERVAL = 2000;
+const unsigned long FIREBASE_UPDATE_INTERVAL = 500;
+const unsigned long SESSION_VALIDATE_INTERVAL = 1500;
+const unsigned long MEASUREMENT_TIMEOUT = 30000;
 
 // =====================================================
 // STATE
 // =====================================================
 
 bool hx711Ready = false;
-
 bool measuring = false;
 
 long currentSessionId = 0;
-
 long lastSessionId = 0;
 
 unsigned long lastCommandPoll = 0;
-
 unsigned long lastFirebaseUpdate = 0;
-
+unsigned long lastSessionValidation = 0;
 unsigned long measurementStartedAt = 0;
-
 
 // =====================================================
 // WIFI
@@ -144,6 +117,8 @@ void connectWiFi() {
   Serial.println("================================");
   Serial.println("CONNECTING TO WIFI");
   Serial.println("================================");
+
+  WiFi.mode(WIFI_STA);
 
   WiFi.begin(
     WIFI_SSID,
@@ -184,7 +159,6 @@ void connectWiFi() {
   }
 }
 
-
 // =====================================================
 // HTTP GET
 // =====================================================
@@ -199,7 +173,6 @@ String httpGet(
   if (
     WiFi.status() != WL_CONNECTED
   ) {
-
     return "";
   }
 
@@ -215,7 +188,6 @@ String httpGet(
   String response = "";
 
   if (httpCode > 0) {
-
     response =
       http.getString();
   }
@@ -225,70 +197,8 @@ String httpGet(
   return response;
 }
 
-
 // =====================================================
-// HTTP POST JSON
-// =====================================================
-
-String httpPostJson(
-  const String& url,
-  const String& jsonBody,
-  int& httpCode
-) {
-
-  httpCode = -1;
-
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
-
-    return "";
-  }
-
-  HTTPClient http;
-
-  http.begin(url);
-
-  http.setTimeout(10000);
-
-  http.addHeader(
-    "Content-Type",
-    "application/json"
-  );
-
-  httpCode =
-    http.POST(
-      jsonBody
-    );
-
-  String response = "";
-
-  if (httpCode > 0) {
-
-    response =
-      http.getString();
-  }
-
-  http.end();
-
-  return response;
-}
-
-
-// =====================================================
-// HTTP POST FORM DATA
-// =====================================================
-//
-// This is used for submit_measurement.php.
-//
-// We tested this exact format successfully from
-// PowerShell:
-//
-// device_id
-// session_id
-// height_cm
-// weight_kg
-//
+// HTTP POST FORM
 // =====================================================
 
 String httpPostForm(
@@ -302,7 +212,6 @@ String httpPostForm(
   if (
     WiFi.status() != WL_CONNECTED
   ) {
-
     return "";
   }
 
@@ -325,7 +234,6 @@ String httpPostForm(
   String response = "";
 
   if (httpCode > 0) {
-
     response =
       http.getString();
   }
@@ -334,7 +242,6 @@ String httpPostForm(
 
   return response;
 }
-
 
 // =====================================================
 // HTTP PUT JSON
@@ -351,7 +258,6 @@ String httpPutJson(
   if (
     WiFi.status() != WL_CONNECTED
   ) {
-
     return "";
   }
 
@@ -374,7 +280,6 @@ String httpPutJson(
   String response = "";
 
   if (httpCode > 0) {
-
     response =
       http.getString();
   }
@@ -384,7 +289,6 @@ String httpPutJson(
   return response;
 }
 
-
 // =====================================================
 // HX711 SETUP
 // =====================================================
@@ -392,25 +296,16 @@ String httpPutJson(
 void setupHX711() {
 
   Serial.println();
-  Serial.println(
-    "================================"
-  );
-
-  Serial.println(
-    "STARTING HX711"
-  );
-
-  Serial.println(
-    "================================"
-  );
+  Serial.println("================================");
+  Serial.println("STARTING HX711");
+  Serial.println("================================");
 
   LoadCell.begin();
 
   unsigned long stabilizingTime =
     2000;
 
-  bool tare =
-    true;
+  bool tare = true;
 
   LoadCell.start(
     stabilizingTime,
@@ -422,26 +317,16 @@ void setupHX711() {
     LoadCell.getSignalTimeoutFlag()
   ) {
 
-    Serial.println(
-      "HX711 ERROR"
-    );
+    Serial.println("HX711 ERROR");
+    Serial.println("Check DOUT and SCK wiring.");
 
-    Serial.println(
-      "Check DOUT and SCK wiring."
-    );
-
-    hx711Ready =
-      false;
+    hx711Ready = false;
 
     return;
   }
 
   LoadCell.setCalFactor(
     HX711_CAL_FACTOR
-  );
-
-  Serial.println(
-    "HX711 startup complete"
   );
 
   Serial.print(
@@ -455,55 +340,16 @@ void setupHX711() {
   while (
     !LoadCell.update()
   ) {
-
     delay(1);
   }
 
-  Serial.println(
-    "HX711 ready"
-  );
+  Serial.println("HX711 ready");
 
-  hx711Ready =
-    true;
+  hx711Ready = true;
 }
 
-
 // =====================================================
-// UPDATE HX711
-// =====================================================
-
-void updateHX711() {
-
-  if (
-    hx711Ready
-  ) {
-
-    LoadCell.update();
-  }
-}
-
-
-// =====================================================
-// GET CURRENT WEIGHT
-// =====================================================
-
-float getCurrentWeight() {
-
-  if (
-    !hx711Ready
-  ) {
-
-    return -1.0f;
-  }
-
-  LoadCell.update();
-
-  return LoadCell.getData();
-}
-
-
-// =====================================================
-// READ TF-LUNA DISTANCE
+// TF-LUNA
 // =====================================================
 
 bool readTFLunaDistanceCm(
@@ -522,7 +368,6 @@ bool readTFLunaDistanceCm(
     if (
       first != 0x59
     ) {
-
       continue;
     }
 
@@ -532,15 +377,11 @@ bool readTFLunaDistanceCm(
     if (
       second != 0x59
     ) {
-
       continue;
     }
 
-    buffer[0] =
-      0x59;
-
-    buffer[1] =
-      0x59;
+    buffer[0] = 0x59;
+    buffer[1] = 0x59;
 
     for (
       int i = 2;
@@ -554,7 +395,6 @@ bool readTFLunaDistanceCm(
       if (
         value < 0
       ) {
-
         return false;
       }
 
@@ -562,34 +402,21 @@ bool readTFLunaDistanceCm(
         (uint8_t)value;
     }
 
-    // =================================================
-    // CHECKSUM
-    // =================================================
-
-    uint16_t checksum =
-      0;
+    uint16_t checksum = 0;
 
     for (
       int i = 0;
       i < 8;
       i++
     ) {
-
-      checksum +=
-        buffer[i];
+      checksum += buffer[i];
     }
 
     if (
-      (checksum & 0xFF) !=
-      buffer[8]
+      (checksum & 0xFF) != buffer[8]
     ) {
-
       continue;
     }
-
-    // =================================================
-    // DISTANCE IN MM
-    // =================================================
 
     uint16_t distanceMm =
       buffer[2] |
@@ -604,9 +431,8 @@ bool readTFLunaDistanceCm(
   return false;
 }
 
-
 // =====================================================
-// GET HEIGHT
+// HEIGHT
 // =====================================================
 
 bool getHeightReading(
@@ -654,9 +480,231 @@ bool getHeightReading(
   return true;
 }
 
+// =====================================================
+// GET CURRENT COMMAND
+// =====================================================
+
+bool getMeasurementCommand(
+  long& sessionId,
+  String& command,
+  bool& shouldMeasure,
+  String& status
+) {
+
+  String url =
+    SERVER_IP +
+    GET_COMMAND_PATH +
+    "?device_id=" +
+    DEVICE_ID;
+
+  int httpCode;
+
+  String response =
+    httpGet(
+      url,
+      httpCode
+    );
+
+  if (
+    httpCode != 200 ||
+    response.length() == 0
+  ) {
+
+    Serial.print(
+      "Command HTTP: "
+    );
+
+    Serial.println(
+      httpCode
+    );
+
+    return false;
+  }
+
+  StaticJsonDocument<1024> doc;
+
+  DeserializationError error =
+    deserializeJson(
+      doc,
+      response
+    );
+
+  if (
+    error
+  ) {
+
+    Serial.println(
+      "Command JSON parse failed."
+    );
+
+    Serial.println(
+      response
+    );
+
+    return false;
+  }
+
+  JsonVariant data;
+
+  if (
+    doc["data"].isNull()
+  ) {
+
+    data =
+      doc.as<JsonVariant>();
+
+  } else {
+
+    data =
+      doc["data"];
+  }
+
+  sessionId =
+    data["session_id"] |
+    0;
+
+  command =
+    String(
+      data["command"] |
+      ""
+    );
+
+  shouldMeasure =
+    data["should_measure"] |
+    false;
+
+  status =
+    String(
+      data["status"] |
+      "IDLE"
+    );
+
+  Serial.println();
+  Serial.println("========== COMMAND ==========");
+
+  Serial.print("Status: ");
+  Serial.println(status);
+
+  Serial.print("Command: ");
+  Serial.println(command);
+
+  Serial.print("Should measure: ");
+  Serial.println(
+    shouldMeasure ? "YES" : "NO"
+  );
+
+  Serial.print("Session ID: ");
+  Serial.println(sessionId);
+
+  Serial.println("=============================");
+
+  return true;
+}
 
 // =====================================================
-// FIREBASE UPDATE
+// IMPORTANT SESSION VALIDATION
+// =====================================================
+//
+// The ESP32 must stop publishing Firebase data if
+// another/newer SQL session has been created.
+//
+// This is the main fix for:
+//
+// Ignoring Firebase session mismatch
+// {expected: 3, received: 2}
+// =====================================================
+
+bool isCurrentSessionStillValid(
+  long sessionId
+) {
+
+  if (
+    sessionId <= 0
+  ) {
+    return false;
+  }
+
+  long serverSessionId = 0;
+
+  String command = "";
+  String status = "";
+
+  bool shouldMeasure = false;
+
+  bool success =
+    getMeasurementCommand(
+      serverSessionId,
+      command,
+      shouldMeasure,
+      status
+    );
+
+  if (
+    !success
+  ) {
+
+    // Do NOT immediately kill the measurement because
+    // one HTTP request failed.
+    return true;
+  }
+
+  if (
+    serverSessionId <= 0
+  ) {
+
+    Serial.println();
+    Serial.println(
+      "CURRENT SESSION NO LONGER ACTIVE"
+    );
+
+    return false;
+  }
+
+  if (
+    serverSessionId != sessionId
+  ) {
+
+    Serial.println();
+    Serial.println(
+      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    );
+
+    Serial.println(
+      "STALE ESP32 SESSION DETECTED"
+    );
+
+    Serial.print(
+      "ESP session: "
+    );
+
+    Serial.println(
+      sessionId
+    );
+
+    Serial.print(
+      "Server session: "
+    );
+
+    Serial.println(
+      serverSessionId
+    );
+
+    Serial.println(
+      "Stopping old session."
+    );
+
+    Serial.println(
+      "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+    );
+
+    return false;
+  }
+
+  return true;
+}
+
+// =====================================================
+// FIREBASE
 // =====================================================
 
 bool updateFirebase(
@@ -669,7 +717,12 @@ bool updateFirebase(
   if (
     WiFi.status() != WL_CONNECTED
   ) {
+    return false;
+  }
 
+  if (
+    sessionId <= 0
+  ) {
     return false;
   }
 
@@ -690,8 +743,7 @@ bool updateFirebase(
       FIREBASE_AUTH;
   }
 
-  StaticJsonDocument<512>
-    doc;
+  StaticJsonDocument<512> doc;
 
   doc["device_id"] =
     DEVICE_ID;
@@ -708,12 +760,9 @@ bool updateFirebase(
   if (
     heightCm >= 0
   ) {
-
     doc["height_cm"] =
       heightCm;
-
   } else {
-
     doc["height_cm"] =
       nullptr;
   }
@@ -721,12 +770,9 @@ bool updateFirebase(
   if (
     weightKg >= 0
   ) {
-
     doc["weight_kg"] =
       weightKg;
-
   } else {
-
     doc["weight_kg"] =
       nullptr;
   }
@@ -758,42 +804,58 @@ bool updateFirebase(
     httpCode
   );
 
-  if (
-    httpCode > 0 &&
-    response.length() > 0
-  ) {
-
-    Serial.print(
-      "Firebase response: "
-    );
-
-    Serial.println(
-      response
-    );
-  }
-
   return (
     httpCode >= 200 &&
     httpCode < 300
   );
 }
 
+// =====================================================
+// SAFE FIREBASE UPDATE
+// =====================================================
+
+bool safeFirebaseUpdate(
+  long sessionId,
+  const char* status,
+  float heightCm,
+  float weightKg
+) {
+
+  if (
+    sessionId <= 0
+  ) {
+    return false;
+  }
+
+  // Do not allow a stale ESP session to overwrite
+  // the Firebase node belonging to a newer session.
+  if (
+    !isCurrentSessionStillValid(
+      sessionId
+    )
+  ) {
+
+    Serial.println(
+      "Firebase update BLOCKED because session is stale."
+    );
+
+    measuring = false;
+
+    currentSessionId = 0;
+
+    return false;
+  }
+
+  return updateFirebase(
+    sessionId,
+    status,
+    heightCm,
+    weightKg
+  );
+}
 
 // =====================================================
-// SUBMIT FINAL MEASUREMENT TO SQL
-// =====================================================
-//
-// IMPORTANT:
-//
-// PHP endpoint was tested successfully using:
-//
-// device_id=ESP32-KIOSK-01
-// session_id=1
-// height_cm=90
-// weight_kg=13
-//
-// Therefore this function sends FORM DATA instead of JSON.
-//
+// SQL SUBMIT
 // =====================================================
 
 bool submitFinalMeasurement(
@@ -805,10 +867,6 @@ bool submitFinalMeasurement(
   String url =
     SERVER_IP +
     SUBMIT_MEASUREMENT_PATH;
-
-  // ===================================================
-  // CREATE FORM BODY
-  // ===================================================
 
   String payload =
     "device_id=" +
@@ -831,14 +889,6 @@ bool submitFinalMeasurement(
 
   Serial.println(
     "================================"
-  );
-
-  Serial.print(
-    "URL: "
-  );
-
-  Serial.println(
-    url
   );
 
   Serial.print(
@@ -886,12 +936,7 @@ bool submitFinalMeasurement(
     return false;
   }
 
-  // ===================================================
-  // PARSE PHP RESPONSE
-  // ===================================================
-
-  StaticJsonDocument<512>
-    responseDoc;
+  StaticJsonDocument<512> responseDoc;
 
   DeserializationError error =
     deserializeJson(
@@ -940,208 +985,6 @@ bool submitFinalMeasurement(
   return true;
 }
 
-
-// =====================================================
-// GET COMMAND FROM SERVER
-// =====================================================
-
-bool getMeasurementCommand(
-  long& sessionId,
-  String& command,
-  bool& shouldMeasure,
-  String& status
-) {
-
-  String url =
-    SERVER_IP +
-    GET_COMMAND_PATH +
-    "?device_id=" +
-    DEVICE_ID;
-
-  Serial.print(
-    "Command URL: "
-  );
-
-  Serial.println(
-    url
-  );
-
-  int httpCode;
-
-  String response =
-    httpGet(
-      url,
-      httpCode
-    );
-
-  if (
-    httpCode != 200 ||
-    response.length() == 0
-  ) {
-
-    Serial.print(
-      "Unable to get command. HTTP: "
-    );
-
-    Serial.println(
-      httpCode
-    );
-
-    if (
-      response.length() > 0
-    ) {
-
-      Serial.println(
-        response
-      );
-    }
-
-    return false;
-  }
-
-  StaticJsonDocument<1024>
-    doc;
-
-  DeserializationError error =
-    deserializeJson(
-      doc,
-      response
-    );
-
-  if (
-    error
-  ) {
-
-    Serial.println(
-      "Failed to parse command response:"
-    );
-
-    Serial.println(
-      response
-    );
-
-    return false;
-  }
-
-  // =================================================
-  // UNWRAP "data"
-  // =================================================
-  //
-  // Fixed ArduinoJson compatibility issue.
-  //
-  // We no longer use:
-  //
-  // doc["data"].isNull()
-  //   ? doc.as<JsonVariant>()
-  //   : doc["data"];
-  //
-  // because ArduinoJson 7 can produce incompatible
-  // types in the ?: operator.
-  //
-  // =================================================
-
-  JsonVariant data;
-
-  if (
-    doc["data"].isNull()
-  ) {
-
-    data =
-      doc.as<JsonVariant>();
-
-  } else {
-
-    data =
-      doc["data"];
-  }
-
-  // =================================================
-  // READ SESSION ID
-  // =================================================
-
-  sessionId =
-    data["session_id"] |
-    0;
-
-  // =================================================
-  // READ COMMAND
-  // =================================================
-
-  command =
-    String(
-      data["command"] |
-      ""
-    );
-
-  // =================================================
-  // READ SHOULD_MEASURE
-  // =================================================
-
-  shouldMeasure =
-    data["should_measure"] |
-    false;
-
-  // =================================================
-  // READ STATUS
-  // =================================================
-
-  status =
-    String(
-      data["status"] |
-      "IDLE"
-    );
-
-  // =================================================
-  // DEBUG
-  // =================================================
-
-  Serial.println();
-  Serial.println(
-    "========== COMMAND =========="
-  );
-
-  Serial.print(
-    "Status: "
-  );
-
-  Serial.println(
-    status
-  );
-
-  Serial.print(
-    "Command: "
-  );
-
-  Serial.println(
-    command
-  );
-
-  Serial.print(
-    "Should measure: "
-  );
-
-  Serial.println(
-    shouldMeasure
-      ? "YES"
-      : "NO"
-  );
-
-  Serial.print(
-    "Session ID: "
-  );
-
-  Serial.println(
-    sessionId
-  );
-
-  Serial.println(
-    "============================="
-  );
-
-  return true;
-}
-
-
 // =====================================================
 // RUN MEASUREMENT
 // =====================================================
@@ -1150,13 +993,15 @@ void runMeasurement(
   long sessionId
 ) {
 
-  measuring =
-    true;
+  measuring = true;
 
   currentSessionId =
     sessionId;
 
   measurementStartedAt =
+    millis();
+
+  lastSessionValidation =
     millis();
 
   Serial.println();
@@ -1180,20 +1025,25 @@ void runMeasurement(
     "################################"
   );
 
-  // =================================================
-  // FIREBASE - MEASURING
-  // =================================================
+  // ===================================================
+  // INITIAL FIREBASE
+  // ===================================================
 
-  updateFirebase(
-    sessionId,
-    "MEASURING",
-    -1,
-    -1
-  );
+  if (
+    !safeFirebaseUpdate(
+      sessionId,
+      "MEASURING",
+      -1,
+      -1
+    )
+  ) {
 
-  // =================================================
-  // COUNTDOWN
-  // =================================================
+    measuring = false;
+
+    currentSessionId = 0;
+
+    return;
+  }
 
   Serial.println();
   Serial.println(
@@ -1205,6 +1055,18 @@ void runMeasurement(
     i >= 1;
     i--
   ) {
+
+    if (
+      !isCurrentSessionStillValid(
+        sessionId
+      )
+    ) {
+
+      measuring = false;
+      currentSessionId = 0;
+
+      return;
+    }
 
     Serial.print(
       "Measuring in "
@@ -1221,53 +1083,74 @@ void runMeasurement(
     delay(1000);
   }
 
-  // =================================================
-  // COLLECT DATA
-  // =================================================
-
   Serial.println();
   Serial.println(
     "COLLECTING SENSOR DATA..."
   );
 
-  const int WEIGHT_SAMPLES =
-    30;
+  const int WEIGHT_SAMPLES = 30;
+  const int HEIGHT_SAMPLES = 20;
 
-  const int HEIGHT_SAMPLES =
-    20;
+  float weightSum = 0;
+  int weightCount = 0;
 
-  float weightSum =
-    0;
-
-  int weightCount =
-    0;
-
-  float heightSum =
-    0;
-
-  int heightCount =
-    0;
+  float heightSum = 0;
+  int heightCount = 0;
 
   unsigned long startTime =
     millis();
 
   while (
-    millis() - startTime <
-    5000
+    millis() - startTime < 5000
   ) {
 
-    // =================================================
-    // HX711
-    // =================================================
+    // ================================================
+    // SESSION VALIDATION
+    // ================================================
 
-    LoadCell.update();
+    if (
+      millis() -
+      lastSessionValidation >=
+      SESSION_VALIDATE_INTERVAL
+    ) {
+
+      lastSessionValidation =
+        millis();
+
+      if (
+        !isCurrentSessionStillValid(
+          sessionId
+        )
+      ) {
+
+        Serial.println(
+          "Measurement cancelled because a newer session exists."
+        );
+
+        measuring = false;
+
+        currentSessionId = 0;
+
+        return;
+      }
+    }
+
+    // ================================================
+    // HX711
+    // ================================================
 
     if (
       hx711Ready
     ) {
 
+      LoadCell.update();
+
       float weight =
-        LoadCell.getData();
+         LoadCell.getData();
+
+      Serial.print("HX711 weight: ");
+      Serial.print(weight, 3);
+      Serial.println(" kg");
 
       if (
         weight > MIN_WEIGHT_KG &&
@@ -1281,9 +1164,9 @@ void runMeasurement(
       }
     }
 
-    // =================================================
+    // ================================================
     // TF-LUNA
-    // =================================================
+    // ================================================
 
     float height;
 
@@ -1305,9 +1188,9 @@ void runMeasurement(
       }
     }
 
-    // =================================================
-    // FIREBASE LIVE UPDATE
-    // =================================================
+    // ================================================
+    // FIREBASE LIVE
+    // ================================================
 
     if (
       millis() -
@@ -1318,11 +1201,8 @@ void runMeasurement(
       lastFirebaseUpdate =
         millis();
 
-      float liveWeight =
-        -1;
-
-      float liveHeight =
-        -1;
+      float liveWeight = -1;
+      float liveHeight = -1;
 
       if (
         weightCount > 0
@@ -1342,7 +1222,7 @@ void runMeasurement(
           heightCount;
       }
 
-      updateFirebase(
+      safeFirebaseUpdate(
         sessionId,
         "MEASURING",
         liveHeight,
@@ -1353,15 +1233,12 @@ void runMeasurement(
     delay(20);
   }
 
-  // =================================================
-  // CALCULATE FINAL VALUES
-  // =================================================
+  // ===================================================
+  // FINAL VALUES
+  // ===================================================
 
-  float finalWeight =
-    -1;
-
-  float finalHeight =
-    -1;
+  float finalWeight = -1;
+  float finalHeight = -1;
 
   if (
     weightCount > 0
@@ -1380,10 +1257,6 @@ void runMeasurement(
       heightSum /
       heightCount;
   }
-
-  // =================================================
-  // DISPLAY RESULT
-  // =================================================
 
   Serial.println();
   Serial.println(
@@ -1424,9 +1297,9 @@ void runMeasurement(
     "================================"
   );
 
-  // =================================================
-  // VALIDATE
-  // =================================================
+  // ===================================================
+  // VALIDATION
+  // ===================================================
 
   bool validWeight =
     finalWeight >= MIN_WEIGHT_KG &&
@@ -1441,46 +1314,48 @@ void runMeasurement(
     !validHeight
   ) {
 
-    Serial.println();
     Serial.println(
       "INVALID MEASUREMENT"
     );
 
-    Serial.print(
-      "Weight: "
-    );
-
-    Serial.println(
-      finalWeight
-    );
-
-    Serial.print(
-      "Height: "
-    );
-
-    Serial.println(
-      finalHeight
-    );
-
-    updateFirebase(
+    safeFirebaseUpdate(
       sessionId,
       "ERROR",
       finalHeight,
       finalWeight
     );
 
-    measuring =
-      false;
+    measuring = false;
 
-    currentSessionId =
-      0;
+    currentSessionId = 0;
 
     return;
   }
 
-  // =================================================
-  // SEND TO SQL
-  // =================================================
+  // ===================================================
+  // FINAL SESSION VALIDATION
+  // ===================================================
+
+  if (
+    !isCurrentSessionStillValid(
+      sessionId
+    )
+  ) {
+
+    Serial.println(
+      "FINAL SQL SUBMISSION BLOCKED: stale session."
+    );
+
+    measuring = false;
+
+    currentSessionId = 0;
+
+    return;
+  }
+
+  // ===================================================
+  // SQL
+  // ===================================================
 
   bool sqlSuccess =
     submitFinalMeasurement(
@@ -1493,60 +1368,56 @@ void runMeasurement(
     !sqlSuccess
   ) {
 
-    Serial.println();
     Serial.println(
       "SQL FAILED"
     );
 
-    Serial.println(
-      "Firebase will remain ERROR."
-    );
-
-    updateFirebase(
+    // Only publish ERROR if this is still
+    // the current session.
+    safeFirebaseUpdate(
       sessionId,
       "ERROR",
       finalHeight,
       finalWeight
     );
 
-    measuring =
-      false;
+    measuring = false;
+
+    currentSessionId = 0;
 
     return;
   }
 
-  // =================================================
-  // SQL SUCCESS
-  // =================================================
+  // ===================================================
+  // COMPLETE
+  // ===================================================
 
   Serial.println();
   Serial.println(
     "SQL SAVED SUCCESSFULLY"
   );
 
-  // =================================================
+  // ===================================================
   // FIREBASE COMPLETE
-  // =================================================
+  // ===================================================
 
-  updateFirebase(
+  safeFirebaseUpdate(
     sessionId,
     "COMPLETE",
     finalHeight,
     finalWeight
   );
 
-  // =================================================
-  // SESSION FINISHED
-  // =================================================
+  // ===================================================
+  // FINISHED
+  // ===================================================
 
   lastSessionId =
     sessionId;
 
-  currentSessionId =
-    0;
+  currentSessionId = 0;
 
-  measuring =
-    false;
+  measuring = false;
 
   Serial.println();
   Serial.println(
@@ -1565,7 +1436,6 @@ void runMeasurement(
     "################################"
   );
 }
-
 
 // =====================================================
 // SETUP
@@ -1593,18 +1463,22 @@ void setup() {
   );
 
   Serial.println(
+    "SESSION-SAFE FIREBASE VERSION"
+  );
+
+  Serial.println(
     "========================================"
   );
 
-  // =================================================
+  // ===================================================
   // HX711
-  // =================================================
+  // ===================================================
 
   setupHX711();
 
-  // =================================================
+  // ===================================================
   // TF-LUNA
-  // =================================================
+  // ===================================================
 
   Serial.println();
   Serial.println(
@@ -1623,20 +1497,21 @@ void setup() {
   );
 
   Serial.print(
-    "Temporary mounting height: "
+    "Mounting height: "
   );
 
   Serial.print(
-    MOUNTING_HEIGHT_CM
+    MOUNTING_HEIGHT_CM,
+    1
   );
 
   Serial.println(
     " cm"
   );
 
-  // =================================================
+  // ===================================================
   // WIFI
-  // =================================================
+  // ===================================================
 
   connectWiFi();
 
@@ -1658,16 +1533,15 @@ void setup() {
   );
 }
 
-
 // =====================================================
 // LOOP
 // =====================================================
 
 void loop() {
 
-  // =================================================
-  // KEEP HX711 ALIVE
-  // =================================================
+  // ===================================================
+  // HX711
+  // ===================================================
 
   if (
     hx711Ready
@@ -1676,13 +1550,12 @@ void loop() {
     LoadCell.update();
   }
 
-  // =================================================
+  // ===================================================
   // WIFI
-  // =================================================
+  // ===================================================
 
   if (
-    WiFi.status() !=
-    WL_CONNECTED
+    WiFi.status() != WL_CONNECTED
   ) {
 
     connectWiFi();
@@ -1692,12 +1565,41 @@ void loop() {
     return;
   }
 
-  // =================================================
-  // ONLY POLL COMMAND WHEN NOT MEASURING
-  // =================================================
+  // ===================================================
+  // MEASURING
+  // ===================================================
 
   if (
-    !measuring &&
+    measuring
+  ) {
+
+    if (
+      millis() -
+      measurementStartedAt >
+      MEASUREMENT_TIMEOUT
+    ) {
+
+      Serial.println(
+        "MEASUREMENT TIMEOUT"
+      );
+
+      measuring = false;
+
+      currentSessionId = 0;
+
+      return;
+    }
+
+    delay(20);
+
+    return;
+  }
+
+  // ===================================================
+  // POLL SERVER
+  // ===================================================
+
+  if (
     millis() -
     lastCommandPoll >=
     COMMAND_POLL_INTERVAL
@@ -1706,17 +1608,13 @@ void loop() {
     lastCommandPoll =
       millis();
 
-    long sessionId =
-      0;
+    long sessionId = 0;
 
-    String command =
-      "";
+    String command = "";
 
-    String status =
-      "";
+    String status = "";
 
-    bool shouldMeasure =
-      false;
+    bool shouldMeasure = false;
 
     bool success =
       getMeasurementCommand(
@@ -1736,32 +1634,17 @@ void loop() {
     }
 
     // =================================================
-    // START CONDITION
-    // =================================================
-    //
-    // Accept:
-    //
-    // 1. should_measure == true
-    // 2. command == START
-    // 3. status == MEASURING
-    //
-    // But only for a NEW session.
+    // START REQUEST
     // =================================================
 
     bool startRequested =
       shouldMeasure ||
-      command.equalsIgnoreCase(
-        "START"
-      ) ||
-      status.equalsIgnoreCase(
-        "MEASURING"
-      );
+      command.equalsIgnoreCase("START");
 
     if (
       startRequested &&
       sessionId > 0 &&
-      sessionId != lastSessionId &&
-      !measuring
+      sessionId != lastSessionId
     ) {
 
       Serial.println();
@@ -1770,7 +1653,7 @@ void loop() {
       );
 
       Serial.println(
-        "START CONDITION RECEIVED"
+        "NEW MEASUREMENT SESSION"
       );
 
       Serial.print(
@@ -1779,22 +1662,6 @@ void loop() {
 
       Serial.println(
         sessionId
-      );
-
-      Serial.print(
-        "Status: "
-      );
-
-      Serial.println(
-        status
-      );
-
-      Serial.print(
-        "Command: "
-      );
-
-      Serial.println(
-        command
       );
 
       Serial.println(
@@ -1828,10 +1695,6 @@ void loop() {
       );
     }
   }
-
-  // =================================================
-  // SMALL DELAY
-  // =================================================
 
   delay(20);
 }
