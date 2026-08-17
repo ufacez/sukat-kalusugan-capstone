@@ -24,7 +24,10 @@
       : "";
   const firebaseEnabled = !!data?.firebase?.enabled && firebaseBaseUrl !== "";
 
-  const state = {
+  // Debug hook: open DevTools console and inspect window.kioskDebugState
+  // to see live internal state (firebaseSessionId, awaitingLiveResult,
+  // weightLocked/heightLocked, etc.) while troubleshooting.
+  const state = (window.kioskDebugState = {
     step: "welcome",
     child: null,
     session: null,
@@ -49,7 +52,7 @@
     lastHeightRaw: null,
     weightStableCount: 0,
     heightStableCount: 0,
-  };
+  });
 
   const refs = {
     currentChildLabel: document.querySelector("[data-kiosk-current-child-label]"),
@@ -177,6 +180,11 @@
 
     screens.forEach((screen) => {
       const active = screen.getAttribute("data-kiosk-screen") === step;
+      // Move focus out before hiding, so aria-hidden is never applied to a
+      // panel that still contains the focused element (a11y warning fix).
+      if (!active && screen.contains(document.activeElement)) {
+        document.activeElement.blur();
+      }
       screen.hidden = !active;
       screen.classList.toggle("is-visible", active);
       screen.setAttribute("aria-hidden", String(!active));
@@ -327,8 +335,14 @@
 
     const sessionId = Number(payload.session_id || 0);
     if (state.firebaseSessionId && sessionId && sessionId !== state.firebaseSessionId) {
+      console.warn(
+        "[kiosk] Ignoring Firebase update: session_id mismatch",
+        { expected: state.firebaseSessionId, received: sessionId, payload }
+      );
       return;
     }
+
+    console.debug("[kiosk] Applying Firebase update", payload);
 
     const status = String(payload.status || "").toUpperCase();
     const weight = payload.weight_kg == null ? NaN : Number(payload.weight_kg);
@@ -453,6 +467,10 @@
 
       const sessionId = Number(payload.session_id || 0);
       if (state.firebaseSessionId && sessionId && sessionId !== state.firebaseSessionId) {
+        console.warn(
+          "[kiosk] Firebase poll skipped: session_id mismatch",
+          { expected: state.firebaseSessionId, received: sessionId, payload }
+        );
         return null;
       }
 
@@ -465,6 +483,7 @@
       applyFirebaseStatus(payload);
       return payload;
     } catch (error) {
+      console.error("[kiosk] Firebase poll failed", error);
       return null;
     }
   }
