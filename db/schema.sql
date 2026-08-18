@@ -281,6 +281,26 @@ INSERT INTO `measurement_sessions` (`id`, `device_id`, `child_id`, `status`, `co
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `nutritionist_events`
+--
+
+CREATE TABLE `nutritionist_events` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `event_type` enum('meeting','oplan_timbang') NOT NULL,
+  `title` varchar(150) NOT NULL,
+  `event_date` date NOT NULL,
+  `event_time` time DEFAULT NULL,
+  `location` varchar(150) DEFAULT NULL,
+  `barangay` varchar(100) DEFAULT NULL,
+  `notes` text DEFAULT NULL,
+  `nutritionist_id` int(10) UNSIGNED NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `parents`
 --
 
@@ -1120,6 +1140,16 @@ ALTER TABLE `measurement_sessions`
   ADD KEY `idx_measurement_sessions_device_created` (`device_id`,`created_at`);
 
 --
+-- Indexes for table `nutritionist_events`
+--
+ALTER TABLE `nutritionist_events`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_nutritionist_events_date` (`event_date`),
+  ADD KEY `idx_nutritionist_events_type_date` (`event_type`,`event_date`),
+  ADD KEY `idx_nutritionist_events_barangay` (`barangay`),
+  ADD KEY `fk_nutritionist_events_user` (`nutritionist_id`);
+
+--
 -- Indexes for table `parents`
 --
 ALTER TABLE `parents`
@@ -1231,6 +1261,12 @@ ALTER TABLE `measurement_sessions`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=24;
 
 --
+-- AUTO_INCREMENT for table `nutritionist_events`
+--
+ALTER TABLE `nutritionist_events`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT;
+
+--
 -- AUTO_INCREMENT for table `parents`
 --
 ALTER TABLE `parents`
@@ -1317,6 +1353,12 @@ ALTER TABLE `measurement_sessions`
   ADD CONSTRAINT `fk_measurement_sessions_child` FOREIGN KEY (`child_id`) REFERENCES `children` (`id`),
   ADD CONSTRAINT `fk_measurement_sessions_device` FOREIGN KEY (`device_id`) REFERENCES `devices` (`id`) ON DELETE CASCADE,
   ADD CONSTRAINT `fk_measurement_sessions_measurement` FOREIGN KEY (`measurement_id`) REFERENCES `measurements` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `nutritionist_events`
+--
+ALTER TABLE `nutritionist_events`
+  ADD CONSTRAINT `fk_nutritionist_events_user` FOREIGN KEY (`nutritionist_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
 -- Constraints for table `role_permissions`

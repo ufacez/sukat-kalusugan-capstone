@@ -145,3 +145,23 @@ function nutritionist_status_class(?string $status): string
         default => 'is-danger',
     };
 }
+
+function nutritionist_calendar_color(string $entryType): string
+{
+    return match ($entryType) {
+        'appointment' => '#E03131',
+        'meeting' => '#4a9fd5',
+        'oplan_timbang' => 'var(--admin-primary)',
+        default => '#94a3b8',
+    };
+}
+
+function nutritionist_calendar_label(string $entryType): string
+{
+    return match ($entryType) {
+        'appointment' => 'Appointment',
+        'meeting' => 'Meeting',
+        'oplan_timbang' => 'Oplan Timbang',
+        default => ucfirst($entryType),
+    };
+}

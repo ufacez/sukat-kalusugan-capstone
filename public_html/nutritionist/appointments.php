@@ -10,13 +10,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if ($action === 'create') {
 		$childId = (int)($_POST['child_id'] ?? 0);
-		$parentId = (int)($_POST['parent_id'] ?? 0);
 		$scheduledAt = trim((string)($_POST['scheduled_at'] ?? ''));
 		$notes = trim((string)($_POST['notes'] ?? ''));
 
-		if ($childId <= 0 || $parentId <= 0 || $scheduledAt === '') {
-			admin_redirect('/nutritionist/appointments.php', ['notice' => 'Child, parent, and schedule are required.', 'type' => 'error']);
+		if ($childId <= 0 || $scheduledAt === '') {
+			admin_redirect('/nutritionist/appointments.php', ['notice' => 'Child and schedule are required.', 'type' => 'error']);
 		}
+
+		// The guardian is never taken from the submitted form. It is always
+		// looked up from the child's own record so an appointment can only
+		// ever be booked with that child's actual parent/guardian, and so a
+		// nutritionist can't accidentally (or a tampered request can't
+		// deliberately) attach the wrong guardian to a child.
+		$childParams = [$childId];
+		$childScope = nutritionist_scope_fragment($user, 'c.barangay', $childParams);
+		$childRecord = admin_fetch_one(
+			"SELECT c.id, c.parent_id
+			 FROM children c
+			 WHERE c.id = ? AND {$childScope}
+			 LIMIT 1",
+			str_repeat('i', 1) . str_repeat('s', count($childParams) - 1),
+			$childParams
+		);
+
+		if ($childRecord === null) {
+			admin_redirect('/nutritionist/appointments.php', ['notice' => 'Select a valid child from your list.', 'type' => 'error']);
+		}
+
+		$parentId = (int)$childRecord['parent_id'];
 
 		$ok = admin_execute(
 			'INSERT INTO appointments (child_id, parent_id, nutritionist_id, scheduled_at, status, notes)
@@ -84,21 +105,13 @@ foreach ($appointments as $appointment) {
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay', $childrenParams);
 $children = admin_fetch_all(
-	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name
+	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 WHERE {$childrenScope}
 	 ORDER BY c.last_name ASC, c.first_name ASC",
 	str_repeat('s', count($childrenParams)),
 	$childrenParams
-);
-
-$parents = admin_fetch_all(
-	"SELECT p.id, p.name, p.parent_type, p.status
-	 FROM parents p
-	 ORDER BY p.name ASC",
-	'',
-	[]
 );
 
 $actions = '<a class="admin-btn-secondary" href="#appointment-form">New appointment</a>';
@@ -196,25 +209,25 @@ nutritionist_layout_start('Appointments', 'Schedule follow-ups and manage appoin
 		</div>
 	</div>
 
-	<form method="post" class="nutritionist-form-grid">
+	<form method="post" class="nutritionist-form-grid" id="appointment-create-form">
 		<input type="hidden" name="action" value="create">
 		<label class="admin-field">
 			<span>Child</span>
-			<select name="child_id" required>
+			<select name="child_id" id="appointment-child-select" required data-appointment-guardian-source>
 				<option value="">-- Select Child --</option>
 				<?php foreach ($children as $child): ?>
-					<option value="<?php echo (int)$child['id']; ?>"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name'] . ' · ' . $child['parent_name']); ?></option>
+					<option
+						value="<?php echo (int)$child['id']; ?>"
+						data-parent-name="<?php echo nutritionist_e((string)$child['parent_name']); ?>"
+						data-parent-type="<?php echo nutritionist_e((string)$child['parent_type']); ?>"
+						data-parent-phone="<?php echo nutritionist_e((string)($child['parent_phone'] ?? '')); ?>"
+					><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></option>
 				<?php endforeach; ?>
 			</select>
 		</label>
 		<label class="admin-field">
 			<span>Parent/Guardian</span>
-			<select name="parent_id" required>
-				<option value="">-- Select Parent --</option>
-				<?php foreach ($parents as $parent): ?>
-						<option value="<?php echo (int)$parent['id']; ?>"><?php echo nutritionist_e($parent['name'] . ' · ' . $parent['parent_type'] . ' · ' . ($parent['status'] ?? 'unknown')); ?></option>
-				<?php endforeach; ?>
-			</select>
+			<input type="text" id="appointment-guardian-display" value="Select a child first" disabled style="color:var(--admin-muted);">
 		</label>
 		<label class="admin-field">
 			<span>Schedule</span>
@@ -229,7 +242,46 @@ nutritionist_layout_start('Appointments', 'Schedule follow-ups and manage appoin
 			<button class="admin-btn" type="submit">Save appointment</button>
 		</div>
 	</form>
+	<p class="admin-mini" style="margin-top:8px;">The parent/guardian is set automatically from the child's own record — you can't attach an appointment to any guardian other than that child's.</p>
 </section>
+
+<script>
+(function () {
+	var childSelect = document.getElementById('appointment-child-select');
+	var guardianDisplay = document.getElementById('appointment-guardian-display');
+
+	if (!childSelect || !guardianDisplay) {
+		return;
+	}
+
+	function updateGuardianDisplay() {
+		var option = childSelect.options[childSelect.selectedIndex];
+
+		if (!option || !option.value) {
+			guardianDisplay.value = 'Select a child first';
+			return;
+		}
+
+		var name = option.getAttribute('data-parent-name') || 'Unknown guardian';
+		var type = option.getAttribute('data-parent-type') || '';
+		var phone = option.getAttribute('data-parent-phone') || '';
+		var parts = [name];
+
+		if (type) {
+			parts.push(type);
+		}
+
+		if (phone) {
+			parts.push(phone);
+		}
+
+		guardianDisplay.value = parts.join(' · ');
+	}
+
+	childSelect.addEventListener('change', updateGuardianDisplay);
+	updateGuardianDisplay();
+})();
+</script>
 <?php
 nutritionist_layout_end();
 

@@ -3,6 +3,82 @@
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
 $user = nutritionist_require_access();
+$today = new DateTimeImmutable('today');
+
+function nutritionist_calendar_redirect_params(): array
+{
+	$params = [];
+
+	if (isset($_GET['range'])) {
+		$params['range'] = (string)$_GET['range'];
+	}
+
+	if (isset($_GET['month'])) {
+		$params['month'] = (string)$_GET['month'];
+	}
+
+	return $params;
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+	$eventAction = (string)($_POST['action'] ?? '');
+	$redirectParams = nutritionist_calendar_redirect_params();
+
+	if (in_array($eventAction, ['create_event', 'update_event'], true)) {
+		$eventId = (int)($_POST['id'] ?? 0);
+		$eventType = (string)($_POST['event_type'] ?? '');
+		$title = trim((string)($_POST['title'] ?? ''));
+		$eventDate = trim((string)($_POST['event_date'] ?? ''));
+		$eventTime = trim((string)($_POST['event_time'] ?? ''));
+		$location = trim((string)($_POST['location'] ?? ''));
+		$notes = trim((string)($_POST['notes'] ?? ''));
+		$barangay = trim((string)($user['barangay'] ?? '')) ?: null;
+
+		if (!in_array($eventType, ['meeting', 'oplan_timbang'], true) || $title === '' || $eventDate === '') {
+			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ['notice' => 'Event type, title, and date are required.', 'type' => 'error']);
+		}
+
+		$eventTimeValue = $eventTime !== '' ? $eventTime : null;
+		$locationValue = $location !== '' ? $location : null;
+		$notesValue = $notes !== '' ? $notes : null;
+
+		if ($eventAction === 'create_event') {
+			$ok = admin_execute(
+				'INSERT INTO nutritionist_events (event_type, title, event_date, event_time, location, barangay, notes, nutritionist_id)
+				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+				'sssssssi',
+				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $barangay, $notesValue, (int)$user['id']]
+			);
+
+			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event added to the calendar.'] : ['notice' => 'Event could not be added.', 'type' => 'error']));
+		}
+
+		if ($eventAction === 'update_event' && $eventId > 0) {
+			$ownerClause = ($user['role'] ?? '') === 'admin' ? '1=1' : 'nutritionist_id = ' . (int)$user['id'];
+
+			$ok = admin_execute(
+				"UPDATE nutritionist_events
+				 SET event_type = ?, title = ?, event_date = ?, event_time = ?, location = ?, notes = ?
+				 WHERE id = ? AND {$ownerClause}",
+				'ssssssi',
+				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $notesValue, $eventId]
+			);
+
+			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event updated.'] : ['notice' => 'Event could not be updated.', 'type' => 'error']));
+		}
+	}
+
+	if ($eventAction === 'delete_event') {
+		$eventId = (int)($_POST['id'] ?? 0);
+		$ownerClause = ($user['role'] ?? '') === 'admin' ? '1=1' : 'nutritionist_id = ' . (int)$user['id'];
+
+		if ($eventId > 0) {
+			$ok = admin_execute("DELETE FROM nutritionist_events WHERE id = ? AND {$ownerClause}", 'i', [$eventId]);
+			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event removed.'] : ['notice' => 'Event could not be removed.', 'type' => 'error']));
+		}
+	}
+}
+
 $range = (string)($_GET['range'] ?? 'Today');
 
 $childrenParams = [];
@@ -96,6 +172,44 @@ $appointments = admin_fetch_all(
 	$appointmentParams
 );
 
+$monthParam = (string)($_GET['month'] ?? '');
+$calendarDate = DateTimeImmutable::createFromFormat('Y-m-d', $monthParam . '-01') ?: null;
+
+if ($calendarDate === false || $calendarDate === null || $calendarDate->format('Y-m') !== $monthParam) {
+	$calendarDate = $today->modify('first day of this month');
+	$monthParam = $calendarDate->format('Y-m');
+} else {
+	$calendarDate = $calendarDate->modify('first day of this month');
+}
+
+$prevMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $calendarDate->modify('-1 month')->format('Y-m')]));
+$nextMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $calendarDate->modify('+1 month')->format('Y-m')]));
+$monthStart = $calendarDate->format('Y-m-d');
+$monthEnd = $calendarDate->modify('last day of this month')->format('Y-m-d');
+
+$eventsParams = [$monthStart, $monthEnd];
+$eventsScope = nutritionist_scope_fragment($user, 'barangay', $eventsParams);
+$monthEvents = admin_fetch_all(
+	"SELECT id, event_type, title, event_date, event_time, location, notes, nutritionist_id
+	 FROM nutritionist_events
+	 WHERE event_date BETWEEN ? AND ? AND {$eventsScope}
+	 ORDER BY event_date ASC, event_time ASC, id ASC",
+	str_repeat('s', count($eventsParams)),
+	$eventsParams
+);
+
+$editingEventId = (int)($_GET['edit_event'] ?? 0);
+$editingEvent = null;
+
+if ($editingEventId > 0) {
+	foreach ($monthEvents as $eventRow) {
+		if ((int)$eventRow['id'] === $editingEventId) {
+			$editingEvent = $eventRow;
+			break;
+		}
+	}
+}
+
 $parentsParams = [];
 $parentsScope = nutritionist_scope_fragment($user, 'c.barangay', $parentsParams);
 $parents = admin_fetch_all(
@@ -149,7 +263,6 @@ $atRiskChildren = array_values(array_filter(
 	static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true),
 ));
 
-$today = new DateTimeImmutable('today');
 $upcomingAppointments = array_values(array_filter(
 	$appointments,
 	static function (array $appointment) use ($today): bool {
@@ -301,14 +414,13 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		<div class="nutritionist-toolbar" style="margin-bottom:12px;">
 			<h2 class="admin-section-title" style="margin:0;">Calendar</h2>
 			<div style="display:flex;align-items:center;gap:6px;">
-				<button class="admin-btn-secondary" type="button" disabled style="min-height:24px;padding:0 8px;">&lt;</button>
-				<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($today->format('F Y')); ?></span>
-				<button class="admin-btn-secondary" type="button" disabled style="min-height:24px;padding:0 8px;">&gt;</button>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&lt;</a>
+				<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&gt;</a>
 			</div>
 		</div>
 
 		<?php
-		$calendarDate = $today->modify('first day of this month');
 		$firstWeekday = (int)$calendarDate->format('w');
 		$daysInMonth = (int)$calendarDate->format('t');
 		$calendarCells = array_merge(array_fill(0, $firstWeekday, null), range(1, $daysInMonth));
@@ -316,18 +428,31 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			$calendarCells[] = null;
 		}
 
-		$appointmentDays = [];
+		$calendarEntries = [];
 		foreach ($appointments as $appointment) {
 			$date = new DateTimeImmutable((string)$appointment['scheduled_at']);
 
-			if ($date->format('Y-m') === $today->format('Y-m')) {
+			if ($date->format('Y-m') === $calendarDate->format('Y-m')) {
 				$day = (int)$date->format('j');
-				$appointmentDays[$day][] = ['color' => '#E03131'];
+				$calendarEntries[$day][] = [
+					'type' => 'appointment',
+					'color' => nutritionist_calendar_color('appointment'),
+					'title' => $appointment['first_name'] . ' ' . $appointment['last_name'] . ' (Appointment)',
+					'time' => $date->format('g:i A'),
+				];
 			}
 		}
 
-		foreach ([6, 13, 20, 27] as $day) {
-			$appointmentDays[$day][] = ['color' => '#1A8F68'];
+		foreach ($monthEvents as $eventRow) {
+			$date = new DateTimeImmutable((string)$eventRow['event_date']);
+			$day = (int)$date->format('j');
+			$calendarEntries[$day][] = [
+				'type' => $eventRow['event_type'],
+				'color' => nutritionist_calendar_color((string)$eventRow['event_type']),
+				'title' => $eventRow['title'],
+				'time' => $eventRow['event_time'] !== null ? (new DateTimeImmutable((string)$eventRow['event_date'] . ' ' . $eventRow['event_time']))->format('g:i A') : null,
+				'id' => (int)$eventRow['id'],
+			];
 		}
 		?>
 		<div class="nutritionist-calendar-grid" style="margin-bottom:4px;">
@@ -340,26 +465,103 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<?php if ($day === null): ?>
 					<div></div>
 				<?php else: ?>
-					<?php $isToday = $day === (int)$today->format('j'); ?>
-					<div class="nutritionist-calendar-day<?php echo $isToday ? ' is-today' : ''; ?>">
-						<div style="line-height:1;font-size:11px;font-weight:<?php echo $isToday ? 600 : 400; ?>;width:<?php echo $isToday ? 22 : 0; ?>px;height:<?php echo $isToday ? 22 : 0; ?>px;border-radius:<?php echo $isToday ? '50%' : '0'; ?>;display:flex;align-items:center;justify-content:center;<?php echo $isToday ? 'background:var(--admin-primary);color:#fff;' : ''; ?>">
+					<?php
+					$isToday = $day === (int)$today->format('j') && $calendarDate->format('Y-m') === $today->format('Y-m');
+					$dayEntries = $calendarEntries[$day] ?? [];
+					$dayTitleParts = array_map(static fn(array $entry): string => ($entry['time'] !== null ? $entry['time'] . ' ' : '') . $entry['title'], $dayEntries);
+					?>
+					<a class="nutritionist-calendar-day<?php echo $isToday ? ' is-today' : ''; ?>" href="#calendar-day-detail" data-calendar-day="<?php echo (int)$day; ?>" title="<?php echo nutritionist_e(implode(' · ', $dayTitleParts)); ?>" style="text-decoration:none;cursor:<?php echo $dayEntries === [] ? 'default' : 'pointer'; ?>;">
+						<div style="line-height:1;font-size:11px;font-weight:<?php echo $isToday ? 600 : 400; ?>;width:<?php echo $isToday ? 22 : 0; ?>px;height:<?php echo $isToday ? 22 : 0; ?>px;border-radius:<?php echo $isToday ? '50%' : '0'; ?>;display:flex;align-items:center;justify-content:center;<?php echo $isToday ? 'background:var(--admin-primary);color:#fff;' : 'color:var(--admin-text);'; ?>">
 							<?php echo (int)$day; ?>
 						</div>
-						<?php if (!empty($appointmentDays[$day])): ?>
+						<?php if ($dayEntries !== []): ?>
 							<div class="nutritionist-calendar-dots">
-								<?php foreach (array_slice($appointmentDays[$day], 0, 3) as $event): ?>
+								<?php foreach (array_slice($dayEntries, 0, 3) as $event): ?>
 									<div class="nutritionist-dot" style="background:<?php echo $isToday ? 'rgba(255,255,255,.8)' : nutritionist_e($event['color']); ?>;"></div>
 								<?php endforeach; ?>
 							</div>
 						<?php endif; ?>
-					</div>
+					</a>
 				<?php endif; ?>
 			<?php endforeach; ?>
 		</div>
 		<div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;padding-top:10px;border-top:1px solid var(--admin-border);">
-			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:#E03131"></span>Appointment</div>
-			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:#4a9fd5"></span>Meeting</div>
-			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:var(--admin-primary)"></span>Oplan Timbang</div>
+			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('appointment')); ?>"></span>Appointment</div>
+			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('meeting')); ?>"></span>Meeting</div>
+			<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('oplan_timbang')); ?>"></span>Oplan Timbang</div>
+		</div>
+
+		<div id="calendar-day-detail" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--admin-border);">
+			<div class="admin-mini" style="margin-bottom:8px;">Hover a day to preview it, or manage meetings and Oplan Timbang entries below. Appointments are still edited from the Appointments page.</div>
+
+			<?php if ($monthEvents === []): ?>
+				<div class="admin-stat-note">No meetings or Oplan Timbang sessions scheduled for <?php echo nutritionist_e($calendarDate->format('F Y')); ?> yet.</div>
+			<?php else: ?>
+				<div style="display:flex;flex-direction:column;gap:6px;">
+					<?php foreach ($monthEvents as $eventRow): ?>
+						<?php $eventDate = new DateTimeImmutable((string)$eventRow['event_date']); ?>
+						<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
+							<div style="display:flex;align-items:center;gap:8px;min-width:0;">
+								<span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$eventRow['event_type'])); ?>;flex-shrink:0;"></span>
+								<div style="min-width:0;">
+									<div style="font-weight:600;font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?php echo nutritionist_e((string)$eventRow['title']); ?></div>
+									<div class="admin-mini"><?php echo nutritionist_e(nutritionist_calendar_label((string)$eventRow['event_type'])); ?> · <?php echo nutritionist_e($eventDate->format('d M Y')); ?><?php echo $eventRow['event_time'] !== null ? ' · ' . nutritionist_e((new DateTimeImmutable('1970-01-01 ' . $eventRow['event_time']))->format('g:i A')) : ''; ?><?php echo $eventRow['location'] !== null && $eventRow['location'] !== '' ? ' · ' . nutritionist_e((string)$eventRow['location']) : ''; ?></div>
+								</div>
+							</div>
+							<div class="admin-actions">
+								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $monthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>">Edit</a>
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php')); ?>" onsubmit="return confirm('Remove this event?');">
+									<input type="hidden" name="action" value="delete_event">
+									<input type="hidden" name="id" value="<?php echo (int)$eventRow['id']; ?>">
+									<input type="hidden" name="range" value="<?php echo nutritionist_e($range); ?>">
+									<input type="hidden" name="month" value="<?php echo nutritionist_e($monthParam); ?>">
+									<button class="admin-btn-danger" type="submit">Delete</button>
+								</form>
+							</div>
+						</div>
+					<?php endforeach; ?>
+				</div>
+			<?php endif; ?>
+
+			<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php')); ?>" id="calendar-event-form" class="nutritionist-form-grid" style="margin-top:14px;">
+				<input type="hidden" name="action" value="<?php echo $editingEvent !== null ? 'update_event' : 'create_event'; ?>">
+				<input type="hidden" name="id" value="<?php echo $editingEvent !== null ? (int)$editingEvent['id'] : ''; ?>">
+				<input type="hidden" name="range" value="<?php echo nutritionist_e($range); ?>">
+				<input type="hidden" name="month" value="<?php echo nutritionist_e($monthParam); ?>">
+				<label class="admin-field">
+					<span>Event type</span>
+					<select name="event_type" required>
+						<option value="meeting" <?php echo ($editingEvent['event_type'] ?? '') === 'meeting' ? 'selected' : ''; ?>>Meeting</option>
+						<option value="oplan_timbang" <?php echo ($editingEvent['event_type'] ?? '') === 'oplan_timbang' ? 'selected' : ''; ?>>Oplan Timbang</option>
+					</select>
+				</label>
+				<label class="admin-field">
+					<span>Title</span>
+					<input name="title" required value="<?php echo nutritionist_e((string)($editingEvent['title'] ?? '')); ?>" placeholder="e.g. Barangay nutrition meeting">
+				</label>
+				<label class="admin-field">
+					<span>Date</span>
+					<input type="date" name="event_date" required value="<?php echo nutritionist_e((string)($editingEvent['event_date'] ?? '')); ?>">
+				</label>
+				<label class="admin-field">
+					<span>Time (optional)</span>
+					<input type="time" name="event_time" value="<?php echo nutritionist_e((string)substr((string)($editingEvent['event_time'] ?? ''), 0, 5)); ?>">
+				</label>
+				<label class="admin-field">
+					<span>Location (optional)</span>
+					<input name="location" value="<?php echo nutritionist_e((string)($editingEvent['location'] ?? '')); ?>" placeholder="e.g. Barangay hall">
+				</label>
+				<label class="admin-field">
+					<span>Notes (optional)</span>
+					<input name="notes" value="<?php echo nutritionist_e((string)($editingEvent['notes'] ?? '')); ?>">
+				</label>
+				<div class="admin-field" style="align-content:end;grid-column:1 / -1;display:flex;gap:8px;">
+					<button class="admin-btn" type="submit"><?php echo $editingEvent !== null ? 'Update event' : 'Add to calendar'; ?></button>
+					<?php if ($editingEvent !== null): ?>
+						<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $monthParam]))); ?>">Cancel edit</a>
+					<?php endif; ?>
+				</div>
+			</form>
 		</div>
 	</article>
 </section>
