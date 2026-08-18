@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/firebase_sync.php';
 
 api_require_method(['GET', 'POST']);
 
@@ -29,7 +30,7 @@ if ($device === null) {
 }
 
 $deviceStatus = strtolower((string)($device['status'] ?? 'offline'));
-$online = api_device_is_online($device, 30);
+$online = api_device_is_online($device, DEVICE_ONLINE_THRESHOLD_SECONDS);
 if ($deviceStatus !== 'active' || !$online) {
     $markOffline = mysqli_prepare($conn, 'UPDATE devices SET status = ?, last_seen_at = NOW(), updated_at = NOW() WHERE device_code = ?');
     if ($markOffline !== false) {
@@ -38,6 +39,10 @@ if ($deviceStatus !== 'active' || !$online) {
         mysqli_stmt_execute($markOffline);
         mysqli_stmt_close($markOffline);
     }
+
+    push_device_status($deviceCode, false, [
+        'message' => 'Scan rejected: device offline or not active.',
+    ]);
 
     api_success([
         'device_id' => $deviceCode,

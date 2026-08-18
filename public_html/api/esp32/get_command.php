@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
+require_once __DIR__ . '/../../includes/firebase_sync.php';
 
 api_require_method(['GET', 'POST']);
 
@@ -44,6 +45,23 @@ if ($deviceId <= 0) {
         500
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| MIRROR THE HEARTBEAT TO FIREBASE
+|--------------------------------------------------------------------------
+|
+| The ESP32 firmware calls this endpoint every COMMAND_POLL_INTERVAL (2s)
+| for as long as it has power and Wi-Fi. api_device_upsert() above already
+| just stamped last_seen_at = NOW() in MySQL, so this device is online
+| right now by definition. Push that same fact to Firebase so it isn't
+| only known to MySQL. This is fire-and-forget: a slow/unreachable
+| Firebase must never stall or fail the ESP32's command poll.
+|
+*/
+push_device_status($deviceCode, true, [
+    'location' => $deviceRow['location'] ?? null,
+]);
 
 mysqli_begin_transaction($conn);
 

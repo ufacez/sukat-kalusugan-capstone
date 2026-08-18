@@ -1,18 +1,10 @@
 <?php
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
+require_once __DIR__ . '/../includes/api_helpers.php';
 
 start_secure_session();
 require_permission('dashboard.view');
-
-$summary = [
-    'users' => admin_scalar('SELECT COUNT(*) FROM users'),
-    'admins' => admin_scalar("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = 'admin'"),
-    'nutritionists' => admin_scalar("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = 'nutritionist'"),
-    'audit_errors' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE level = 'danger'"),
-    'devices_online' => admin_scalar("SELECT COUNT(*) FROM devices WHERE status = 'active'"),
-    'devices_total' => admin_scalar('SELECT COUNT(*) FROM devices'),
-];
 
 $recentLogs = admin_fetch_all(
     'SELECT a.id, a.action, a.level, a.description, a.created_at, COALESCE(u.email, "System") AS actor
@@ -22,11 +14,44 @@ $recentLogs = admin_fetch_all(
      LIMIT 5'
 );
 
+/*
+|--------------------------------------------------------------------------
+| "ONLINE" IS COMPUTED, NEVER JUST READ FROM devices.status
+|--------------------------------------------------------------------------
+|
+| devices.status is an admin-set flag (active/maintenance/offline) — it
+| does NOT get pushed to "offline" by itself. It only used to change when
+| someone happened to be polling device_ping.php from an open kiosk tab,
+| which meant this dashboard could show "active" for a device that had
+| been powered off for hours if nobody had the kiosk page open.
+|
+| Fix: this dashboard now computes connectivity itself, the same way
+| device_ping.php does, straight from last_seen_at — so it's correct the
+| moment you load the page, with no dependency on any other page's polling.
+|
+*/
 $devices = admin_fetch_all(
-    'SELECT device_code, location, status, last_calibration_at, updated_at
+    'SELECT device_code, location, status, last_seen_at, last_calibration_at, updated_at
      FROM devices
      ORDER BY device_code ASC'
 );
+
+$devicesOnlineCount = 0;
+foreach ($devices as $device) {
+    if (api_device_is_online($device)) {
+        $devicesOnlineCount++;
+    }
+}
+
+$summary = [
+    'users' => admin_scalar('SELECT COUNT(*) FROM users'),
+    'admins' => admin_scalar("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = 'admin'"),
+    'nutritionists' => admin_scalar("SELECT COUNT(*) FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = 'nutritionist'"),
+    'audit_errors' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE level = 'danger'"),
+    'devices_online' => $devicesOnlineCount,
+    'devices_total' => admin_scalar('SELECT COUNT(*) FROM devices'),
+];
+
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">Manage users</a>';
 
@@ -98,8 +123,11 @@ admin_layout_start('Dashboard', 'System overview, account health, and device sta
         <div class="admin-list">
             <?php foreach ($devices as $device): ?>
                 <?php
-                $pillClass = $device['status'] === 'active' ? 'is-success' : ($device['status'] === 'maintenance' ? 'is-warn' : 'is-danger');
-                $dotStyle = $device['status'] === 'active' ? 'background:#0b6e4f;' : ($device['status'] === 'maintenance' ? 'background:#f2a93b;' : 'background:#c93b3b;');
+                $isOnline = api_device_is_online($device);
+                $isMaintenance = ($device['status'] ?? '') === 'maintenance';
+                $pillLabel = $isMaintenance ? 'maintenance' : ($isOnline ? 'online' : 'offline');
+                $pillClass = $isMaintenance ? 'is-warn' : ($isOnline ? 'is-success' : 'is-danger');
+                $dotStyle = $isMaintenance ? 'background:#f2a93b;' : ($isOnline ? 'background:#0b6e4f;' : 'background:#c93b3b;');
                 ?>
                 <div class="admin-list-item">
                     <div>
@@ -107,7 +135,7 @@ admin_layout_start('Dashboard', 'System overview, account health, and device sta
                         <div class="admin-mini"><?php echo admin_e($device['location'] ?? 'No location set'); ?></div>
                     </div>
                     <div style="text-align:right;">
-                        <div class="admin-pill <?php echo $pillClass; ?>"><?php echo admin_e($device['status']); ?></div>
+                        <div class="admin-pill <?php echo $pillClass; ?>"><?php echo admin_e($pillLabel); ?></div>
                         <div class="admin-mini">Calibrated: <?php echo admin_e((string)($device['last_calibration_at'] ?? 'n/a')); ?></div>
                     </div>
                 </div>

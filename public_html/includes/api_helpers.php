@@ -2,6 +2,28 @@
 
 require_once __DIR__ . '/auth_middleware.php';
 
+/*
+|--------------------------------------------------------------------------
+| DEVICE HEARTBEAT WINDOW
+|--------------------------------------------------------------------------
+|
+| The ESP32 firmware calls get_command.php every COMMAND_POLL_INTERVAL
+| (2000ms, see esp32_kios_arduino_code.ino) to refresh devices.last_seen_at.
+| This constant is how long we wait after the last heartbeat before we
+| consider the device offline. It must be a few multiples of that 2s
+| interval so one dropped packet or a slow Wi-Fi round trip doesn't cause
+| a false "offline" flicker, but it should stay small so power-off is
+| reflected quickly. 6 seconds = 3 missed heartbeats.
+|
+| This is single source of truth: device_ping.php, start_scan.php, and
+| api_device_is_online()'s default all read this constant so the
+| threshold can never drift out of sync between endpoints.
+|
+*/
+if (!defined('DEVICE_ONLINE_THRESHOLD_SECONDS')) {
+    define('DEVICE_ONLINE_THRESHOLD_SECONDS', 6);
+}
+
 function api_json_headers(int $statusCode = 200): void
 {
     http_response_code($statusCode);
@@ -157,7 +179,7 @@ function api_measurement_classification(float $waz, float $haz, float $whz): str
     return 'Normal';
 }
 
-function api_device_is_online(?array $device, int $heartbeatSeconds = 30): bool
+function api_device_is_online(?array $device, int $heartbeatSeconds = DEVICE_ONLINE_THRESHOLD_SECONDS): bool
 {
     if (!is_array($device)) {
         return false;

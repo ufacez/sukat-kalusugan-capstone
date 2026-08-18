@@ -73,7 +73,11 @@ $appData = [
     ],
     'defaults' => [
         'deviceId' => 'ESP32-KIOSK-01',
-        'syncSeconds' => 5,
+        // How often the kiosk browser re-checks device_ping.php while idle.
+        // Kept close to the ESP32's own 2s heartbeat (COMMAND_POLL_INTERVAL
+        // in the firmware) so an offline flip in MySQL shows up on screen
+        // within a couple of seconds, not five.
+        'syncSeconds' => 3,
         'pollSeconds' => 0.5,
         'sessionTimeoutSeconds' => 180,
     ],

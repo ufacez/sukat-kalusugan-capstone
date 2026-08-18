@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
+require_once __DIR__ . '/../includes/api_helpers.php';
 
 start_secure_session();
 require_permission('sensors.view');
@@ -63,8 +64,10 @@ $maintenanceCount = 0;
 $offlineCount = 0;
 
 foreach ($devices as &$device) {
-    $lastSeen = trim((string)($device['last_seen_at'] ?? ''));
-    $device['connection_online'] = $lastSeen !== '' && $lastSeen !== '0000-00-00 00:00:00' && (time() - strtotime($lastSeen)) <= 30;
+    // Use the same heartbeat window as everywhere else (device_ping.php,
+    // the admin dashboard) instead of a separate hardcoded number, so
+    // "online" means the same thing on every screen in the app.
+    $device['connection_online'] = api_device_is_online($device);
 
     if ($device['status'] === 'active') {
         $activeCount++;

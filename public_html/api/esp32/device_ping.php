@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/firebase_sync.php';
 
 api_require_method(['GET', 'POST']);
 
@@ -51,7 +52,7 @@ if ($device === null) {
 }
 
 $deviceStatus = strtolower((string)($device['status'] ?? 'offline'));
-$online = api_device_is_online($device, 30);
+$online = api_device_is_online($device, DEVICE_ONLINE_THRESHOLD_SECONDS);
 
 /*
 |--------------------------------------------------------------------------
@@ -61,6 +62,14 @@ $online = api_device_is_online($device, 30);
 | Only touch the `status` column here, never `last_seen_at`. Rewriting
 | last_seen_at would refresh the heartbeat clock and make a genuinely
 | offline device look "recently seen" again on the very next poll.
+|
+| This check only runs when the kiosk browser polls this endpoint
+| (every syncSeconds, see kiosk.js), so the worst-case detection time
+| for a powered-off ESP32 is roughly syncSeconds + DEVICE_ONLINE_THRESHOLD_SECONDS.
+| There is no way to make this literally instantaneous over HTTP polling —
+| the server can only notice a device is gone once it has stayed silent
+| longer than the threshold, since cutting power sends no "goodbye"
+| message. Keeping both numbers small is what makes this feel real-time.
 |
 */
 
@@ -73,6 +82,11 @@ if ($deviceStatus !== 'maintenance' && $deviceStatus !== 'offline' && !$online) 
         mysqli_stmt_close($statusUpdate);
     }
     $deviceStatus = 'offline';
+
+    // Mirror the transition to Firebase the moment MySQL notices it.
+    push_device_status($deviceCode, false, [
+        'message' => 'Heartbeat timed out (no check-in for over ' . DEVICE_ONLINE_THRESHOLD_SECONDS . 's).',
+    ]);
 }
 
 $isConnected = $online && $deviceStatus !== 'maintenance' && $deviceStatus !== 'offline';
