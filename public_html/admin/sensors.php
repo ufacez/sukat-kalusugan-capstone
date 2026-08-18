@@ -54,6 +54,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
 
 $devices = admin_fetch_all(
     'SELECT d.id, d.device_code, d.location, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.updated_at,
+            TIMESTAMPDIFF(SECOND, d.last_seen_at, NOW()) AS seconds_since_last_seen,
             s.hx711_calibration_factor, s.tf_luna_offset_cm, s.tf_luna_scale_factor, s.height_offset_cm, s.weight_offset_kg
      FROM devices d
      LEFT JOIN device_sensor_settings s ON s.device_code = d.device_code

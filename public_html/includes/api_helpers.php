@@ -190,17 +190,29 @@ function api_device_is_online(?array $device, int $heartbeatSeconds = DEVICE_ONL
         return false;
     }
 
-    $lastSeen = trim((string)($device['last_seen_at'] ?? $device['updated_at'] ?? ''));
-    if ($lastSeen === '' || $lastSeen === 'n/a' || $lastSeen === '0000-00-00 00:00:00') {
+    /*
+    | Deliberately NOT doing `time() - strtotime($lastSeen)` here. That
+    | compares a PHP-clock timestamp against a MySQL-clock timestamp, and
+    | the two are not guaranteed to share a timezone (last_seen_at is
+    | written by MySQL's NOW()/CURRENT_TIMESTAMP, while time() reads PHP's
+    | date.timezone). A mismatch there previously made this always return
+    | true, no matter how stale the row was.
+    |
+    | Instead the caller's SQL is expected to compute the staleness with
+    | MySQL's own clock, e.g.:
+    |   SELECT ..., TIMESTAMPDIFF(SECOND, last_seen_at, NOW()) AS seconds_since_last_seen
+    | and hand us that number. Both sides of the subtraction then come
+    | from the same clock, so there's nothing left to disagree.
+    */
+    if (!array_key_exists('seconds_since_last_seen', $device) || $device['seconds_since_last_seen'] === null) {
+        // No precomputed staleness available — fail closed rather than
+        // silently falling back to the broken PHP-vs-MySQL comparison.
         return false;
     }
 
-    $timestamp = strtotime($lastSeen);
-    if ($timestamp === false) {
-        return false;
-    }
+    $secondsSinceLastSeen = (int)$device['seconds_since_last_seen'];
 
-    return (time() - $timestamp) <= $heartbeatSeconds;
+    return $secondsSinceLastSeen >= 0 && $secondsSinceLastSeen <= $heartbeatSeconds;
 }
 
 /*

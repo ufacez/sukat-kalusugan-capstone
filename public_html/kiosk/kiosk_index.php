@@ -230,6 +230,9 @@ $appData = [
                         <?php endforeach; ?>
                     </div>
                     <div class="kiosk-panel-actions">
+                        <button class="kiosk-button is-secondary" type="button" data-kiosk-action="reset">
+                            Back
+                        </button>
                         <button class="kiosk-button is-primary" type="button" data-kiosk-action="proceed-live" disabled>
                             Continue to Live Measurement
                         </button>
@@ -246,9 +249,14 @@ $appData = [
                                 automatically.
                             </p>
                         </div>
-                        <div class="kiosk-locked-chip">
-                            <span>Child</span>
-                            <strong data-kiosk-current-child-label>Choose a child</strong>
+                        <div class="kiosk-panel-head-actions">
+                            <button class="kiosk-button is-secondary" type="button" data-kiosk-action="back-to-select">
+                                Back
+                            </button>
+                            <div class="kiosk-locked-chip">
+                                <span>Child</span>
+                                <strong data-kiosk-current-child-label>Choose a child</strong>
+                            </div>
                         </div>
                     </div>
                     <div class="kiosk-live-grid">

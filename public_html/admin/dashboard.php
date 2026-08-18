@@ -32,7 +32,8 @@ $recentLogs = admin_fetch_all(
 |
 */
 $devices = admin_fetch_all(
-    'SELECT device_code, location, status, last_seen_at, last_calibration_at, updated_at
+    'SELECT device_code, location, status, last_seen_at, last_calibration_at, updated_at,
+            TIMESTAMPDIFF(SECOND, last_seen_at, NOW()) AS seconds_since_last_seen
      FROM devices
      ORDER BY device_code ASC'
 );

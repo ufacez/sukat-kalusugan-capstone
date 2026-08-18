@@ -296,6 +296,11 @@
   border-radius: 14px;
   min-width: 180px;
 }
+.kiosk-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 .kiosk-locked-chip span {
   display: block;
   font-size: 11px;

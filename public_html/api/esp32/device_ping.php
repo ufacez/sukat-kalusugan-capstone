@@ -25,7 +25,9 @@ $conn = get_db_connection();
 |
 */
 
-$stmt = mysqli_prepare($conn, 'SELECT id, device_code, location, status, last_seen_at, last_calibration_at, calibration_offset_height, calibration_offset_weight, updated_at FROM devices WHERE device_code = ? LIMIT 1');
+$stmt = mysqli_prepare($conn, 'SELECT id, device_code, location, status, last_seen_at, last_calibration_at, calibration_offset_height, calibration_offset_weight, updated_at,
+    TIMESTAMPDIFF(SECOND, last_seen_at, NOW()) AS seconds_since_last_seen
+    FROM devices WHERE device_code = ? LIMIT 1');
 
 if ($stmt !== false) {
     mysqli_stmt_bind_param($stmt, 's', $deviceCode);

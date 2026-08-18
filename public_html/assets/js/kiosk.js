@@ -951,10 +951,10 @@
         formatChildName(child);
     }
 
-    if (proceedLiveButton) {
-      proceedLiveButton.disabled =
-        !child;
-    }
+    // Let syncStartButtonState() decide proceedLiveButton's disabled
+    // state — it also accounts for device connectivity, which a plain
+    // "!child" check here does not.
+    syncStartButtonState();
 
     if (child) {
       pushFeed(
@@ -1007,31 +1007,48 @@
   // ============================================================
 
   function syncStartButtonState() {
-    if (!startButton) {
-      return;
-    }
-
     const deviceUnavailable =
       state.deviceStatusChecked &&
       !state.deviceOnline;
 
-    const disabled =
-      state.submitting ||
-      state.startRequestInProgress ||
-      isMeasurementActive() ||
-      state.processingStarted ||
-      deviceUnavailable;
+    if (startButton) {
+      const disabled =
+        state.submitting ||
+        state.startRequestInProgress ||
+        isMeasurementActive() ||
+        state.processingStarted ||
+        deviceUnavailable;
 
-    startButton.disabled =
-      disabled;
+      startButton.disabled =
+        disabled;
 
-    startButton.textContent =
-      state.submitting ||
-      state.startRequestInProgress
-        ? "Starting..."
-        : deviceUnavailable
-        ? "Device Offline"
-        : "Start Measurement";
+      startButton.textContent =
+        state.submitting ||
+        state.startRequestInProgress
+          ? "Starting..."
+          : deviceUnavailable
+          ? "Device Offline"
+          : "Start Measurement";
+    }
+
+    /*
+     * "Proceed to Live" used to only track whether a child was
+     * selected (see selectChild()). That meant once a child was
+     * picked, this button stayed clickable even after the device
+     * dropped offline, since nothing re-synced it the way
+     * startButton gets re-synced on every device status poll here.
+     * Fold the same deviceUnavailable check in so both buttons
+     * agree with the actual connectivity state at all times.
+     */
+    if (proceedLiveButton) {
+      proceedLiveButton.disabled =
+        !getSelectedChild() ||
+        state.submitting ||
+        state.startRequestInProgress ||
+        isMeasurementActive() ||
+        state.processingStarted ||
+        deviceUnavailable;
+    }
   }
 
   // ============================================================
@@ -3017,10 +3034,10 @@ function finishResults(
         formatChildName(child);
     }
 
-    if (proceedLiveButton) {
-      proceedLiveButton.disabled =
-        false;
-    }
+    // Was unconditionally `false` here — a restored session would
+    // re-enable "Proceed to Live" even if the device is offline right
+    // now. Route through the shared sync so device status still gates it.
+    syncStartButtonState();
 
     // ==========================================================
     // SENSOR UI
@@ -3153,32 +3170,18 @@ function finishResults(
   // RESET
   // ============================================================
 
-  function resetKioskToIdle() {
-    if (
-      isMeasurementActive()
-    ) {
-      pushFeed(
-        "Reset blocked",
-        "Wait for the active measurement to finish.",
-        "warn"
-      );
-
-      return;
-    }
-
-    if (
-      state.processingStarted &&
-      state.step === "processing"
-    ) {
-      pushFeed(
-        "Reset blocked",
-        "Wait for measurement processing to finish.",
-        "warn"
-      );
-
-      return;
-    }
-
+  /*
+   * Shared by resetKioskToIdle() (back to welcome, full reset) and the
+   * "Back" button on the Live screen (back to select, child deselected).
+   * Both need the same teardown — clear the pending session, sensor
+   * readouts, and the selected child — they only differ in which step
+   * they land on and what they tell the operator afterward.
+   */
+  function clearSelectionAndSession(
+    targetStep,
+    feedTitle,
+    feedMessage
+  ) {
     if (state.statusTimer) {
       clearTimeout(
         state.statusTimer
@@ -3286,11 +3289,6 @@ function finishResults(
     if (refs.currentChildLabel) {
       refs.currentChildLabel.textContent =
         "Choose a child";
-    }
-
-    if (proceedLiveButton) {
-      proceedLiveButton.disabled =
-        true;
     }
 
     if (searchInput) {
@@ -3405,7 +3403,7 @@ function finishResults(
 
     updateSessionInfo(null);
 
-    setStep("welcome");
+    setStep(targetStep);
 
     if (heroNote) {
       heroNote.textContent =
@@ -3414,7 +3412,42 @@ function finishResults(
 
     syncStartButtonState();
 
-    pushFeed(
+    if (feedTitle) {
+      pushFeed(
+        feedTitle,
+        feedMessage
+      );
+    }
+  }
+
+  function resetKioskToIdle() {
+    if (
+      isMeasurementActive()
+    ) {
+      pushFeed(
+        "Reset blocked",
+        "Wait for the active measurement to finish.",
+        "warn"
+      );
+
+      return;
+    }
+
+    if (
+      state.processingStarted &&
+      state.step === "processing"
+    ) {
+      pushFeed(
+        "Reset blocked",
+        "Wait for measurement processing to finish.",
+        "warn"
+      );
+
+      return;
+    }
+
+    clearSelectionAndSession(
+      "welcome",
       "Kiosk reset",
       "Ready for the next child."
     );
@@ -3809,6 +3842,51 @@ function finishResults(
           }
 
           // ====================================================
+          // BACK TO SELECT (from the Live screen) — deselects the
+          // child and clears the pending session, same teardown as
+          // a full reset, just landing on Select instead of Welcome.
+          // ====================================================
+
+          if (
+            action ===
+            "back-to-select"
+          ) {
+            event.preventDefault();
+
+            if (
+              isMeasurementActive()
+            ) {
+              pushFeed(
+                "Back blocked",
+                "Wait for the current measurement to finish.",
+                "warn"
+              );
+
+              return;
+            }
+
+            if (
+              state.processingStarted
+            ) {
+              pushFeed(
+                "Back blocked",
+                "The current measurement is being processed.",
+                "warn"
+              );
+
+              return;
+            }
+
+            clearSelectionAndSession(
+              "select",
+              "Back to selection",
+              "Child deselected. Choose a child to continue."
+            );
+
+            return;
+          }
+
+          // ====================================================
           // PROCESS
           // ====================================================
 
@@ -3869,11 +3947,31 @@ function finishResults(
           if (
             target === "live"
           ) {
+            /*
+             * This tab used to only check state.session, which meant
+             * a leftover/restored session let you jump straight to
+             * the live screen with no regard for whether the device
+             * is actually connected right now — the one path in the
+             * UI that skipped the device-offline guard entirely.
+             */
             if (
               state.session &&
-              !state.processingStarted
+              !state.processingStarted &&
+              !(
+                state.deviceStatusChecked &&
+                !state.deviceOnline
+              )
             ) {
               setStep("live");
+            } else if (
+              state.deviceStatusChecked &&
+              !state.deviceOnline
+            ) {
+              pushFeed(
+                "Live view unavailable",
+                "The kiosk device is offline. Check the ESP32 power and connection.",
+                "warn"
+              );
             }
 
             return;

@@ -13,7 +13,7 @@ if ($token === '') {
 }
 
 $conn = get_db_connection();
-$stmt = mysqli_prepare($conn, 'SELECT id, status FROM devices WHERE device_code = ? LIMIT 1');
+$stmt = mysqli_prepare($conn, 'SELECT id, status, TIMESTAMPDIFF(SECOND, last_seen_at, NOW()) AS seconds_since_last_seen FROM devices WHERE device_code = ? LIMIT 1');
 
 if ($stmt === false) {
     api_error('Unable to validate device.', 500);
