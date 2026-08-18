@@ -2611,146 +2611,223 @@
   // RESULTS
   // ============================================================
 
-  function finishResults(
-    payload,
-    weight,
-    height
-  ) {
-    const child =
-      getSelectedChild();
+function finishResults(
+  payload,
+  weight,
+  height
+) {
+  const child =
+    getSelectedChild();
 
-    const nutritionalStatus =
-      payload.nutritional_status ||
-      payload.measurement
-        ?.nutritional_status ||
-      "Pending";
+  /*
+   * The backend returns WHO indicators inside
+   * payload.measurement.
+   *
+   * Keep a fallback to payload so this also works
+   * if the API is changed later to return them
+   * at the top level.
+   */
+  const measurement =
+    payload?.measurement || payload || {};
 
-    state.nutritionalStatus =
-      nutritionalStatus;
+  const nutritionalStatus =
+    measurement.nutritional_status ||
+    payload?.nutritional_status ||
+    "Pending";
 
-    state.phase =
-      "results";
+  state.nutritionalStatus =
+    nutritionalStatus;
 
-    state.processingStarted =
-      true;
+  state.phase =
+    "results";
 
-    if (refs.resultChild) {
-      refs.resultChild.textContent =
-        payload.child_name ||
-        formatChildName(child);
-    }
+  state.processingStarted =
+    true;
 
-    if (refs.resultMeta) {
-      refs.resultMeta.textContent =
-        `${
-          child?.age_months || 0
-        } months old`;
-    }
+  // ==========================================================
+  // CHILD
+  // ==========================================================
 
-    if (refs.resultHeight) {
-      refs.resultHeight.textContent =
-        isValidHeight(height)
-          ? `${Number(height).toFixed(1)} cm`
-          : "--.- cm";
-    }
-
-    if (refs.resultWeight) {
-      refs.resultWeight.textContent =
-        isValidWeight(weight)
-          ? `${Number(weight).toFixed(2)} kg`
-          : "--.-- kg";
-    }
-
-    if (refs.resultStatus) {
-      refs.resultStatus.textContent =
-        nutritionalStatus;
-    }
-
-    if (refs.resultWaz) {
-      refs.resultWaz.textContent =
-        payload.waz != null
-          ? Number(
-              payload.waz
-            ).toFixed(2)
-          : "--";
-    }
-
-    if (refs.resultHaz) {
-      refs.resultHaz.textContent =
-        payload.haz != null
-          ? Number(
-              payload.haz
-            ).toFixed(2)
-          : "--";
-    }
-
-    if (refs.resultWhz) {
-      refs.resultWhz.textContent =
-        payload.whz != null
-          ? Number(
-              payload.whz
-            ).toFixed(2)
-          : "--";
-    }
-
-    if (refs.resultSource) {
-      refs.resultSource.textContent =
-        "ESP32 → Firebase → SQL";
-    }
-
-    setProgress(
-      100,
-      "Measurement complete"
-    );
-
-    setStep("results");
-
-    pushFeed(
-      "Measurement complete",
-      `${
-        payload.child_code ||
-        child?.child_code ||
-        "Child"
-      } · ${
-        isValidWeight(weight)
-          ? Number(weight).toFixed(2)
-          : "--"
-      } kg · ${
-        isValidHeight(height)
-          ? Number(height).toFixed(1)
-          : "--"
-      } cm`
-    );
-
-    stopFirebasePolling();
-
-    if (state.statusTimer) {
-      clearTimeout(
-        state.statusTimer
-      );
-
-      state.statusTimer =
-        null;
-    }
-
-    if (
-      state.backendCompletionTimer
-    ) {
-      clearTimeout(
-        state.backendCompletionTimer
-      );
-
-      state.backendCompletionTimer =
-        null;
-    }
-
-    /*
-     * Only clear the browser session AFTER
-     * results are successfully displayed.
-     */
-
-    clearSessionStorage();
+  if (refs.resultChild) {
+    refs.resultChild.textContent =
+      payload.child_name ||
+      measurement.child_name ||
+      formatChildName(child);
   }
+
+  // ==========================================================
+  // AGE
+  // ==========================================================
+
+  if (refs.resultMeta) {
+    const ageMonths =
+      measurement.age_months ??
+      payload.age_months ??
+      child?.age_months ??
+      0;
+
+    refs.resultMeta.textContent =
+      `${ageMonths} months old`;
+  }
+
+  // ==========================================================
+  // HEIGHT
+  // ==========================================================
+
+  const resultHeight =
+    measurement.height_cm ??
+    payload.height_cm ??
+    height;
+
+  if (refs.resultHeight) {
+    refs.resultHeight.textContent =
+      isValidHeight(resultHeight)
+        ? `${Number(resultHeight).toFixed(1)} cm`
+        : "--.- cm";
+  }
+
+  // ==========================================================
+  // WEIGHT
+  // ==========================================================
+
+  const resultWeight =
+    measurement.weight_kg ??
+    payload.weight_kg ??
+    weight;
+
+  if (refs.resultWeight) {
+    refs.resultWeight.textContent =
+      isValidWeight(resultWeight)
+        ? `${Number(resultWeight).toFixed(2)} kg`
+        : "--.-- kg";
+  }
+
+  // ==========================================================
+  // NUTRITIONAL STATUS
+  // ==========================================================
+
+  if (refs.resultStatus) {
+    refs.resultStatus.textContent =
+      nutritionalStatus;
+  }
+
+  // ==========================================================
+  // WAZ — WEIGHT FOR AGE
+  // ==========================================================
+
+  const waz =
+    measurement.waz ??
+    payload.waz ??
+    null;
+
+  if (refs.resultWaz) {
+    refs.resultWaz.textContent =
+      waz !== null &&
+      waz !== undefined &&
+      Number.isFinite(Number(waz))
+        ? Number(waz).toFixed(2)
+        : "--";
+  }
+
+  // ==========================================================
+  // HAZ — HEIGHT FOR AGE
+  // ==========================================================
+
+  const haz =
+    measurement.haz ??
+    payload.haz ??
+    null;
+
+  if (refs.resultHaz) {
+    refs.resultHaz.textContent =
+      haz !== null &&
+      haz !== undefined &&
+      Number.isFinite(Number(haz))
+        ? Number(haz).toFixed(2)
+        : "--";
+  }
+
+  // ==========================================================
+  // WHZ — WEIGHT FOR HEIGHT
+  // ==========================================================
+
+  const whz =
+    measurement.whz ??
+    payload.whz ??
+    null;
+
+  if (refs.resultWhz) {
+    refs.resultWhz.textContent =
+      whz !== null &&
+      whz !== undefined &&
+      Number.isFinite(Number(whz))
+        ? Number(whz).toFixed(2)
+        : "--";
+  }
+
+  // ==========================================================
+  // SOURCE
+  // ==========================================================
+
+  if (refs.resultSource) {
+    refs.resultSource.textContent =
+      "ESP32 → Firebase → SQL → WHO";
+  }
+
+  // ==========================================================
+  // COMPLETE UI
+  // ==========================================================
+
+  setProgress(
+    100,
+    "Measurement complete"
+  );
+
+  setStep("results");
+
+  pushFeed(
+    "Measurement complete",
+    `${
+      payload.child_code ||
+      child?.child_code ||
+      "Child"
+    } · ${
+      isValidWeight(resultWeight)
+        ? Number(resultWeight).toFixed(2)
+        : "--"
+    } kg · ${
+      isValidHeight(resultHeight)
+        ? Number(resultHeight).toFixed(1)
+        : "--"
+    } cm`
+  );
+
+  stopFirebasePolling();
+
+  if (state.statusTimer) {
+    clearTimeout(
+      state.statusTimer
+    );
+
+    state.statusTimer =
+      null;
+  }
+
+  if (state.backendCompletionTimer) {
+    clearTimeout(
+      state.backendCompletionTimer
+    );
+
+    state.backendCompletionTimer =
+      null;
+  }
+
+  /*
+   * Only clear the browser session AFTER
+   * results are successfully displayed.
+   */
+  clearSessionStorage();
+}
 
   // ============================================================
   // RESTORE ACTIVE SESSION
