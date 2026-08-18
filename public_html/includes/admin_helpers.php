@@ -42,11 +42,21 @@ function admin_fetch_all(string $sql, string $types = '', array $params = []): a
     $stmt = mysqli_prepare($conn, $sql);
 
     if ($stmt === false) {
+        error_log('[SukatKalusugan] admin_fetch_all prepare failed: ' . mysqli_error($conn) . ' | SQL: ' . $sql);
+
         return [];
     }
 
     admin_bind_params($stmt, $types, $params);
-    mysqli_stmt_execute($stmt);
+
+    if (!mysqli_stmt_execute($stmt)) {
+        error_log('[SukatKalusugan] admin_fetch_all execute failed: ' . mysqli_stmt_error($stmt) . ' | SQL: ' . $sql);
+
+        mysqli_stmt_close($stmt);
+
+        return [];
+    }
+
     $result = mysqli_stmt_get_result($stmt);
     $rows = [];
 
@@ -74,11 +84,18 @@ function admin_execute(string $sql, string $types = '', array $params = []): boo
     $stmt = mysqli_prepare($conn, $sql);
 
     if ($stmt === false) {
+        error_log('[SukatKalusugan] admin_execute prepare failed: ' . mysqli_error($conn) . ' | SQL: ' . $sql);
+
         return false;
     }
 
     admin_bind_params($stmt, $types, $params);
     $ok = mysqli_stmt_execute($stmt);
+
+    if (!$ok) {
+        error_log('[SukatKalusugan] admin_execute failed: ' . mysqli_stmt_error($stmt) . ' | SQL: ' . $sql);
+    }
+
     mysqli_stmt_close($stmt);
 
     return $ok;

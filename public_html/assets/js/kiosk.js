@@ -29,6 +29,14 @@
 
   const pollIntervalMs = pollSeconds * 1000;
 
+  const syncSeconds = Math.max(
+    2,
+    Number(data?.defaults?.syncSeconds || 5)
+  );
+
+  const deviceStatusIntervalMs =
+    syncSeconds * 1000;
+
   const sessionTimeoutSeconds = Math.max(
     30,
     Number(data?.defaults?.sessionTimeoutSeconds || 180)
@@ -317,6 +325,14 @@
     heightStableCount: 0,
 
     firebaseOnline: false,
+
+    deviceOnline: false,
+
+    deviceStatusChecked: false,
+
+    deviceStatusTimer: null,
+
+    deviceStatusRequestInProgress: false,
 
     measurementReady: false,
 
@@ -995,11 +1011,16 @@
       return;
     }
 
+    const deviceUnavailable =
+      state.deviceStatusChecked &&
+      !state.deviceOnline;
+
     const disabled =
       state.submitting ||
       state.startRequestInProgress ||
       isMeasurementActive() ||
-      state.processingStarted;
+      state.processingStarted ||
+      deviceUnavailable;
 
     startButton.disabled =
       disabled;
@@ -1008,6 +1029,8 @@
       state.submitting ||
       state.startRequestInProgress
         ? "Starting..."
+        : deviceUnavailable
+        ? "Device Offline"
         : "Start Measurement";
   }
 
@@ -2032,6 +2055,21 @@
       return false;
     }
 
+    if (
+      state.deviceStatusChecked &&
+      !state.deviceOnline
+    ) {
+      pushFeed(
+        "Start blocked",
+        "The kiosk device is offline. Check the ESP32 power and connection.",
+        "error"
+      );
+
+      syncStartButtonState();
+
+      return false;
+    }
+
     state.startRequestInProgress =
       true;
 
@@ -2165,6 +2203,13 @@
 
       state.restoredSession =
         false;
+
+      /*
+       * Hand chip updates over to Firebase polling for the
+       * live screen; stop the pre-start heartbeat check.
+       */
+
+      stopDeviceStatusPolling();
 
       updateSessionInfo(
         payload
@@ -3156,6 +3201,8 @@ function finishResults(
 
     stopFirebasePolling();
 
+    startDeviceStatusPolling();
+
     state.statusTimer =
       null;
 
@@ -3444,6 +3491,216 @@ function finishResults(
   }
 
   // ============================================================
+  // DEVICE STATUS (PRE-MEASUREMENT HEARTBEAT)
+  // ============================================================
+  //
+  // Separate from checkFirebaseConnection() above: that only
+  // confirms Firebase itself is reachable. This confirms the
+  // physical ESP32 kiosk device has actually checked in recently
+  // (devices.last_seen_at), so we don't let a parent tap
+  // "Start Measurement" against a powered-off or disconnected
+  // device.
+
+  async function refreshDeviceStatus() {
+    if (state.deviceStatusRequestInProgress) {
+      return state.deviceOnline;
+    }
+
+    state.deviceStatusRequestInProgress =
+      true;
+
+    try {
+      const endpoint =
+        data?.endpoints?.ping ||
+        "../api/esp32/device_ping.php";
+
+      const url =
+        new URL(
+          endpoint,
+          window.location.href
+        );
+
+      url.searchParams.set(
+        "device",
+        deviceId
+      );
+
+      const response =
+        await fetch(
+          url.toString(),
+          {
+            cache: "no-store",
+            headers: {
+              Accept:
+                "application/json"
+            }
+          }
+        );
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      const payload =
+        json?.data || {};
+
+      const online = Boolean(
+        response.ok &&
+        json?.success === true &&
+        payload.connected
+      );
+
+      const wasChecked =
+        state.deviceStatusChecked;
+
+      const wasOnline =
+        state.deviceOnline;
+
+      state.deviceOnline =
+        online;
+
+      state.deviceStatusChecked =
+        true;
+
+      setChip(
+        connectedChip,
+        online
+          ? "Device: Online"
+          : "Device: Offline",
+        online
+      );
+
+      setChip(
+        lidarChip,
+        payload.lidar_status ===
+          "ready"
+          ? "LiDAR: Ready"
+          : "LiDAR: Waiting",
+        payload.lidar_status ===
+          "ready"
+      );
+
+      setChip(
+        loadCellChip,
+        payload.loadcell_status ===
+          "ready"
+          ? "Scale: Ready"
+          : "Scale: Waiting",
+        payload.loadcell_status ===
+          "ready"
+      );
+
+      if (heroNote && state.step === "welcome") {
+        heroNote.textContent =
+          online
+            ? "Select a child, then start the measurement."
+            : (
+                payload.message ||
+                "Kiosk device is offline. Check the ESP32 power and Wi-Fi connection."
+              );
+      }
+
+      /*
+       * Only announce the transition, not every poll,
+       * so the activity feed doesn't get spammed every
+       * few seconds.
+       */
+
+      if (
+        (!wasChecked || wasOnline) &&
+        !online
+      ) {
+        pushFeed(
+          "Device offline",
+          payload.message ||
+            "The kiosk device stopped responding.",
+          "error"
+        );
+      } else if (
+        wasChecked &&
+        !wasOnline &&
+        online
+      ) {
+        pushFeed(
+          "Device online",
+          "The kiosk device is connected and ready.",
+          "info"
+        );
+      }
+
+      syncStartButtonState();
+
+      return online;
+    } catch (error) {
+      console.warn(
+        "[SukatKalusugan] Device status check failed",
+        error
+      );
+
+      const wasOnline =
+        state.deviceOnline;
+
+      state.deviceOnline =
+        false;
+
+      state.deviceStatusChecked =
+        true;
+
+      setChip(
+        connectedChip,
+        "Device: Offline",
+        false
+      );
+
+      if (heroNote && state.step === "welcome") {
+        heroNote.textContent =
+          "Kiosk device is offline. Check the ESP32 power and Wi-Fi connection.";
+      }
+
+      if (wasOnline) {
+        pushFeed(
+          "Device offline",
+          "Lost contact with the kiosk device.",
+          "error"
+        );
+      }
+
+      syncStartButtonState();
+
+      return false;
+    } finally {
+      state.deviceStatusRequestInProgress =
+        false;
+    }
+  }
+
+  function startDeviceStatusPolling() {
+    stopDeviceStatusPolling();
+
+    state.deviceStatusTimer =
+      setInterval(
+        () => {
+          refreshDeviceStatus();
+        },
+        deviceStatusIntervalMs
+      );
+
+    refreshDeviceStatus();
+  }
+
+  function stopDeviceStatusPolling() {
+    if (state.deviceStatusTimer) {
+      clearInterval(
+        state.deviceStatusTimer
+      );
+
+      state.deviceStatusTimer =
+        null;
+    }
+  }
+
+  // ============================================================
   // EVENTS
   // ============================================================
 
@@ -3710,6 +3967,10 @@ function finishResults(
         ) {
           refreshFirebaseLatestMeasurement();
         }
+
+        if (state.deviceStatusTimer) {
+          refreshDeviceStatus();
+        }
       }
     );
   }
@@ -3760,6 +4021,14 @@ function finishResults(
     checkFirebaseConnection();
 
     /*
+     * Poll the ESP32 heartbeat (devices.last_seen_at) so the
+     * Start button and status chips reflect whether the kiosk
+     * hardware is actually reachable, not just Firebase.
+     */
+
+    startDeviceStatusPolling();
+
+    /*
      * FIRST restore browser session.
      *
      * Do not immediately force Welcome.
@@ -3779,6 +4048,14 @@ function finishResults(
             state.child?.child_code
         }
       );
+
+      /*
+       * A measurement is already in flight; Firebase polling
+       * owns the status chips from here, not the pre-start
+       * heartbeat check.
+       */
+
+      stopDeviceStatusPolling();
 
       return;
     }
