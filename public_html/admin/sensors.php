@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/api_helpers.php';
+require_once __DIR__ . '/../includes/firebase_sync.php';
 
 start_secure_session();
 require_permission('sensors.view');
@@ -64,6 +65,14 @@ $maintenanceCount = 0;
 $offlineCount = 0;
 
 foreach ($devices as &$device) {
+    // Correct devices.status in the database itself the moment we notice
+    // it's stale, instead of only computing a separate "online/offline"
+    // pill for display. Without this, the Active/Maintenance/Offline
+    // badge below (and the counts above) kept reading the admin-set
+    // 'active' label straight from the table, which never changed by
+    // itself unless a kiosk tab happened to be open polling device_ping.php.
+    $device = api_sync_stale_device_status($device);
+
     // Use the same heartbeat window as everywhere else (device_ping.php,
     // the admin dashboard) instead of a separate hardcoded number, so
     // "online" means the same thing on every screen in the app.
@@ -191,4 +200,3 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
 </section>
 <?php
 admin_layout_end();
-

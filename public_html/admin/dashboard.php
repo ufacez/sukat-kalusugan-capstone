@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/api_helpers.php';
+require_once __DIR__ . '/../includes/firebase_sync.php';
 
 start_secure_session();
 require_permission('dashboard.view');
@@ -37,11 +38,15 @@ $devices = admin_fetch_all(
 );
 
 $devicesOnlineCount = 0;
-foreach ($devices as $device) {
+foreach ($devices as &$device) {
+    // Correct devices.status in the table too, not just the badge below —
+    // see api_sync_stale_device_status() in api_helpers.php.
+    $device = api_sync_stale_device_status($device);
     if (api_device_is_online($device)) {
         $devicesOnlineCount++;
     }
 }
+unset($device);
 
 $summary = [
     'users' => admin_scalar('SELECT COUNT(*) FROM users'),
@@ -145,4 +150,3 @@ admin_layout_start('Dashboard', 'System overview, account health, and device sta
 </section>
 <?php
 admin_layout_end();
-

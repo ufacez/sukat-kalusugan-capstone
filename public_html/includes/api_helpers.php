@@ -203,6 +203,61 @@ function api_device_is_online(?array $device, int $heartbeatSeconds = DEVICE_ONL
     return (time() - $timestamp) <= $heartbeatSeconds;
 }
 
+/*
+|--------------------------------------------------------------------------
+| WRITE THE STALE STATUS BACK TO devices.status
+|--------------------------------------------------------------------------
+|
+| api_device_is_online() only computes an answer for the current request;
+| it never touches the database, so devices.status can still say 'active'
+| in the table itself even after every page correctly renders "offline".
+| This function is the single place that actually corrects that column.
+| Call it anywhere a device row is loaded for display (kiosk ping,
+| admin dashboard, sensors page) — a genuinely online or manually
+| maintenance/offline device is left untouched, so this is always safe
+| to call.
+|
+*/
+function api_sync_stale_device_status(array $device): array
+{
+    $status = strtolower((string)($device['status'] ?? 'offline'));
+
+    if ($status === 'maintenance' || $status === 'offline') {
+        return $device;
+    }
+
+    if (api_device_is_online($device)) {
+        return $device;
+    }
+
+    $deviceCode = (string)($device['device_code'] ?? '');
+    if ($deviceCode === '') {
+        return $device;
+    }
+
+    $conn = get_db_connection();
+    $stmt = mysqli_prepare($conn, 'UPDATE devices SET status = ?, updated_at = NOW() WHERE device_code = ?');
+    if ($stmt !== false) {
+        $offlineStatus = 'offline';
+        mysqli_stmt_bind_param($stmt, 'ss', $offlineStatus, $deviceCode);
+        mysqli_stmt_execute($stmt);
+        mysqli_stmt_close($stmt);
+    }
+
+    $device['status'] = 'offline';
+
+    // Mirror to Firebase too, same as device_ping.php does, but only if
+    // firebase_sync.php happens to be loaded on this page — never fatal
+    // on a page that hasn't required it.
+    if (function_exists('push_device_status')) {
+        push_device_status($deviceCode, false, [
+            'message' => 'Heartbeat timed out (no check-in for over ' . DEVICE_ONLINE_THRESHOLD_SECONDS . 's).',
+        ]);
+    }
+
+    return $device;
+}
+
 function api_device_upsert(string $deviceCode, ?string $location = null, ?string $status = null): ?array
 {
     $conn = get_db_connection();

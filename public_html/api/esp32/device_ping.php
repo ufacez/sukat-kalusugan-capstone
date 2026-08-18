@@ -74,19 +74,8 @@ $online = api_device_is_online($device, DEVICE_ONLINE_THRESHOLD_SECONDS);
 */
 
 if ($deviceStatus !== 'maintenance' && $deviceStatus !== 'offline' && !$online) {
-    $statusUpdate = mysqli_prepare($conn, 'UPDATE devices SET status = ?, updated_at = NOW() WHERE device_code = ?');
-    if ($statusUpdate !== false) {
-        $offlineStatus = 'offline';
-        mysqli_stmt_bind_param($statusUpdate, 'ss', $offlineStatus, $deviceCode);
-        mysqli_stmt_execute($statusUpdate);
-        mysqli_stmt_close($statusUpdate);
-    }
-    $deviceStatus = 'offline';
-
-    // Mirror the transition to Firebase the moment MySQL notices it.
-    push_device_status($deviceCode, false, [
-        'message' => 'Heartbeat timed out (no check-in for over ' . DEVICE_ONLINE_THRESHOLD_SECONDS . 's).',
-    ]);
+    $device = api_sync_stale_device_status($device);
+    $deviceStatus = $device['status'];
 }
 
 $isConnected = $online && $deviceStatus !== 'maintenance' && $deviceStatus !== 'offline';
