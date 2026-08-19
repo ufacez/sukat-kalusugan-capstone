@@ -32,7 +32,10 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status
+		lm.nutritional_status,
+		lm.wfa_status,
+		lm.hfa_status,
+		lm.wfh_status
 	 FROM children c
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
@@ -76,6 +79,9 @@ $recentMeasurements = admin_fetch_all(
 		m.haz,
 		m.whz,
 		m.nutritional_status,
+		m.wfa_status,
+		m.hfa_status,
+		m.wfh_status,
 		c.first_name,
 		c.last_name,
 		c.child_code
@@ -217,11 +223,14 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 					<th>Height</th>
 					<th>Weight</th>
 					<th>Status</th>
+				<th>WFA</th>
+				<th>HFA</th>
+				<th>WFH</th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php if ($recentMeasurements === []): ?>
-					<tr><td colspan="5" style="color:var(--admin-muted);">No measurements available yet.</td></tr>
+					<tr><td colspan="8" style="color:var(--admin-muted);">No measurements available yet.</td></tr>
 				<?php else: ?>
 					<?php foreach ($recentMeasurements as $measurement): ?>
 						<tr>
@@ -230,6 +239,9 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 							<td><?php echo parent_e((string)$measurement['height_cm']); ?> cm</td>
 							<td><?php echo parent_e((string)$measurement['weight_kg']); ?> kg</td>
 							<td><span class="admin-pill <?php echo parent_status_class((string)($measurement['nutritional_status'] ?? 'Pending')); ?>"><?php echo parent_e((string)($measurement['nutritional_status'] ?? 'Pending')); ?></span></td>
+							<td style="color:var(--admin-muted);"><?php echo parent_e((string)($measurement['wfa_status'] ?? '—')); ?></td>
+							<td style="color:var(--admin-muted);"><?php echo parent_e((string)($measurement['hfa_status'] ?? '—')); ?></td>
+							<td style="color:var(--admin-muted);"><?php echo parent_e((string)($measurement['wfh_status'] ?? '—')); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				<?php endif; ?>

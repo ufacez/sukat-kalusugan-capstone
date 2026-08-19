@@ -24,7 +24,10 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status
+		lm.nutritional_status,
+		lm.wfa_status,
+		lm.hfa_status,
+		lm.wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -174,6 +177,32 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 						<strong><?php echo parent_e((string)($selectedChild['parent_phone'] ?? '')); ?></strong>
 					</div>
 				</div>
+				<?php
+				$dohLabels = [
+					'SUW' => 'Severely underweight', 'MUW' => 'Moderately underweight', 'Normal' => 'Normal',
+					'SSt' => 'Severely stunted', 'MSt' => 'Moderately stunted', 'Tall' => 'Tall for age',
+					'SW/SAM' => 'Severe wasting (SAM)', 'MW/MAM' => 'Moderate wasting (MAM)', 'OW' => 'Overweight', 'Ob' => 'Obese',
+				];
+				$wfaLabel = $dohLabels[$selectedChild['wfa_status'] ?? ''] ?? null;
+				$hfaLabel = $dohLabels[$selectedChild['hfa_status'] ?? ''] ?? null;
+				$wfhLabel = $dohLabels[$selectedChild['wfh_status'] ?? ''] ?? null;
+				?>
+				<?php if ($wfaLabel !== null || $hfaLabel !== null || $wfhLabel !== null): ?>
+					<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border);">
+						<div style="font-weight:700;font-size:12px;color:var(--admin-muted);margin-bottom:8px;">Growth Assessment</div>
+						<div style="display:grid;gap:6px;">
+							<?php if ($wfaLabel !== null): ?>
+								<div class="admin-list-item" style="padding:6px 0;"><span class="admin-mini">Weight for age</span><strong><?php echo parent_e($wfaLabel); ?></strong></div>
+							<?php endif; ?>
+							<?php if ($hfaLabel !== null): ?>
+								<div class="admin-list-item" style="padding:6px 0;"><span class="admin-mini">Height for age</span><strong><?php echo parent_e($hfaLabel); ?></strong></div>
+							<?php endif; ?>
+							<?php if ($wfhLabel !== null): ?>
+								<div class="admin-list-item" style="padding:6px 0;"><span class="admin-mini">Weight for height</span><strong><?php echo parent_e($wfhLabel); ?></strong></div>
+							<?php endif; ?>
+						</div>
+					</div>
+				<?php endif; ?>
 			</div>
 		<?php endif; ?>
 	</article>

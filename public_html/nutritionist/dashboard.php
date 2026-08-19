@@ -102,7 +102,10 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status
+		lm.nutritional_status,
+		lm.wfa_status,
+		lm.hfa_status,
+		lm.wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -131,6 +134,9 @@ $measurements = admin_fetch_all(
 		m.haz,
 		m.whz,
 		m.nutritional_status,
+		m.wfa_status,
+		m.hfa_status,
+		m.wfh_status,
 		m.source_type,
 		c.first_name,
 		c.last_name,
@@ -586,6 +592,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<div>
 					<div style="font-size:12px;font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
 					<div class="admin-mini" style="margin-top:3px;">WAZ <?php echo nutritionist_e((string)($child['waz'] ?? 'n/a')); ?> · HAZ <?php echo nutritionist_e((string)($child['haz'] ?? 'n/a')); ?> · WHZ <?php echo nutritionist_e((string)($child['whz'] ?? 'n/a')); ?></div>
+					<div class="admin-mini" style="margin-top:2px;">WFA <?php echo nutritionist_e((string)($child['wfa_status'] ?? '—')); ?> · HFA <?php echo nutritionist_e((string)($child['hfa_status'] ?? '—')); ?> · WFH <?php echo nutritionist_e((string)($child['wfh_status'] ?? '—')); ?></div>
 				</div>
 				<div class="admin-pill <?php echo $statusClass; ?>"><?php echo nutritionist_e($status); ?></div>
 			</div>
@@ -643,6 +650,9 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 					<th>Age</th>
 					<th>Date of Birth</th>
 					<th>Status</th>
+					<th>WFA</th>
+					<th>HFA</th>
+					<th>WFH</th>
 					<th>Barangay</th>
 					<th>Parent</th>
 					<th>Action</th>
@@ -671,6 +681,9 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo (int)$ageMonths; ?> mo</td>
 						<td style="color:var(--admin-muted);font-size:12px;white-space:nowrap;"><?php echo nutritionist_e($birthdate->format('d M Y')); ?></td>
 						<td><span class="admin-pill <?php echo $pillClass; ?>"><?php echo nutritionist_e($status); ?></span></td>
+						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['wfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['hfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['wfh_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['barangay'] ?? '')); ?></td>
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)$child['parent_name']); ?></td>
 						<td>

@@ -10,13 +10,16 @@ $rows = admin_fetch_all(
 	"SELECT
 		m.measurement_date,
 		m.nutritional_status,
+		m.wfa_status,
+		m.hfa_status,
+		m.wfh_status,
 		a.status AS appointment_status
 	 FROM children c
 	 LEFT JOIN measurements m ON m.child_id = c.id
 	 LEFT JOIN appointments a ON a.child_id = c.id
 	 WHERE {$scope}
 	 ORDER BY m.measurement_date DESC",
-	str_repeat('s', count($params)),
+	str_repeat('i', count($params)),
 	$params
 );
 
@@ -28,6 +31,10 @@ $statusCounts = [
 	'Wasted' => 0,
 	'Overweight' => 0,
 ];
+
+$wfaCounts = ['SUW' => 0, 'MUW' => 0, 'Normal' => 0];
+$hfaCounts = ['SSt' => 0, 'MSt' => 0, 'Normal' => 0, 'Tall' => 0];
+$wfhCounts = ['SW/SAM' => 0, 'MW/MAM' => 0, 'Normal' => 0, 'OW' => 0, 'Ob' => 0];
 
 $appointmentCounts = [
 	'pending' => 0,
@@ -41,6 +48,21 @@ foreach ($rows as $row) {
 
 	if (isset($statusCounts[$status])) {
 		$statusCounts[$status]++;
+	}
+
+	$wfaStatus = (string)($row['wfa_status'] ?? '');
+	if (isset($wfaCounts[$wfaStatus])) {
+		$wfaCounts[$wfaStatus]++;
+	}
+
+	$hfaStatus = (string)($row['hfa_status'] ?? '');
+	if (isset($hfaCounts[$hfaStatus])) {
+		$hfaCounts[$hfaStatus]++;
+	}
+
+	$wfhStatus = (string)($row['wfh_status'] ?? '');
+	if (isset($wfhCounts[$wfhStatus])) {
+		$wfhCounts[$wfhStatus]++;
 	}
 
 	$appointmentStatus = (string)($row['appointment_status'] ?? '');
@@ -106,6 +128,27 @@ nutritionist_layout_start('Reports', 'Nutrition status summaries and appointment
 	</article>
 
 	<article class="nutritionist-panel">
+		<div class="admin-section-title" style="margin-bottom:12px;">DOH Status Breakdown (per OPT Plus)</div>
+		<?php
+		$axisGroups = [
+			'WFA' => $wfaCounts,
+			'HFA' => $hfaCounts,
+			'WFH' => $wfhCounts,
+		];
+		?>
+		<?php foreach ($axisGroups as $axisLabel => $counts): ?>
+			<div style="margin-bottom:12px;">
+				<div style="font-size:11px;font-weight:700;color:var(--admin-muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:6px;"><?php echo nutritionist_e($axisLabel); ?></div>
+				<div style="display:flex;flex-wrap:wrap;gap:6px;">
+					<?php foreach ($counts as $label => $count): ?>
+						<span class="admin-pill <?php echo nutritionist_status_class($label); ?>"><?php echo nutritionist_e($label); ?>: <?php echo (int)$count; ?></span>
+					<?php endforeach; ?>
+				</div>
+			</div>
+		<?php endforeach; ?>
+	</article>
+
+	<article class="nutritionist-panel">
 		<div class="admin-section-title" style="margin-bottom:12px;">Appointment Status</div>
 		<?php foreach ($appointmentCounts as $status => $count): ?>
 			<?php
@@ -145,6 +188,9 @@ nutritionist_layout_start('Reports', 'Nutrition status summaries and appointment
 				<tr>
 					<th>Measurement Date</th>
 					<th>Nutrition Status</th>
+					<th>WFA</th>
+					<th>HFA</th>
+					<th>WFH</th>
 					<th>Appointment Status</th>
 				</tr>
 			</thead>
@@ -153,6 +199,9 @@ nutritionist_layout_start('Reports', 'Nutrition status summaries and appointment
 					<tr data-filter-text="<?php echo nutritionist_e(strtolower((string)($row['measurement_date'] ?? '') . ' ' . (string)($row['nutritional_status'] ?? '') . ' ' . (string)($row['appointment_status'] ?? ''))); ?>">
 						<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? 'n/a')); ?></td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)($row['nutritional_status'] ?? 'Pending')); ?>"><?php echo nutritionist_e((string)($row['nutritional_status'] ?? 'Pending')); ?></span></td>
+						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)($row['appointment_status'] ?? 'pending')); ?>"><?php echo nutritionist_e(ucfirst((string)($row['appointment_status'] ?? 'n/a'))); ?></span></td>
 					</tr>
 				<?php endforeach; ?>

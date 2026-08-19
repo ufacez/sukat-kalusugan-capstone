@@ -22,7 +22,10 @@ $rows = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status
+		lm.nutritional_status,
+		lm.wfa_status,
+		lm.hfa_status,
+		lm.wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -146,6 +149,9 @@ nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and class
 					<th>HAZ</th>
 					<th>WHZ</th>
 					<th>Status</th>
+					<th>WFA</th>
+					<th>HFA</th>
+					<th>WFH</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -162,6 +168,9 @@ nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and class
 						<td style="color:#4a9fd5;font-weight:600;"><?php echo isset($row['haz']) ? ((float)$row['haz'] > 0 ? '+' : '') . nutritionist_e((string)$row['haz']) : 'n/a'; ?></td>
 						<td style="color:#0d8871;font-weight:600;"><?php echo isset($row['whz']) ? ((float)$row['whz'] > 0 ? '+' : '') . nutritionist_e((string)$row['whz']) : 'n/a'; ?></td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)($row['nutritional_status'] ?? 'Pending')); ?>"><?php echo nutritionist_e((string)($row['nutritional_status'] ?? 'Pending')); ?></span></td>
+					<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
+					<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
+					<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>

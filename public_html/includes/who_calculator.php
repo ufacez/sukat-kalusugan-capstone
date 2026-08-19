@@ -215,11 +215,11 @@ function classify_hfa_status(float $haz): string
 function classify_wfh_status(float $whz): string
 {
 	if ($whz < -3) {
-		return 'SW(SAM)';
+		return 'SW/SAM';
 	}
 
 	if ($whz < -2) {
-		return 'MW(MAM)';
+		return 'MW/MAM';
 	}
 
 	if ($whz <= 2) {
