@@ -371,6 +371,9 @@ if (
                 haz,
                 whz,
                 nutritional_status,
+                wfa_status,
+                hfa_status,
+                wfh_status,
                 source_type,
                 device_id,
                 created_at
@@ -462,6 +465,15 @@ if (
                         $measurementRow['nutritional_status']
                         ?? ''
                     ),
+
+                'wfa_status' =>
+                    $measurementRow['wfa_status'] ?? null,
+
+                'hfa_status' =>
+                    $measurementRow['hfa_status'] ?? null,
+
+                'wfh_status' =>
+                    $measurementRow['wfh_status'] ?? null,
 
                 'source_type' =>
                     (string)(
@@ -666,6 +678,15 @@ $whz =
 $status =
     $metrics['nutritional_status'];
 
+$wfaStatus =
+    $metrics['wfa_status'];
+
+$hfaStatus =
+    $metrics['hfa_status'];
+
+$wfhStatus =
+    $metrics['wfh_status'];
+
 /*
 |--------------------------------------------------------------------------
 | INSERT MEASUREMENT
@@ -687,6 +708,9 @@ $measurementInsert =
             haz,
             whz,
             nutritional_status,
+            wfa_status,
+            hfa_status,
+            wfh_status,
             device_id
         )
         VALUES
@@ -696,6 +720,9 @@ $measurementInsert =
             ?,
             ?,
             CURDATE(),
+            ?,
+            ?,
+            ?,
             ?,
             ?,
             ?,
@@ -729,7 +756,7 @@ $deviceDbId =
 
 mysqli_stmt_bind_param(
     $measurementInsert,
-    'iddisdddsi',
+    'iddisdddssssi',
     $childId,
     $heightCm,
     $weightKg,
@@ -739,6 +766,9 @@ mysqli_stmt_bind_param(
     $haz,
     $whz,
     $status,
+    $wfaStatus,
+    $hfaStatus,
+    $wfhStatus,
     $deviceDbId
 );
 
@@ -898,6 +928,15 @@ $measurementPayload = [
     'nutritional_status' =>
         $status,
 
+    'wfa_status' =>
+        $wfaStatus,
+
+    'hfa_status' =>
+        $hfaStatus,
+
+    'wfh_status' =>
+        $wfhStatus,
+
     'source_type' =>
         $sourceType,
 
@@ -970,6 +1009,15 @@ api_success(
 
         'nutritional_status' =>
             $status,
+
+        'wfa_status' =>
+            $wfaStatus,
+
+        'hfa_status' =>
+            $hfaStatus,
+
+        'wfh_status' =>
+            $wfhStatus,
 
         'source_type' =>
             $sourceType,

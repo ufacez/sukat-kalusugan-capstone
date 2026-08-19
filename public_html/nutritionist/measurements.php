@@ -18,6 +18,9 @@ $measurements = admin_fetch_all(
 		m.haz,
 		m.whz,
 		m.nutritional_status,
+		m.wfa_status,
+		m.hfa_status,
+		m.wfh_status,
 		c.id AS child_id,
 		c.child_code,
 		c.first_name,
@@ -153,6 +156,9 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 					<th>HAZ</th>
 					<th>WHZ</th>
 					<th>Status</th>
+					<th>WFA</th>
+					<th>HFA</th>
+					<th>WFH</th>
 					<th>Action</th>
 				</tr>
 			</thead>
@@ -171,6 +177,9 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 						<td style="color:#4a9fd5;font-weight:600;"><?php echo ((float)$measurement['haz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['haz']); ?></td>
 						<td style="color:#0d8871;font-weight:600;"><?php echo ((float)$measurement['whz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['whz']); ?></td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span></td>
+						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['hfa_status'] ?? '—')); ?></td>
+						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfh_status'] ?? '—')); ?></td>
 						<td><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$measurement['child_id'])); ?>">View child</a></td>
 					</tr>
 				<?php endforeach; ?>

@@ -145,6 +145,9 @@ CREATE TABLE `children` (
   `sex` enum('Male','Female') NOT NULL,
   `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
+  `purok` varchar(150) DEFAULT NULL,
+  `is_ip` tinyint(1) NOT NULL DEFAULT 0,
+  `has_disability` tinyint(1) NOT NULL DEFAULT 0,
   `parent_id` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -154,8 +157,8 @@ CREATE TABLE `children` (
 -- Dumping data for table `children`
 --
 
-INSERT INTO `children` (`id`, `child_code`, `first_name`, `last_name`, `birthdate`, `sex`, `barangay_id`, `address`, `parent_id`, `created_at`, `updated_at`) VALUES
-(1, 'CHD-0001', 'Ean', 'Espiritu', '2023-02-01', 'Male', 1, '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 1, '2026-07-07 10:10:38', '2026-07-07 10:10:38');
+INSERT INTO `children` (`id`, `child_code`, `first_name`, `last_name`, `birthdate`, `sex`, `barangay_id`, `address`, `purok`, `is_ip`, `has_disability`, `parent_id`, `created_at`, `updated_at`) VALUES
+(1, 'CHD-0001', 'Ean', 'Espiritu', '2023-02-01', 'Male', 1, '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 'Purok 6', 0, 0, 1, '2026-07-07 10:10:38', '2026-07-07 10:10:38');
 
 -- --------------------------------------------------------
 
@@ -229,6 +232,9 @@ CREATE TABLE `measurements` (
   `haz` decimal(5,2) DEFAULT NULL,
   `whz` decimal(5,2) DEFAULT NULL,
   `nutritional_status` enum('Normal','Underweight','Severely Underweight','Stunted','Wasted','Overweight') DEFAULT NULL,
+  `wfa_status` enum('SUW','MUW','Normal') DEFAULT NULL,
+  `hfa_status` enum('SSt','MSt','Normal','Tall') DEFAULT NULL,
+  `wfh_status` enum('SW(SAM)','MW(MAM)','Normal','OW','Ob') DEFAULT NULL,
   `device_id` int(10) UNSIGNED DEFAULT NULL,
   `recorded_by` int(10) UNSIGNED DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
@@ -238,16 +244,16 @@ CREATE TABLE `measurements` (
 -- Dumping data for table `measurements`
 --
 
-INSERT INTO `measurements` (`id`, `child_id`, `height_cm`, `weight_kg`, `age_months`, `measurement_date`, `source_type`, `waz`, `haz`, `whz`, `nutritional_status`, `device_id`, `recorded_by`, `created_at`) VALUES
-(1, 1, 100.40, 3.910, 42, '2026-08-17', 'kiosk', -11.73, 0.14, -21.48, 'Severely Underweight', 1, NULL, '2026-08-17 04:19:07'),
-(2, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 1, NULL, '2026-08-17 04:35:39'),
-(3, 1, 100.50, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.16, -21.58, 'Severely Underweight', 1, NULL, '2026-08-17 04:36:55'),
-(4, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 1, NULL, '2026-08-17 04:37:20'),
-(5, 1, 100.40, 3.880, 42, '2026-08-17', 'kiosk', -11.80, 0.14, -21.63, 'Severely Underweight', 1, NULL, '2026-08-17 04:37:46'),
-(6, 1, 100.40, 3.840, 42, '2026-08-17', 'kiosk', -11.89, 0.14, -21.83, 'Severely Underweight', 1, NULL, '2026-08-17 04:40:59'),
-(7, 1, 100.40, 3.870, 42, '2026-08-17', 'kiosk', -11.82, 0.14, -21.68, 'Severely Underweight', 1, NULL, '2026-08-17 04:51:54'),
-(8, 1, 100.40, 4.340, 42, '2026-08-17', 'kiosk', -10.78, 0.14, -19.46, 'Severely Underweight', 1, NULL, '2026-08-17 04:52:28'),
-(9, 1, 99.10, 3.560, 42, '2026-08-17', 'kiosk', -12.59, -0.19, -22.99, 'Severely Underweight', 1, NULL, '2026-08-17 05:21:31');
+INSERT INTO `measurements` (`id`, `child_id`, `height_cm`, `weight_kg`, `age_months`, `measurement_date`, `source_type`, `waz`, `haz`, `whz`, `nutritional_status`, `wfa_status`, `hfa_status`, `wfh_status`, `device_id`, `recorded_by`, `created_at`) VALUES
+(1, 1, 100.40, 3.910, 42, '2026-08-17', 'kiosk', -11.73, 0.14, -21.48, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:19:07'),
+(2, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:35:39'),
+(3, 1, 100.50, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.16, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:36:55'),
+(4, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:37:20'),
+(5, 1, 100.40, 3.880, 42, '2026-08-17', 'kiosk', -11.80, 0.14, -21.63, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:37:46'),
+(6, 1, 100.40, 3.840, 42, '2026-08-17', 'kiosk', -11.89, 0.14, -21.83, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:40:59'),
+(7, 1, 100.40, 3.870, 42, '2026-08-17', 'kiosk', -11.82, 0.14, -21.68, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:51:54'),
+(8, 1, 100.40, 4.340, 42, '2026-08-17', 'kiosk', -10.78, 0.14, -19.46, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 04:52:28'),
+(9, 1, 99.10, 3.560, 42, '2026-08-17', 'kiosk', -12.59, -0.19, -22.99, 'Severely Underweight', 'SUW', 'Normal', 'SW(SAM)', 1, NULL, '2026-08-17 05:21:31');
 
 -- --------------------------------------------------------
 
@@ -1163,7 +1169,10 @@ ALTER TABLE `measurements`
   ADD KEY `fk_measurements_device` (`device_id`),
   ADD KEY `fk_measurements_user` (`recorded_by`),
   ADD KEY `idx_measurements_child` (`child_id`),
-  ADD KEY `idx_measurements_date` (`measurement_date`);
+  ADD KEY `idx_measurements_date` (`measurement_date`),
+  ADD KEY `idx_measurements_wfa_status` (`wfa_status`),
+  ADD KEY `idx_measurements_hfa_status` (`hfa_status`),
+  ADD KEY `idx_measurements_wfh_status` (`wfh_status`);
 
 --
 -- Indexes for table `measurement_sessions`

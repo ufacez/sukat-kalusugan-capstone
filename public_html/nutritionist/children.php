@@ -45,6 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
 $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	$address = trim((string)($_POST['address'] ?? ''));
+	$purok = trim((string)($_POST['purok'] ?? ''));
+	$isIp = isset($_POST['is_ip']) ? 1 : 0;
+	$hasDisability = isset($_POST['has_disability']) ? 1 : 0;
 	$parentId = (int)($_POST['parent_id'] ?? 0);
 
 	if ($firstName === '' || $lastName === '' || $birthdate === '' || $parentId <= 0) {
@@ -61,10 +64,10 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 
 		$ok = admin_execute(
 			'UPDATE children
-			 SET child_code = ?, first_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, address = ?, parent_id = ?
+			 SET child_code = ?, first_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, address = ?, purok = ?, is_ip = ?, has_disability = ?, parent_id = ?
 			 WHERE id = ?',
-			'sssssisii',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $parentId, $childId]
+			'sssssissiiii',
+			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId, $childId]
 		);
 
 		admin_redirect(
@@ -79,10 +82,10 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 		$childCode = nutritionist_next_child_code();
 
 		$ok = admin_execute(
-			'INSERT INTO children (child_code, first_name, last_name, birthdate, sex, barangay_id, address, parent_id)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssisi',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $parentId]
+			'INSERT INTO children (child_code, first_name, last_name, birthdate, sex, barangay_id, address, purok, is_ip, has_disability, parent_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			'sssssissiii',
+			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId]
 		);
 
 		admin_redirect(
@@ -118,6 +121,9 @@ $children = admin_fetch_all(
 		c.barangay_id,
 		bg.name AS barangay,
 		c.address,
+		c.purok,
+		c.is_ip,
+		c.has_disability,
 		c.parent_id,
 		p.name AS parent_name,
 		p.status AS parent_status,
@@ -127,7 +133,10 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status
+		lm.nutritional_status,
+		lm.wfa_status,
+		lm.hfa_status,
+		lm.wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -289,8 +298,11 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 					['Age', ((new DateTimeImmutable((string)$selectedChild['birthdate']))->diff(new DateTimeImmutable('today'))->y * 12 + (new DateTimeImmutable((string)$selectedChild['birthdate']))->diff(new DateTimeImmutable('today'))->m) . ' months'],
 					['Sex', $selectedChild['sex']],
 					['Barangay', $selectedChild['barangay']],
+					['Purok', $selectedChild['purok'] ?? ''],
 					['Parent', $selectedChild['parent_name']],
 					['Address', $selectedChild['address']],
+					['IP Group', !empty($selectedChild['is_ip']) ? 'Yes' : 'No'],
+					['Disability', !empty($selectedChild['has_disability']) ? 'Yes' : 'No'],
 				] as [$label, $value]): ?>
 					<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--admin-border);">
 						<span style="font-size:12px;color:var(--admin-muted);"><?php echo nutritionist_e($label); ?></span>
@@ -298,6 +310,23 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 					</div>
 				<?php endforeach; ?>
 			</div>
+			<?php if (($selectedChild['wfa_status'] ?? null) !== null || ($selectedChild['hfa_status'] ?? null) !== null || ($selectedChild['wfh_status'] ?? null) !== null): ?>
+				<div style="margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border);">
+					<div style="font-weight:700;font-size:12px;color:var(--admin-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;">DOH Nutritional Status (per OPT Plus)</div>
+					<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;">
+						<?php foreach ([
+							['WFA', $selectedChild['wfa_status'] ?? '—'],
+							['HFA', $selectedChild['hfa_status'] ?? '—'],
+							['WFH', $selectedChild['wfh_status'] ?? '—'],
+						] as [$axis, $val]): ?>
+							<div style="text-align:center;background:var(--admin-surface-alt, #f7f7f5);border-radius:8px;padding:8px 4px;">
+								<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($axis); ?></div>
+								<div style="font-size:12px;font-weight:700;color:var(--admin-text);"><?php echo nutritionist_e((string)$val); ?></div>
+							</div>
+						<?php endforeach; ?>
+					</div>
+				</div>
+			<?php endif; ?>
 		</article>
 
 		<article class="nutritionist-panel">
@@ -413,6 +442,18 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 		<label class="admin-field" style="grid-column:1 / -1;">
 			<span>Address</span>
 			<input name="address" value="<?php echo nutritionist_e($editChild['address'] ?? ''); ?>" placeholder="Home address">
+		</label>
+		<label class="admin-field">
+			<span>Purok / Sitio</span>
+			<input name="purok" value="<?php echo nutritionist_e($editChild['purok'] ?? ''); ?>" placeholder="Purok 6">
+		</label>
+		<label class="admin-field" style="flex-direction:row;align-items:center;gap:8px;">
+			<input type="checkbox" name="is_ip" value="1" style="width:auto;" <?php echo !empty($editChild['is_ip']) ? 'checked' : ''; ?>>
+			<span>Belongs to IP (Indigenous Peoples) group</span>
+		</label>
+		<label class="admin-field" style="flex-direction:row;align-items:center;gap:8px;">
+			<input type="checkbox" name="has_disability" value="1" style="width:auto;" <?php echo !empty($editChild['has_disability']) ? 'checked' : ''; ?>>
+			<span>Has a disability</span>
 		</label>
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
 			<span>&nbsp;</span>

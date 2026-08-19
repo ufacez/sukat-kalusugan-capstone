@@ -168,6 +168,71 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 	return 'Normal';
 }
 
+/**
+ * DOH Operation Timbang Plus (eOPT Plus) classifies WFA, HFA, and WFH as
+ * three independent axes rather than collapsing them into one label. These
+ * match the exact cutoffs used in the DOH "Nut_StatusTool" reference sheet.
+ *
+ * WFA deliberately has no overweight/obese category -- DOH classifies
+ * weight-related overweight/obesity through WFH instead, since WFA alone
+ * can't distinguish a tall-heavy child from an overweight one. A waz above
+ * +2 returns null here; the WFH axis is what carries that signal.
+ */
+function classify_wfa_status(float $waz): ?string
+{
+	if ($waz < -3) {
+		return 'SUW';
+	}
+
+	if ($waz < -2) {
+		return 'MUW';
+	}
+
+	if ($waz <= 2) {
+		return 'Normal';
+	}
+
+	return null;
+}
+
+function classify_hfa_status(float $haz): string
+{
+	if ($haz < -3) {
+		return 'SSt';
+	}
+
+	if ($haz < -2) {
+		return 'MSt';
+	}
+
+	if ($haz <= 2) {
+		return 'Normal';
+	}
+
+	return 'Tall';
+}
+
+function classify_wfh_status(float $whz): string
+{
+	if ($whz < -3) {
+		return 'SW(SAM)';
+	}
+
+	if ($whz < -2) {
+		return 'MW(MAM)';
+	}
+
+	if ($whz <= 2) {
+		return 'Normal';
+	}
+
+	if ($whz <= 3) {
+		return 'OW';
+	}
+
+	return 'Ob';
+}
+
 function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_months, string $sex): array
 {
 	$waz = calculate_waz($weight_kg, $age_months, $sex);
@@ -179,5 +244,8 @@ function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_mont
 		'haz' => $haz,
 		'whz' => $whz,
 		'nutritional_status' => classify_nutritional_status($waz, $haz, $whz),
+		'wfa_status' => classify_wfa_status($waz),
+		'hfa_status' => classify_hfa_status($haz),
+		'wfh_status' => classify_wfh_status($whz),
 	];
 }
