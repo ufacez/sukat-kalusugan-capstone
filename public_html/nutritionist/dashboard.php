@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
 
 $user = nutritionist_require_access();
 $today = new DateTimeImmutable('today');
@@ -661,8 +662,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<tbody>
 				<?php foreach ($selectedChildren as $index => $child): ?>
 					<?php
-					$birthdate = new DateTimeImmutable((string)$child['birthdate']);
-					$ageMonths = $birthdate->diff($today)->y * 12 + $birthdate->diff($today)->m;
+					$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
 					$status = (string)($child['nutritional_status'] ?? 'Pending');
 					$pillClass = $status === 'Normal' ? 'is-success' : ($status === 'Overweight' ? 'is-warn' : 'is-danger');
 					?>

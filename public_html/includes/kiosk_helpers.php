@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/who_calculator.php';
+
 function kiosk_e(string $value): string
 {
     return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
@@ -72,11 +74,10 @@ function kiosk_age_months(?string $birthdate): int
 {
     if (!$birthdate) return 0;
 
-    $birth = new DateTimeImmutable($birthdate);
-    $today = new DateTimeImmutable('today');
-    $diff = $birth->diff($today);
-
-    return ($diff->y * 12) + $diff->m;
+    // Delegates to doh_age_in_months() (includes/who_calculator.php) so this
+    // matches the DOH e-OPT Plus convention and every other screen in the
+    // app instead of using its own calendar-based calculation.
+    return doh_age_in_months($birthdate) ?? 0;
 }
 
 function kiosk_person_name(array $child): string

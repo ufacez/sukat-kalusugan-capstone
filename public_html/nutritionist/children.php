@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
 
 function nutritionist_next_child_code(): string
 {
@@ -241,7 +242,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 			<tbody>
 				<?php foreach ($filteredChildren as $child): ?>
 					<?php
-					$ageMonths = (new DateTimeImmutable((string)$child['birthdate']))->diff(new DateTimeImmutable('today'))->y * 12 + (new DateTimeImmutable((string)$child['birthdate']))->diff(new DateTimeImmutable('today'))->m;
+					$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
 					$status = (string)($child['nutritional_status'] ?? 'Pending');
 					$pillClass = nutritionist_child_status_class($status);
 					?>
@@ -295,7 +296,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 			<div style="border-top:1px solid var(--admin-border);padding-top:16px;">
 				<?php foreach ([
 					['Birthdate', $selectedChild['birthdate']],
-					['Age', ((new DateTimeImmutable((string)$selectedChild['birthdate']))->diff(new DateTimeImmutable('today'))->y * 12 + (new DateTimeImmutable((string)$selectedChild['birthdate']))->diff(new DateTimeImmutable('today'))->m) . ' months'],
+					['Age', (doh_age_in_months((string)$selectedChild['birthdate']) ?? 0) . ' months'],
 					['Sex', $selectedChild['sex']],
 					['Barangay', $selectedChild['barangay']],
 					['Purok', $selectedChild['purok'] ?? ''],

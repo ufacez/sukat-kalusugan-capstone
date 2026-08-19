@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/parent_helpers.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
 
 $user = parent_require_access();
 
@@ -112,9 +113,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 					<?php else: ?>
 						<?php foreach ($children as $child): ?>
 							<?php
-							$birthdate = new DateTimeImmutable((string)$child['birthdate']);
-							$age = $birthdate->diff(new DateTimeImmutable('today'));
-							$ageMonths = $age->y * 12 + $age->m;
+							$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
 							?>
 							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
 								<td>

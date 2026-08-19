@@ -21,6 +21,7 @@ $measurements = admin_fetch_all(
 		m.wfa_status,
 		m.hfa_status,
 		m.wfh_status,
+		m.data_quality_flag,
 		c.id AS child_id,
 		c.child_code,
 		c.first_name,
@@ -176,7 +177,11 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 						<td style="color:var(--admin-primary);font-weight:600;"><?php echo ((float)$measurement['waz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['waz']); ?></td>
 						<td style="color:#4a9fd5;font-weight:600;"><?php echo ((float)$measurement['haz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['haz']); ?></td>
 						<td style="color:#0d8871;font-weight:600;"><?php echo ((float)$measurement['whz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['whz']); ?></td>
-						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span></td>
+						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span>
+							<?php if ((int)($measurement['data_quality_flag'] ?? 0) === 1): ?>
+								<span class="admin-pill is-danger" title="One or more z-scores are outside WHO's plausible range (WAZ -6/+5, HAZ -6/+6, WHZ -5/+5). Double-check the raw weight/height/age before acting on this record.">⚠ Check data entry</span>
+							<?php endif; ?>
+						</td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['hfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfh_status'] ?? '—')); ?></td>
