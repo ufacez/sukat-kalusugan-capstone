@@ -27,9 +27,16 @@
         credentials: "same-origin",
       });
 
-      const payload = await response.json();
+      const raw = await response.text();
+      let payload = null;
 
-      if (!response.ok || !payload.success) {
+      try {
+        payload = JSON.parse(raw);
+      } catch (_) {
+        throw new Error("Login service returned an invalid response.");
+      }
+
+      if (!response.ok || !payload || !payload.success) {
         throw new Error(payload.message || "Unable to sign in.");
       }
 

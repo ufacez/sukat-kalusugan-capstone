@@ -1,105 +1,154 @@
 <?php
 
 /**
- * auth/login.php
- * The public login page (staff + parent share this form; role determines redirect).
- * Renders HTML form, submits to api/auth/login.php via fetch().
+ * api/auth/login.php
+ * Authenticates staff (admin/nutritionist) and parent accounts.
  */
 
-require_once __DIR__ . '/../includes/auth_middleware.php';
+require_once __DIR__ . '/../../includes/auth_middleware.php';
+require_once __DIR__ . '/../../includes/audit_logger.php';
 
 start_secure_session();
 
-$currentUser = current_user();
+function login_respond_error(string $message, int $statusCode = 401): void
+{
+    if (wants_json_response()) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => false,
+            'message' => $message,
+        ]);
+        exit;
+    }
 
-if ($currentUser !== null) {
-    header('Location: ' . redirect_for_current_user($currentUser));
+    header('Location: ' . app_url('/auth/login.php?error=' . urlencode($message)));
     exit;
 }
 
-$error = trim((string)($_GET['error'] ?? ''));
-$notice = trim((string)($_GET['notice'] ?? ''));
-?>
-<!doctype html>
-<html lang="en">
+function login_respond_success(array $authSession): void
+{
+    $redirectUrl = redirect_for_current_user($authSession);
 
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sukat Kalusugan | Sign In</title>
-    <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css">
-</head>
+    if (wants_json_response()) {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => true,
+            'message' => 'Signed in successfully.',
+            'redirect_url' => $redirectUrl,
+        ]);
+        exit;
+    }
 
-<body class="auth-page">
-    <main class="auth-shell">
-        <section class="auth-hero" aria-hidden="true">
-            <div class="auth-brand">
-                <div class="auth-mark">SK</div>
-                <div>
-                    <p class="auth-kicker">Sukat Kalusugan</p>
-                    <h1>Monitor growth with a cleaner clinical workflow.</h1>
-                </div>
-            </div>
-            <p class="auth-copy">
-                Access the child nutrition monitoring system for staff and parents.
-                Manage appointments, measurements, and reports from one secure portal.
-            </p>
-            <ul class="auth-highlights">
-                <li>Role-aware redirect for admin, nutritionist, and parent accounts</li>
-                <li>Secure PHP session handling with reusable API endpoints</li>
-                <li>Designed to fit the existing wireframe direction</li>
-            </ul>
-        </section>
+    header('Location: ' . $redirectUrl);
+    exit;
+}
 
-        <section class="auth-card" aria-labelledby="sign-in-title">
-            <div class="auth-card-header">
-                <p class="eyebrow">Welcome back</p>
-                <h2 id="sign-in-title">Sign in to continue</h2>
-                <p class="muted">Use your staff username/email or parent email and password.</p>
-            </div>
+if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
+    login_respond_error('Method not allowed.', 405);
+}
 
-            <?php if ($error !== ''): ?>
-                <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
-            <?php endif; ?>
+$identifier = trim((string)($_POST['identifier'] ?? ''));
+$password = (string)($_POST['password'] ?? '');
 
-            <?php if ($notice !== ''): ?>
-                <div class="flash flash-notice" role="status"><?php echo htmlspecialchars($notice, ENT_QUOTES, 'UTF-8'); ?></div>
-            <?php endif; ?>
+if ($identifier === '' || $password === '') {
+    login_respond_error('Email/username and password are required.', 422);
+}
 
-            <form class="auth-form" id="loginForm" action="../api/auth/login.php" method="post" novalidate>
-                <label class="field" for="identifier">
-                    <span>Email or username</span>
-                    <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="admin@sukat.ph or johndoe12" required>
-                </label>
+$conn = get_db_connection();
 
-                <label class="field" for="password">
-                    <span>Password</span>
-                    <div class="password-field">
-                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
-                        <button class="toggle-password" type="button" data-toggle-password aria-label="Show password">Show</button>
-                    </div>
-                </label>
+// Attempt staff authentication by username or email.
+$staffStmt = mysqli_prepare(
+    $conn,
+    'SELECT u.id, u.name, u.email, u.username, u.password_hash, u.status, u.role_id, u.barangay_id, r.name AS role
+     FROM users u
+     INNER JOIN roles r ON r.id = u.role_id
+     WHERE LOWER(u.email) = LOWER(?) OR LOWER(u.username) = LOWER(?)
+     LIMIT 1'
+);
 
-                <div class="auth-row">
-                    <label class="checkbox">
-                        <input type="checkbox" name="remember" value="1" disabled>
-                        <span>Remember me</span>
-                    </label>
-                    <a class="link" href="#" aria-disabled="true">Forgot password?</a>
-                </div>
+if ($staffStmt === false) {
+    login_respond_error('Unable to process sign in right now.', 500);
+}
 
-                <div class="form-message" id="formMessage" aria-live="polite"></div>
+mysqli_stmt_bind_param($staffStmt, 'ss', $identifier, $identifier);
+mysqli_stmt_execute($staffStmt);
+$staffResult = mysqli_stmt_get_result($staffStmt);
+$staff = $staffResult instanceof mysqli_result ? mysqli_fetch_assoc($staffResult) : null;
+mysqli_stmt_close($staffStmt);
 
-                <button class="auth-submit" type="submit">
-                    <span class="button-label">Sign in</span>
-                    <span class="button-spinner" aria-hidden="true"></span>
-                </button>
-            </form>
-        </section>
-    </main>
+if (is_array($staff) && password_verify($password, (string)($staff['password_hash'] ?? ''))) {
+    if (($staff['status'] ?? 'inactive') !== 'active') {
+        login_respond_error('This account is inactive.', 403);
+    }
 
-    <script src="../assets/js/auth-login.js"></script>
-</body>
+    session_regenerate_id(true);
 
-</html>
+    $barangayId = $staff['barangay_id'];
+    $_SESSION['auth'] = [
+        'type' => 'staff',
+        'id' => (int)$staff['id'],
+        'name' => (string)$staff['name'],
+        'email' => (string)$staff['email'],
+        'username' => (string)$staff['username'],
+        'role' => (string)$staff['role'],
+        'role_id' => (int)$staff['role_id'],
+        'barangay_id' => $barangayId === null ? null : (int)$barangayId,
+        'status' => (string)$staff['status'],
+    ];
+
+    $lastLoginStmt = mysqli_prepare($conn, 'UPDATE users SET last_login = NOW() WHERE id = ? LIMIT 1');
+    if ($lastLoginStmt !== false) {
+        $staffId = (int)$staff['id'];
+        mysqli_stmt_bind_param($lastLoginStmt, 'i', $staffId);
+        mysqli_stmt_execute($lastLoginStmt);
+        mysqli_stmt_close($lastLoginStmt);
+    }
+
+    log_action((int)$staff['id'], 'LOGIN', 'info', 'Staff login for ' . (string)$staff['email']);
+    login_respond_success($_SESSION['auth']);
+}
+
+// Fall back to parent authentication (email only).
+$parentStmt = mysqli_prepare(
+    $conn,
+    'SELECT id, name, email, password_hash, parent_type, status, barangay_id
+     FROM parents
+     WHERE LOWER(email) = LOWER(?)
+     LIMIT 1'
+);
+
+if ($parentStmt === false) {
+    login_respond_error('Unable to process sign in right now.', 500);
+}
+
+mysqli_stmt_bind_param($parentStmt, 's', $identifier);
+mysqli_stmt_execute($parentStmt);
+$parentResult = mysqli_stmt_get_result($parentStmt);
+$parent = $parentResult instanceof mysqli_result ? mysqli_fetch_assoc($parentResult) : null;
+mysqli_stmt_close($parentStmt);
+
+if (is_array($parent) && password_verify($password, (string)($parent['password_hash'] ?? ''))) {
+    if (($parent['status'] ?? 'inactive') !== 'active') {
+        login_respond_error('This account is inactive.', 403);
+    }
+
+    session_regenerate_id(true);
+
+    $barangayId = $parent['barangay_id'];
+    $_SESSION['auth'] = [
+        'type' => 'parent',
+        'id' => (int)$parent['id'],
+        'name' => (string)$parent['name'],
+        'email' => (string)$parent['email'],
+        'role' => 'parent',
+        'parent_type' => (string)($parent['parent_type'] ?? ''),
+        'barangay_id' => $barangayId === null ? null : (int)$barangayId,
+        'status' => (string)$parent['status'],
+    ];
+
+    log_action(null, 'LOGIN', 'info', 'Parent login for ' . (string)$parent['email']);
+    login_respond_success($_SESSION['auth']);
+}
+
+login_respond_error('Invalid email/username or password.', 401);
