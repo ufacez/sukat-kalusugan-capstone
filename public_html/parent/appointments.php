@@ -71,9 +71,10 @@ $children = admin_fetch_all(
 );
 
 $nutritionists = admin_fetch_all(
-	'SELECT u.id, u.name, u.barangay
+	'SELECT u.id, u.name, b.name AS barangay
 	 FROM users u
 	 INNER JOIN roles r ON r.id = u.role_id
+	 LEFT JOIN barangays b ON b.id = u.barangay_id
 	 WHERE r.name = ? AND u.status = ?
 	 ORDER BY u.name ASC',
 	'ss',
@@ -90,10 +91,11 @@ $appointments = admin_fetch_all(
 		c.last_name,
 		c.child_code,
 		u.name AS nutritionist_name,
-		u.barangay AS nutritionist_barangay
+		b.name AS nutritionist_barangay
 	 FROM appointments a
 	 INNER JOIN children c ON c.id = a.child_id
 	 INNER JOIN users u ON u.id = a.nutritionist_id
+	 LEFT JOIN barangays b ON b.id = u.barangay_id
 	 WHERE a.parent_id = ?
 	 ORDER BY a.scheduled_at DESC, a.id DESC',
 	'i',

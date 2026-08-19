@@ -23,13 +23,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		// nutritionist can't accidentally (or a tampered request can't
 		// deliberately) attach the wrong guardian to a child.
 		$childParams = [$childId];
-		$childScope = nutritionist_scope_fragment($user, 'c.barangay', $childParams);
+		$childScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childParams);
 		$childRecord = admin_fetch_one(
 			"SELECT c.id, c.parent_id
 			 FROM children c
 			 WHERE c.id = ? AND {$childScope}
 			 LIMIT 1",
-			str_repeat('i', 1) . str_repeat('s', count($childParams) - 1),
+			str_repeat('i', count($childParams)),
 			$childParams
 		);
 
@@ -67,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay', $params);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
 $appointments = admin_fetch_all(
 	"SELECT
 		a.id,
@@ -78,7 +78,7 @@ $appointments = admin_fetch_all(
 		c.child_code,
 		c.first_name,
 		c.last_name,
-		c.barangay,
+		bg.name AS barangay,
 		p.name AS parent_name,
 		p.phone AS parent_phone,
 		u.name AS nutritionist_name
@@ -86,9 +86,10 @@ $appointments = admin_fetch_all(
 	 INNER JOIN children c ON c.id = a.child_id
 	 INNER JOIN parents p ON p.id = a.parent_id
 	 INNER JOIN users u ON u.id = a.nutritionist_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 WHERE {$scope}
 	 ORDER BY a.scheduled_at ASC, a.id ASC",
-	str_repeat('s', count($params)),
+	str_repeat('i', count($params)),
 	$params
 );
 
@@ -103,14 +104,14 @@ foreach ($appointments as $appointment) {
 }
 
 $childrenParams = [];
-$childrenScope = nutritionist_scope_fragment($user, 'c.barangay', $childrenParams);
+$childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 $children = admin_fetch_all(
 	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 WHERE {$childrenScope}
 	 ORDER BY c.last_name ASC, c.first_name ASC",
-	str_repeat('s', count($childrenParams)),
+	str_repeat('i', count($childrenParams)),
 	$childrenParams
 );
 

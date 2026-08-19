@@ -1,160 +1,105 @@
 <?php
 
 /**
- * api/auth/login.php
- * Shared login handler for staff and parents.
+ * auth/login.php
+ * The public login page (staff + parent share this form; role determines redirect).
+ * Renders HTML form, submits to api/auth/login.php via fetch().
  */
 
-require_once __DIR__ . '/../../includes/auth_middleware.php';
-require_once __DIR__ . '/../../includes/audit_logger.php';
+require_once __DIR__ . '/../includes/auth_middleware.php';
 
 start_secure_session();
-header('Content-Type: application/json; charset=utf-8');
 
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Method not allowed.',
-    ]);
+$currentUser = current_user();
+
+if ($currentUser !== null) {
+    header('Location: ' . redirect_for_current_user($currentUser));
     exit;
 }
 
-$identifier = trim((string)($_POST['identifier'] ?? ''));
-$password = (string)($_POST['password'] ?? '');
+$error = trim((string)($_GET['error'] ?? ''));
+$notice = trim((string)($_GET['notice'] ?? ''));
+?>
+<!doctype html>
+<html lang="en">
 
-if ($identifier === '' || $password === '') {
-    http_response_code(422);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Email or username and password are required.',
-    ]);
-    exit;
-}
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sukat Kalusugan | Sign In</title>
+    <link rel="stylesheet" href="../assets/css/app.css">
+    <link rel="stylesheet" href="../assets/css/auth.css">
+</head>
 
-$conn = get_db_connection();
-$user = null;
+<body class="auth-page">
+    <main class="auth-shell">
+        <section class="auth-hero" aria-hidden="true">
+            <div class="auth-brand">
+                <div class="auth-mark">SK</div>
+                <div>
+                    <p class="auth-kicker">Sukat Kalusugan</p>
+                    <h1>Monitor growth with a cleaner clinical workflow.</h1>
+                </div>
+            </div>
+            <p class="auth-copy">
+                Access the child nutrition monitoring system for staff and parents.
+                Manage appointments, measurements, and reports from one secure portal.
+            </p>
+            <ul class="auth-highlights">
+                <li>Role-aware redirect for admin, nutritionist, and parent accounts</li>
+                <li>Secure PHP session handling with reusable API endpoints</li>
+                <li>Designed to fit the existing wireframe direction</li>
+            </ul>
+        </section>
 
-$staffSql = '
-	SELECT
-		u.id,
-		u.name,
-		u.email,
-		u.username,
-		u.password_hash,
-		u.phone,
-		u.barangay,
-		u.status,
-		u.role_id,
-		r.name AS role_name
-	FROM users u
-	INNER JOIN roles r ON r.id = u.role_id
-	WHERE u.email = ? OR u.username = ?
-	LIMIT 1
-';
-$staffStmt = mysqli_prepare($conn, $staffSql);
+        <section class="auth-card" aria-labelledby="sign-in-title">
+            <div class="auth-card-header">
+                <p class="eyebrow">Welcome back</p>
+                <h2 id="sign-in-title">Sign in to continue</h2>
+                <p class="muted">Use your staff username/email or parent email and password.</p>
+            </div>
 
-if ($staffStmt !== false) {
-    mysqli_stmt_bind_param($staffStmt, 'ss', $identifier, $identifier);
-    mysqli_stmt_execute($staffStmt);
-    $staffResult = mysqli_stmt_get_result($staffStmt);
+            <?php if ($error !== ''): ?>
+                <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
 
-    if ($staffResult instanceof mysqli_result) {
-        $user = mysqli_fetch_assoc($staffResult) ?: null;
-    }
+            <?php if ($notice !== ''): ?>
+                <div class="flash flash-notice" role="status"><?php echo htmlspecialchars($notice, ENT_QUOTES, 'UTF-8'); ?></div>
+            <?php endif; ?>
 
-    mysqli_stmt_close($staffStmt);
-}
+            <form class="auth-form" id="loginForm" action="../api/auth/login.php" method="post" novalidate>
+                <label class="field" for="identifier">
+                    <span>Email or username</span>
+                    <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="admin@sukat.ph or johndoe12" required>
+                </label>
 
-$accountType = 'staff';
+                <label class="field" for="password">
+                    <span>Password</span>
+                    <div class="password-field">
+                        <input id="password" name="password" type="password" autocomplete="current-password" placeholder="Enter your password" required>
+                        <button class="toggle-password" type="button" data-toggle-password aria-label="Show password">Show</button>
+                    </div>
+                </label>
 
-if ($user === null) {
-    $parentSql = '
-		SELECT id, name, email, password_hash, phone, address, status
-		FROM parents
-		WHERE email = ?
-		LIMIT 1
-	';
-    $parentStmt = mysqli_prepare($conn, $parentSql);
+                <div class="auth-row">
+                    <label class="checkbox">
+                        <input type="checkbox" name="remember" value="1" disabled>
+                        <span>Remember me</span>
+                    </label>
+                    <a class="link" href="#" aria-disabled="true">Forgot password?</a>
+                </div>
 
-    if ($parentStmt !== false) {
-        mysqli_stmt_bind_param($parentStmt, 's', $identifier);
-        mysqli_stmt_execute($parentStmt);
-        $parentResult = mysqli_stmt_get_result($parentStmt);
+                <div class="form-message" id="formMessage" aria-live="polite"></div>
 
-        if ($parentResult instanceof mysqli_result) {
-            $user = mysqli_fetch_assoc($parentResult) ?: null;
-            $accountType = 'parent';
-        }
+                <button class="auth-submit" type="submit">
+                    <span class="button-label">Sign in</span>
+                    <span class="button-spinner" aria-hidden="true"></span>
+                </button>
+            </form>
+        </section>
+    </main>
 
-        mysqli_stmt_close($parentStmt);
-    }
-}
+    <script src="../assets/js/auth-login.js"></script>
+</body>
 
-if ($user === null || !password_verify($password, (string)$user['password_hash'])) {
-    http_response_code(401);
-    echo json_encode([
-        'success' => false,
-        'message' => 'Invalid email, username, or password.',
-    ]);
-    exit;
-}
-
-if (($user['status'] ?? 'active') !== 'active') {
-    http_response_code(403);
-    echo json_encode([
-        'success' => false,
-        'message' => 'This account is inactive.',
-    ]);
-    exit;
-}
-
-session_regenerate_id(true);
-
-if ($accountType === 'staff') {
-    $_SESSION['auth'] = [
-        'type' => 'staff',
-        'id' => (int)$user['id'],
-        'name' => $user['name'],
-        'email' => $user['email'],
-        'username' => $user['username'],
-        'phone' => $user['phone'],
-        'barangay' => $user['barangay'],
-        'status' => $user['status'],
-        'role_id' => (int)$user['role_id'],
-        'role' => $user['role_name'],
-    ];
-
-    $updateStmt = mysqli_prepare($conn, 'UPDATE users SET last_login = CURRENT_TIMESTAMP WHERE id = ?');
-
-    if ($updateStmt !== false) {
-        $userId = (int)$user['id'];
-        mysqli_stmt_bind_param($updateStmt, 'i', $userId);
-        mysqli_stmt_execute($updateStmt);
-        mysqli_stmt_close($updateStmt);
-    }
-
-    log_action((int)$user['id'], 'LOGIN', 'info', 'Staff login from ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-} else {
-    $_SESSION['auth'] = [
-        'type' => 'parent',
-        'id' => (int)$user['id'],
-        'name' => $user['name'],
-        'email' => $user['email'],
-        'phone' => $user['phone'],
-        'address' => $user['address'],
-        'status' => $user['status'],
-        'role' => 'parent',
-    ];
-
-    log_action(null, 'LOGIN', 'info', 'Parent login for ' . $user['email'] . ' from ' . ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
-}
-
-$redirectUrl = redirect_for_current_user($_SESSION['auth']);
-
-echo json_encode([
-    'success' => true,
-    'message' => 'Login successful.',
-    'redirect_url' => $redirectUrl,
-    'user' => current_user(),
-]);
+</html>

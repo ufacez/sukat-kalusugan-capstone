@@ -42,7 +42,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$lastName = trim((string)($_POST['last_name'] ?? ''));
 	$birthdate = trim((string)($_POST['birthdate'] ?? ''));
 	$sex = trim((string)($_POST['sex'] ?? 'Male'));
-	$barangay = trim((string)($_POST['barangay'] ?? ''));
+	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	$address = trim((string)($_POST['address'] ?? ''));
 	$parentId = (int)($_POST['parent_id'] ?? 0);
 
@@ -60,10 +61,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 		$ok = admin_execute(
 			'UPDATE children
-			 SET child_code = ?, first_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay = ?, address = ?, parent_id = ?
+			 SET child_code = ?, first_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, address = ?, parent_id = ?
 			 WHERE id = ?',
-			'ssssssiii',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangay, $address, $parentId, $childId]
+			'sssssisii',
+			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $parentId, $childId]
 		);
 
 		admin_redirect(
@@ -78,10 +79,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$childCode = nutritionist_next_child_code();
 
 		$ok = admin_execute(
-			'INSERT INTO children (child_code, first_name, last_name, birthdate, sex, barangay, address, parent_id)
+			'INSERT INTO children (child_code, first_name, last_name, birthdate, sex, barangay_id, address, parent_id)
 			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssssi',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangay, $address, $parentId]
+			'sssssisi',
+			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $parentId]
 		);
 
 		admin_redirect(
@@ -105,7 +106,7 @@ if ($deleteId > 0) {
 }
 
 $childrenParams = [];
-$childrenScope = nutritionist_scope_fragment($user, 'c.barangay', $childrenParams);
+$childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 $children = admin_fetch_all(
 	"SELECT
 		c.id,
@@ -114,7 +115,8 @@ $children = admin_fetch_all(
 		c.last_name,
 		c.birthdate,
 		c.sex,
-		c.barangay,
+		c.barangay_id,
+		bg.name AS barangay,
 		c.address,
 		c.parent_id,
 		p.name AS parent_name,
@@ -128,6 +130,7 @@ $children = admin_fetch_all(
 		lm.nutritional_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m
@@ -137,7 +140,7 @@ $children = admin_fetch_all(
 	 )
 	 WHERE {$childrenScope}
 	 ORDER BY c.last_name ASC, c.first_name ASC",
-	str_repeat('s', count($childrenParams)),
+	str_repeat('i', count($childrenParams)),
 	$childrenParams
 );
 
@@ -162,6 +165,7 @@ $parents = admin_fetch_all(
 	'',
 	[]
 );
+$barangays = admin_barangay_options();
 
 $statuses = ['All', 'Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Wasted', 'Overweight'];
 $filteredChildren = array_values(array_filter(
@@ -232,7 +236,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 					$status = (string)($child['nutritional_status'] ?? 'Pending');
 					$pillClass = nutritionist_child_status_class($status);
 					?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . $child['barangay'] . ' ' . $child['parent_name'] . ' ' . $status)); ?>">
+					<tr data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . $child['parent_name'] . ' ' . $status)); ?>">
 						<td style="font-family:monospace;color:var(--admin-muted);"><?php echo nutritionist_e($child['child_code']); ?></td>
 						<td>
 							<div style="display:flex;align-items:center;gap:8px;">
@@ -387,7 +391,15 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 		</label>
 		<label class="admin-field">
 			<span>Barangay</span>
-			<input name="barangay" value="<?php echo nutritionist_e($editChild['barangay'] ?? ($user['barangay'] ?? '')); ?>" placeholder="Assigned barangay">
+			<select name="barangay_id">
+				<option value="">-- Select barangay --</option>
+				<?php
+				$selectedBarangayId = $editChild['barangay_id'] ?? ($user['barangay_id'] ?? null);
+				foreach ($barangays as $barangay):
+				?>
+					<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)$selectedBarangayId === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
+				<?php endforeach; ?>
+			</select>
 		</label>
 		<label class="admin-field">
 			<span>Parent/Guardian</span>

@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 $user = nutritionist_require_access();
 
 $params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay', $params);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
 $rows = admin_fetch_all(
 	"SELECT
 		c.id AS child_id,
@@ -13,7 +13,7 @@ $rows = admin_fetch_all(
 		c.first_name,
 		c.last_name,
 		c.sex,
-		c.barangay,
+		bg.name AS barangay,
 		c.birthdate,
 		p.name AS parent_name,
 		lm.measurement_date,
@@ -25,6 +25,7 @@ $rows = admin_fetch_all(
 		lm.nutritional_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m
@@ -34,7 +35,7 @@ $rows = admin_fetch_all(
 	 )
 	 WHERE {$scope}
 	 ORDER BY c.last_name ASC, c.first_name ASC",
-	str_repeat('s', count($params)),
+	str_repeat('i', count($params)),
 	$params
 );
 
@@ -149,7 +150,7 @@ nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and class
 			</thead>
 			<tbody>
 				<?php foreach ($rows as $row): ?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($row['first_name'] . ' ' . $row['last_name'] . ' ' . $row['child_code'] . ' ' . $row['barangay'] . ' ' . ($row['nutritional_status'] ?? ''))); ?>">
+					<tr data-filter-text="<?php echo nutritionist_e(strtolower($row['first_name'] . ' ' . $row['last_name'] . ' ' . $row['child_code'] . ' ' . (string)($row['barangay'] ?? '') . ' ' . ($row['nutritional_status'] ?? ''))); ?>">
 						<td>
 							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($row['first_name'] . ' ' . $row['last_name']); ?></div>
 							<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?> · <?php echo nutritionist_e((string)$row['parent_name']); ?></div>

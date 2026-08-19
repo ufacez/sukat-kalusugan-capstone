@@ -12,6 +12,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
 	$phone = trim((string)($_POST['phone'] ?? ''));
 	$address = trim((string)($_POST['address'] ?? ''));
+	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+	$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	$status = (string)($_POST['status'] ?? 'active');
 	$parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 
@@ -34,9 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if ($action === 'update' && $parentId > 0) {
 		$ok = admin_execute(
-			'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, status = ? WHERE id = ?',
-			'ssssssi',
-			[$name, $email, $parentType, $phone, $address, $status, $parentId]
+			'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, status = ? WHERE id = ?',
+			'sssssisi',
+			[$name, $email, $parentType, $phone, $address, $barangayId, $status, $parentId]
 		);
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated.', 'type' => 'error']);
@@ -45,9 +47,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if ($action === 'create') {
 		$passwordHash = password_hash('ChangeMe123!', PASSWORD_DEFAULT);
 		$ok = admin_execute(
-			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, status) VALUES (?, ?, ?, ?, ?, ?, ?)',
-			'sssssss',
-			[$name, $email, $passwordHash, $parentType, $phone, $address, $status]
+			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+			'ssssssis',
+			[$name, $email, $passwordHash, $parentType, $phone, $address, $barangayId, $status]
 		);
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added.', 'type' => 'error']);
@@ -55,7 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay', $params);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
 $parents = admin_fetch_all(
 	"SELECT
 		p.id,
@@ -64,11 +66,14 @@ $parents = admin_fetch_all(
 		p.parent_type,
 		p.phone,
 		p.address,
+		p.barangay_id,
+		bg.name AS barangay,
 		p.status,
 		COUNT(DISTINCT c.id) AS children_count,
 		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal', 'Overweight') THEN 1 ELSE 0 END) AS follow_up_count,
 		MAX(lm.measurement_date) AS latest_measurement
 	 FROM parents p
+	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
 	 LEFT JOIN children c ON c.parent_id = p.id AND {$scope}
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m2.id
@@ -77,13 +82,14 @@ $parents = admin_fetch_all(
 		ORDER BY m2.measurement_date DESC, m2.id DESC
 		LIMIT 1
 	 )
-	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.status
+	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status
 	 ORDER BY p.name ASC",
-	str_repeat('s', count($params)),
+	str_repeat('i', count($params)),
 	$params
 );
 
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
+$barangays = admin_barangay_options();
 
 $actions = '<a class="admin-btn" href="#parent-form">Add parent</a>';
 
@@ -129,6 +135,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 					<th>Type</th>
 					<th>Email</th>
 					<th>Phone</th>
+					<th>Barangay</th>
 					<th>Children</th>
 					<th>Follow-up</th>
 					<th>Status</th>
@@ -145,6 +152,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 							<td style="color:var(--admin-muted);"><span class="admin-pill is-muted"><?php echo nutritionist_e($parent['parent_type']); ?></span></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e($parent['email']); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?></td>
+						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['barangay'] ?? '')); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
 						<td style="color:var(--admin-muted);"><?php echo (int)($parent['follow_up_count'] ?? 0); ?></td>
 						<td><span class="admin-pill <?php echo $parent['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo nutritionist_e(ucfirst($parent['status'])); ?></span></td>
@@ -183,6 +191,12 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 			<?php endforeach; ?>
 		</select></label>
 		<label class="admin-field"><span>Phone</span><input name="phone" placeholder="0917..."></label>
+		<label class="admin-field"><span>Barangay</span><select name="barangay_id">
+			<option value="">-- Select barangay --</option>
+			<?php foreach ($barangays as $barangay): ?>
+				<option value="<?php echo (int)$barangay['id']; ?>"><?php echo nutritionist_e($barangay['name']); ?></option>
+			<?php endforeach; ?>
+		</select></label>
 		<label class="admin-field"><span>Status</span><select name="status"><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
 		<label class="admin-field" style="grid-column:1 / -1;"><span>Address</span><input name="address" placeholder="Household address"></label>
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;"><span>&nbsp;</span><button class="admin-btn" type="submit">Save parent</button></div>

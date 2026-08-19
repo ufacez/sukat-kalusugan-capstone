@@ -24,7 +24,7 @@ $children = admin_fetch_all(
 		c.last_name,
 		c.birthdate,
 		c.sex,
-		c.barangay,
+		bg.name AS barangay,
 		c.address,
 		lm.measurement_date,
 		lm.height_cm,
@@ -34,6 +34,7 @@ $children = admin_fetch_all(
 		lm.whz,
 		lm.nutritional_status
 	 FROM children c
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m

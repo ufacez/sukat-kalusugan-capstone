@@ -14,6 +14,7 @@ function admin_nav_items(): array
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/admin/dashboard.php')],
         ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php')],
+        ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php')],
         ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php')],
         ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php')],
         ['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php')],
@@ -117,6 +118,21 @@ function admin_scalar(string $sql, string $types = '', array $params = [], int $
 function admin_find_role_id(string $roleName): int
 {
     return admin_scalar('SELECT id FROM roles WHERE name = ? LIMIT 1', 's', [$roleName]);
+}
+
+/**
+ * Shared dropdown source for every "assign a barangay" form across the
+ * admin, nutritionist, and settings pages. Active barangays only, sorted
+ * by name so the <select> stays predictable.
+ */
+function admin_barangay_options(): array
+{
+    return admin_fetch_all(
+        "SELECT id, name, city_municipality, status
+         FROM barangays
+         WHERE status = 'active'
+         ORDER BY name ASC"
+    );
 }
 
 function admin_redirect(string $path, array $query = []): void

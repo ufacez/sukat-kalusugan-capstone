@@ -15,7 +15,8 @@ $name = trim((string)($_POST['name'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
 $username = trim((string)($_POST['username'] ?? ''));
 $phone = trim((string)($_POST['phone'] ?? ''));
-$barangay = trim((string)($_POST['barangay'] ?? ''));
+$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 $roleName = trim((string)($_POST['role'] ?? 'nutritionist'));
 $status = trim((string)($_POST['status'] ?? 'active'));
 $password = (string)($_POST['password'] ?? '');
@@ -34,21 +35,21 @@ $conn = get_db_connection();
 
 if ($password !== '') {
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, role_id = ?, barangay = ?, status = ? WHERE id = ?');
+    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?');
 
     if ($stmt === false) {
         admin_redirect('/admin/users.php', ['notice' => 'Unable to update user right now.', 'type' => 'error']);
     }
 
-    mysqli_stmt_bind_param($stmt, 'sssssissi', $name, $email, $username, $hash, $phone, $roleId, $barangay, $status, $id);
+    mysqli_stmt_bind_param($stmt, 'sssssiisi', $name, $email, $username, $hash, $phone, $roleId, $barangayId, $status, $id);
 } else {
-    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, role_id = ?, barangay = ?, status = ? WHERE id = ?');
+    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?');
 
     if ($stmt === false) {
         admin_redirect('/admin/users.php', ['notice' => 'Unable to update user right now.', 'type' => 'error']);
     }
 
-    mysqli_stmt_bind_param($stmt, 'sssssisi', $name, $email, $username, $phone, $roleId, $barangay, $status, $id);
+    mysqli_stmt_bind_param($stmt, 'ssssiisi', $name, $email, $username, $phone, $roleId, $barangayId, $status, $id);
 }
 
 if (!mysqli_stmt_execute($stmt)) {

@@ -8,7 +8,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$name = trim((string)($_POST['name'] ?? ''));
 	$email = trim((string)($_POST['email'] ?? ''));
 	$phone = trim((string)($_POST['phone'] ?? ''));
-	$barangay = trim((string)($_POST['barangay'] ?? ''));
+	$phone = trim((string)($_POST['phone'] ?? ''));
+	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+	$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	$password = (string)($_POST['password'] ?? '');
 
 	if ($name === '' || $email === '') {
@@ -21,14 +23,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		admin_redirect('/nutritionist/settings.php', ['notice' => 'Profile could not be loaded.', 'type' => 'error']);
 	}
 
-	$params = [$name, $email, $phone, $barangay, (int)$user['id']];
-	$sql = 'UPDATE users SET name = ?, email = ?, phone = ?, barangay = ?';
-	$types = 'ssssi';
+	$params = [$name, $email, $phone, $barangayId, (int)$user['id']];
+	$sql = 'UPDATE users SET name = ?, email = ?, phone = ?, barangay_id = ?';
+	$types = 'sssii';
 
 	if ($password !== '') {
 		$sql .= ', password_hash = ?';
-		$types = 'sssssi';
-		$params = [$name, $email, $phone, $barangay, password_hash($password, PASSWORD_DEFAULT), (int)$user['id']];
+		$types = 'sssisi';
+		$params = [$name, $email, $phone, $barangayId, password_hash($password, PASSWORD_DEFAULT), (int)$user['id']];
 	}
 
 	$sql .= ' WHERE id = ?';
@@ -39,21 +41,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$_SESSION['auth']['name'] = $name;
 		$_SESSION['auth']['email'] = $email;
 		$_SESSION['auth']['phone'] = $phone;
-		$_SESSION['auth']['barangay'] = $barangay;
+		$_SESSION['auth']['barangay_id'] = $barangayId;
+		$barangayRow = $barangayId !== null ? admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayId]) : null;
+		$_SESSION['auth']['barangay'] = $barangayRow['name'] ?? null;
 	}
 
 	admin_redirect('/nutritionist/settings.php', $ok ? ['notice' => 'Profile updated successfully.'] : ['notice' => 'Profile could not be updated.', 'type' => 'error']);
 }
 
 $profile = admin_fetch_one(
-	'SELECT u.id, u.name, u.email, u.phone, u.barangay, u.status, r.name AS role_name
+	'SELECT u.id, u.name, u.email, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
 	 FROM users u
 	 INNER JOIN roles r ON r.id = u.role_id
+	 LEFT JOIN barangays b ON b.id = u.barangay_id
 	 WHERE u.id = ?
 	 LIMIT 1',
 	'i',
 	[(int)$user['id']]
 );
+
+$barangays = admin_barangay_options();
 
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/dashboard.php')) . '">Back to dashboard</a>';
 
@@ -72,7 +79,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 	</article>
 	<article class="nutritionist-stat-card">
 		<div class="nutritionist-stat-label">Assigned Barangay</div>
-		<div class="admin-stat-value"><?php echo nutritionist_e((string)($profile['barangay'] ?? 'All')); ?></div>
+		<div class="admin-stat-value"><?php echo nutritionist_e((string)($profile['barangay'] ?? 'All barangays')); ?></div>
 		<div class="admin-stat-note">Scope for records and appointments</div>
 	</article>
 	<article class="nutritionist-stat-card">
@@ -100,7 +107,12 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 			</label>
 			<label class="admin-field">
 				<span>Assigned Barangay</span>
-				<input name="barangay" value="<?php echo nutritionist_e((string)($profile['barangay'] ?? '')); ?>">
+				<select name="barangay_id">
+					<option value="">-- All barangays --</option>
+					<?php foreach ($barangays as $barangay): ?>
+						<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($profile['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
+					<?php endforeach; ?>
+				</select>
 			</label>
 			<label class="admin-field">
 				<span>New Password</span>

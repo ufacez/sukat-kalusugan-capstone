@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 $user = nutritionist_require_access();
 
 $params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay', $params);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
 $rows = admin_fetch_all(
 	"SELECT
 		m.measurement_date,

@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$eventTime = trim((string)($_POST['event_time'] ?? ''));
 		$location = trim((string)($_POST['location'] ?? ''));
 		$notes = trim((string)($_POST['notes'] ?? ''));
-		$barangay = trim((string)($user['barangay'] ?? '')) ?: null;
+		$barangayId = $user['barangay_id'] ?? null;
 
 		if (!in_array($eventType, ['meeting', 'oplan_timbang'], true) || $title === '' || $eventDate === '') {
 			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ['notice' => 'Event type, title, and date are required.', 'type' => 'error']);
@@ -44,10 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 		if ($eventAction === 'create_event') {
 			$ok = admin_execute(
-				'INSERT INTO nutritionist_events (event_type, title, event_date, event_time, location, barangay, notes, nutritionist_id)
+				'INSERT INTO nutritionist_events (event_type, title, event_date, event_time, location, barangay_id, notes, nutritionist_id)
 				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-				'sssssssi',
-				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $barangay, $notesValue, (int)$user['id']]
+				'sssssisi',
+				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $barangayId, $notesValue, (int)$user['id']]
 			);
 
 			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event added to the calendar.'] : ['notice' => 'Event could not be added.', 'type' => 'error']));
@@ -82,7 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $range = (string)($_GET['range'] ?? 'Today');
 
 $childrenParams = [];
-$childrenScope = nutritionist_scope_fragment($user, 'c.barangay', $childrenParams);
+$childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 $children = admin_fetch_all(
 	"SELECT
 		c.id,
@@ -91,7 +91,8 @@ $children = admin_fetch_all(
 		c.last_name,
 		c.birthdate,
 		c.sex,
-		c.barangay,
+		c.barangay_id,
+		bg.name AS barangay,
 		c.address,
 		p.name AS parent_name,
 		p.status AS parent_status,
@@ -104,6 +105,7 @@ $children = admin_fetch_all(
 		lm.nutritional_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m
@@ -113,12 +115,12 @@ $children = admin_fetch_all(
 	 )
 	 WHERE {$childrenScope}
 	 ORDER BY c.last_name ASC, c.first_name ASC",
-	str_repeat('s', count($childrenParams)),
+	str_repeat('i', count($childrenParams)),
 	$childrenParams
 );
 
 $measurementsParams = [];
-$measurementsScope = nutritionist_scope_fragment($user, 'c.barangay', $measurementsParams);
+$measurementsScope = nutritionist_scope_fragment($user, 'c.barangay_id', $measurementsParams);
 $measurements = admin_fetch_all(
 	"SELECT
 		m.id,
@@ -134,15 +136,16 @@ $measurements = admin_fetch_all(
 		c.last_name,
 		c.child_code,
 		c.birthdate,
-		c.barangay,
+		bg.name AS barangay,
 		p.name AS parent_name
 	 FROM measurements m
 	 INNER JOIN children c ON c.id = m.child_id
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 WHERE {$measurementsScope}
 	 ORDER BY m.measurement_date DESC, m.id DESC
 	 LIMIT 60",
-	str_repeat('s', count($measurementsParams)),
+	str_repeat('i', count($measurementsParams)),
 	$measurementsParams
 );
 
@@ -188,12 +191,13 @@ $monthStart = $calendarDate->format('Y-m-d');
 $monthEnd = $calendarDate->modify('last day of this month')->format('Y-m-d');
 
 $eventsParams = [$monthStart, $monthEnd];
-$eventsScope = nutritionist_scope_fragment($user, 'barangay', $eventsParams);
+$eventsScope = nutritionist_scope_fragment($user, 'ne.barangay_id', $eventsParams);
 $monthEvents = admin_fetch_all(
-	"SELECT id, event_type, title, event_date, event_time, location, notes, nutritionist_id
-	 FROM nutritionist_events
-	 WHERE event_date BETWEEN ? AND ? AND {$eventsScope}
-	 ORDER BY event_date ASC, event_time ASC, id ASC",
+	"SELECT ne.id, ne.event_type, ne.title, ne.event_date, ne.event_time, ne.location, ne.notes, ne.nutritionist_id, bg.name AS barangay
+	 FROM nutritionist_events ne
+	 LEFT JOIN barangays bg ON bg.id = ne.barangay_id
+	 WHERE ne.event_date BETWEEN ? AND ? AND {$eventsScope}
+	 ORDER BY ne.event_date ASC, ne.event_time ASC, ne.id ASC",
 	str_repeat('s', count($eventsParams)),
 	$eventsParams
 );
@@ -211,7 +215,7 @@ if ($editingEventId > 0) {
 }
 
 $parentsParams = [];
-$parentsScope = nutritionist_scope_fragment($user, 'c.barangay', $parentsParams);
+$parentsScope = nutritionist_scope_fragment($user, 'c.barangay_id', $parentsParams);
 $parents = admin_fetch_all(
 	"SELECT
 		p.id,

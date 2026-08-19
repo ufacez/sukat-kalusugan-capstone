@@ -6,11 +6,13 @@ start_secure_session();
 require_permission('users.view');
 
 $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
+$barangays = admin_barangay_options();
 $editingId = (int)($_GET['edit'] ?? 0);
 $editingUser = $editingId > 0 ? admin_fetch_one(
-    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay, u.status, r.name AS role_name
+    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
+     LEFT JOIN barangays b ON b.id = u.barangay_id
      WHERE u.id = ?
      LIMIT 1',
     'i',
@@ -18,9 +20,10 @@ $editingUser = $editingId > 0 ? admin_fetch_one(
 ) : null;
 
 $users = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay, u.status, u.last_login, u.created_at, r.name AS role_name
+    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay, u.status, u.last_login, u.created_at, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
+     LEFT JOIN barangays b ON b.id = u.barangay_id
      ORDER BY u.created_at DESC, u.id DESC'
 );
 
@@ -107,7 +110,12 @@ admin_layout_start('User Management', 'Create, update, and remove staff accounts
         </label>
         <label class="admin-field">
             <span>Barangay</span>
-            <input name="barangay" value="<?php echo admin_e($editingUser['barangay'] ?? ''); ?>" placeholder="All or assigned barangay">
+            <select name="barangay_id">
+                <option value="">-- All barangays (admin scope) --</option>
+                <?php foreach ($barangays as $barangay): ?>
+                    <option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingUser['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
         </label>
         <label class="admin-field">
             <span>Status</span>
@@ -162,7 +170,7 @@ admin_layout_start('User Management', 'Create, update, and remove staff accounts
                         <td><?php echo admin_e($user['name']); ?></td>
                         <td><?php echo admin_e($user['username'] ?? ''); ?></td>
                         <td><?php echo admin_e($user['email']); ?></td>
-                        <td><?php echo admin_e($user['barangay'] ?? 'All'); ?></td>
+                        <td><?php echo admin_e($user['barangay'] ?? 'All barangays'); ?></td>
                         <td><span class="admin-pill <?php echo $statusClass; ?>"><?php echo admin_e(ucfirst($user['status'])); ?></span></td>
                         <td><?php echo admin_e((string)($user['last_login'] ?? 'n/a')); ?></td>
                         <td>

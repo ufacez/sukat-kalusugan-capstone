@@ -36,6 +36,38 @@ function kiosk_fetch_all(string $sql, string $types = '', array $params = []): a
     return $rows;
 }
 
+/**
+ * Resolves the barangay a given kiosk device is assigned to.
+ *
+ * A device with no barangay assigned (or one that doesn't exist yet) is
+ * treated as unscoped, so a freshly-registered kiosk keeps showing every
+ * child instead of an empty list until an admin assigns it a barangay
+ * from Admin > Sensors.
+ *
+ * @return array{id:int,name:string}|null
+ */
+function kiosk_resolve_device_barangay(string $deviceCode): ?array
+{
+    $rows = kiosk_fetch_all(
+        'SELECT b.id, b.name
+         FROM devices d
+         INNER JOIN barangays b ON b.id = d.barangay_id
+         WHERE d.device_code = ?
+         LIMIT 1',
+        's',
+        [$deviceCode]
+    );
+
+    if ($rows === []) {
+        return null;
+    }
+
+    return [
+        'id' => (int)$rows[0]['id'],
+        'name' => (string)$rows[0]['name'],
+    ];
+}
+
 function kiosk_age_months(?string $birthdate): int
 {
     if (!$birthdate) return 0;

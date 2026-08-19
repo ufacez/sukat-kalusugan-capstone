@@ -13,16 +13,19 @@ $parents = admin_fetch_all(
         p.parent_type,
         p.phone,
         p.address,
+        p.barangay_id,
+        b.name AS barangay,
         p.status,
         p.created_at,
         COUNT(DISTINCT c.id) AS children_count,
         COUNT(DISTINCT a.id) AS appointment_count,
         MAX(m.measurement_date) AS latest_measurement
      FROM parents p
+     LEFT JOIN barangays b ON b.id = p.barangay_id
      LEFT JOIN children c ON c.parent_id = p.id
      LEFT JOIN appointments a ON a.parent_id = p.id
      LEFT JOIN measurements m ON m.child_id = c.id
-     GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.status, p.created_at
+     GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, b.name, p.status, p.created_at
      ORDER BY p.created_at DESC, p.id DESC'
 );
 
@@ -73,6 +76,7 @@ admin_layout_start('Parents', 'Parent accounts and linked child records.', 'pare
                     <th>Parent</th>
                     <th>Type</th>
                     <th>Email</th>
+                    <th>Barangay</th>
                     <th>Children</th>
                     <th>Appointments</th>
                     <th>Latest measurement</th>
@@ -88,6 +92,7 @@ admin_layout_start('Parents', 'Parent accounts and linked child records.', 'pare
                         </td>
                         <td><span class="admin-pill is-muted"><?php echo admin_e((string)$parent['parent_type']); ?></span></td>
                         <td><?php echo admin_e((string)$parent['email']); ?></td>
+                        <td><?php echo admin_e((string)($parent['barangay'] ?? '')); ?></td>
                         <td><?php echo (int)$parent['children_count']; ?></td>
                         <td><?php echo (int)$parent['appointment_count']; ?></td>
                         <td><?php echo admin_e((string)($parent['latest_measurement'] ?? 'n/a')); ?></td>

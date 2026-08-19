@@ -14,7 +14,8 @@ $name = trim((string)($_POST['name'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
 $username = trim((string)($_POST['username'] ?? ''));
 $phone = trim((string)($_POST['phone'] ?? ''));
-$barangay = trim((string)($_POST['barangay'] ?? ''));
+$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 $roleName = trim((string)($_POST['role'] ?? 'nutritionist'));
 $status = trim((string)($_POST['status'] ?? 'active'));
 $password = (string)($_POST['password'] ?? '');
@@ -31,13 +32,13 @@ if ($roleId <= 0) {
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
 $conn = get_db_connection();
-$stmt = mysqli_prepare($conn, 'INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+$stmt = mysqli_prepare($conn, 'INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
 
 if ($stmt === false) {
     admin_redirect('/admin/users.php', ['notice' => 'Unable to create user right now.', 'type' => 'error']);
 }
 
-mysqli_stmt_bind_param($stmt, 'sssssiss', $name, $email, $username, $hash, $phone, $roleId, $barangay, $status);
+mysqli_stmt_bind_param($stmt, 'sssssiis', $name, $email, $username, $hash, $phone, $roleId, $barangayId, $status);
 
 if (!mysqli_stmt_execute($stmt)) {
     mysqli_stmt_close($stmt);

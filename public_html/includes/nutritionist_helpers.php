@@ -123,13 +123,13 @@ function nutritionist_layout_end(): void
 
 function nutritionist_scope_fragment(array $user, string $column, array &$params): string
 {
-    $barangay = trim((string)($user['barangay'] ?? ''));
+    $barangayId = $user['barangay_id'] ?? null;
 
-    if (($user['role'] ?? '') === 'admin' || $barangay === '' || strcasecmp($barangay, 'all') === 0) {
+    if (($user['role'] ?? '') === 'admin' || $barangayId === null || $barangayId === '') {
         return '1=1';
     }
 
-    $params[] = $barangay;
+    $params[] = (int)$barangayId;
 
     return $column . ' = ?';
 }

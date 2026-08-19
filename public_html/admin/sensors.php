@@ -13,6 +13,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
     $deviceId = (int)($_POST['device_id'] ?? 0);
     $deviceCode = trim((string)($_POST['device_code'] ?? ''));
     $location = trim((string)($_POST['location'] ?? ''));
+    $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+    $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
     $status = trim((string)($_POST['status'] ?? 'active'));
     $lastCalibrationAt = trim((string)($_POST['last_calibration_at'] ?? ''));
     $heightOffset = (float)($_POST['calibration_offset_height'] ?? 0);
@@ -25,9 +27,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
 
     if ($deviceId > 0) {
         admin_execute(
-            'UPDATE devices SET location = ?, status = ?, last_calibration_at = NULLIF(?, ""), calibration_offset_height = ?, calibration_offset_weight = ? WHERE id = ?',
-            'sssddi',
-            [$location, $status, $lastCalibrationAt, $heightOffset, $weightOffset, $deviceId]
+            'UPDATE devices SET location = ?, barangay_id = ?, status = ?, last_calibration_at = NULLIF(?, ""), calibration_offset_height = ?, calibration_offset_weight = ? WHERE id = ?',
+            'sissddi',
+            [$location, $barangayId, $status, $lastCalibrationAt, $heightOffset, $weightOffset, $deviceId]
         );
 
         if ($deviceCode !== '') {
@@ -53,13 +55,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
 }
 
 $devices = admin_fetch_all(
-    'SELECT d.id, d.device_code, d.location, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.updated_at,
+    'SELECT d.id, d.device_code, d.location, d.barangay_id, bg.name AS barangay, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.updated_at,
             TIMESTAMPDIFF(SECOND, d.last_seen_at, NOW()) AS seconds_since_last_seen,
             s.hx711_calibration_factor, s.tf_luna_offset_cm, s.tf_luna_scale_factor, s.height_offset_cm, s.weight_offset_kg
      FROM devices d
+     LEFT JOIN barangays bg ON bg.id = d.barangay_id
      LEFT JOIN device_sensor_settings s ON s.device_code = d.device_code
      ORDER BY d.device_code ASC'
 );
+$barangays = admin_barangay_options();
 $deviceCount = count($devices);
 $activeCount = 0;
 $maintenanceCount = 0;
@@ -143,12 +147,22 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                     <div style="display:flex; gap:8px; flex-wrap:wrap;">
                         <span class="admin-pill <?php echo $deviceStatus === 'active' ? 'is-success' : ($deviceStatus === 'maintenance' ? 'is-warn' : 'is-danger'); ?>"><?php echo admin_e($deviceStatus); ?></span>
                         <span class="admin-pill <?php echo $connectionClass; ?>"><?php echo admin_e($connectionText); ?></span>
+                        <span class="admin-pill is-muted"><?php echo admin_e((string)($device['barangay'] ?? 'All barangays')); ?></span>
                     </div>
                 </div>
                 <div class="admin-form-grid">
                     <label class="admin-field">
                         <span>Location</span>
                         <input name="location" value="<?php echo admin_e((string)($device['location'] ?? '')); ?>">
+                    </label>
+                    <label class="admin-field">
+                        <span>Barangay</span>
+                        <select name="barangay_id">
+                            <option value="">-- Unassigned (shows all barangays) --</option>
+                            <?php foreach ($barangays as $barangay): ?>
+                                <option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($device['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
                     </label>
                     <label class="admin-field">
                         <span>Device status</span>

@@ -3,17 +3,38 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 require_once __DIR__ . '/../includes/kiosk_helpers.php';
 
+// Same convention the ESP32 endpoints use (device_ping.php, get_command.php,
+// etc.): the physical unit / kiosk browser identifies itself with a
+// ?device= code, falling back to the single-kiosk default so existing
+// deployments that never pass one keep working unchanged.
+$deviceCode = trim((string)($_GET['device'] ?? 'ESP32-KIOSK-01'));
+$kioskBarangay = kiosk_resolve_device_barangay($deviceCode);
+
+$childrenScopeSql = '';
+$childrenScopeParams = [];
+$childrenScopeTypes = '';
+
+if ($kioskBarangay !== null) {
+    $childrenScopeSql = ' WHERE c.barangay_id = ?';
+    $childrenScopeParams = [$kioskBarangay['id']];
+    $childrenScopeTypes = 'i';
+}
+
 $children = kiosk_fetch_all(
-    'SELECT c.id,c.child_code,c.first_name,c.last_name,c.birthdate,c.sex,c.barangay,c.address,
+    "SELECT c.id,c.child_code,c.first_name,c.last_name,c.birthdate,c.sex,c.barangay_id,bg.name AS barangay,c.address,
             p.name AS parent_name,p.parent_type,p.status AS parent_status,
             lm.measurement_date,lm.height_cm,lm.weight_kg,lm.waz,lm.haz,lm.whz,lm.nutritional_status
      FROM children c
      INNER JOIN parents p ON p.id=c.parent_id
+     LEFT JOIN barangays bg ON bg.id = c.barangay_id
      LEFT JOIN measurements lm ON lm.id=(
        SELECT m.id FROM measurements m WHERE m.child_id=c.id
        ORDER BY m.measurement_date DESC,m.id DESC LIMIT 1
      )
-     ORDER BY c.last_name ASC,c.first_name ASC'
+     {$childrenScopeSql}
+     ORDER BY c.last_name ASC,c.first_name ASC",
+    $childrenScopeTypes,
+    $childrenScopeParams
 );
 
 $childrenPayload = array_map(
@@ -38,9 +59,21 @@ $childrenPayload = array_map(
     $children
 );
 
+$devicesScopeSql = '';
+$devicesScopeParams = [];
+$devicesScopeTypes = '';
+
+if ($kioskBarangay !== null) {
+    $devicesScopeSql = ' WHERE barangay_id = ?';
+    $devicesScopeParams = [$kioskBarangay['id']];
+    $devicesScopeTypes = 'i';
+}
+
 $devices = kiosk_fetch_all(
-    'SELECT device_code,location,status,last_calibration_at,calibration_offset_height,calibration_offset_weight,updated_at
-     FROM devices ORDER BY updated_at DESC,id DESC LIMIT 4'
+    "SELECT device_code,location,status,last_calibration_at,calibration_offset_height,calibration_offset_weight,updated_at
+     FROM devices{$devicesScopeSql} ORDER BY updated_at DESC,id DESC LIMIT 4",
+    $devicesScopeTypes,
+    $devicesScopeParams
 );
 $devicePayload = array_map(
     static function (array $r): array {
@@ -64,6 +97,7 @@ $appData = [
     'demoMode' => false,
     'company' => 'Sukat Kalusugan',
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
+    'barangay' => $kioskBarangay,
     'endpoints' => [
         'ping' => '../api/esp32/device_ping.php',
         'command' => '../api/esp32/get_command.php',
@@ -72,7 +106,7 @@ $appData = [
         'measurement' => '../api/esp32/submit_measurement.php',
     ],
     'defaults' => [
-        'deviceId' => 'ESP32-KIOSK-01',
+        'deviceId' => $deviceCode,
         // How often the kiosk browser re-checks device_ping.php while idle.
         // Kept close to the ESP32's own 2s heartbeat (COMMAND_POLL_INTERVAL
         // in the firmware) so an offline flip in MySQL shows up on screen

@@ -111,6 +111,28 @@ INSERT INTO `audit_logs` (`id`, `user_id`, `action`, `level`, `description`, `ip
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `barangays`
+--
+
+CREATE TABLE `barangays` (
+  `id` int(10) UNSIGNED NOT NULL,
+  `name` varchar(100) NOT NULL,
+  `city_municipality` varchar(150) DEFAULT NULL,
+  `status` enum('active','inactive') NOT NULL DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `barangays`
+--
+
+INSERT INTO `barangays` (`id`, `name`, `city_municipality`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'Bagong Silang', 'City of San Fernando, Pampanga', 'active', '2026-08-18 00:00:00', '2026-08-18 00:00:00');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `children`
 --
 
@@ -121,7 +143,7 @@ CREATE TABLE `children` (
   `last_name` varchar(100) NOT NULL,
   `birthdate` date NOT NULL,
   `sex` enum('Male','Female') NOT NULL,
-  `barangay` varchar(100) DEFAULT NULL,
+  `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
   `parent_id` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -132,8 +154,8 @@ CREATE TABLE `children` (
 -- Dumping data for table `children`
 --
 
-INSERT INTO `children` (`id`, `child_code`, `first_name`, `last_name`, `birthdate`, `sex`, `barangay`, `address`, `parent_id`, `created_at`, `updated_at`) VALUES
-(1, 'CHD-0001', 'Ean', 'Espiritu', '2023-02-01', 'Male', 'Bagong Silang', '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 1, '2026-07-07 10:10:38', '2026-07-07 10:10:38');
+INSERT INTO `children` (`id`, `child_code`, `first_name`, `last_name`, `birthdate`, `sex`, `barangay_id`, `address`, `parent_id`, `created_at`, `updated_at`) VALUES
+(1, 'CHD-0001', 'Ean', 'Espiritu', '2023-02-01', 'Male', 1, '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 1, '2026-07-07 10:10:38', '2026-07-07 10:10:38');
 
 -- --------------------------------------------------------
 
@@ -145,6 +167,7 @@ CREATE TABLE `devices` (
   `id` int(10) UNSIGNED NOT NULL,
   `device_code` varchar(50) NOT NULL,
   `location` varchar(150) DEFAULT NULL,
+  `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `last_calibration_at` date DEFAULT NULL,
   `calibration_offset_height` decimal(6,2) DEFAULT 0.00,
   `calibration_offset_weight` decimal(6,3) DEFAULT 0.000,
@@ -169,7 +192,7 @@ INSERT INTO `devices` (`id`, `device_code`, `location`, `last_calibration_at`, `
 
 CREATE TABLE `device_sensor_settings` (
   `id` int(10) UNSIGNED NOT NULL,
-  `device_code` varchar(50) NOT NULL,
+  `device_code` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
   `hx711_calibration_factor` decimal(12,4) NOT NULL DEFAULT 0.0000,
   `hx711_tare_offset` decimal(10,3) NOT NULL DEFAULT 0.000,
   `tf_luna_offset_cm` decimal(6,2) NOT NULL DEFAULT 0.00,
@@ -291,7 +314,7 @@ CREATE TABLE `nutritionist_events` (
   `event_date` date NOT NULL,
   `event_time` time DEFAULT NULL,
   `location` varchar(150) DEFAULT NULL,
-  `barangay` varchar(100) DEFAULT NULL,
+  `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `notes` text DEFAULT NULL,
   `nutritionist_id` int(10) UNSIGNED NOT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -312,6 +335,7 @@ CREATE TABLE `parents` (
   `parent_type` enum('Father','Mother','Guardian','Grandparent','Other') NOT NULL DEFAULT 'Guardian',
   `phone` varchar(30) DEFAULT NULL,
   `address` varchar(255) DEFAULT NULL,
+  `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
@@ -321,9 +345,9 @@ CREATE TABLE `parents` (
 -- Dumping data for table `parents`
 --
 
-INSERT INTO `parents` (`id`, `name`, `email`, `password_hash`, `parent_type`, `phone`, `address`, `status`, `created_at`, `updated_at`) VALUES
-(1, 'John Doe', 'johndoe@gmail.com', '$2y$10$v79WKLLAb4U4VHiMEwSNW.5Al3urLiwD8a74xF4UJxLKDDr3k7wL2', 'Guardian', '0917910393', '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 'active', '2026-07-07 09:57:23', '2026-07-07 09:57:23'),
-(2, 'Parent User', 'parent@sukat.local', '$2y$10$79K/UkdSI684IKAC/ekCM.irEzm206kvVE6o41d0hbChwNFelra7e', 'Guardian', NULL, 'All', 'active', '2026-07-31 14:25:13', '2026-07-31 14:25:13');
+INSERT INTO `parents` (`id`, `name`, `email`, `password_hash`, `parent_type`, `phone`, `address`, `barangay_id`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'John Doe', 'johndoe@gmail.com', '$2y$10$v79WKLLAb4U4VHiMEwSNW.5Al3urLiwD8a74xF4UJxLKDDr3k7wL2', 'Guardian', '0917910393', '143 Purok 6 Brgy Dela Paz Norte City of San Fernando Pampanga', 1, 'active', '2026-07-07 09:57:23', '2026-07-07 09:57:23'),
+(2, 'Parent User', 'parent@sukat.local', '$2y$10$79K/UkdSI684IKAC/ekCM.irEzm206kvVE6o41d0hbChwNFelra7e', 'Guardian', NULL, 'All', NULL, 'active', '2026-07-31 14:25:13', '2026-07-31 14:25:13');
 
 -- --------------------------------------------------------
 
@@ -355,7 +379,9 @@ INSERT INTO `permissions` (`id`, `code`, `description`, `created_at`) VALUES
 (10, 'sensors.update', 'Update device calibration data', '2026-07-06 13:19:50'),
 (11, 'settings.view', 'View system settings', '2026-07-06 13:19:50'),
 (12, 'settings.update', 'Update system settings', '2026-07-06 13:19:50'),
-(13, 'parents.view', 'View parent accounts and linked children', '2026-07-31 14:29:23');
+(13, 'parents.view', 'View parent accounts and linked children', '2026-07-31 14:29:23'),
+(14, 'barangays.view', 'View barangay master list', '2026-08-18 00:00:00'),
+(15, 'barangays.manage', 'Create, update, and deactivate barangays', '2026-08-18 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -407,7 +433,9 @@ INSERT INTO `role_permissions` (`role_id`, `permission_id`) VALUES
 (1, 10),
 (1, 11),
 (1, 12),
-(1, 13);
+(1, 13),
+(1, 14),
+(1, 15);
 
 -- --------------------------------------------------------
 
@@ -449,7 +477,7 @@ CREATE TABLE `users` (
   `password_hash` varchar(255) NOT NULL,
   `phone` varchar(30) DEFAULT NULL,
   `role_id` int(10) UNSIGNED NOT NULL,
-  `barangay` varchar(100) DEFAULT NULL,
+  `barangay_id` int(10) UNSIGNED DEFAULT NULL,
   `status` enum('active','inactive') NOT NULL DEFAULT 'active',
   `last_login` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -460,9 +488,9 @@ CREATE TABLE `users` (
 -- Dumping data for table `users`
 --
 
-INSERT INTO `users` (`id`, `name`, `email`, `username`, `password_hash`, `phone`, `role_id`, `barangay`, `status`, `last_login`, `created_at`, `updated_at`) VALUES
-(1, 'System Administrator', 'admin@sukat.local', 'admin', '$2y$10$QeU7O5MRHmHPRIcCxGxluewFYWG9XlLAjQekBTU/bTNufGHqPNTmC', NULL, 1, 'All', 'active', '2026-08-16 15:48:18', '2026-07-06 12:25:08', '2026-08-16 15:48:18'),
-(2, 'Nutritionist User', 'nutritionist@sukat.ph', 'nutritionist', '$2y$10$mLbAvfFAvfm63tCDmfN/0ezjmtXt6zv.e0r.SAUgdBJXIbV.I1BKy', NULL, 2, 'Bagong Silang', 'active', '2026-08-17 00:19:31', '2026-07-07 06:05:41', '2026-08-17 00:19:31');
+INSERT INTO `users` (`id`, `name`, `email`, `username`, `password_hash`, `phone`, `role_id`, `barangay_id`, `status`, `last_login`, `created_at`, `updated_at`) VALUES
+(1, 'System Administrator', 'admin@sukat.local', 'admin', '$2y$10$QeU7O5MRHmHPRIcCxGxluewFYWG9XlLAjQekBTU/bTNufGHqPNTmC', NULL, 1, NULL, 'active', '2026-08-16 15:48:18', '2026-07-06 12:25:08', '2026-08-16 15:48:18'),
+(2, 'Nutritionist User', 'nutritionist@sukat.ph', 'nutritionist', '$2y$10$mLbAvfFAvfm63tCDmfN/0ezjmtXt6zv.e0r.SAUgdBJXIbV.I1BKy', NULL, 2, 1, 'active', '2026-08-17 00:19:31', '2026-07-07 06:05:41', '2026-08-17 00:19:31');
 
 -- --------------------------------------------------------
 
@@ -1096,19 +1124,27 @@ ALTER TABLE `audit_logs`
   ADD KEY `idx_audit_created` (`created_at`);
 
 --
+-- Indexes for table `barangays`
+--
+ALTER TABLE `barangays`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `uq_barangays_name` (`name`);
+
+--
 -- Indexes for table `children`
 --
 ALTER TABLE `children`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `child_code` (`child_code`),
   ADD KEY `idx_children_parent` (`parent_id`),
-  ADD KEY `idx_children_barangay` (`barangay`);
+  ADD KEY `idx_children_barangay_id` (`barangay_id`);
 
 --
 -- Indexes for table `devices`
 --
 ALTER TABLE `devices`
   ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_devices_barangay_id` (`barangay_id`),
   ADD UNIQUE KEY `device_code` (`device_code`);
 
 --
@@ -1146,7 +1182,7 @@ ALTER TABLE `nutritionist_events`
   ADD PRIMARY KEY (`id`),
   ADD KEY `idx_nutritionist_events_date` (`event_date`),
   ADD KEY `idx_nutritionist_events_type_date` (`event_type`,`event_date`),
-  ADD KEY `idx_nutritionist_events_barangay` (`barangay`),
+  ADD KEY `idx_nutritionist_events_barangay_id` (`barangay_id`),
   ADD KEY `fk_nutritionist_events_user` (`nutritionist_id`);
 
 --
@@ -1154,6 +1190,7 @@ ALTER TABLE `nutritionist_events`
 --
 ALTER TABLE `parents`
   ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_parents_barangay_id` (`barangay_id`),
   ADD UNIQUE KEY `email` (`email`);
 
 --
@@ -1191,7 +1228,8 @@ ALTER TABLE `users`
   ADD PRIMARY KEY (`id`),
   ADD UNIQUE KEY `email` (`email`),
   ADD UNIQUE KEY `username` (`username`),
-  ADD KEY `idx_users_role` (`role_id`);
+  ADD KEY `idx_users_role` (`role_id`),
+  ADD KEY `idx_users_barangay_id` (`barangay_id`);
 
 --
 -- Indexes for table `who_height_for_age`
@@ -1229,6 +1267,12 @@ ALTER TABLE `appointments`
 --
 ALTER TABLE `audit_logs`
   MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
+
+--
+-- AUTO_INCREMENT for table `barangays`
+--
+ALTER TABLE `barangays`
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `children`
@@ -1276,7 +1320,7 @@ ALTER TABLE `parents`
 -- AUTO_INCREMENT for table `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=14;
+  MODIFY `id` int(10) UNSIGNED NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
 
 --
 -- AUTO_INCREMENT for table `roles`
@@ -1336,7 +1380,20 @@ ALTER TABLE `audit_logs`
 -- Constraints for table `children`
 --
 ALTER TABLE `children`
+  ADD CONSTRAINT `fk_children_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_children_parent` FOREIGN KEY (`parent_id`) REFERENCES `parents` (`id`);
+
+--
+-- Constraints for table `devices`
+--
+ALTER TABLE `devices`
+  ADD CONSTRAINT `fk_devices_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL;
+
+--
+-- Constraints for table `parents`
+--
+ALTER TABLE `parents`
+  ADD CONSTRAINT `fk_parents_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL;
 
 --
 -- Constraints for table `measurements`
@@ -1358,6 +1415,7 @@ ALTER TABLE `measurement_sessions`
 -- Constraints for table `nutritionist_events`
 --
 ALTER TABLE `nutritionist_events`
+  ADD CONSTRAINT `fk_nutritionist_events_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_nutritionist_events_user` FOREIGN KEY (`nutritionist_id`) REFERENCES `users` (`id`) ON DELETE CASCADE;
 
 --
@@ -1371,6 +1429,7 @@ ALTER TABLE `role_permissions`
 -- Constraints for table `users`
 --
 ALTER TABLE `users`
+  ADD CONSTRAINT `fk_users_barangay` FOREIGN KEY (`barangay_id`) REFERENCES `barangays` (`id`) ON DELETE SET NULL,
   ADD CONSTRAINT `fk_users_role` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`);
 COMMIT;
 

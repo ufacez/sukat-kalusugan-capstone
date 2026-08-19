@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 $user = nutritionist_require_access();
 
 $params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay', $params);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
 $measurements = admin_fetch_all(
 	"SELECT
 		m.id,
@@ -22,14 +22,15 @@ $measurements = admin_fetch_all(
 		c.child_code,
 		c.first_name,
 		c.last_name,
-		c.barangay,
+		bg.name AS barangay,
 		p.name AS parent_name
 	 FROM measurements m
 	 INNER JOIN children c ON c.id = m.child_id
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 WHERE {$scope}
 	 ORDER BY m.measurement_date DESC, m.id DESC",
-	str_repeat('s', count($params)),
+	str_repeat('i', count($params)),
 	$params
 );
 

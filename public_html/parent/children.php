@@ -12,7 +12,7 @@ $children = admin_fetch_all(
 		c.last_name,
 		c.birthdate,
 		c.sex,
-		c.barangay,
+		bg.name AS barangay,
 		c.address,
 		p.name AS parent_name,
 		p.parent_type,
@@ -27,6 +27,7 @@ $children = admin_fetch_all(
 		lm.nutritional_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
+	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m
@@ -112,7 +113,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 							$age = $birthdate->diff(new DateTimeImmutable('today'));
 							$ageMonths = $age->y * 12 + $age->m;
 							?>
-							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . $child['barangay'] . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
+							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
 								<td>
 									<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
 									<div class="admin-mini"><?php echo parent_e((string)$child['child_code']); ?> · <?php echo parent_e((string)$child['sex']); ?></div>
