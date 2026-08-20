@@ -22,3 +22,13 @@ define('FIREBASE_DATABASE_URL', '');
 // Optional: Firebase Realtime Database auth token for server-side REST writes.
 // Leave empty if you are using test-mode rules during development.
 define('FIREBASE_AUTH_TOKEN', '');
+
+// Growth Result Assistant (AI chatbot on the nutritionist & parent portals).
+// Leave CHATBOT_API_KEY empty to keep the chatbot disabled — the widget
+// will still render but will show a "not configured" message instead of
+// calling out to an external API.
+define('CHATBOT_PROVIDER', 'openai'); // 'openai' | 'gemini'
+define('CHATBOT_API_KEY', '');        // your OpenAI or Gemini API key
+define('CHATBOT_MODEL', 'gpt-4o-mini'); // e.g. 'gpt-4o-mini' or 'gemini-1.5-flash'
+// Only needed if you use an OpenAI-compatible proxy instead of api.openai.com.
+define('CHATBOT_API_URL', '');

@@ -66,6 +66,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css')) . '">';
+    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/chatbot.css')) . '">';
     echo '</head>';
     echo '<body class="admin-page nutritionist-page">';
     echo '<div class="admin-shell">';
@@ -118,6 +119,11 @@ function nutritionist_layout_end(): void
     echo '</div>';
     echo '</div>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js')) . '"></script>';
+
+    $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'staff'];
+    echo '<script>window.CHATBOT_CONFIG = ' . json_encode($chatbotConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/chatbot_widget.js')) . '"></script>';
+
     echo '</body>';
     echo '</html>';
 }
