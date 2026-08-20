@@ -294,11 +294,6 @@ $appData = [
                         </div>
                     </div>
 
-                    <div class="kiosk-live-error" data-kiosk-live-error hidden>
-                        <strong>Measurement failed</strong>
-                        <span data-kiosk-live-error-message>—</span>
-                    </div>
-
                     <div class="kiosk-live-grid">
                         <div class="kiosk-sensor-card">
                             <div class="kiosk-sensor-visual is-weight">
@@ -335,6 +330,10 @@ $appData = [
 
                 <article class="kiosk-panel" data-kiosk-screen="processing" hidden>
                     <p class="kiosk-section-kicker kiosk-center">Step 3</p>
+                    <div class="kiosk-live-error" data-kiosk-processing-error hidden>
+                        <strong>Measurement failed</strong>
+                        <span data-kiosk-processing-error-message>—</span>
+                    </div>
                     <div class="kiosk-processing-ring">
                         <svg viewBox="0 0 160 160" aria-hidden="true">
                             <circle cx="80" cy="80" r="68" class="kiosk-ring-track"></circle>

@@ -205,14 +205,14 @@
         "[data-kiosk-process-stage]"
       ),
 
-    liveError:
+    processingError:
       document.querySelector(
-        "[data-kiosk-live-error]"
+        "[data-kiosk-processing-error]"
       ),
 
-    liveErrorMessage:
+    processingErrorMessage:
       document.querySelector(
-        "[data-kiosk-live-error-message]"
+        "[data-kiosk-processing-error-message]"
       ),
 
     resultChild:
@@ -824,32 +824,28 @@
   }
 
   // ============================================================
-  // LIVE-STEP ERROR BANNER
+  // STEP 3 (PROCESSING) ERROR BANNER
+  // ============================================================
+  //
+  // Step 2 (live) never shows "Measurement failed" — that
+  // banner only ever belongs on Step 3 (processing/results).
   // ============================================================
 
-  function showLiveError(message) {
-    if (refs.liveError) {
-      refs.liveError.hidden = false;
+  function showProcessingError(message) {
+    if (refs.processingError) {
+      refs.processingError.hidden = false;
     }
 
-    if (refs.liveErrorMessage) {
-      refs.liveErrorMessage.textContent =
+    if (refs.processingErrorMessage) {
+      refs.processingErrorMessage.textContent =
         message ||
         "Something went wrong with the measurement.";
     }
-
-    if (refs.weightStatus) {
-      refs.weightStatus.textContent = "Error";
-    }
-
-    if (refs.heightStatus) {
-      refs.heightStatus.textContent = "Error";
-    }
   }
 
-  function hideLiveError() {
-    if (refs.liveError) {
-      refs.liveError.hidden = true;
+  function hideProcessingError() {
+    if (refs.processingError) {
+      refs.processingError.hidden = true;
     }
   }
 
@@ -1391,12 +1387,64 @@
     );
 
     // ==========================================================
-    // MEASURING
+    // GET READY — shown BEFORE we start reading the sensors,
+    // so the kiosk never flashes an error/blank screen first.
     // ==========================================================
 
     if (
       [
         "START_REQUESTED",
+        "GET_READY"
+      ].includes(status)
+    ) {
+      state.phase = "live";
+
+      if (
+        !state.processingStarted &&
+        state.step !== "live"
+      ) {
+        setStep("live");
+      }
+
+      const secondsLeft =
+        Number.isFinite(
+          Number(payload.seconds_left)
+        )
+          ? Number(payload.seconds_left)
+          : null;
+
+      const readyMessage =
+        payload.message ||
+        "Please step on the platform now.";
+
+      setProgress(
+        10,
+        secondsLeft !== null && secondsLeft > 0
+          ? `${readyMessage} (${secondsLeft})`
+          : readyMessage
+      );
+
+      if (refs.weightStatus) {
+        refs.weightStatus.textContent =
+          "Please step on the platform...";
+      }
+
+      if (refs.heightStatus) {
+        refs.heightStatus.textContent =
+          "Please step on the platform...";
+      }
+
+      saveSessionToStorage();
+
+      return;
+    }
+
+    // ==========================================================
+    // MEASURING
+    // ==========================================================
+
+    if (
+      [
         "MEASURING",
         "WEIGHT_MEASURING",
         "HEIGHT_MEASURING"
@@ -1453,7 +1501,8 @@
 
       setProgress(
         progress,
-        "Stand still while the sensors capture your measurement..."
+        payload.message ||
+          "Stand still while the sensors capture your measurement..."
       );
 
       if (
@@ -1521,7 +1570,8 @@
     }
 
     // ==========================================================
-    // ERROR
+    // ERROR — never shown on Step 2. We advance to Step 3
+    // (processing) and show the failure banner there instead.
     // ==========================================================
 
     if (
@@ -1537,22 +1587,30 @@
       state.awaitingLiveResult =
         false;
 
+      state.processingStarted =
+        true;
+
       updateProcessButton();
 
-      showLiveError(
-        payload.error_message ||
+      setStep("processing");
+
+      showProcessingError(
+        payload.message ||
+          payload.error_message ||
           "Measurement failed."
       );
 
       setProgress(
         100,
-        payload.error_message ||
+        payload.message ||
+          payload.error_message ||
           "Measurement failed."
       );
 
       pushFeed(
         "Measurement failed",
-        payload.error_message ||
+        payload.message ||
+          payload.error_message ||
           "Unknown measurement error.",
         "error"
       );
@@ -2268,7 +2326,7 @@
       state.restoredSession =
         false;
 
-      hideLiveError();
+      hideProcessingError();
 
       /*
        * Hand chip updates over to Firebase polling for the
@@ -2292,8 +2350,8 @@
       setStep("live");
 
       setProgress(
-        20,
-        "Starting live measurement..."
+        10,
+        "Please step on the platform now."
       );
 
       if (refs.weightReadout) {
@@ -2308,12 +2366,12 @@
 
       if (refs.weightStatus) {
         refs.weightStatus.textContent =
-          "Waiting for HX711...";
+          "Please step on the platform...";
       }
 
       if (refs.heightStatus) {
         refs.heightStatus.textContent =
-          "Waiting for TF-Luna...";
+          "Please step on the platform...";
       }
 
       if (refs.weightBars) {
@@ -2704,7 +2762,7 @@
 
     updateProcessButton();
 
-    showLiveError(
+    showProcessingError(
       message
     );
 
