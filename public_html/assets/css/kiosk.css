@@ -379,6 +379,21 @@
   margin-top: 25px;
   flex-wrap: wrap;
 }
+.kiosk-live-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fdeeee;
+  border: 1px solid var(--sk-danger);
+  color: var(--sk-danger);
+  border-radius: 12px;
+  padding: 12px 16px;
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.kiosk-live-error strong {
+  white-space: nowrap;
+}
 .kiosk-live-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;

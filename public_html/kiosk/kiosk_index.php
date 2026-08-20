@@ -293,6 +293,12 @@ $appData = [
                             </div>
                         </div>
                     </div>
+
+                    <div class="kiosk-live-error" data-kiosk-live-error hidden>
+                        <strong>Measurement failed</strong>
+                        <span data-kiosk-live-error-message>—</span>
+                    </div>
+
                     <div class="kiosk-live-grid">
                         <div class="kiosk-sensor-card">
                             <div class="kiosk-sensor-visual is-weight">

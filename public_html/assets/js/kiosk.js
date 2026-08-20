@@ -205,6 +205,16 @@
         "[data-kiosk-process-stage]"
       ),
 
+    liveError:
+      document.querySelector(
+        "[data-kiosk-live-error]"
+      ),
+
+    liveErrorMessage:
+      document.querySelector(
+        "[data-kiosk-live-error-message]"
+      ),
+
     resultChild:
       document.querySelector(
         "[data-kiosk-result-child]"
@@ -810,6 +820,36 @@
     ) {
       refs.processStage.textContent =
         message;
+    }
+  }
+
+  // ============================================================
+  // LIVE-STEP ERROR BANNER
+  // ============================================================
+
+  function showLiveError(message) {
+    if (refs.liveError) {
+      refs.liveError.hidden = false;
+    }
+
+    if (refs.liveErrorMessage) {
+      refs.liveErrorMessage.textContent =
+        message ||
+        "Something went wrong with the measurement.";
+    }
+
+    if (refs.weightStatus) {
+      refs.weightStatus.textContent = "Error";
+    }
+
+    if (refs.heightStatus) {
+      refs.heightStatus.textContent = "Error";
+    }
+  }
+
+  function hideLiveError() {
+    if (refs.liveError) {
+      refs.liveError.hidden = true;
     }
   }
 
@@ -1499,6 +1539,11 @@
 
       updateProcessButton();
 
+      showLiveError(
+        payload.error_message ||
+          "Measurement failed."
+      );
+
       setProgress(
         100,
         payload.error_message ||
@@ -1513,6 +1558,8 @@
       );
 
       saveSessionToStorage();
+
+      stopFirebasePolling();
     }
   }
 
@@ -2221,6 +2268,8 @@
       state.restoredSession =
         false;
 
+      hideLiveError();
+
       /*
        * Hand chip updates over to Firebase polling for the
        * live screen; stop the pre-start heartbeat check.
@@ -2654,6 +2703,10 @@
       "error";
 
     updateProcessButton();
+
+    showLiveError(
+      message
+    );
 
     setProgress(
       100,
