@@ -2644,6 +2644,17 @@
 
     updateProcessButton();
 
+    /*
+     * Clear any "Measurement failed" banner left over from a
+     * previous failed attempt on this same session before
+     * showing Step 3 again. Without this, retrying after a
+     * failure re-enters Processing with the old error banner
+     * still on screen even though this new attempt hasn't
+     * failed (yet).
+     */
+
+    hideProcessingError();
+
     setStep("processing");
 
     setProgress(
