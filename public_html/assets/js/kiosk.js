@@ -1310,10 +1310,19 @@
     const isWeight =
       type === "weight";
 
+    /*
+     * Real sensor noise floor:
+     * - HX711 load cells commonly drift +/-50-150g even on a
+     *   perfectly still platform, so 0.05kg was tighter than the
+     *   hardware itself can hold, which is what made "stable"
+     *   feel like it never arrived.
+     * - TF-Luna height noise is on the order of a few mm to ~1cm.
+     */
+
     const epsilon =
       isWeight
-        ? 0.05
-        : 0.5;
+        ? 0.15
+        : 1.0;
 
     const lastKey =
       isWeight
@@ -1342,7 +1351,24 @@
     ) {
       state[countKey] += 1;
     } else {
-      state[countKey] = 0;
+      /*
+       * DECAY, DON'T WIPE.
+       *
+       * A single noisy sample used to reset the whole counter to
+       * 0, so if you were 2 of 3 readings into locking, one blip
+       * threw away all that progress and restarted the wait from
+       * scratch. On noisy hardware that meant "stable" could take
+       * a very long time (or never happen) even though the value
+       * was genuinely holding steady overall. Decrementing instead
+       * still requires sustained agreement to lock, but survives
+       * an isolated stray reading instead of restarting on it.
+       */
+
+      state[countKey] =
+        Math.max(
+          0,
+          state[countKey] - 1
+        );
     }
 
     state[lastKey] =
@@ -2770,7 +2796,22 @@
   async function waitForBackendCompletion() {
     let attempts = 0;
 
-    const maxAttempts = 30;
+    /*
+     * After Process is clicked, a full round trip can legitimately
+     * take a while: the ESP32 has to notice the PROCESS command on
+     * its next poll (up to ~1.5s), re-validate the session with one
+     * more HTTP call to get_command.php (which itself makes a
+     * server-side Firebase request with up to a 7s worst-case
+     * timeout), then POST the final result to submit_measurement.php
+     * (another server-side Firebase call, same worst-case 7s
+     * timeout). 30 attempts at 1s each (30s total) was tight enough
+     * that ordinary WiFi hiccups made this give up and show
+     * "Measurement failed" while the device was still genuinely
+     * working and about to succeed. 90 attempts (90s) gives real
+     * headroom for that full chain, including a retry or two.
+     */
+
+    const maxAttempts = 90;
 
     const check = async () => {
       if (
@@ -2835,7 +2876,7 @@
         Math.min(
           98,
           94 +
-            attempts * 0.15
+            attempts * 0.05
         ),
         "Waiting for SQL to confirm the measurement..."
       );
@@ -3669,9 +3710,20 @@ function finishResults(
       return;
     }
 
+    /*
+     * A settled failure (phase === "error") is NOT "still
+     * processing" — processingStarted stays true after a failure
+     * so the Process button/step-jump guards don't reopen, but
+     * that used to also block Reset itself, leaving the operator
+     * stuck on the failed screen with no way out except waiting
+     * for the whole session to time out. Only block Reset while
+     * genuinely mid-flight (no error/complete outcome yet).
+     */
+
     if (
       state.processingStarted &&
-      state.step === "processing"
+      state.step === "processing" &&
+      state.phase !== "error"
     ) {
       pushFeed(
         "Reset blocked",
