@@ -663,6 +663,17 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<?php foreach ($selectedChildren as $index => $child): ?>
 					<?php
 					$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
+					$birthdate = null;
+					$birthdateValue = trim((string)($child['birthdate'] ?? ''));
+
+					if ($birthdateValue !== '') {
+						try {
+							$birthdate = new DateTimeImmutable($birthdateValue);
+						} catch (Exception $exception) {
+							$birthdate = null;
+						}
+					}
+
 					$status = (string)($child['nutritional_status'] ?? 'Pending');
 					$pillClass = $status === 'Normal' ? 'is-success' : ($status === 'Overweight' ? 'is-warn' : 'is-danger');
 					?>
@@ -679,7 +690,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 							</div>
 						</td>
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo (int)$ageMonths; ?> mo</td>
-						<td style="color:var(--admin-muted);font-size:12px;white-space:nowrap;"><?php echo nutritionist_e($birthdate->format('d M Y')); ?></td>
+						<td style="color:var(--admin-muted);font-size:12px;white-space:nowrap;"><?php echo nutritionist_e($birthdate?->format('d M Y') ?? '—'); ?></td>
 						<td><span class="admin-pill <?php echo $pillClass; ?>"><?php echo nutritionist_e($status); ?></span></td>
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['wfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['hfa_status'] ?? '—')); ?></td>

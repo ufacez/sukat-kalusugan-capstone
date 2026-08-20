@@ -183,6 +183,17 @@
   text-transform: uppercase;
 }
 
+.nutritionist-page .nutritionist-patient-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.nutritionist-page .nutritionist-patient-table {
+  min-width: 1120px;
+  table-layout: fixed;
+}
+
 .nutritionist-page .nutritionist-form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
