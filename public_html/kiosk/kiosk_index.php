@@ -102,6 +102,7 @@ $appData = [
         'ping' => '../api/esp32/device_ping.php',
         'command' => '../api/esp32/get_command.php',
         'startMeasurement' => '../api/kiosk/start_measurement.php',
+        'requestProcess' => '../api/kiosk/request_process.php',
         'measurementStatus' => '../api/kiosk/measurement_status.php',
         'measurement' => '../api/esp32/submit_measurement.php',
     ],

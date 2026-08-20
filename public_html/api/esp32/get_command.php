@@ -346,6 +346,30 @@ if (
         $conn
     );
 
+    /*
+    |----------------------------------------------------------------
+    | PROCESS COMMAND
+    |----------------------------------------------------------------
+    |
+    | request_process.php sets measurement_sessions.command = 'PROCESS'
+    | when the operator clicks "Process Measurement" in the kiosk UI.
+    | Surface that here so the ESP32 (which polls this endpoint while
+    | it is live-sampling) knows to stop collecting, average its
+    | buffered readings, and submit the final measurement. Any other
+    | value (still 'START' by default) means "keep sampling, don't
+    | submit yet".
+    |
+    */
+
+    $sessionCommand =
+        (string)(
+            $sessionRow['command'] ??
+            'START'
+        );
+
+    $shouldProcess =
+        $sessionCommand === 'PROCESS';
+
     api_success(
         [
             'device_id' =>
@@ -392,10 +416,13 @@ if (
                 'MEASURING',
 
             'command' =>
-                'NONE',
+                $shouldProcess ? 'PROCESS' : 'NONE',
 
             'should_measure' =>
                 false,
+
+            'should_process' =>
+                $shouldProcess,
 
             'measurement_active' =>
                 true,
@@ -412,7 +439,9 @@ if (
                     ''
                 ),
         ],
-        'Measurement already in progress.'
+        $shouldProcess
+            ? 'Processing requested.'
+            : 'Measurement already in progress.'
     );
 }
 

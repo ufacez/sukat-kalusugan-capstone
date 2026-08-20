@@ -86,7 +86,23 @@ const float MAX_WEIGHT_KG = 300.0f;
 const unsigned long COMMAND_POLL_INTERVAL = 2000;
 const unsigned long FIREBASE_UPDATE_INTERVAL = 500;
 const unsigned long SESSION_VALIDATE_INTERVAL = 1500;
-const unsigned long MEASUREMENT_TIMEOUT = 30000;
+
+// The operator now controls when a measurement finalizes (by clicking
+// "Process Measurement" in the kiosk UI), so this is a safety ceiling
+// on how long the ESP32 will keep live-sampling without ever seeing a
+// PROCESS command, not the length of the sample window itself. Kept
+// well under the backend's own MEASUREMENT_SESSION_TIMEOUT_SECONDS
+// (180s, see measurement_sessions.php) so the firmware times out first
+// and reports a clean local error.
+const unsigned long MEASUREMENT_TIMEOUT = 120000;
+
+// How many of the most recent samples to average into the "live"
+// weight/height value. A rolling window (not a running average since
+// the session began) keeps the live readout responsive to someone
+// stepping on/off the platform while waiting for the operator to
+// click Process.
+const int WEIGHT_SAMPLE_WINDOW = 30;
+const int HEIGHT_SAMPLE_WINDOW = 20;
 
 // =====================================================
 // STATE
@@ -704,6 +720,103 @@ bool isCurrentSessionStillValid(
 }
 
 // =====================================================
+// SESSION + PROCESS COMMAND POLL
+// =====================================================
+//
+// Used by the live-sampling loop in runMeasurement(). Combines the
+// existing "is this still the current session" check with a check for
+// the operator's PROCESS command (set by request_process.php when the
+// kiosk UI's "Process Measurement" button is clicked) into a single
+// HTTP round trip to get_command.php, instead of two.
+//
+// stillValid  - false if a newer/different session has taken over and
+//               this measurement must stop immediately without
+//               submitting anything.
+// shouldProcess - true only once the operator has clicked Process for
+//               THIS session. Until then the loop keeps sampling and
+//               publishing live readings and must NOT submit a final
+//               measurement.
+// =====================================================
+
+bool pollSessionState(
+  long sessionId,
+  bool& stillValid,
+  bool& shouldProcess
+) {
+
+  long serverSessionId = 0;
+
+  String command = "";
+  String status = "";
+
+  bool shouldMeasureUnused = false;
+
+  bool success =
+    getMeasurementCommand(
+      serverSessionId,
+      command,
+      shouldMeasureUnused,
+      status
+    );
+
+  if (
+    !success
+  ) {
+
+    // A single failed HTTP poll should never abort a measurement
+    // that's otherwise in progress, and it must never be
+    // misread as a PROCESS command.
+    stillValid = true;
+    shouldProcess = false;
+
+    return false;
+  }
+
+  if (
+    serverSessionId <= 0 ||
+    serverSessionId != sessionId
+  ) {
+
+    Serial.println();
+    Serial.println(
+      "STALE ESP32 SESSION DETECTED DURING SAMPLING"
+    );
+
+    stillValid = false;
+    shouldProcess = false;
+
+    return true;
+  }
+
+  stillValid = true;
+
+  shouldProcess =
+    command.equalsIgnoreCase(
+      "PROCESS"
+    );
+
+  if (
+    shouldProcess
+  ) {
+
+    Serial.println();
+    Serial.println(
+      "################################"
+    );
+
+    Serial.println(
+      "PROCESS COMMAND RECEIVED"
+    );
+
+    Serial.println(
+      "################################"
+    );
+  }
+
+  return true;
+}
+
+// =====================================================
 // FIREBASE
 // =====================================================
 
@@ -1085,27 +1198,72 @@ void runMeasurement(
 
   Serial.println();
   Serial.println(
-    "COLLECTING SENSOR DATA..."
+    "COLLECTING LIVE SENSOR DATA..."
   );
 
-  const int WEIGHT_SAMPLES = 30;
-  const int HEIGHT_SAMPLES = 20;
+  Serial.println(
+    "Waiting for operator to press Process Measurement..."
+  );
 
-  float weightSum = 0;
-  int weightCount = 0;
+  // ===================================================
+  // ROLLING SAMPLE BUFFERS
+  // ===================================================
+  //
+  // Fixed-size circular buffers so the "live" value reflects
+  // the most recent WEIGHT_SAMPLE_WINDOW / HEIGHT_SAMPLE_WINDOW
+  // readings, not a running average since the loop started.
+  // That keeps the live readout responsive if the child steps
+  // on/off the platform while waiting for the operator to
+  // click Process.
 
-  float heightSum = 0;
-  int heightCount = 0;
+  static float weightBuffer[WEIGHT_SAMPLE_WINDOW];
+  int weightBufIndex = 0;
+  int weightBufFilled = 0;
 
-  unsigned long startTime =
-    millis();
+  static float heightBuffer[HEIGHT_SAMPLE_WINDOW];
+  int heightBufIndex = 0;
+  int heightBufFilled = 0;
+
+  bool shouldProcess = false;
 
   while (
-    millis() - startTime < 5000
+    true
   ) {
 
     // ================================================
-    // SESSION VALIDATION
+    // OVERALL SAFETY TIMEOUT
+    // ================================================
+    //
+    // Only trips if the operator never clicks Process at all.
+    // A legitimate wait for the operator does not reset this.
+
+    if (
+      millis() -
+      measurementStartedAt >
+      MEASUREMENT_TIMEOUT
+    ) {
+
+      Serial.println();
+      Serial.println(
+        "MEASUREMENT TIMEOUT: no PROCESS command received."
+      );
+
+      safeFirebaseUpdate(
+        sessionId,
+        "ERROR",
+        -1,
+        -1
+      );
+
+      measuring = false;
+
+      currentSessionId = 0;
+
+      return;
+    }
+
+    // ================================================
+    // SESSION VALIDATION + PROCESS COMMAND
     // ================================================
 
     if (
@@ -1117,10 +1275,16 @@ void runMeasurement(
       lastSessionValidation =
         millis();
 
+      bool stillValid = true;
+
+      pollSessionState(
+        sessionId,
+        stillValid,
+        shouldProcess
+      );
+
       if (
-        !isCurrentSessionStillValid(
-          sessionId
-        )
+        !stillValid
       ) {
 
         Serial.println(
@@ -1132,6 +1296,15 @@ void runMeasurement(
         currentSessionId = 0;
 
         return;
+      }
+
+      if (
+        shouldProcess
+      ) {
+
+        // Stop sampling right away; final values are computed
+        // from whatever is already in the rolling buffers.
+        break;
       }
     }
 
@@ -1157,10 +1330,19 @@ void runMeasurement(
         weight < MAX_WEIGHT_KG
       ) {
 
-        weightSum +=
+        weightBuffer[weightBufIndex] =
           weight;
 
-        weightCount++;
+        weightBufIndex =
+          (weightBufIndex + 1) %
+          WEIGHT_SAMPLE_WINDOW;
+
+        if (
+          weightBufFilled <
+          WEIGHT_SAMPLE_WINDOW
+        ) {
+          weightBufFilled++;
+        }
       }
     }
 
@@ -1181,10 +1363,19 @@ void runMeasurement(
         height <= MAX_HEIGHT_CM
       ) {
 
-        heightSum +=
+        heightBuffer[heightBufIndex] =
           height;
 
-        heightCount++;
+        heightBufIndex =
+          (heightBufIndex + 1) %
+          HEIGHT_SAMPLE_WINDOW;
+
+        if (
+          heightBufFilled <
+          HEIGHT_SAMPLE_WINDOW
+        ) {
+          heightBufFilled++;
+        }
       }
     }
 
@@ -1205,21 +1396,41 @@ void runMeasurement(
       float liveHeight = -1;
 
       if (
-        weightCount > 0
+        weightBufFilled > 0
       ) {
 
+        float sum = 0;
+
+        for (
+          int i = 0;
+          i < weightBufFilled;
+          i++
+        ) {
+          sum += weightBuffer[i];
+        }
+
         liveWeight =
-          weightSum /
-          weightCount;
+          sum /
+          weightBufFilled;
       }
 
       if (
-        heightCount > 0
+        heightBufFilled > 0
       ) {
 
+        float sum = 0;
+
+        for (
+          int i = 0;
+          i < heightBufFilled;
+          i++
+        ) {
+          sum += heightBuffer[i];
+        }
+
         liveHeight =
-          heightSum /
-          heightCount;
+          sum /
+          heightBufFilled;
       }
 
       safeFirebaseUpdate(
@@ -1236,26 +1447,49 @@ void runMeasurement(
   // ===================================================
   // FINAL VALUES
   // ===================================================
+  //
+  // Averaged from whatever is currently in the rolling
+  // buffers at the moment PROCESS was received.
 
   float finalWeight = -1;
   float finalHeight = -1;
 
   if (
-    weightCount > 0
+    weightBufFilled > 0
   ) {
 
+    float sum = 0;
+
+    for (
+      int i = 0;
+      i < weightBufFilled;
+      i++
+    ) {
+      sum += weightBuffer[i];
+    }
+
     finalWeight =
-      weightSum /
-      weightCount;
+      sum /
+      weightBufFilled;
   }
 
   if (
-    heightCount > 0
+    heightBufFilled > 0
   ) {
 
+    float sum = 0;
+
+    for (
+      int i = 0;
+      i < heightBufFilled;
+      i++
+    ) {
+      sum += heightBuffer[i];
+    }
+
     finalHeight =
-      heightSum /
-      heightCount;
+      sum /
+      heightBufFilled;
   }
 
   Serial.println();

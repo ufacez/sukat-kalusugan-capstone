@@ -432,21 +432,37 @@
   }
 
   function isValidWeight(value) {
+    /*
+     * IMPORTANT: null/undefined mean "no reading yet", not "0 kg".
+     * Number(null) === 0 in JS, so without this guard a missing
+     * reading was silently treated as a valid 0 kg measurement,
+     * which is how the live readout would end up stuck showing
+     * "0.00" (e.g. via restoreActiveSession() coercing a not-yet-
+     * captured saved.weight of null into 0).
+     */
+    if (value === null || value === undefined || value === "") {
+      return false;
+    }
+
     const n = Number(value);
 
     return (
       Number.isFinite(n) &&
-      n >= 0 &&
+      n > 0 &&
       n <= 300
     );
   }
 
   function isValidHeight(value) {
+    if (value === null || value === undefined || value === "") {
+      return false;
+    }
+
     const n = Number(value);
 
     return (
       Number.isFinite(n) &&
-      n >= 0 &&
+      n > 0 &&
       n <= 300
     );
   }
@@ -2512,6 +2528,92 @@
         "error"
       );
 
+      return;
+    }
+
+    /*
+     * ========================================================
+     * TELL THE ESP32 TO FINALIZE
+     * ========================================================
+     *
+     * The ESP32 sits in a live-sampling loop and polls
+     * get_command.php roughly every 1.5s (SESSION_VALIDATE_
+     * INTERVAL) waiting to see command === "PROCESS" for this
+     * session. It will NOT compute or submit a final
+     * measurement until it sees that. This call is what flips
+     * measurement_sessions.command to 'PROCESS' in SQL so the
+     * ESP32's next poll picks it up.
+     *
+     * Do this BEFORE touching any local "processing" UI state,
+     * so a failed request leaves the live screen exactly as it
+     * was and the operator can just try again.
+     */
+
+    let processRequestOk = false;
+
+    try {
+      const endpoint =
+        data?.endpoints
+          ?.requestProcess ||
+        "../api/kiosk/request_process.php";
+
+      const response =
+        await fetch(
+          endpoint,
+          {
+            method: "POST",
+
+            headers: {
+              "Content-Type":
+                "application/json",
+
+              Accept:
+                "application/json"
+            },
+
+            body: JSON.stringify({
+              device_id:
+                deviceId,
+
+              session_id:
+                sessionId
+            }),
+
+            cache: "no-store"
+          }
+        );
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      processRequestOk =
+        response.ok &&
+        json?.success === true;
+
+      if (!processRequestOk) {
+        pushFeed(
+          "Processing blocked",
+          json?.message ||
+            "Could not request processing from the device.",
+          "error"
+        );
+      }
+    } catch (error) {
+      console.error(
+        "[SukatKalusugan] Request process failed",
+        error
+      );
+
+      pushFeed(
+        "Processing blocked",
+        "Could not reach the server to request processing.",
+        "error"
+      );
+    }
+
+    if (!processRequestOk) {
       return;
     }
 
