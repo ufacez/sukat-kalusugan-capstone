@@ -21,7 +21,8 @@ $measurements = admin_fetch_all(
 		m.wfa_status,
 		m.hfa_status,
 		m.wfh_status,
-		m.data_quality_flag,
+		m.is_flagged,
+		m.flag_reason,
 		c.id AS child_id,
 		c.child_code,
 		c.first_name,
@@ -60,6 +61,7 @@ $recentMeasurements = array_values(array_filter(
 	static fn(array $measurement): bool => new DateTimeImmutable((string)$measurement['measurement_date']) >= (new DateTimeImmutable('today'))->modify('-7 days')
 ));
 $atRiskCount = count(array_filter($measurements, static fn(array $measurement): bool => !in_array((string)($measurement['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true)));
+$flaggedCount = count(array_filter($measurements, static fn(array $measurement): bool => !empty($measurement['is_flagged'])));
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">View children</a>';
 
 nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measurements in one view.', 'measurements', $actions);
@@ -84,6 +86,11 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 		<div class="nutritionist-stat-label">Normal</div>
 		<div class="admin-stat-value"><?php echo (int)($statusCounts['Normal'] ?? 0); ?></div>
 		<div class="admin-stat-note">Healthy classification</div>
+	</article>
+	<article class="nutritionist-stat-card<?php echo $flaggedCount > 0 ? ' is-featured' : ''; ?>" style="<?php echo $flaggedCount > 0 ? 'border-color:#E03131;' : ''; ?>">
+		<div class="nutritionist-stat-label">Flagged for Review</div>
+		<div class="admin-stat-value" style="<?php echo $flaggedCount > 0 ? 'color:#E03131;' : ''; ?>"><?php echo $flaggedCount; ?></div>
+		<div class="admin-stat-note">Biologically implausible values, likely data/device error</div>
 	</article>
 </section>
 
@@ -160,12 +167,14 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 					<th>WFA</th>
 					<th>HFA</th>
 					<th>WFH</th>
+					<th>Flag</th>
 					<th>Action</th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ($measurements as $measurement): ?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($measurement['measurement_date'] . ' ' . $measurement['first_name'] . ' ' . $measurement['last_name'] . ' ' . $measurement['child_code'] . ' ' . ($measurement['nutritional_status'] ?? ''))); ?>">
+					<?php $isFlagged = !empty($measurement['is_flagged']); ?>
+					<tr data-filter-text="<?php echo nutritionist_e(strtolower($measurement['measurement_date'] . ' ' . $measurement['first_name'] . ' ' . $measurement['last_name'] . ' ' . $measurement['child_code'] . ' ' . ($measurement['nutritional_status'] ?? ''))); ?>" style="<?php echo $isFlagged ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
 						<td style="white-space:nowrap;"><?php echo nutritionist_e((string)$measurement['measurement_date']); ?></td>
 						<td>
 							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($measurement['first_name'] . ' ' . $measurement['last_name']); ?></div>
@@ -177,14 +186,17 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 						<td style="color:var(--admin-primary);font-weight:600;"><?php echo ((float)$measurement['waz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['waz']); ?></td>
 						<td style="color:#4a9fd5;font-weight:600;"><?php echo ((float)$measurement['haz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['haz']); ?></td>
 						<td style="color:#0d8871;font-weight:600;"><?php echo ((float)$measurement['whz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['whz']); ?></td>
-						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span>
-							<?php if ((int)($measurement['data_quality_flag'] ?? 0) === 1): ?>
-								<span class="admin-pill is-danger" title="One or more z-scores are outside WHO's plausible range (WAZ -6/+5, HAZ -6/+6, WHZ -5/+5). Double-check the raw weight/height/age before acting on this record.">⚠ Check data entry</span>
-							<?php endif; ?>
-						</td>
+						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['hfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfh_status'] ?? '—')); ?></td>
+						<td>
+							<?php if ($isFlagged): ?>
+								<span class="admin-pill is-danger" title="<?php echo nutritionist_e((string)($measurement['flag_reason'] ?? '')); ?>">⚠ Review</span>
+							<?php else: ?>
+								<span style="color:var(--admin-muted);">—</span>
+							<?php endif; ?>
+						</td>
 						<td><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$measurement['child_id'])); ?>">View child</a></td>
 					</tr>
 				<?php endforeach; ?>

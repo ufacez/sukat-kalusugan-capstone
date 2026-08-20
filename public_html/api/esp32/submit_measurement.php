@@ -374,6 +374,8 @@ if (
                 wfa_status,
                 hfa_status,
                 wfh_status,
+                is_flagged,
+                flag_reason,
                 source_type,
                 device_id,
                 created_at
@@ -474,6 +476,12 @@ if (
 
                 'wfh_status' =>
                     $measurementRow['wfh_status'] ?? null,
+
+                'is_flagged' =>
+                    (bool)($measurementRow['is_flagged'] ?? false),
+
+                'flag_reason' =>
+                    $measurementRow['flag_reason'] ?? null,
 
                 'source_type' =>
                     (string)(
@@ -589,14 +597,36 @@ $childSex =
         ?? 'Male'
     );
 
-// doh_age_in_months() (includes/who_calculator.php) uses the same
-// completed-months-by-average-days convention as the DOH e-OPT Plus
-// "Nut_StatusTool" sheet, instead of the calendar-based DateInterval
-// calculation this used to do -- see that function's docblock for why the
-// two disagree near month boundaries.
-$ageMonths = $childBirthdate !== ''
-    ? (doh_age_in_months($childBirthdate) ?? 0)
-    : 0;
+$ageMonths = 0;
+
+if ($childBirthdate !== '') {
+
+    try {
+
+        $birth =
+            new DateTimeImmutable(
+                $childBirthdate
+            );
+
+        $today =
+            new DateTimeImmutable(
+                'today'
+            );
+
+        $diff =
+            $birth->diff(
+                $today
+            );
+
+        $ageMonths =
+            ($diff->y * 12) +
+            $diff->m;
+
+    } catch (Throwable $e) {
+
+        $ageMonths = 0;
+    }
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -665,11 +695,11 @@ $hfaStatus =
 $wfhStatus =
     $metrics['wfh_status'];
 
-// WHO-standard implausibility flag (see WHO_FLAG_LIMITS in who_calculator.php)
-// -- stored, not discarded, so nutritionists can see it. See
-// db/20260819_measurements_data_quality_flag.sql.
-$dataQualityFlag =
-    $metrics['flagged'] ? 1 : 0;
+$isFlagged =
+    $metrics['is_flagged'] ? 1 : 0;
+
+$flagReason =
+    $metrics['flag_reason'];
 
 /*
 |--------------------------------------------------------------------------
@@ -695,7 +725,8 @@ $measurementInsert =
             wfa_status,
             hfa_status,
             wfh_status,
-            data_quality_flag,
+            is_flagged,
+            flag_reason,
             device_id
         )
         VALUES
@@ -705,6 +736,7 @@ $measurementInsert =
             ?,
             ?,
             CURDATE(),
+            ?,
             ?,
             ?,
             ?,
@@ -742,7 +774,7 @@ $deviceDbId =
 
 mysqli_stmt_bind_param(
     $measurementInsert,
-    'iddisdddssssii',
+    'iddisdddssssisi',
     $childId,
     $heightCm,
     $weightKg,
@@ -755,7 +787,8 @@ mysqli_stmt_bind_param(
     $wfaStatus,
     $hfaStatus,
     $wfhStatus,
-    $dataQualityFlag,
+    $isFlagged,
+    $flagReason,
     $deviceDbId
 );
 
@@ -924,6 +957,12 @@ $measurementPayload = [
     'wfh_status' =>
         $wfhStatus,
 
+    'is_flagged' =>
+        (bool)$isFlagged,
+
+    'flag_reason' =>
+        $flagReason,
+
     'source_type' =>
         $sourceType,
 
@@ -1005,6 +1044,12 @@ api_success(
 
         'wfh_status' =>
             $wfhStatus,
+
+        'is_flagged' =>
+            (bool)$isFlagged,
+
+        'flag_reason' =>
+            $flagReason,
 
         'source_type' =>
             $sourceType,

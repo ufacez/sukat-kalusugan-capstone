@@ -18,6 +18,7 @@ function nutritionist_nav_items(): array
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'reports', 'label' => 'Reports', 'href' => app_url('/nutritionist/reports.php')],
+        ['key' => 'doh_reports', 'label' => 'DOH Reports', 'href' => app_url('/nutritionist/doh_reports.php')],
         ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php')],
     ];
 }
