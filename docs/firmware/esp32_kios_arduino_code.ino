@@ -78,6 +78,10 @@ const float MAX_HEIGHT_CM = 250.0f;
 
 const float MIN_WEIGHT_KG = 0.1f;
 const float MAX_WEIGHT_KG = 300.0f;
+// Ignore tare drift and vibration when the platform is empty. The actual
+// validation range remains MIN_WEIGHT_KG so very small valid readings are
+// still accepted after a person steps on the platform.
+const float EMPTY_PLATFORM_THRESHOLD_KG = 1.0f;
 
 // =====================================================
 // TIMING
@@ -1326,7 +1330,7 @@ void runMeasurement(
       Serial.println(" kg");
 
       if (
-        weight > MIN_WEIGHT_KG &&
+        weight >= EMPTY_PLATFORM_THRESHOLD_KG &&
         weight < MAX_WEIGHT_KG
       ) {
 

@@ -897,6 +897,18 @@
     } else if (ready) {
       button.textContent =
         "Process Measurement";
+    } else if (
+      state.weightLocked &&
+      !state.heightLocked
+    ) {
+      button.textContent =
+        "Waiting for Height";
+    } else if (
+      !state.weightLocked &&
+      state.heightLocked
+    ) {
+      button.textContent =
+        "Waiting for Weight";
     } else {
       button.textContent =
         "Waiting for Measurement";
