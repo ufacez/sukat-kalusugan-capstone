@@ -27,8 +27,8 @@ define('FIREBASE_AUTH_TOKEN', '');
 // Leave CHATBOT_API_KEY empty to keep the chatbot disabled — the widget
 // will still render but will show a "not configured" message instead of
 // calling out to an external API.
-define('CHATBOT_PROVIDER', 'openai'); // 'openai' | 'gemini'
+define('CHATBOT_PROVIDER', 'gemini'); // 'openai' | 'gemini'
 define('CHATBOT_API_KEY', '');        // your OpenAI or Gemini API key
-define('CHATBOT_MODEL', 'gpt-4o-mini'); // e.g. 'gpt-4o-mini' or 'gemini-1.5-flash'
+define('CHATBOT_MODEL', 'gemini-3.5-flash-lite'); // e.g. 'gpt-4o-mini' or 'gemini-1.5-flash'
 // Only needed if you use an OpenAI-compatible proxy instead of api.openai.com.
 define('CHATBOT_API_URL', '');
