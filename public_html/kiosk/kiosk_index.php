@@ -125,8 +125,8 @@ $appData = [
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta name="theme-color" content="#0b6e4f" />
         <title>Sukat Kalusugan | Kiosk</title>
-        <link rel="stylesheet" href="../assets/css/app.css" />
-        <link rel="stylesheet" href="../assets/css/kiosk.css" />
+        <link rel="stylesheet" href="../assets/css/app.css?v=<?php echo @filemtime(__DIR__ . '/../assets/css/app.css') ?: time(); ?>" />
+        <link rel="stylesheet" href="../assets/css/kiosk.css?v=<?php echo @filemtime(__DIR__ . '/../assets/css/kiosk.css') ?: time(); ?>" />
     </head>
     <body class="kiosk-page">
         <main class="kiosk-shell">
@@ -332,8 +332,13 @@ $appData = [
                 <article class="kiosk-panel" data-kiosk-screen="processing" hidden>
                     <p class="kiosk-section-kicker kiosk-center">Step 3</p>
                     <div class="kiosk-live-error" data-kiosk-processing-error hidden>
-                        <strong>Measurement failed</strong>
-                        <span data-kiosk-processing-error-message>—</span>
+                        <div class="kiosk-live-error-body">
+                            <strong>Measurement failed</strong>
+                            <span data-kiosk-processing-error-message>—</span>
+                        </div>
+                        <button class="kiosk-button is-secondary" type="button" data-kiosk-action="reset">
+                            Try Again
+                        </button>
                     </div>
                     <div class="kiosk-processing-ring">
                         <svg viewBox="0 0 160 160" aria-hidden="true">
@@ -398,6 +403,6 @@ $appData = [
         <script>
             window.KIOSK_DATA = <?php echo json_encode($appData, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
         </script>
-        <script src="../assets/js/kiosk.js" defer></script>
+        <script src="../assets/js/kiosk.js?v=<?php echo @filemtime(__DIR__ . '/../assets/js/kiosk.js') ?: time(); ?>" defer></script>
     </body>
 </html>

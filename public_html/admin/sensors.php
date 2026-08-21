@@ -11,7 +11,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
     require_permission('sensors.update');
 
     $deviceId = (int)($_POST['device_id'] ?? 0);
-    $deviceCode = trim((string)($_POST['device_code'] ?? ''));
     $location = trim((string)($_POST['location'] ?? ''));
     $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
     $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
@@ -19,11 +18,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
     $lastCalibrationAt = trim((string)($_POST['last_calibration_at'] ?? ''));
     $heightOffset = (float)($_POST['calibration_offset_height'] ?? 0);
     $weightOffset = (float)($_POST['calibration_offset_weight'] ?? 0);
-    $hx711CalFactor = (float)($_POST['hx711_calibration_factor'] ?? 0);
-    $tfLunaOffsetCm = (float)($_POST['tf_luna_offset_cm'] ?? 0);
-    $tfLunaScaleFactor = (float)($_POST['tf_luna_scale_factor'] ?? 1);
-    $mountHeightCm = (float)($_POST['height_offset_cm'] ?? 0);
-    $weightOffsetKg = (float)($_POST['weight_offset_kg'] ?? $weightOffset);
 
     if ($deviceId > 0) {
         admin_execute(
@@ -32,23 +26,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
             [$location, $barangayId, $status, $lastCalibrationAt, $heightOffset, $weightOffset, $deviceId]
         );
 
-        if ($deviceCode !== '') {
-            admin_execute(
-                'INSERT INTO device_sensor_settings (device_code, hx711_calibration_factor, tf_luna_offset_cm, tf_luna_scale_factor, height_offset_cm, weight_offset_kg, last_calibration_at, updated_at)
-                 VALUES (?, ?, ?, ?, ?, ?, NULLIF(?, ""), NOW())
-                 ON DUPLICATE KEY UPDATE
-                    hx711_calibration_factor = VALUES(hx711_calibration_factor),
-                    tf_luna_offset_cm = VALUES(tf_luna_offset_cm),
-                    tf_luna_scale_factor = VALUES(tf_luna_scale_factor),
-                    height_offset_cm = VALUES(height_offset_cm),
-                    weight_offset_kg = VALUES(weight_offset_kg),
-                    last_calibration_at = NULLIF(VALUES(last_calibration_at), ""),
-                    updated_at = NOW()',
-                'sddddds',
-                [$deviceCode, $hx711CalFactor, $tfLunaOffsetCm, $tfLunaScaleFactor, $mountHeightCm, $weightOffsetKg, $lastCalibrationAt]
-            );
-        }
-
         log_action((current_user()['id'] ?? null), 'UPDATE_DEVICE', 'info', 'Updated device ' . $deviceId);
         admin_redirect('/admin/sensors.php', ['notice' => 'Sensor settings updated successfully.', 'type' => 'success']);
     }
@@ -56,11 +33,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
 
 $devices = admin_fetch_all(
     'SELECT d.id, d.device_code, d.location, d.barangay_id, bg.name AS barangay, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.updated_at,
-            TIMESTAMPDIFF(SECOND, d.last_seen_at, NOW()) AS seconds_since_last_seen,
-            s.hx711_calibration_factor, s.tf_luna_offset_cm, s.tf_luna_scale_factor, s.height_offset_cm, s.weight_offset_kg
+            TIMESTAMPDIFF(SECOND, d.last_seen_at, NOW()) AS seconds_since_last_seen
      FROM devices d
      LEFT JOIN barangays bg ON bg.id = d.barangay_id
-     LEFT JOIN device_sensor_settings s ON s.device_code = d.device_code
      ORDER BY d.device_code ASC'
 );
 $barangays = admin_barangay_options();
@@ -137,7 +112,6 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
             ?>
             <form class="admin-check-card" method="post">
                 <input type="hidden" name="device_id" value="<?php echo (int)$device['id']; ?>">
-                <input type="hidden" name="device_code" value="<?php echo admin_e((string)($device['device_code'] ?? '')); ?>">
                 <input type="hidden" name="save_device" value="1">
                 <div class="admin-section-head" style="margin-bottom:12px;">
                     <div>
@@ -177,32 +151,12 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                         <input type="date" name="last_calibration_at" value="<?php echo admin_e((string)($device['last_calibration_at'] ?? '')); ?>">
                     </label>
                     <label class="admin-field">
-                        <span>HX711 cal. factor</span>
-                        <input type="number" step="0.01" name="hx711_calibration_factor" value="<?php echo admin_e((string)($device['hx711_calibration_factor'] ?? '0')); ?>">
-                    </label>
-                    <label class="admin-field">
-                        <span>TF-Luna offset (cm)</span>
-                        <input type="number" step="0.01" name="tf_luna_offset_cm" value="<?php echo admin_e((string)($device['tf_luna_offset_cm'] ?? '0')); ?>">
-                    </label>
-                    <label class="admin-field">
-                        <span>TF-Luna scale factor</span>
-                        <input type="number" step="0.0001" name="tf_luna_scale_factor" value="<?php echo admin_e((string)($device['tf_luna_scale_factor'] ?? '1')); ?>">
-                    </label>
-                    <label class="admin-field">
-                        <span>Mounted height (cm)</span>
-                        <input type="number" step="0.01" name="height_offset_cm" value="<?php echo admin_e((string)($device['height_offset_cm'] ?? (string)($device['calibration_offset_height'] ?? '0'))); ?>">
-                    </label>
-                    <label class="admin-field">
-                        <span>Height offset</span>
+                        <span>Height offset (cm)</span>
                         <input type="number" step="0.01" name="calibration_offset_height" value="<?php echo admin_e((string)($device['calibration_offset_height'] ?? '0')); ?>">
                     </label>
                     <label class="admin-field">
-                        <span>Weight offset</span>
+                        <span>Weight offset (kg)</span>
                         <input type="number" step="0.001" name="calibration_offset_weight" value="<?php echo admin_e((string)($device['calibration_offset_weight'] ?? '0')); ?>">
-                    </label>
-                    <label class="admin-field">
-                        <span>Weight offset kg</span>
-                        <input type="number" step="0.0001" name="weight_offset_kg" value="<?php echo admin_e((string)($device['weight_offset_kg'] ?? (string)($device['calibration_offset_weight'] ?? '0'))); ?>">
                     </label>
                     <div class="admin-field" style="align-content:end;">
                         <span>&nbsp;</span>

@@ -382,6 +382,8 @@
 .kiosk-live-error {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   gap: 10px;
   background: #fdeeee;
   border: 1px solid var(--sk-danger);
@@ -391,7 +393,32 @@
   margin-bottom: 16px;
   font-size: 14px;
 }
+/*
+ * The `hidden` attribute is toggled from kiosk.js to show/hide this
+ * banner (it should ONLY appear when a measurement actually fails,
+ * never while Step 3 is just processing normally). Without this rule,
+ * the `display: flex` above wins the cascade over the browser's
+ * built-in `[hidden] { display: none }` UA rule, so the banner stayed
+ * visible (with its "—" placeholder) even when JS had set
+ * `hidden = true`. This rule restores hidden actually hiding it.
+ */
+.kiosk-live-error[hidden] {
+  display: none;
+}
+.kiosk-live-error-body {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 auto;
+  min-width: 220px;
+}
 .kiosk-live-error strong {
+  white-space: nowrap;
+}
+.kiosk-live-error .kiosk-button {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+  font-size: 14px;
   white-space: nowrap;
 }
 .kiosk-live-grid {

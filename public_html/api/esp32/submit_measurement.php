@@ -595,6 +595,47 @@ if (
 
 /*
 |--------------------------------------------------------------------------
+| DEVICE CALIBRATION
+|--------------------------------------------------------------------------
+|
+| This MUST run before the height/weight range checks below. The raw
+| sensor reading can legitimately sit outside 40-140 cm (or 2-80 kg)
+| before the device's configured calibration offset is applied, and the
+| operator only ever sees/expects the CALIBRATED value to make sense.
+| Validating the raw, uncalibrated number here was rejecting otherwise
+| valid measurements (and could equally let a bad raw reading slip
+| through if calibration happened to push it into range afterward).
+|
+*/
+
+$deviceCalibrationHeight =
+    isset(
+        $sessionRow['calibration_offset_height']
+    )
+        ? (float)$sessionRow[
+            'calibration_offset_height'
+        ]
+        : 0.0;
+
+$deviceCalibrationWeight =
+    isset(
+        $sessionRow['calibration_offset_weight']
+    )
+        ? (float)$sessionRow[
+            'calibration_offset_weight'
+        ]
+        : 0.0;
+
+$heightCm =
+    $heightCm +
+    $deviceCalibrationHeight;
+
+$weightKg =
+    $weightKg +
+    $deviceCalibrationWeight;
+
+/*
+|--------------------------------------------------------------------------
 | HEIGHT RANGE
 |--------------------------------------------------------------------------
 */
@@ -656,38 +697,6 @@ if ($childBirthdate !== '') {
             $childBirthdate
         ) ?? 0;
 }
-
-/*
-|--------------------------------------------------------------------------
-| DEVICE CALIBRATION
-|--------------------------------------------------------------------------
-*/
-
-$deviceCalibrationHeight =
-    isset(
-        $sessionRow['calibration_offset_height']
-    )
-        ? (float)$sessionRow[
-            'calibration_offset_height'
-        ]
-        : 0.0;
-
-$deviceCalibrationWeight =
-    isset(
-        $sessionRow['calibration_offset_weight']
-    )
-        ? (float)$sessionRow[
-            'calibration_offset_weight'
-        ]
-        : 0.0;
-
-$heightCm =
-    $heightCm +
-    $deviceCalibrationHeight;
-
-$weightKg =
-    $weightKg +
-    $deviceCalibrationWeight;
 
 /*
 |--------------------------------------------------------------------------
