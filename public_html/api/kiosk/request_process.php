@@ -6,27 +6,15 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 
-/*
-|--------------------------------------------------------------------------
-| REQUEST PROCESS
-|--------------------------------------------------------------------------
-|
-| Called by the kiosk browser when the operator clicks "Process
-| Measurement". This does NOT compute or save the final measurement
-| itself — it only flips measurement_sessions.command to 'PROCESS'.
-|
-| The ESP32 (see runMeasurement() in the firmware) polls get_command.php
-| every SESSION_VALIDATE_INTERVAL while it is live-sampling and waits to
-| see this command before it stops sampling, averages its buffered
-| readings, and calls submit_measurement.php. Until this endpoint is
-| called, the ESP32 must keep collecting/publishing live readings and
-| must NEVER submit a final measurement on its own.
-|
-*/
-
 api_require_method(['POST']);
 
 $payload = api_payload();
+
+/*
+|--------------------------------------------------------------------------
+| REQUEST DATA
+|--------------------------------------------------------------------------
+*/
 
 $deviceCode = api_string(
     $payload['device_id']
@@ -35,14 +23,6 @@ $deviceCode = api_string(
     'ESP32-KIOSK-01'
 );
 
-$finalSequence = api_int(
-    $payload['final_sequence'] ?? 0,
-    0
-);
-
-$finalWeight = (float)($payload['final_weight_kg'] ?? -1);
-$finalHeight = (float)($payload['final_height_cm'] ?? -1);
-
 $sessionId = api_int(
     $payload['session_id']
         ?? $payload['sessionId']
@@ -50,141 +30,264 @@ $sessionId = api_int(
     0
 );
 
-if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
-    api_error('Invalid device ID.', 400);
+/*
+|--------------------------------------------------------------------------
+| VALIDATION
+|--------------------------------------------------------------------------
+*/
+
+if (
+    !preg_match(
+        '/^[A-Za-z0-9_-]{3,50}$/',
+        $deviceCode
+    )
+) {
+    api_error(
+        'Invalid device ID.',
+        400
+    );
 }
 
 if ($sessionId <= 0) {
-    api_error('A valid session ID is required.', 400);
-}
-
-// The kiosk may only request PROCESS after it has received an exact
-// final stable snapshot from the ESP32. This prevents the old behavior
-// where any still-changing MEASURING state could immediately be finalized.
-if (
-    $finalSequence <= 0 ||
-    $finalWeight <= 0 || $finalWeight > 300 ||
-    $finalHeight <= 0 || $finalHeight > 300
-) {
     api_error(
-        'Processing is blocked until a confirmed final stable reading is available.',
-        409
+        'A valid session ID is required.',
+        400
     );
 }
+
+/*
+|--------------------------------------------------------------------------
+| DATABASE
+|--------------------------------------------------------------------------
+*/
 
 $conn = get_db_connection();
 
 mysqli_begin_transaction($conn);
 
-$sessionRow = measurement_session_fetch_by_id_for_device(
-    $conn,
-    $sessionId,
-    $deviceCode
-);
+try {
 
-if (!is_array($sessionRow)) {
-    mysqli_rollback($conn);
+    /*
+    |--------------------------------------------------------------------------
+    | GET EXACT SESSION
+    |--------------------------------------------------------------------------
+    */
 
-    api_error('Measurement session not found for this device.', 404);
-}
+    $sessionRow =
+        measurement_session_fetch_by_id_for_device(
+            $conn,
+            $sessionId,
+            $deviceCode
+        );
 
-$status = (string)($sessionRow['status'] ?? '');
+    if (!is_array($sessionRow)) {
 
-/*
-|--------------------------------------------------------------------------
-| Only a session the ESP32 is actively sampling can be told to process.
-|--------------------------------------------------------------------------
-*/
+        mysqli_rollback($conn);
 
-if ($status !== 'MEASURING') {
-    mysqli_rollback($conn);
-
-    api_error(
-        'Measurement is not currently active for this session.',
-        409,
-        ['status' => $status]
-    );
-}
-
-$updateStmt = mysqli_prepare(
-    $conn,
-    'UPDATE measurement_sessions
-     SET
-        command = \'PROCESS\',
-        updated_at = NOW()
-     WHERE id = ?
-       AND status = \'MEASURING\''
-);
-
-if ($updateStmt === false) {
-    mysqli_rollback($conn);
-
-    api_error('Unable to request processing.', 500);
-}
-
-mysqli_stmt_bind_param($updateStmt, 'i', $sessionId);
-
-$executed = mysqli_stmt_execute($updateStmt);
-
-$affected = $executed ? mysqli_stmt_affected_rows($updateStmt) : 0;
-
-mysqli_stmt_close($updateStmt);
-
-if (!$executed) {
-    mysqli_rollback($conn);
-
-    api_error('Unable to request processing.', 500);
-}
-
-if ($affected <= 0) {
-    // MySQL reports 0 affected rows both when the WHERE clause
-    // matched nothing AND when it matched a row that already had
-    // these exact values (a no-op UPDATE). Tell those apart before
-    // deciding whether this is an error.
-    $latest = measurement_session_fetch_by_id_for_device(
-        $conn,
-        $sessionId,
-        $deviceCode
-    );
-
-    $latestStatus = (string)($latest['status'] ?? '');
-    $latestCommand = (string)($latest['command'] ?? '');
-
-    if ($latestStatus === 'MEASURING' && $latestCommand === 'PROCESS') {
-        // Duplicate click (e.g. a double-tap) — the command was
-        // already set, nothing changed, nothing went wrong.
-        mysqli_commit($conn);
-
-        api_success(
-            measurement_session_row_to_payload($latest),
-            'Processing already requested.'
+        api_error(
+            'Measurement session not found for this device.',
+            404
         );
     }
 
-    // Someone else (a concurrent request, or the session finishing/
-    // erroring in the meantime) changed the row first.
+    $status = strtoupper(
+        (string)(
+            $sessionRow['status']
+            ?? ''
+        )
+    );
+
+    /*
+    |--------------------------------------------------------------------------
+    | SESSION MUST STILL BE MEASURING
+    |--------------------------------------------------------------------------
+    */
+
+    if ($status !== 'MEASURING') {
+
+        mysqli_rollback($conn);
+
+        api_error(
+            'Measurement is not currently active for this session.',
+            409,
+            [
+                'status' => $status
+            ]
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | REQUEST PROCESS
+    |--------------------------------------------------------------------------
+    |
+    | IMPORTANT:
+    |
+    | The kiosk DOES NOT submit the final measurement.
+    |
+    | It only tells the ESP32:
+    |
+    |     command = PROCESS
+    |
+    | The ESP32 will:
+    |
+    | 1. Stop live sampling.
+    | 2. Average its final buffered readings.
+    | 3. Validate them.
+    | 4. Call submit_measurement.php.
+    |
+    */
+
+    $updateStmt = mysqli_prepare(
+        $conn,
+        'UPDATE measurement_sessions
+         SET
+            command = \'PROCESS\',
+            updated_at = NOW()
+         WHERE id = ?
+           AND status = \'MEASURING\''
+    );
+
+    if ($updateStmt === false) {
+
+        mysqli_rollback($conn);
+
+        api_error(
+            'Unable to request processing.',
+            500
+        );
+    }
+
+    mysqli_stmt_bind_param(
+        $updateStmt,
+        'i',
+        $sessionId
+    );
+
+    $executed =
+        mysqli_stmt_execute(
+            $updateStmt
+        );
+
+    $affected =
+        $executed
+            ? mysqli_stmt_affected_rows(
+                $updateStmt
+            )
+            : 0;
+
+    mysqli_stmt_close(
+        $updateStmt
+    );
+
+    if (!$executed) {
+
+        mysqli_rollback($conn);
+
+        api_error(
+            'Unable to request processing.',
+            500
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | HANDLE DUPLICATE CLICK
+    |--------------------------------------------------------------------------
+    */
+
+    if ($affected <= 0) {
+
+        $latest =
+            measurement_session_fetch_by_id_for_device(
+                $conn,
+                $sessionId,
+                $deviceCode
+            );
+
+        $latestStatus =
+            strtoupper(
+                (string)(
+                    $latest['status']
+                    ?? ''
+                )
+            );
+
+        $latestCommand =
+            strtoupper(
+                (string)(
+                    $latest['command']
+                    ?? ''
+                )
+            );
+
+        if (
+            $latestStatus === 'MEASURING' &&
+            $latestCommand === 'PROCESS'
+        ) {
+
+            mysqli_commit($conn);
+
+            api_success(
+                measurement_session_row_to_payload(
+                    $latest
+                ),
+                'Processing already requested.'
+            );
+        }
+
+        mysqli_rollback($conn);
+
+        api_error(
+            'Measurement session already moved on.',
+            409,
+            [
+                'status' => $latestStatus
+            ]
+        );
+    }
+
+    mysqli_commit($conn);
+
+    /*
+    |--------------------------------------------------------------------------
+    | RETURN UPDATED SESSION
+    |--------------------------------------------------------------------------
+    */
+
+    $updatedRow =
+        measurement_session_fetch_by_id_for_device(
+            $conn,
+            $sessionId,
+            $deviceCode
+        );
+
+    $responsePayload =
+        is_array($updatedRow)
+            ? measurement_session_row_to_payload(
+                $updatedRow
+            )
+            : [
+                'session_id' => $sessionId,
+                'command' => 'PROCESS'
+            ];
+
+    api_success(
+        $responsePayload,
+        'Processing requested. Waiting for the device to finalize the reading.'
+    );
+
+} catch (Throwable $e) {
+
     mysqli_rollback($conn);
 
+    error_log(
+        '[SukatKalusugan] request_process.php: '
+        . $e->getMessage()
+    );
+
     api_error(
-        'Measurement session already moved on.',
-        409,
-        ['status' => $latestStatus]
+        'Unable to request processing.',
+        500
     );
 }
-
-mysqli_commit($conn);
-
-$updatedRow = measurement_session_fetch_by_id_for_device(
-    $conn,
-    $sessionId,
-    $deviceCode
-);
-
-$responsePayload = is_array($updatedRow)
-    ? measurement_session_row_to_payload($updatedRow)
-    : ['session_id' => $sessionId, 'command' => 'PROCESS'];
-
-api_success(
-    $responsePayload,
-    'Processing requested. Waiting for the device to finalize the reading.'
-);

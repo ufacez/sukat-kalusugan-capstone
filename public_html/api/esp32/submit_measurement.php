@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
@@ -179,8 +181,19 @@ $conn = get_db_connection();
 
 /*
 |--------------------------------------------------------------------------
+| BEGIN TRANSACTION
+|--------------------------------------------------------------------------
+*/
+
+mysqli_begin_transaction($conn);
+
+/*
+|--------------------------------------------------------------------------
 | LOCK EXACT SESSION
 |--------------------------------------------------------------------------
+|
+| This MUST be the exact session sent by the ESP32.
+|
 */
 
 $sessionStmt = mysqli_prepare(
@@ -230,13 +243,13 @@ $sessionStmt = mysqli_prepare(
 
 if ($sessionStmt === false) {
 
+    mysqli_rollback($conn);
+
     api_error(
         'Unable to validate measurement session.',
         500
     );
 }
-
-mysqli_begin_transaction($conn);
 
 mysqli_stmt_bind_param(
     $sessionStmt,
@@ -281,7 +294,7 @@ if (!is_array($sessionRow)) {
 
 /*
 |--------------------------------------------------------------------------
-| VERIFY EXACT SESSION
+| EXACT SESSION CHECK
 |--------------------------------------------------------------------------
 */
 
@@ -303,7 +316,7 @@ if ($databaseSessionId !== $sessionId) {
 
 /*
 |--------------------------------------------------------------------------
-| VERIFY DEVICE
+| EXACT DEVICE CHECK
 |--------------------------------------------------------------------------
 */
 
@@ -325,15 +338,27 @@ if ($databaseDeviceCode !== $deviceCode) {
 
 /*
 |--------------------------------------------------------------------------
-| SESSION STATUS
+| SESSION STATE
 |--------------------------------------------------------------------------
 */
 
 $sessionStatus =
     strtoupper(
-        (string)(
-            $sessionRow['status']
-            ?? ''
+        trim(
+            (string)(
+                $sessionRow['status']
+                ?? ''
+            )
+        )
+    );
+
+$sessionCommand =
+    strtoupper(
+        trim(
+            (string)(
+                $sessionRow['command']
+                ?? ''
+            )
         )
     );
 
@@ -345,12 +370,8 @@ $measurementId =
 
 /*
 |--------------------------------------------------------------------------
-| ALREADY COMPLETE
+| DUPLICATE COMPLETE PROTECTION
 |--------------------------------------------------------------------------
-|
-| This prevents duplicate ESP32 retries from creating another
-| measurement record.
-|
 */
 
 if (
@@ -478,10 +499,14 @@ if (
                     $measurementRow['wfh_status'] ?? null,
 
                 'is_flagged' =>
-                    (bool)($measurementRow['is_flagged'] ?? false),
+                    (bool)(
+                        $measurementRow['is_flagged']
+                        ?? false
+                    ),
 
                 'flag_reason' =>
-                    $measurementRow['flag_reason'] ?? null,
+                    $measurementRow['flag_reason']
+                    ?? null,
 
                 'source_type' =>
                     (string)(
@@ -502,26 +527,51 @@ if (
 
 /*
 |--------------------------------------------------------------------------
-| SESSION MUST BE ACTIVE
+| CRITICAL PROCESS LOCK
 |--------------------------------------------------------------------------
+|
+| THIS IS THE IMPORTANT FIX.
+|
+| The ESP32 is NOT allowed to submit merely because a stable
+| measurement exists.
+|
+| It MUST first receive:
+|
+|     command = PROCESS
+|
+| from get_command.php.
+|
+| request_process.php sets this command only when the operator
+| clicks "Process Measurement".
+|
 */
 
-if (
-    !in_array(
-        $sessionStatus,
-        [
-            'START_REQUESTED',
-            'MEASURING'
-        ],
-        true
-    )
-) {
+if ($sessionStatus !== 'MEASURING') {
 
     mysqli_rollback($conn);
 
     api_error(
-        'This session is not active.',
-        409
+        'This session is not actively measuring.',
+        409,
+        [
+            'status' => $sessionStatus,
+            'command' => $sessionCommand
+        ]
+    );
+}
+
+if ($sessionCommand !== 'PROCESS') {
+
+    mysqli_rollback($conn);
+
+    api_error(
+        'Measurement is not authorized for processing yet. The kiosk must click Process Measurement first.',
+        409,
+        [
+            'status' => $sessionStatus,
+            'command' => $sessionCommand,
+            'session_id' => $sessionId
+        ]
     );
 }
 
@@ -800,6 +850,9 @@ mysqli_stmt_close(
 |--------------------------------------------------------------------------
 | COMPLETE SESSION
 |--------------------------------------------------------------------------
+|
+| Only COMPLETE after the measurement was actually inserted.
+|
 */
 
 $sessionUpdate =
@@ -808,6 +861,7 @@ $sessionUpdate =
         'UPDATE measurement_sessions
          SET
             status = \'COMPLETE\',
+            command = \'COMPLETE\',
             completed_at = NOW(),
             height_cm = ?,
             weight_kg = ?,
@@ -815,10 +869,8 @@ $sessionUpdate =
             error_message = NULL,
             updated_at = NOW()
          WHERE id = ?
-           AND status IN (
-                \'START_REQUESTED\',
-                \'MEASURING\'
-           )'
+           AND status = \'MEASURING\'
+           AND command = \'PROCESS\''
     );
 
 if ($sessionUpdate === false) {
@@ -858,9 +910,24 @@ if (
     );
 }
 
+$sessionAffected =
+    mysqli_stmt_affected_rows(
+        $sessionUpdate
+    );
+
 mysqli_stmt_close(
     $sessionUpdate
 );
+
+if ($sessionAffected <= 0) {
+
+    mysqli_rollback($conn);
+
+    api_error(
+        'Measurement was saved but the session could not be finalized safely.',
+        409
+    );
+}
 
 mysqli_commit($conn);
 
@@ -952,9 +1019,7 @@ $measurementPayload = [
         'COMPLETE',
 
     'timestamp' =>
-        date(
-            'c'
-        ),
+        date('c'),
 ];
 
 /*

@@ -2,6 +2,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <HX711_ADC.h>
+#include <math.h>
 
 // =====================================================
 // WIFI
@@ -40,15 +41,14 @@ const String FIREBASE_AUTH = "";
 // =====================================================
 
 const int HX711_DOUT = 16;
-const int HX711_SCK  = 17;
+const int HX711_SCK = 17;
 
 HX711_ADC LoadCell(
   HX711_DOUT,
   HX711_SCK
 );
 
-const float HX711_CAL_FACTOR =
-  -20892.50f;
+const float HX711_CAL_FACTOR = -20892.50f;
 
 // =====================================================
 // TF-LUNA
@@ -63,12 +63,8 @@ HardwareSerial TF_Luna(2);
 // HEIGHT
 // =====================================================
 
-// TF-Luna is mounted 6 ft (182.88 cm) above the platform.
-const float MOUNTING_HEIGHT_CM =
-  182.88f;
-
-const float HEIGHT_OFFSET_CM =
-  0.0f;
+const float MOUNTING_HEIGHT_CM = 182.88f;
+const float HEIGHT_OFFSET_CM = 0.0f;
 
 // =====================================================
 // VALID RANGE
@@ -79,9 +75,7 @@ const float MAX_HEIGHT_CM = 250.0f;
 
 const float MIN_WEIGHT_KG = 0.1f;
 const float MAX_WEIGHT_KG = 300.0f;
-// Ignore tare drift and vibration when the platform is empty. The actual
-// validation range remains MIN_WEIGHT_KG so very small valid readings are
-// still accepted after a person steps on the platform.
+
 const float EMPTY_PLATFORM_THRESHOLD_KG = 1.0f;
 
 // =====================================================
@@ -92,32 +86,23 @@ const unsigned long COMMAND_POLL_INTERVAL = 2000;
 const unsigned long FIREBASE_UPDATE_INTERVAL = 250;
 const unsigned long SESSION_VALIDATE_INTERVAL = 1500;
 
-// The operator now controls when a measurement finalizes (by clicking
-// "Process Measurement" in the kiosk UI), so this is a safety ceiling
-// on how long the ESP32 will keep live-sampling without ever seeing a
-// PROCESS command, not the length of the sample window itself. Kept
-// well under the backend's own MEASUREMENT_SESSION_TIMEOUT_SECONDS
-// (180s, see measurement_sessions.php) so the firmware times out first
-// and reports a clean local error.
 const unsigned long MEASUREMENT_TIMEOUT = 120000;
 
-// How many of the most recent samples to average into the "live"
-// weight/height value. A rolling window (not a running average since
-// the session began) keeps the live readout responsive to someone
-// stepping on/off the platform while waiting for the operator to
-// click Process.
+// =====================================================
+// SAMPLE WINDOWS
+// =====================================================
+
 const int WEIGHT_SAMPLE_WINDOW = 8;
 const int HEIGHT_SAMPLE_WINDOW = 8;
 
-// How many CONSECUTIVE fresh raw samples (not the smoothed average
-// above) must agree within the epsilon below before the device
-// itself considers weight/height "stable" and reports that to the
-// kiosk via Firebase. Computed from the raw sensor, not the rolling
-// average, so a slow-moving average can no longer look "stable"
-// while the true reading is still settling.
+// =====================================================
+// STABILITY
+// =====================================================
+
 const int STABLE_SAMPLES_REQUIRED = 8;
-// Both sensors must remain stable continuously before a final snapshot is frozen.
+
 const unsigned long FINAL_STABLE_HOLD_MS = 2500;
+
 const float WEIGHT_STABLE_EPSILON_KG = 0.15f;
 const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
 
@@ -180,16 +165,11 @@ void connectWiFi() {
     Serial.println("WiFi connected");
 
     Serial.print("ESP32 IP: ");
-
-    Serial.println(
-      WiFi.localIP()
-    );
+    Serial.println(WiFi.localIP());
 
   } else {
 
-    Serial.println(
-      "WiFi connection FAILED"
-    );
+    Serial.println("WiFi connection FAILED");
   }
 }
 
@@ -204,26 +184,21 @@ String httpGet(
 
   httpCode = -1;
 
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
     return "";
   }
 
   HTTPClient http;
 
   http.begin(url);
-
   http.setTimeout(2000);
 
-  httpCode =
-    http.GET();
+  httpCode = http.GET();
 
   String response = "";
 
   if (httpCode > 0) {
-    response =
-      http.getString();
+    response = http.getString();
   }
 
   http.end();
@@ -243,16 +218,13 @@ String httpPostForm(
 
   httpCode = -1;
 
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
     return "";
   }
 
   HTTPClient http;
 
   http.begin(url);
-
   http.setTimeout(3000);
 
   http.addHeader(
@@ -260,16 +232,12 @@ String httpPostForm(
     "application/x-www-form-urlencoded"
   );
 
-  httpCode =
-    http.POST(
-      formBody
-    );
+  httpCode = http.POST(formBody);
 
   String response = "";
 
   if (httpCode > 0) {
-    response =
-      http.getString();
+    response = http.getString();
   }
 
   http.end();
@@ -289,16 +257,13 @@ String httpPutJson(
 
   httpCode = -1;
 
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
     return "";
   }
 
   HTTPClient http;
 
   http.begin(url);
-
   http.setTimeout(3000);
 
   http.addHeader(
@@ -306,16 +271,12 @@ String httpPutJson(
     "application/json"
   );
 
-  httpCode =
-    http.PUT(
-      jsonBody
-    );
+  httpCode = http.PUT(jsonBody);
 
   String response = "";
 
   if (httpCode > 0) {
-    response =
-      http.getString();
+    response = http.getString();
   }
 
   http.end();
@@ -336,8 +297,7 @@ void setupHX711() {
 
   LoadCell.begin();
 
-  unsigned long stabilizingTime =
-    2000;
+  unsigned long stabilizingTime = 2000;
 
   bool tare = true;
 
@@ -363,17 +323,10 @@ void setupHX711() {
     HX711_CAL_FACTOR
   );
 
-  Serial.print(
-    "Calibration factor: "
-  );
+  Serial.print("Calibration factor: ");
+  Serial.println(LoadCell.getCalFactor());
 
-  Serial.println(
-    LoadCell.getCalFactor()
-  );
-
-  while (
-    !LoadCell.update()
-  ) {
+  while (!LoadCell.update()) {
     delay(1);
   }
 
@@ -392,33 +345,19 @@ bool readTFLunaDistanceCm(
 
   static uint8_t buffer[9];
 
-  // TF-Luna streams frames at ~100Hz but this function is only
-  // called once per loop tick (~20ms), so several frames can be
-  // sitting in the UART buffer by the time we read. Drain ALL of
-  // them and keep the LAST valid one so we report the freshest
-  // distance instead of a stale, already-superseded frame.
-
   bool gotFrame = false;
 
-  while (
-    TF_Luna.available() >= 9
-  ) {
+  while (TF_Luna.available() >= 9) {
 
-    int first =
-      TF_Luna.read();
+    int first = TF_Luna.read();
 
-    if (
-      first != 0x59
-    ) {
+    if (first != 0x59) {
       continue;
     }
 
-    int second =
-      TF_Luna.read();
+    int second = TF_Luna.read();
 
-    if (
-      second != 0x59
-    ) {
+    if (second != 0x59) {
       continue;
     }
 
@@ -433,23 +372,17 @@ bool readTFLunaDistanceCm(
       i++
     ) {
 
-      int value =
-        TF_Luna.read();
+      int value = TF_Luna.read();
 
-      if (
-        value < 0
-      ) {
+      if (value < 0) {
         readFailed = true;
         break;
       }
 
-      buffer[i] =
-        (uint8_t)value;
+      buffer[i] = (uint8_t)value;
     }
 
-    if (
-      readFailed
-    ) {
+    if (readFailed) {
       break;
     }
 
@@ -460,12 +393,14 @@ bool readTFLunaDistanceCm(
       i < 8;
       i++
     ) {
+
       checksum += buffer[i];
     }
 
     if (
       (checksum & 0xFF) != buffer[8]
     ) {
+
       continue;
     }
 
@@ -477,9 +412,6 @@ bool readTFLunaDistanceCm(
       distanceMm / 10.0f;
 
     gotFrame = true;
-
-    // Keep looping — if another frame is already waiting,
-    // it's newer than the one we just parsed.
   }
 
   return gotFrame;
@@ -495,41 +427,22 @@ bool getHeightReading(
 
   float distanceCm;
 
-  if (
-    !readTFLunaDistanceCm(
-      distanceCm
-    )
-  ) {
-
+  if (!readTFLunaDistanceCm(distanceCm)) {
     return false;
   }
 
   heightCm =
-    MOUNTING_HEIGHT_CM
-    - distanceCm
-    + HEIGHT_OFFSET_CM;
+    MOUNTING_HEIGHT_CM -
+    distanceCm +
+    HEIGHT_OFFSET_CM;
 
-  Serial.print(
-    "TF-Luna distance: "
-  );
+  Serial.print("TF-Luna distance: ");
+  Serial.print(distanceCm, 1);
 
-  Serial.print(
-    distanceCm,
-    1
-  );
+  Serial.print(" cm | Height: ");
+  Serial.print(heightCm, 1);
 
-  Serial.print(
-    " cm | Height: "
-  );
-
-  Serial.print(
-    heightCm,
-    1
-  );
-
-  Serial.println(
-    " cm"
-  );
+  Serial.println(" cm");
 
   return true;
 }
@@ -564,13 +477,8 @@ bool getMeasurementCommand(
     response.length() == 0
   ) {
 
-    Serial.print(
-      "Command HTTP: "
-    );
-
-    Serial.println(
-      httpCode
-    );
+    Serial.print("Command HTTP: ");
+    Serial.println(httpCode);
 
     return false;
   }
@@ -583,54 +491,36 @@ bool getMeasurementCommand(
       response
     );
 
-  if (
-    error
-  ) {
+  if (error) {
 
-    Serial.println(
-      "Command JSON parse failed."
-    );
-
-    Serial.println(
-      response
-    );
+    Serial.println("Command JSON parse failed.");
+    Serial.println(response);
 
     return false;
   }
 
   JsonVariant data;
 
-  if (
-    doc["data"].isNull()
-  ) {
-
-    data =
-      doc.as<JsonVariant>();
-
+  if (doc["data"].isNull()) {
+    data = doc.as<JsonVariant>();
   } else {
-
-    data =
-      doc["data"];
+    data = doc["data"];
   }
 
   sessionId =
-    data["session_id"] |
-    0;
+    data["session_id"] | 0;
 
   command =
     String(
-      data["command"] |
-      ""
+      data["command"] | ""
     );
 
   shouldMeasure =
-    data["should_measure"] |
-    false;
+    data["should_measure"] | false;
 
   status =
     String(
-      data["status"] |
-      "IDLE"
+      data["status"] | "IDLE"
     );
 
   Serial.println();
@@ -656,25 +546,14 @@ bool getMeasurementCommand(
 }
 
 // =====================================================
-// IMPORTANT SESSION VALIDATION
-// =====================================================
-//
-// The ESP32 must stop publishing Firebase data if
-// another/newer SQL session has been created.
-//
-// This is the main fix for:
-//
-// Ignoring Firebase session mismatch
-// {expected: 3, received: 2}
+// SESSION VALIDATION
 // =====================================================
 
 bool isCurrentSessionStillValid(
   long sessionId
 ) {
 
-  if (
-    sessionId <= 0
-  ) {
+  if (sessionId <= 0) {
     return false;
   }
 
@@ -693,18 +572,12 @@ bool isCurrentSessionStillValid(
       status
     );
 
-  if (
-    !success
-  ) {
+  if (!success) {
 
-    // Do NOT immediately kill the measurement because
-    // one HTTP request failed.
     return true;
   }
 
-  if (
-    serverSessionId <= 0
-  ) {
+  if (serverSessionId <= 0) {
 
     Serial.println();
     Serial.println(
@@ -714,9 +587,7 @@ bool isCurrentSessionStillValid(
     return false;
   }
 
-  if (
-    serverSessionId != sessionId
-  ) {
+  if (serverSessionId != sessionId) {
 
     Serial.println();
     Serial.println(
@@ -727,25 +598,13 @@ bool isCurrentSessionStillValid(
       "STALE ESP32 SESSION DETECTED"
     );
 
-    Serial.print(
-      "ESP session: "
-    );
+    Serial.print("ESP session: ");
+    Serial.println(sessionId);
 
-    Serial.println(
-      sessionId
-    );
+    Serial.print("Server session: ");
+    Serial.println(serverSessionId);
 
-    Serial.print(
-      "Server session: "
-    );
-
-    Serial.println(
-      serverSessionId
-    );
-
-    Serial.println(
-      "Stopping old session."
-    );
+    Serial.println("Stopping old session.");
 
     Serial.println(
       "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
@@ -758,22 +617,7 @@ bool isCurrentSessionStillValid(
 }
 
 // =====================================================
-// SESSION + PROCESS COMMAND POLL
-// =====================================================
-//
-// Used by the live-sampling loop in runMeasurement(). Combines the
-// existing "is this still the current session" check with a check for
-// the operator's PROCESS command (set by request_process.php when the
-// kiosk UI's "Process Measurement" button is clicked) into a single
-// HTTP round trip to get_command.php, instead of two.
-//
-// stillValid  - false if a newer/different session has taken over and
-//               this measurement must stop immediately without
-//               submitting anything.
-// shouldProcess - true only once the operator has clicked Process for
-//               THIS session. Until then the loop keeps sampling and
-//               publishing live readings and must NOT submit a final
-//               measurement.
+// SESSION + PROCESS COMMAND
 // =====================================================
 
 bool pollSessionState(
@@ -797,13 +641,8 @@ bool pollSessionState(
       status
     );
 
-  if (
-    !success
-  ) {
+  if (!success) {
 
-    // A single failed HTTP poll should never abort a measurement
-    // that's otherwise in progress, and it must never be
-    // misread as a PROCESS command.
     stillValid = true;
     shouldProcess = false;
 
@@ -829,13 +668,9 @@ bool pollSessionState(
   stillValid = true;
 
   shouldProcess =
-    command.equalsIgnoreCase(
-      "PROCESS"
-    );
+    command.equalsIgnoreCase("PROCESS");
 
-  if (
-    shouldProcess
-  ) {
+  if (shouldProcess) {
 
     Serial.println();
     Serial.println(
@@ -871,15 +706,11 @@ bool updateFirebase(
   unsigned long finalSequence = 0
 ) {
 
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
     return false;
   }
 
-  if (
-    sessionId <= 0
-  ) {
+  if (sessionId <= 0) {
     return false;
   }
 
@@ -889,71 +720,60 @@ bool updateFirebase(
     DEVICE_ID +
     ".json";
 
-  if (
-    FIREBASE_AUTH.length() > 0
-  ) {
+  if (FIREBASE_AUTH.length() > 0) {
 
-    url +=
-      "?auth=";
-
-    url +=
-      FIREBASE_AUTH;
+    url += "?auth=";
+    url += FIREBASE_AUTH;
   }
 
   StaticJsonDocument<512> doc;
 
-  doc["device_id"] =
-    DEVICE_ID;
+  doc["device_id"] = DEVICE_ID;
+  doc["session_id"] = sessionId;
+  doc["status"] = status;
+  doc["source_type"] = "kiosk";
 
-  doc["session_id"] =
-    sessionId;
-
-  doc["status"] =
-    status;
-
-  doc["source_type"] =
-    "kiosk";
-
-  doc["weight_stable"] =
-    weightStable;
-
-  doc["height_stable"] =
-    heightStable;
+  doc["weight_stable"] = weightStable;
+  doc["height_stable"] = heightStable;
 
   doc["sequence"] = measurementSequence;
-  doc["final_ready"] = finalReady;
-  doc["final_sequence"] = finalReady ? finalSequence : 0;
 
-  if (finalReady && finalHeightCm >= 0 && finalWeightKg >= 0) {
-    doc["final_height_cm"] = finalHeightCm;
-    doc["final_weight_kg"] = finalWeightKg;
+  doc["final_ready"] = finalReady;
+
+  doc["final_sequence"] =
+    finalReady ? finalSequence : 0;
+
+  if (
+    finalReady &&
+    finalHeightCm >= 0 &&
+    finalWeightKg >= 0
+  ) {
+
+    doc["final_height_cm"] =
+      finalHeightCm;
+
+    doc["final_weight_kg"] =
+      finalWeightKg;
+
   } else {
+
     doc["final_height_cm"] = nullptr;
     doc["final_weight_kg"] = nullptr;
   }
 
-  if (
-    heightCm >= 0
-  ) {
-    doc["height_cm"] =
-      heightCm;
+  if (heightCm >= 0) {
+    doc["height_cm"] = heightCm;
   } else {
-    doc["height_cm"] =
-      nullptr;
+    doc["height_cm"] = nullptr;
   }
 
-  if (
-    weightKg >= 0
-  ) {
-    doc["weight_kg"] =
-      weightKg;
+  if (weightKg >= 0) {
+    doc["weight_kg"] = weightKg;
   } else {
-    doc["weight_kg"] =
-      nullptr;
+    doc["weight_kg"] = nullptr;
   }
 
-  doc["timestamp"] =
-    millis();
+  doc["timestamp"] = millis();
 
   String body;
 
@@ -971,13 +791,8 @@ bool updateFirebase(
       httpCode
     );
 
-  Serial.print(
-    "Firebase HTTP: "
-  );
-
-  Serial.println(
-    httpCode
-  );
+  Serial.print("Firebase HTTP: ");
+  Serial.println(httpCode);
 
   return (
     httpCode >= 200 &&
@@ -1003,19 +818,13 @@ bool safeFirebaseUpdate(
   unsigned long finalSequence = 0
 ) {
 
-  if (
-    sessionId <= 0
-  ) {
+  if (sessionId <= 0) {
     return false;
   }
 
-  // Do not allow a stale ESP session to overwrite
-  // the Firebase node belonging to a newer session.
   if (
     !skipSessionCheck &&
-    !isCurrentSessionStillValid(
-      sessionId
-    )
+    !isCurrentSessionStillValid(sessionId)
   ) {
 
     Serial.println(
@@ -1023,7 +832,6 @@ bool safeFirebaseUpdate(
     );
 
     measuring = false;
-
     currentSessionId = 0;
 
     return false;
@@ -1080,13 +888,8 @@ bool submitFinalMeasurement(
     "================================"
   );
 
-  Serial.print(
-    "Payload: "
-  );
-
-  Serial.println(
-    payload
-  );
+  Serial.print("Payload: ");
+  Serial.println(payload);
 
   int httpCode;
 
@@ -1097,21 +900,11 @@ bool submitFinalMeasurement(
       httpCode
     );
 
-  Serial.print(
-    "SQL HTTP: "
-  );
+  Serial.print("SQL HTTP: ");
+  Serial.println(httpCode);
 
-  Serial.println(
-    httpCode
-  );
-
-  Serial.print(
-    "SQL response: "
-  );
-
-  Serial.println(
-    response
-  );
+  Serial.print("SQL response: ");
+  Serial.println(response);
 
   if (
     httpCode < 200 ||
@@ -1133,9 +926,7 @@ bool submitFinalMeasurement(
       response
     );
 
-  if (
-    error
-  ) {
+  if (error) {
 
     Serial.println(
       "Invalid JSON from PHP."
@@ -1145,24 +936,16 @@ bool submitFinalMeasurement(
   }
 
   bool success =
-    responseDoc["success"] |
-    false;
+    responseDoc["success"] | false;
 
-  if (
-    !success
-  ) {
+  if (!success) {
 
     const char* message =
       responseDoc["message"] |
       "Unknown server error";
 
-    Serial.print(
-      "PHP ERROR: "
-    );
-
-    Serial.println(
-      message
-    );
+    Serial.print("PHP ERROR: ");
+    Serial.println(message);
 
     return false;
   }
@@ -1183,15 +966,10 @@ void runMeasurement(
 ) {
 
   measuring = true;
+  currentSessionId = sessionId;
 
-  currentSessionId =
-    sessionId;
-
-  measurementStartedAt =
-    millis();
-
-  lastSessionValidation =
-    millis();
+  measurementStartedAt = millis();
+  lastSessionValidation = millis();
 
   Serial.println();
   Serial.println(
@@ -1202,13 +980,8 @@ void runMeasurement(
     "STARTING MEASUREMENT"
   );
 
-  Serial.print(
-    "Session ID: "
-  );
-
-  Serial.println(
-    sessionId
-  );
+  Serial.print("Session ID: ");
+  Serial.println(sessionId);
 
   Serial.println(
     "################################"
@@ -1228,7 +1001,6 @@ void runMeasurement(
   ) {
 
     measuring = false;
-
     currentSessionId = 0;
 
     return;
@@ -1257,17 +1029,9 @@ void runMeasurement(
       return;
     }
 
-    Serial.print(
-      "Measuring in "
-    );
-
-    Serial.print(
-      i
-    );
-
-    Serial.println(
-      "..."
-    );
+    Serial.print("Measuring in ");
+    Serial.print(i);
+    Serial.println("...");
 
     delay(1000);
   }
@@ -1282,15 +1046,8 @@ void runMeasurement(
   );
 
   // ===================================================
-  // ROLLING SAMPLE BUFFERS
+  // ROLLING BUFFERS
   // ===================================================
-  //
-  // Fixed-size circular buffers so the "live" value reflects
-  // the most recent WEIGHT_SAMPLE_WINDOW / HEIGHT_SAMPLE_WINDOW
-  // readings, not a running average since the loop started.
-  // That keeps the live readout responsive if the child steps
-  // on/off the platform while waiting for the operator to
-  // click Process.
 
   static float weightBuffer[WEIGHT_SAMPLE_WINDOW];
   int weightBufIndex = 0;
@@ -1300,40 +1057,46 @@ void runMeasurement(
   int heightBufIndex = 0;
   int heightBufFilled = 0;
 
-  // Raw-sample stability tracking. Deliberately separate from the
-  // smoothed weightBuffer/heightBuffer averages above: comparing two
-  // already-averaged numbers 500ms apart can look "stable" while the
-  // true reading is still settling, because averaging itself hides
-  // the moment-to-moment movement. Comparing consecutive RAW sensor
-  // samples instead means "stable" only becomes true once the actual
-  // sensor has stopped changing.
+  // ===================================================
+  // RAW STABILITY
+  // ===================================================
+
   bool haveLastRawWeight = false;
   float lastRawWeight = 0;
+
   int weightStableCount = 0;
   bool weightStable = false;
 
   bool haveLastRawHeight = false;
   float lastRawHeight = 0;
+
   int heightStableCount = 0;
   bool heightStable = false;
 
+  // ===================================================
+  // FINAL SNAPSHOT
+  // ===================================================
+
   bool shouldProcess = false;
+
   bool finalReady = false;
+
   unsigned long stableSince = 0;
+
   float finalWeightSnapshot = -1;
   float finalHeightSnapshot = -1;
+
   unsigned long finalSequence = 0;
 
-  while (
-    true
-  ) {
+  // ===================================================
+  // LIVE MEASUREMENT LOOP
+  // ===================================================
+
+  while (true) {
 
     // ================================================
-    // OVERALL SAFETY TIMEOUT
+    // TIMEOUT
     // ================================================
-    //
-    // Only trips if the operator never clicks Process at all.
-    // A legitimate wait for the operator does not reset this.
 
     if (
       millis() -
@@ -1354,14 +1117,13 @@ void runMeasurement(
       );
 
       measuring = false;
-
       currentSessionId = 0;
 
       return;
     }
 
     // ================================================
-    // SESSION VALIDATION + PROCESS COMMAND
+    // SESSION + PROCESS
     // ================================================
 
     if (
@@ -1370,8 +1132,7 @@ void runMeasurement(
       SESSION_VALIDATE_INTERVAL
     ) {
 
-      lastSessionValidation =
-        millis();
+      lastSessionValidation = millis();
 
       bool stillValid = true;
 
@@ -1381,27 +1142,72 @@ void runMeasurement(
         shouldProcess
       );
 
-      if (
-        !stillValid
-      ) {
+      // -----------------------------------------------
+      // SESSION NO LONGER VALID
+      // -----------------------------------------------
+
+      if (!stillValid) {
 
         Serial.println(
           "Measurement cancelled because a newer session exists."
         );
 
         measuring = false;
-
         currentSessionId = 0;
 
         return;
       }
 
-      if (
-        shouldProcess
-      ) {
+      // -----------------------------------------------
+      // PROCESS COMMAND
+      // -----------------------------------------------
 
-        // Stop sampling right away; final values are computed
-        // from whatever is already in the rolling buffers.
+      if (shouldProcess) {
+
+        Serial.println();
+        Serial.println(
+          "################################"
+        );
+
+        Serial.println(
+          "PROCESS COMMAND RECEIVED"
+        );
+
+        Serial.println(
+          "FINAL SNAPSHOT WILL NOW BE SUBMITTED"
+        );
+
+        Serial.println(
+          "################################"
+        );
+
+        // ---------------------------------------------
+        // FINAL SNAPSHOT MUST EXIST
+        // ---------------------------------------------
+
+        if (
+          !finalReady ||
+          finalSequence == 0
+        ) {
+
+          Serial.println(
+            "PROCESS RECEIVED BUT FINAL SNAPSHOT IS NOT READY."
+          );
+
+          safeFirebaseUpdate(
+            sessionId,
+            "ERROR",
+            -1,
+            -1
+          );
+
+          measuring = false;
+          currentSessionId = 0;
+
+          return;
+        }
+
+        // Exit the sampling loop.
         break;
       }
     }
@@ -1415,14 +1221,10 @@ void runMeasurement(
       LoadCell.update()
     ) {
 
-      // Only reached when the HX711 actually finished a new
-      // conversion — prevents re-adding the same stale cached
-      // reading into the buffer multiple times per conversion.
-
       measurementSequence++;
 
       float weight =
-         LoadCell.getData();
+        LoadCell.getData();
 
       Serial.print("HX711 weight: ");
       Serial.print(weight, 3);
@@ -1444,20 +1246,24 @@ void runMeasurement(
           weightBufFilled <
           WEIGHT_SAMPLE_WINDOW
         ) {
+
           weightBufFilled++;
         }
 
-        // ============================================
-        // RAW STABILITY (weight)
-        // ============================================
+        // ---------------------------------------------
+        // RAW WEIGHT STABILITY
+        // ---------------------------------------------
 
         if (
           haveLastRawWeight &&
           fabs(weight - lastRawWeight) <=
-            WEIGHT_STABLE_EPSILON_KG
+          WEIGHT_STABLE_EPSILON_KG
         ) {
+
           weightStableCount++;
+
         } else {
+
           weightStableCount = 0;
           weightStable = false;
         }
@@ -1469,6 +1275,7 @@ void runMeasurement(
           weightStableCount >=
           STABLE_SAMPLES_REQUIRED
         ) {
+
           weightStable = true;
         }
       }
@@ -1481,9 +1288,7 @@ void runMeasurement(
     float height;
 
     if (
-      getHeightReading(
-        height
-      )
+      getHeightReading(height)
     ) {
 
       measurementSequence++;
@@ -1504,20 +1309,24 @@ void runMeasurement(
           heightBufFilled <
           HEIGHT_SAMPLE_WINDOW
         ) {
+
           heightBufFilled++;
         }
 
-        // ============================================
-        // RAW STABILITY (height)
-        // ============================================
+        // ---------------------------------------------
+        // RAW HEIGHT STABILITY
+        // ---------------------------------------------
 
         if (
           haveLastRawHeight &&
           fabs(height - lastRawHeight) <=
-            HEIGHT_STABLE_EPSILON_CM
+          HEIGHT_STABLE_EPSILON_CM
         ) {
+
           heightStableCount++;
+
         } else {
+
           heightStableCount = 0;
           heightStable = false;
         }
@@ -1529,6 +1338,7 @@ void runMeasurement(
           heightStableCount >=
           STABLE_SAMPLES_REQUIRED
         ) {
+
           heightStable = true;
         }
       }
@@ -1537,32 +1347,104 @@ void runMeasurement(
     // ================================================
     // FINAL STABLE SNAPSHOT
     // ================================================
-    if (weightStable && heightStable && weightBufFilled > 0 && heightBufFilled > 0) {
-      if (stableSince == 0) stableSince = millis();
 
-      if (!finalReady && millis() - stableSince >= FINAL_STABLE_HOLD_MS) {
-        float ws = 0;
-        for (int i = 0; i < weightBufFilled; i++) ws += weightBuffer[i];
-        float hs = 0;
-        for (int i = 0; i < heightBufFilled; i++) hs += heightBuffer[i];
+    if (
+      weightStable &&
+      heightStable &&
+      weightBufFilled > 0 &&
+      heightBufFilled > 0
+    ) {
 
-        finalWeightSnapshot = ws / weightBufFilled;
-        finalHeightSnapshot = hs / heightBufFilled;
-        finalReady = true;
-        finalSequence = measurementSequence;
-
-        Serial.println("FINAL STABLE SNAPSHOT READY");
+      if (stableSince == 0) {
+        stableSince = millis();
       }
+
+      if (
+        !finalReady &&
+        millis() - stableSince >=
+        FINAL_STABLE_HOLD_MS
+      ) {
+
+        float ws = 0;
+
+        for (
+          int i = 0;
+          i < weightBufFilled;
+          i++
+        ) {
+
+          ws += weightBuffer[i];
+        }
+
+        float hs = 0;
+
+        for (
+          int i = 0;
+          i < heightBufFilled;
+          i++
+        ) {
+
+          hs += heightBuffer[i];
+        }
+
+        finalWeightSnapshot =
+          ws / weightBufFilled;
+
+        finalHeightSnapshot =
+          hs / heightBufFilled;
+
+        finalReady = true;
+
+        finalSequence =
+          measurementSequence;
+
+        Serial.println();
+        Serial.println(
+          "================================"
+        );
+
+        Serial.println(
+          "FINAL STABLE SNAPSHOT READY"
+        );
+
+        Serial.print("Final Weight: ");
+        Serial.print(
+          finalWeightSnapshot,
+          2
+        );
+
+        Serial.println(" kg");
+
+        Serial.print("Final Height: ");
+        Serial.print(
+          finalHeightSnapshot,
+          1
+        );
+
+        Serial.println(" cm");
+
+        Serial.print("Final Sequence: ");
+        Serial.println(finalSequence);
+
+        Serial.println(
+          "================================"
+        );
+      }
+
     } else {
+
       stableSince = 0;
+
       finalReady = false;
+
       finalWeightSnapshot = -1;
       finalHeightSnapshot = -1;
+
       finalSequence = 0;
     }
 
     // ================================================
-    // FIREBASE LIVE
+    // FIREBASE LIVE UPDATE
     // ================================================
 
     if (
@@ -1588,12 +1470,12 @@ void runMeasurement(
           i < weightBufFilled;
           i++
         ) {
+
           sum += weightBuffer[i];
         }
 
         liveWeight =
-          sum /
-          weightBufFilled;
+          sum / weightBufFilled;
       }
 
       if (
@@ -1607,12 +1489,12 @@ void runMeasurement(
           i < heightBufFilled;
           i++
         ) {
+
           sum += heightBuffer[i];
         }
 
         liveHeight =
-          sum /
-          heightBufFilled;
+          sum / heightBufFilled;
       }
 
       safeFirebaseUpdate(
@@ -1622,7 +1504,7 @@ void runMeasurement(
         liveWeight,
         weightStable,
         heightStable,
-        true, // skipSessionCheck
+        true,
         finalReady,
         finalHeightSnapshot,
         finalWeightSnapshot,
@@ -1636,13 +1518,35 @@ void runMeasurement(
   // ===================================================
   // FINAL VALUES
   // ===================================================
-  // Processing is allowed only after the frozen final stable snapshot.
-  float finalWeight = finalWeightSnapshot;
-  float finalHeight = finalHeightSnapshot;
 
-  if (!finalReady || finalSequence == 0) {
-    Serial.println("PROCESS BLOCKED: final stable snapshot is not ready.");
-    safeFirebaseUpdate(sessionId, "MEASURING", -1, -1, false, false, true);
+  float finalWeight =
+    finalWeightSnapshot;
+
+  float finalHeight =
+    finalHeightSnapshot;
+
+  if (
+    !finalReady ||
+    finalSequence == 0
+  ) {
+
+    Serial.println(
+      "PROCESS BLOCKED: final stable snapshot is not ready."
+    );
+
+    safeFirebaseUpdate(
+      sessionId,
+      "MEASURING",
+      -1,
+      -1,
+      false,
+      false,
+      true
+    );
+
+    measuring = false;
+    currentSessionId = 0;
+
     return;
   }
 
@@ -1675,7 +1579,6 @@ void runMeasurement(
     );
 
     measuring = false;
-
     currentSessionId = 0;
 
     return;
@@ -1696,14 +1599,13 @@ void runMeasurement(
     );
 
     measuring = false;
-
     currentSessionId = 0;
 
     return;
   }
 
   // ===================================================
-  // SQL
+  // SQL SUBMISSION
   // ===================================================
 
   bool sqlSuccess =
@@ -1713,16 +1615,12 @@ void runMeasurement(
       finalWeight
     );
 
-  if (
-    !sqlSuccess
-  ) {
+  if (!sqlSuccess) {
 
     Serial.println(
       "SQL FAILED"
     );
 
-    // Only publish ERROR if this is still
-    // the current session.
     safeFirebaseUpdate(
       sessionId,
       "ERROR",
@@ -1731,7 +1629,6 @@ void runMeasurement(
     );
 
     measuring = false;
-
     currentSessionId = 0;
 
     return;
@@ -1746,10 +1643,6 @@ void runMeasurement(
     "SQL SAVED SUCCESSFULLY"
   );
 
-  // ===================================================
-  // FIREBASE COMPLETE
-  // ===================================================
-
   safeFirebaseUpdate(
     sessionId,
     "COMPLETE",
@@ -1757,7 +1650,7 @@ void runMeasurement(
     finalWeight,
     true,
     true,
-    false,
+    true,
     true,
     finalHeight,
     finalWeight,
@@ -1772,7 +1665,6 @@ void runMeasurement(
     sessionId;
 
   currentSessionId = 0;
-
   measuring = false;
 
   Serial.println();
@@ -1799,9 +1691,7 @@ void runMeasurement(
 
 void setup() {
 
-  Serial.begin(
-    115200
-  );
+  Serial.begin(115200);
 
   delay(1000);
 
@@ -1899,10 +1789,7 @@ void loop() {
   // HX711
   // ===================================================
 
-  if (
-    hx711Ready
-  ) {
-
+  if (hx711Ready) {
     LoadCell.update();
   }
 
@@ -1910,9 +1797,7 @@ void loop() {
   // WIFI
   // ===================================================
 
-  if (
-    WiFi.status() != WL_CONNECTED
-  ) {
+  if (WiFi.status() != WL_CONNECTED) {
 
     connectWiFi();
 
@@ -1925,9 +1810,7 @@ void loop() {
   // MEASURING
   // ===================================================
 
-  if (
-    measuring
-  ) {
+  if (measuring) {
 
     if (
       millis() -
@@ -1940,7 +1823,6 @@ void loop() {
       );
 
       measuring = false;
-
       currentSessionId = 0;
 
       return;
@@ -1967,7 +1849,6 @@ void loop() {
     long sessionId = 0;
 
     String command = "";
-
     String status = "";
 
     bool shouldMeasure = false;
@@ -1980,9 +1861,7 @@ void loop() {
         status
       );
 
-    if (
-      !success
-    ) {
+    if (!success) {
 
       delay(200);
 
@@ -2012,21 +1891,14 @@ void loop() {
         "NEW MEASUREMENT SESSION"
       );
 
-      Serial.print(
-        "Session ID: "
-      );
-
-      Serial.println(
-        sessionId
-      );
+      Serial.print("Session ID: ");
+      Serial.println(sessionId);
 
       Serial.println(
         "################################"
       );
 
-      runMeasurement(
-        sessionId
-      );
+      runMeasurement(sessionId);
     }
 
     // =================================================
@@ -2038,13 +1910,8 @@ void loop() {
       sessionId == lastSessionId
     ) {
 
-      Serial.print(
-        "Session "
-      );
-
-      Serial.print(
-        sessionId
-      );
+      Serial.print("Session ");
+      Serial.print(sessionId);
 
       Serial.println(
         " already processed."
