@@ -1,0 +1,104 @@
+<?php
+
+require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/who_reference_import.php';
+
+nutritionist_require_access();
+
+$indicators = [
+	'waz' => ['label' => 'Weight-for-Age', 'table' => 'who_weight_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'haz' => ['label' => 'Height-for-Age', 'table' => 'who_height_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'whz' => ['label' => 'Weight-for-Height', 'table' => 'who_weight_for_height', 'column' => 'height_cm', 'columnLabel' => 'Height/Length (cm)'],
+];
+
+$indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
+
+if (!isset($indicators[$indicator])) {
+	$indicator = 'waz';
+}
+
+$sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
+$ageRange = (string)($_GET['range'] ?? 'old');
+
+if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
+	$ageRange = 'old';
+}
+
+$rangeBounds = [
+	'young' => ['age_months' => [0, 23], 'height_cm' => [0, 64.9]],
+	'old' => ['age_months' => [24, 60], 'height_cm' => [65, 999]],
+	'all' => null,
+];
+
+$config = $indicators[$indicator];
+$sql = "SELECT {$config['column']} AS x, L, M, S FROM {$config['table']} WHERE sex = ?";
+$types = 's';
+$params = [$sex];
+
+if ($rangeBounds[$ageRange] !== null) {
+	[$low, $high] = $rangeBounds[$ageRange][$config['column']];
+	$sql .= " AND {$config['column']} BETWEEN ? AND ?";
+	$types .= 'dd';
+	$params[] = $low;
+	$params[] = $high;
+}
+
+$sql .= " ORDER BY {$config['column']} ASC";
+
+$rows = admin_fetch_all($sql, $types, $params);
+
+function who_reference_export_sd(float $L, float $M, float $S, int $z): float
+{
+	if (abs($L) < 0.000001) {
+		return $M * exp($S * $z);
+	}
+
+	return $M * (1 + $L * $S * $z) ** (1 / $L);
+}
+
+$header = [$config['columnLabel'], 'L', 'M', 'S', '-3SD', '-2SD', '-1SD', 'Median', '+1SD', '+2SD', '+3SD'];
+$dataRows = [];
+
+foreach ($rows as $row) {
+	$L = (float)$row['L'];
+	$M = (float)$row['M'];
+	$S = (float)$row['S'];
+
+	$dataRows[] = [
+		$row['x'],
+		round($L, 6),
+		round($M, 6),
+		round($S, 6),
+		round(who_reference_export_sd($L, $M, $S, -3), 3),
+		round(who_reference_export_sd($L, $M, $S, -2), 3),
+		round(who_reference_export_sd($L, $M, $S, -1), 3),
+		round($M, 3),
+		round(who_reference_export_sd($L, $M, $S, 1), 3),
+		round(who_reference_export_sd($L, $M, $S, 2), 3),
+		round(who_reference_export_sd($L, $M, $S, 3), 3),
+	];
+}
+
+$tmpPath = tempnam(sys_get_temp_dir(), 'who_export_') . '.xlsx';
+$sheetName = strtoupper($indicator) . '_' . $sex;
+
+if (!xlsx_lite_write($tmpPath, $header, $dataRows, $sheetName)) {
+	admin_redirect('/nutritionist/who_reference.php', [
+		'indicator' => $indicator,
+		'sex' => $sex,
+		'range' => $ageRange,
+		'notice' => 'The export file could not be generated.',
+		'type' => 'error',
+	]);
+}
+
+$downloadName = 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.xlsx';
+
+header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+header('Content-Disposition: attachment; filename="' . $downloadName . '"');
+header('Content-Length: ' . (string)filesize($tmpPath));
+header('Cache-Control: no-store');
+
+readfile($tmpPath);
+unlink($tmpPath);
+exit;
