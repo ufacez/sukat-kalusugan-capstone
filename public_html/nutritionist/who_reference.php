@@ -191,32 +191,17 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 </section>
 
 <section class="nutritionist-panel" style="margin-bottom:20px;">
-	<h2 class="admin-section-title" style="margin-bottom:2px;">How the SD columns are calculated</h2>
-	<p class="admin-section-subtitle" style="margin-bottom:12px;">
-		Every row stores three WHO LMS parameters — <strong>L</strong> (Box-Cox power, corrects skewness),
-		<strong>M</strong> (median), and <strong>S</strong> (coefficient of variation). The &minus;3SD…+3SD
-		columns and every child's z-score are both derived from the same formula, just solved in opposite
-		directions.
-	</p>
+	<h2 class="admin-section-title" style="margin-bottom:12px;">How the SD columns are calculated</h2>
 	<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
 		<div class="admin-mini" style="background:var(--admin-surface-alt, #f8f9fb);padding:12px 14px;border-radius:8px;">
-			<div style="font-weight:700;color:var(--admin-text);margin-bottom:6px;">SD band value at a given z (used to draw this table)</div>
 			<code style="display:block;white-space:pre-wrap;">X = M &times; (1 + L&middot;S&middot;z)^(1/L)&nbsp;&nbsp;&nbsp;if L &ne; 0
 X = M &times; e^(S&middot;z)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if L = 0</code>
-			<div style="margin-top:6px;color:var(--admin-muted);">Where z is &minus;3, &minus;2, &minus;1, 0 (median), +1, +2, +3.</div>
 		</div>
 		<div class="admin-mini" style="background:var(--admin-surface-alt, #f8f9fb);padding:12px 14px;border-radius:8px;">
-			<div style="font-weight:700;color:var(--admin-text);margin-bottom:6px;">Child's z-score at a given measurement (used by WHO Analysis)</div>
 			<code style="display:block;white-space:pre-wrap;">z = [ (X / M)^L &minus; 1 ] / (L&middot;S)&nbsp;&nbsp;if L &ne; 0
 z = ln(X / M) / S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if L = 0</code>
-			<div style="margin-top:6px;color:var(--admin-muted);">Where X is the child's actual weight/height/length.</div>
 		</div>
 	</div>
-	<p class="admin-mini" style="margin-top:10px;color:var(--admin-muted);">
-		This is the WHO Child Growth Standards (2006) LMS method — see <code>who_reference_sd()</code> in this
-		file for the SD-band version, and <code>who_lms_z_score()</code> in <code>includes/who_calculator.php</code>
-		for the z-score version used when analyzing a child.
-	</p>
 </section>
 
 <section class="nutritionist-panel" style="margin-bottom:20px;">

@@ -6,79 +6,9 @@ require_once __DIR__ . '/../includes/who_calculator.php';
 $user = nutritionist_require_access();
 $today = new DateTimeImmutable('today');
 
-function nutritionist_calendar_redirect_params(): array
-{
-	$params = [];
-
-	if (isset($_GET['range'])) {
-		$params['range'] = (string)$_GET['range'];
-	}
-
-	if (isset($_GET['month'])) {
-		$params['month'] = (string)$_GET['month'];
-	}
-
-	return $params;
-}
-
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-	$eventAction = (string)($_POST['action'] ?? '');
-	$redirectParams = nutritionist_calendar_redirect_params();
-
-	if (in_array($eventAction, ['create_event', 'update_event'], true)) {
-		$eventId = (int)($_POST['id'] ?? 0);
-		$eventType = (string)($_POST['event_type'] ?? '');
-		$title = trim((string)($_POST['title'] ?? ''));
-		$eventDate = trim((string)($_POST['event_date'] ?? ''));
-		$eventTime = trim((string)($_POST['event_time'] ?? ''));
-		$location = trim((string)($_POST['location'] ?? ''));
-		$notes = trim((string)($_POST['notes'] ?? ''));
-		$barangayId = $user['barangay_id'] ?? null;
-
-		if (!in_array($eventType, ['meeting', 'oplan_timbang'], true) || $title === '' || $eventDate === '') {
-			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ['notice' => 'Event type, title, and date are required.', 'type' => 'error']);
-		}
-
-		$eventTimeValue = $eventTime !== '' ? $eventTime : null;
-		$locationValue = $location !== '' ? $location : null;
-		$notesValue = $notes !== '' ? $notes : null;
-
-		if ($eventAction === 'create_event') {
-			$ok = admin_execute(
-				'INSERT INTO nutritionist_events (event_type, title, event_date, event_time, location, barangay_id, notes, nutritionist_id)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-				'sssssisi',
-				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $barangayId, $notesValue, (int)$user['id']]
-			);
-
-			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event added to the calendar.'] : ['notice' => 'Event could not be added.', 'type' => 'error']));
-		}
-
-		if ($eventAction === 'update_event' && $eventId > 0) {
-			$ownerClause = ($user['role'] ?? '') === 'admin' ? '1=1' : 'nutritionist_id = ' . (int)$user['id'];
-
-			$ok = admin_execute(
-				"UPDATE nutritionist_events
-				 SET event_type = ?, title = ?, event_date = ?, event_time = ?, location = ?, notes = ?
-				 WHERE id = ? AND {$ownerClause}",
-				'ssssssi',
-				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $notesValue, $eventId]
-			);
-
-			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event updated.'] : ['notice' => 'Event could not be updated.', 'type' => 'error']));
-		}
-	}
-
-	if ($eventAction === 'delete_event') {
-		$eventId = (int)($_POST['id'] ?? 0);
-		$ownerClause = ($user['role'] ?? '') === 'admin' ? '1=1' : 'nutritionist_id = ' . (int)$user['id'];
-
-		if ($eventId > 0) {
-			$ok = admin_execute("DELETE FROM nutritionist_events WHERE id = ? AND {$ownerClause}", 'i', [$eventId]);
-			admin_redirect('/nutritionist/dashboard.php', $redirectParams + ($ok ? ['notice' => 'Event removed.'] : ['notice' => 'Event could not be removed.', 'type' => 'error']));
-		}
-	}
-}
+// Calendar events are read-only on this dashboard. Adding, editing, and
+// deleting meetings/Oplan Timbang entries happens on the Settings page
+// (see nutritionist/settings.php, "Manage Calendar" section).
 
 $range = (string)($_GET['range'] ?? 'Today');
 
@@ -208,18 +138,6 @@ $monthEvents = admin_fetch_all(
 	str_repeat('s', count($eventsParams)),
 	$eventsParams
 );
-
-$editingEventId = (int)($_GET['edit_event'] ?? 0);
-$editingEvent = null;
-
-if ($editingEventId > 0) {
-	foreach ($monthEvents as $eventRow) {
-		if ((int)$eventRow['id'] === $editingEventId) {
-			$editingEvent = $eventRow;
-			break;
-		}
-	}
-}
 
 $parentsParams = [];
 $parentsScope = nutritionist_scope_fragment($user, 'c.barangay_id', $parentsParams);
@@ -428,6 +346,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&lt;</a>
 				<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&gt;</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php') . '#calendar-management'); ?>" style="min-height:24px;padding:0 10px;line-height:24px;">Manage</a>
 			</div>
 		</div>
 
@@ -503,76 +422,31 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		</div>
 
 		<div id="calendar-day-detail" style="margin-top:14px;padding-top:12px;border-top:1px solid var(--admin-border);">
-			<div class="admin-mini" style="margin-bottom:8px;">Hover a day to preview it, or manage meetings and Oplan Timbang entries below. Appointments are still edited from the Appointments page.</div>
+			<div class="admin-mini" style="margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
+				<span id="day-detail-heading"></span>
+				<a href="#calendar-day-detail" id="day-detail-reset" class="admin-mini" style="display:none;font-weight:600;">Show all</a>
+			</div>
 
 			<?php if ($monthEvents === []): ?>
 				<div class="admin-stat-note">No meetings or Oplan Timbang sessions scheduled for <?php echo nutritionist_e($calendarDate->format('F Y')); ?> yet.</div>
 			<?php else: ?>
-				<div style="display:flex;flex-direction:column;gap:6px;">
+				<div style="display:flex;flex-direction:column;gap:6px;" id="day-detail-list">
 					<?php foreach ($monthEvents as $eventRow): ?>
 						<?php $eventDate = new DateTimeImmutable((string)$eventRow['event_date']); ?>
-						<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
-							<div style="display:flex;align-items:center;gap:8px;min-width:0;">
-								<span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$eventRow['event_type'])); ?>;flex-shrink:0;"></span>
-								<div style="min-width:0;">
-									<div style="font-weight:600;font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?php echo nutritionist_e((string)$eventRow['title']); ?></div>
-									<div class="admin-mini"><?php echo nutritionist_e(nutritionist_calendar_label((string)$eventRow['event_type'])); ?> · <?php echo nutritionist_e($eventDate->format('d M Y')); ?><?php echo $eventRow['event_time'] !== null ? ' · ' . nutritionist_e((new DateTimeImmutable('1970-01-01 ' . $eventRow['event_time']))->format('g:i A')) : ''; ?><?php echo $eventRow['location'] !== null && $eventRow['location'] !== '' ? ' · ' . nutritionist_e((string)$eventRow['location']) : ''; ?></div>
-								</div>
-							</div>
-							<div class="admin-actions">
-								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $monthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>">Edit</a>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php')); ?>" onsubmit="return confirm('Remove this event?');">
-									<input type="hidden" name="action" value="delete_event">
-									<input type="hidden" name="id" value="<?php echo (int)$eventRow['id']; ?>">
-									<input type="hidden" name="range" value="<?php echo nutritionist_e($range); ?>">
-									<input type="hidden" name="month" value="<?php echo nutritionist_e($monthParam); ?>">
-									<button class="admin-btn-danger" type="submit">Delete</button>
-								</form>
+						<div data-event-day="<?php echo (int)$eventDate->format('j'); ?>" style="display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
+							<span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$eventRow['event_type'])); ?>;flex-shrink:0;"></span>
+							<div style="min-width:0;">
+								<div style="font-weight:600;font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?php echo nutritionist_e((string)$eventRow['title']); ?></div>
+								<div class="admin-mini"><?php echo nutritionist_e(nutritionist_calendar_label((string)$eventRow['event_type'])); ?> · <?php echo nutritionist_e($eventDate->format('d M Y')); ?><?php echo $eventRow['event_time'] !== null ? ' · ' . nutritionist_e((new DateTimeImmutable('1970-01-01 ' . $eventRow['event_time']))->format('g:i A')) : ''; ?><?php echo $eventRow['location'] !== null && $eventRow['location'] !== '' ? ' · ' . nutritionist_e((string)$eventRow['location']) : ''; ?></div>
 							</div>
 						</div>
 					<?php endforeach; ?>
 				</div>
 			<?php endif; ?>
 
-			<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php')); ?>" id="calendar-event-form" class="nutritionist-form-grid" style="margin-top:14px;">
-				<input type="hidden" name="action" value="<?php echo $editingEvent !== null ? 'update_event' : 'create_event'; ?>">
-				<input type="hidden" name="id" value="<?php echo $editingEvent !== null ? (int)$editingEvent['id'] : ''; ?>">
-				<input type="hidden" name="range" value="<?php echo nutritionist_e($range); ?>">
-				<input type="hidden" name="month" value="<?php echo nutritionist_e($monthParam); ?>">
-				<label class="admin-field">
-					<span>Event type</span>
-					<select name="event_type" required>
-						<option value="meeting" <?php echo ($editingEvent['event_type'] ?? '') === 'meeting' ? 'selected' : ''; ?>>Meeting</option>
-						<option value="oplan_timbang" <?php echo ($editingEvent['event_type'] ?? '') === 'oplan_timbang' ? 'selected' : ''; ?>>Oplan Timbang</option>
-					</select>
-				</label>
-				<label class="admin-field">
-					<span>Title</span>
-					<input name="title" required value="<?php echo nutritionist_e((string)($editingEvent['title'] ?? '')); ?>" placeholder="e.g. Barangay nutrition meeting">
-				</label>
-				<label class="admin-field">
-					<span>Date</span>
-					<input type="date" name="event_date" required value="<?php echo nutritionist_e((string)($editingEvent['event_date'] ?? '')); ?>">
-				</label>
-				<label class="admin-field">
-					<span>Time (optional)</span>
-					<input type="time" name="event_time" value="<?php echo nutritionist_e((string)substr((string)($editingEvent['event_time'] ?? ''), 0, 5)); ?>">
-				</label>
-				<label class="admin-field">
-					<span>Location (optional)</span>
-					<input name="location" value="<?php echo nutritionist_e((string)($editingEvent['location'] ?? '')); ?>" placeholder="e.g. Barangay hall">
-				</label>
-				<label class="admin-field">
-					<span>Notes (optional)</span>
-					<input name="notes" value="<?php echo nutritionist_e((string)($editingEvent['notes'] ?? '')); ?>">
-				</label>
-				<div class="admin-field" style="align-content:end;grid-column:1 / -1;display:flex;gap:8px;">
-					<button class="admin-btn" type="submit"><?php echo $editingEvent !== null ? 'Update event' : 'Add to calendar'; ?></button>
-					<?php if ($editingEvent !== null): ?>
-						<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $monthParam]))); ?>">Cancel edit</a>
-					<?php endif; ?>
-				</div>
-			</form>
+			<div style="margin-top:14px;">
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php') . '#calendar-management'); ?>">Manage calendar events →</a>
+			</div>
 		</div>
 	</article>
 </section>
@@ -714,6 +588,63 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		</table>
 	</div>
 </section>
+<script>
+(function () {
+	var dayCells = document.querySelectorAll('.nutritionist-calendar-day[data-calendar-day]');
+	var eventRows = document.querySelectorAll('#day-detail-list [data-event-day]');
+	var heading = document.getElementById('day-detail-heading');
+	var resetLink = document.getElementById('day-detail-reset');
+	var detailSection = document.getElementById('calendar-day-detail');
+	var defaultHeading = heading ? heading.textContent : '';
+
+	function showDay(day) {
+		var any = false;
+
+		eventRows.forEach(function (row) {
+			var match = row.getAttribute('data-event-day') === String(day);
+			row.style.display = match ? '' : 'none';
+			if (match) { any = true; }
+		});
+
+		dayCells.forEach(function (cell) {
+			cell.classList.toggle('is-selected-day', cell.getAttribute('data-calendar-day') === String(day));
+		});
+
+		if (heading) {
+			heading.textContent = any
+				? 'Events on ' + day + ':'
+				: 'No meetings or Oplan Timbang sessions on the ' + day + (day == 1 || day == 21 || day == 31 ? 'st' : (day == 2 || day == 22 ? 'nd' : (day == 3 || day == 23 ? 'rd' : 'th')));
+		}
+
+		if (resetLink) { resetLink.style.display = ''; }
+	}
+
+	function showAll() {
+		eventRows.forEach(function (row) { row.style.display = ''; });
+		dayCells.forEach(function (cell) { cell.classList.remove('is-selected-day'); });
+		if (heading) { heading.textContent = defaultHeading; }
+		if (resetLink) { resetLink.style.display = 'none'; }
+	}
+
+	dayCells.forEach(function (cell) {
+		cell.addEventListener('click', function (event) {
+			event.preventDefault();
+			var day = cell.getAttribute('data-calendar-day');
+			showDay(day);
+			if (detailSection) {
+				detailSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+			}
+		});
+	});
+
+	if (resetLink) {
+		resetLink.addEventListener('click', function (event) {
+			event.preventDefault();
+			showAll();
+		});
+	}
+
+})();
+</script>
 <?php
 nutritionist_layout_end();
-

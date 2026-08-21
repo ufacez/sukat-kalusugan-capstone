@@ -182,7 +182,7 @@ nutritionist_layout_start('Appointments', 'Schedule follow-ups and manage appoin
 								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">
 									<input type="hidden" name="action" value="update_status">
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
-									<select name="status" data-admin-autosubmit>
+									<select class="admin-btn-secondary" name="status" data-admin-autosubmit>
 										<?php foreach (['pending', 'confirmed', 'completed', 'cancelled'] as $status): ?>
 											<option value="<?php echo nutritionist_e($status); ?>" <?php echo $appointment['status'] === $status ? 'selected' : ''; ?>><?php echo nutritionist_e(ucfirst($status)); ?></option>
 										<?php endforeach; ?>
