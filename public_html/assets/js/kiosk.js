@@ -1305,10 +1305,35 @@
 
   function updateStability(
     type,
-    value
+    value,
+    deviceStable
   ) {
     const isWeight =
       type === "weight";
+
+    const lockedKey =
+      isWeight
+        ? "weightLocked"
+        : "heightLocked";
+
+    // Prefer the device's own raw-sample stability flag when the
+    // firmware provides one: it's computed from consecutive RAW
+    // sensor readings on the ESP32, so it can't be fooled by a
+    // slow-moving smoothed average looking "stable" while the true
+    // reading is still settling. Sticky, like the fallback below —
+    // once true, stays true for the rest of this session.
+    if (
+      typeof deviceStable ===
+      "boolean"
+    ) {
+      if (
+        deviceStable
+      ) {
+        state[lockedKey] = true;
+      }
+
+      return state[lockedKey];
+    }
 
     /*
      * Real sensor noise floor:
@@ -1333,11 +1358,6 @@
       isWeight
         ? "weightStableCount"
         : "heightStableCount";
-
-    const lockedKey =
-      isWeight
-        ? "weightLocked"
-        : "heightLocked";
 
     const last =
       state[lastKey];
@@ -1513,11 +1533,24 @@
         setStep("live");
       }
 
+      const deviceWeightStable =
+        typeof payload.weight_stable ===
+        "boolean"
+          ? payload.weight_stable
+          : undefined;
+
+      const deviceHeightStable =
+        typeof payload.height_stable ===
+        "boolean"
+          ? payload.height_stable
+          : undefined;
+
       if (hasWeight) {
         const locked =
           updateStability(
             "weight",
-            weight
+            weight,
+            deviceWeightStable
           );
 
         setWeight(
@@ -1532,7 +1565,8 @@
         const locked =
           updateStability(
             "height",
-            height
+            height,
+            deviceHeightStable
           );
 
         setHeight(
@@ -3362,7 +3396,9 @@ function finishResults(
       ) &&
       isValidHeight(
         state.height
-      )
+      ) &&
+      state.weightLocked &&
+      state.heightLocked
     ) {
       state.measurementReady =
         true;

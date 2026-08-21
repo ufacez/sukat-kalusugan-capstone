@@ -63,8 +63,9 @@ HardwareSerial TF_Luna(2);
 // HEIGHT
 // =====================================================
 
+// TF-Luna is mounted 6 ft (182.88 cm) above the platform.
 const float MOUNTING_HEIGHT_CM =
-  127.5f;
+  182.88f;
 
 const float HEIGHT_OFFSET_CM =
   0.0f;
@@ -105,8 +106,18 @@ const unsigned long MEASUREMENT_TIMEOUT = 120000;
 // the session began) keeps the live readout responsive to someone
 // stepping on/off the platform while waiting for the operator to
 // click Process.
-const int WEIGHT_SAMPLE_WINDOW = 30;
-const int HEIGHT_SAMPLE_WINDOW = 20;
+const int WEIGHT_SAMPLE_WINDOW = 8;
+const int HEIGHT_SAMPLE_WINDOW = 8;
+
+// How many CONSECUTIVE fresh raw samples (not the smoothed average
+// above) must agree within the epsilon below before the device
+// itself considers weight/height "stable" and reports that to the
+// kiosk via Firebase. Computed from the raw sensor, not the rolling
+// average, so a slow-moving average can no longer look "stable"
+// while the true reading is still settling.
+const int STABLE_SAMPLES_REQUIRED = 5;
+const float WEIGHT_STABLE_EPSILON_KG = 0.15f;
+const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
 
 // =====================================================
 // STATE
@@ -378,6 +389,14 @@ bool readTFLunaDistanceCm(
 
   static uint8_t buffer[9];
 
+  // TF-Luna streams frames at ~100Hz but this function is only
+  // called once per loop tick (~20ms), so several frames can be
+  // sitting in the UART buffer by the time we read. Drain ALL of
+  // them and keep the LAST valid one so we report the freshest
+  // distance instead of a stale, already-superseded frame.
+
+  bool gotFrame = false;
+
   while (
     TF_Luna.available() >= 9
   ) {
@@ -403,6 +422,8 @@ bool readTFLunaDistanceCm(
     buffer[0] = 0x59;
     buffer[1] = 0x59;
 
+    bool readFailed = false;
+
     for (
       int i = 2;
       i < 9;
@@ -415,11 +436,18 @@ bool readTFLunaDistanceCm(
       if (
         value < 0
       ) {
-        return false;
+        readFailed = true;
+        break;
       }
 
       buffer[i] =
         (uint8_t)value;
+    }
+
+    if (
+      readFailed
+    ) {
+      break;
     }
 
     uint16_t checksum = 0;
@@ -445,10 +473,13 @@ bool readTFLunaDistanceCm(
     distanceCm =
       distanceMm / 10.0f;
 
-    return true;
+    gotFrame = true;
+
+    // Keep looping — if another frame is already waiting,
+    // it's newer than the one we just parsed.
   }
 
-  return false;
+  return gotFrame;
 }
 
 // =====================================================
@@ -828,7 +859,9 @@ bool updateFirebase(
   long sessionId,
   const char* status,
   float heightCm,
-  float weightKg
+  float weightKg,
+  bool weightStable = false,
+  bool heightStable = false
 ) {
 
   if (
@@ -873,6 +906,12 @@ bool updateFirebase(
 
   doc["source_type"] =
     "kiosk";
+
+  doc["weight_stable"] =
+    weightStable;
+
+  doc["height_stable"] =
+    heightStable;
 
   if (
     heightCm >= 0
@@ -935,7 +974,10 @@ bool safeFirebaseUpdate(
   long sessionId,
   const char* status,
   float heightCm,
-  float weightKg
+  float weightKg,
+  bool weightStable = false,
+  bool heightStable = false,
+  bool skipSessionCheck = false
 ) {
 
   if (
@@ -947,6 +989,7 @@ bool safeFirebaseUpdate(
   // Do not allow a stale ESP session to overwrite
   // the Firebase node belonging to a newer session.
   if (
+    !skipSessionCheck &&
     !isCurrentSessionStillValid(
       sessionId
     )
@@ -967,7 +1010,9 @@ bool safeFirebaseUpdate(
     sessionId,
     status,
     heightCm,
-    weightKg
+    weightKg,
+    weightStable,
+    heightStable
   );
 }
 
@@ -1228,6 +1273,23 @@ void runMeasurement(
   int heightBufIndex = 0;
   int heightBufFilled = 0;
 
+  // Raw-sample stability tracking. Deliberately separate from the
+  // smoothed weightBuffer/heightBuffer averages above: comparing two
+  // already-averaged numbers 500ms apart can look "stable" while the
+  // true reading is still settling, because averaging itself hides
+  // the moment-to-moment movement. Comparing consecutive RAW sensor
+  // samples instead means "stable" only becomes true once the actual
+  // sensor has stopped changing.
+  bool haveLastRawWeight = false;
+  float lastRawWeight = 0;
+  int weightStableCount = 0;
+  bool weightStable = false;
+
+  bool haveLastRawHeight = false;
+  float lastRawHeight = 0;
+  int heightStableCount = 0;
+  bool heightStable = false;
+
   bool shouldProcess = false;
 
   while (
@@ -1317,10 +1379,13 @@ void runMeasurement(
     // ================================================
 
     if (
-      hx711Ready
+      hx711Ready &&
+      LoadCell.update()
     ) {
 
-      LoadCell.update();
+      // Only reached when the HX711 actually finished a new
+      // conversion — prevents re-adding the same stale cached
+      // reading into the buffer multiple times per conversion.
 
       float weight =
          LoadCell.getData();
@@ -1346,6 +1411,31 @@ void runMeasurement(
           WEIGHT_SAMPLE_WINDOW
         ) {
           weightBufFilled++;
+        }
+
+        // ============================================
+        // RAW STABILITY (weight)
+        // ============================================
+
+        if (
+          haveLastRawWeight &&
+          fabs(weight - lastRawWeight) <=
+            WEIGHT_STABLE_EPSILON_KG
+        ) {
+          weightStableCount++;
+        } else {
+          weightStableCount =
+            max(0, weightStableCount - 1);
+        }
+
+        lastRawWeight = weight;
+        haveLastRawWeight = true;
+
+        if (
+          weightStableCount >=
+          STABLE_SAMPLES_REQUIRED
+        ) {
+          weightStable = true;
         }
       }
     }
@@ -1379,6 +1469,31 @@ void runMeasurement(
           HEIGHT_SAMPLE_WINDOW
         ) {
           heightBufFilled++;
+        }
+
+        // ============================================
+        // RAW STABILITY (height)
+        // ============================================
+
+        if (
+          haveLastRawHeight &&
+          fabs(height - lastRawHeight) <=
+            HEIGHT_STABLE_EPSILON_CM
+        ) {
+          heightStableCount++;
+        } else {
+          heightStableCount =
+            max(0, heightStableCount - 1);
+        }
+
+        lastRawHeight = height;
+        haveLastRawHeight = true;
+
+        if (
+          heightStableCount >=
+          STABLE_SAMPLES_REQUIRED
+        ) {
+          heightStable = true;
         }
       }
     }
@@ -1441,7 +1556,10 @@ void runMeasurement(
         sessionId,
         "MEASURING",
         liveHeight,
-        liveWeight
+        liveWeight,
+        weightStable,
+        heightStable,
+        true // skipSessionCheck — already validated by pollSessionState() above
       );
     }
 
@@ -1643,7 +1761,9 @@ void runMeasurement(
     sessionId,
     "COMPLETE",
     finalHeight,
-    finalWeight
+    finalWeight,
+    true,
+    true
   );
 
   // ===================================================

@@ -601,31 +601,10 @@ $ageMonths = 0;
 
 if ($childBirthdate !== '') {
 
-    try {
-
-        $birth =
-            new DateTimeImmutable(
-                $childBirthdate
-            );
-
-        $today =
-            new DateTimeImmutable(
-                'today'
-            );
-
-        $diff =
-            $birth->diff(
-                $today
-            );
-
-        $ageMonths =
-            ($diff->y * 12) +
-            $diff->m;
-
-    } catch (Throwable $e) {
-
-        $ageMonths = 0;
-    }
+    $ageMonths =
+        doh_age_in_months(
+            $childBirthdate
+        ) ?? 0;
 }
 
 /*
