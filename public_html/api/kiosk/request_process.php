@@ -35,6 +35,14 @@ $deviceCode = api_string(
     'ESP32-KIOSK-01'
 );
 
+$finalSequence = api_int(
+    $payload['final_sequence'] ?? 0,
+    0
+);
+
+$finalWeight = (float)($payload['final_weight_kg'] ?? -1);
+$finalHeight = (float)($payload['final_height_cm'] ?? -1);
+
 $sessionId = api_int(
     $payload['session_id']
         ?? $payload['sessionId']
@@ -48,6 +56,20 @@ if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
 
 if ($sessionId <= 0) {
     api_error('A valid session ID is required.', 400);
+}
+
+// The kiosk may only request PROCESS after it has received an exact
+// final stable snapshot from the ESP32. This prevents the old behavior
+// where any still-changing MEASURING state could immediately be finalized.
+if (
+    $finalSequence <= 0 ||
+    $finalWeight <= 0 || $finalWeight > 300 ||
+    $finalHeight <= 0 || $finalHeight > 300
+) {
+    api_error(
+        'Processing is blocked until a confirmed final stable reading is available.',
+        409
+    );
 }
 
 $conn = get_db_connection();

@@ -346,6 +346,11 @@
 
     measurementReady: false,
 
+    finalReady: false,
+    finalSequence: 0,
+    finalWeight: null,
+    finalHeight: null,
+
     processingStarted: false,
 
     restoredSession: false,
@@ -885,6 +890,8 @@
 
     const ready =
       state.measurementReady &&
+      state.finalReady &&
+      state.finalSequence > 0 &&
       !state.processingStarted &&
       isValidWeight(state.weight) &&
       isValidHeight(state.height);
@@ -911,14 +918,16 @@
         "Waiting for Weight";
     } else {
       button.textContent =
-        "Waiting for Measurement";
+        "Waiting for Final Stable Reading";
     }
   }
 
   function markMeasurementReady() {
     if (
-      !isValidWeight(state.weight) ||
-      !isValidHeight(state.height)
+      !state.finalReady ||
+      state.finalSequence <= 0 ||
+      !isValidWeight(state.finalWeight) ||
+      !isValidHeight(state.finalHeight)
     ) {
       state.measurementReady =
         false;
@@ -1577,6 +1586,42 @@
         );
       }
 
+      // A stable flag alone is NOT enough. The ESP32 must hold both
+      // sensors stable, freeze one exact snapshot, and publish final_ready.
+      const finalReady = payload.final_ready === true;
+      const finalSequence = Number(payload.final_sequence || 0);
+      const sequence = Number(payload.sequence || 0);
+      const finalWeight = Number(payload.final_weight_kg);
+      const finalHeight = Number(payload.final_height_cm);
+
+      if (
+        finalReady &&
+        finalSequence > 0 &&
+        finalSequence <= sequence &&
+        isValidWeight(finalWeight) &&
+        isValidHeight(finalHeight)
+      ) {
+        state.finalReady = true;
+        state.finalSequence = finalSequence;
+        state.finalWeight = finalWeight;
+        state.finalHeight = finalHeight;
+        state.weight = finalWeight;
+        state.height = finalHeight;
+        state.weightLocked = true;
+        state.heightLocked = true;
+
+        setWeight(finalWeight, "Final stable weight");
+        setHeight(finalHeight, "Final stable height");
+        markMeasurementReady();
+      } else {
+        state.finalReady = false;
+        state.finalSequence = 0;
+        state.finalWeight = null;
+        state.finalHeight = null;
+        state.measurementReady = false;
+        updateProcessButton();
+      }
+
       let progress = 20;
 
       if (state.weightLocked) {
@@ -1592,13 +1637,6 @@
         payload.message ||
           "Stand still while the sensors capture your measurement..."
       );
-
-      if (
-        state.weightLocked &&
-        state.heightLocked
-      ) {
-        markMeasurementReady();
-      }
 
       saveSessionToStorage();
 
@@ -1872,6 +1910,11 @@
             payload.weight_kg ?? "",
           height_cm:
             payload.height_cm ?? "",
+          sequence: payload.sequence ?? "",
+          final_ready: payload.final_ready ?? false,
+          final_sequence: payload.final_sequence ?? "",
+          final_weight_kg: payload.final_weight_kg ?? "",
+          final_height_cm: payload.final_height_cm ?? "",
           timestamp
         });
 
@@ -2564,12 +2607,10 @@
     }
 
     if (
-      !isValidWeight(
-        state.weight
-      ) ||
-      !isValidHeight(
-        state.height
-      )
+      !state.finalReady ||
+      state.finalSequence <= 0 ||
+      !isValidWeight(state.finalWeight) ||
+      !isValidHeight(state.finalHeight)
     ) {
       pushFeed(
         "Processing blocked",
@@ -2648,7 +2689,16 @@
                 deviceId,
 
               session_id:
-                sessionId
+                sessionId,
+
+              final_sequence:
+                state.finalSequence,
+
+              final_weight_kg:
+                state.finalWeight,
+
+              final_height_cm:
+                state.finalHeight
             }),
 
             cache: "no-store"

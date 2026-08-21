@@ -89,7 +89,7 @@ const float EMPTY_PLATFORM_THRESHOLD_KG = 1.0f;
 // =====================================================
 
 const unsigned long COMMAND_POLL_INTERVAL = 2000;
-const unsigned long FIREBASE_UPDATE_INTERVAL = 500;
+const unsigned long FIREBASE_UPDATE_INTERVAL = 250;
 const unsigned long SESSION_VALIDATE_INTERVAL = 1500;
 
 // The operator now controls when a measurement finalizes (by clicking
@@ -115,7 +115,9 @@ const int HEIGHT_SAMPLE_WINDOW = 8;
 // kiosk via Firebase. Computed from the raw sensor, not the rolling
 // average, so a slow-moving average can no longer look "stable"
 // while the true reading is still settling.
-const int STABLE_SAMPLES_REQUIRED = 5;
+const int STABLE_SAMPLES_REQUIRED = 8;
+// Both sensors must remain stable continuously before a final snapshot is frozen.
+const unsigned long FINAL_STABLE_HOLD_MS = 2500;
 const float WEIGHT_STABLE_EPSILON_KG = 0.15f;
 const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
 
@@ -133,6 +135,7 @@ unsigned long lastCommandPoll = 0;
 unsigned long lastFirebaseUpdate = 0;
 unsigned long lastSessionValidation = 0;
 unsigned long measurementStartedAt = 0;
+unsigned long measurementSequence = 0;
 
 // =====================================================
 // WIFI
@@ -211,7 +214,7 @@ String httpGet(
 
   http.begin(url);
 
-  http.setTimeout(5000);
+  http.setTimeout(2000);
 
   httpCode =
     http.GET();
@@ -250,7 +253,7 @@ String httpPostForm(
 
   http.begin(url);
 
-  http.setTimeout(10000);
+  http.setTimeout(3000);
 
   http.addHeader(
     "Content-Type",
@@ -296,7 +299,7 @@ String httpPutJson(
 
   http.begin(url);
 
-  http.setTimeout(10000);
+  http.setTimeout(3000);
 
   http.addHeader(
     "Content-Type",
@@ -861,7 +864,11 @@ bool updateFirebase(
   float heightCm,
   float weightKg,
   bool weightStable = false,
-  bool heightStable = false
+  bool heightStable = false,
+  bool finalReady = false,
+  float finalHeightCm = -1,
+  float finalWeightKg = -1,
+  unsigned long finalSequence = 0
 ) {
 
   if (
@@ -912,6 +919,18 @@ bool updateFirebase(
 
   doc["height_stable"] =
     heightStable;
+
+  doc["sequence"] = measurementSequence;
+  doc["final_ready"] = finalReady;
+  doc["final_sequence"] = finalReady ? finalSequence : 0;
+
+  if (finalReady && finalHeightCm >= 0 && finalWeightKg >= 0) {
+    doc["final_height_cm"] = finalHeightCm;
+    doc["final_weight_kg"] = finalWeightKg;
+  } else {
+    doc["final_height_cm"] = nullptr;
+    doc["final_weight_kg"] = nullptr;
+  }
 
   if (
     heightCm >= 0
@@ -977,7 +996,11 @@ bool safeFirebaseUpdate(
   float weightKg,
   bool weightStable = false,
   bool heightStable = false,
-  bool skipSessionCheck = false
+  bool skipSessionCheck = false,
+  bool finalReady = false,
+  float finalHeightCm = -1,
+  float finalWeightKg = -1,
+  unsigned long finalSequence = 0
 ) {
 
   if (
@@ -1012,7 +1035,11 @@ bool safeFirebaseUpdate(
     heightCm,
     weightKg,
     weightStable,
-    heightStable
+    heightStable,
+    finalReady,
+    finalHeightCm,
+    finalWeightKg,
+    finalSequence
   );
 }
 
@@ -1291,6 +1318,11 @@ void runMeasurement(
   bool heightStable = false;
 
   bool shouldProcess = false;
+  bool finalReady = false;
+  unsigned long stableSince = 0;
+  float finalWeightSnapshot = -1;
+  float finalHeightSnapshot = -1;
+  unsigned long finalSequence = 0;
 
   while (
     true
@@ -1387,6 +1419,8 @@ void runMeasurement(
       // conversion — prevents re-adding the same stale cached
       // reading into the buffer multiple times per conversion.
 
+      measurementSequence++;
+
       float weight =
          LoadCell.getData();
 
@@ -1424,8 +1458,8 @@ void runMeasurement(
         ) {
           weightStableCount++;
         } else {
-          weightStableCount =
-            max(0, weightStableCount - 1);
+          weightStableCount = 0;
+          weightStable = false;
         }
 
         lastRawWeight = weight;
@@ -1451,6 +1485,8 @@ void runMeasurement(
         height
       )
     ) {
+
+      measurementSequence++;
 
       if (
         height >= MIN_HEIGHT_CM &&
@@ -1482,8 +1518,8 @@ void runMeasurement(
         ) {
           heightStableCount++;
         } else {
-          heightStableCount =
-            max(0, heightStableCount - 1);
+          heightStableCount = 0;
+          heightStable = false;
         }
 
         lastRawHeight = height;
@@ -1496,6 +1532,33 @@ void runMeasurement(
           heightStable = true;
         }
       }
+    }
+
+    // ================================================
+    // FINAL STABLE SNAPSHOT
+    // ================================================
+    if (weightStable && heightStable && weightBufFilled > 0 && heightBufFilled > 0) {
+      if (stableSince == 0) stableSince = millis();
+
+      if (!finalReady && millis() - stableSince >= FINAL_STABLE_HOLD_MS) {
+        float ws = 0;
+        for (int i = 0; i < weightBufFilled; i++) ws += weightBuffer[i];
+        float hs = 0;
+        for (int i = 0; i < heightBufFilled; i++) hs += heightBuffer[i];
+
+        finalWeightSnapshot = ws / weightBufFilled;
+        finalHeightSnapshot = hs / heightBufFilled;
+        finalReady = true;
+        finalSequence = measurementSequence;
+
+        Serial.println("FINAL STABLE SNAPSHOT READY");
+      }
+    } else {
+      stableSince = 0;
+      finalReady = false;
+      finalWeightSnapshot = -1;
+      finalHeightSnapshot = -1;
+      finalSequence = 0;
     }
 
     // ================================================
@@ -1559,7 +1622,11 @@ void runMeasurement(
         liveWeight,
         weightStable,
         heightStable,
-        true // skipSessionCheck — already validated by pollSessionState() above
+        true, // skipSessionCheck
+        finalReady,
+        finalHeightSnapshot,
+        finalWeightSnapshot,
+        finalSequence
       );
     }
 
@@ -1569,89 +1636,15 @@ void runMeasurement(
   // ===================================================
   // FINAL VALUES
   // ===================================================
-  //
-  // Averaged from whatever is currently in the rolling
-  // buffers at the moment PROCESS was received.
+  // Processing is allowed only after the frozen final stable snapshot.
+  float finalWeight = finalWeightSnapshot;
+  float finalHeight = finalHeightSnapshot;
 
-  float finalWeight = -1;
-  float finalHeight = -1;
-
-  if (
-    weightBufFilled > 0
-  ) {
-
-    float sum = 0;
-
-    for (
-      int i = 0;
-      i < weightBufFilled;
-      i++
-    ) {
-      sum += weightBuffer[i];
-    }
-
-    finalWeight =
-      sum /
-      weightBufFilled;
+  if (!finalReady || finalSequence == 0) {
+    Serial.println("PROCESS BLOCKED: final stable snapshot is not ready.");
+    safeFirebaseUpdate(sessionId, "MEASURING", -1, -1, false, false, true);
+    return;
   }
-
-  if (
-    heightBufFilled > 0
-  ) {
-
-    float sum = 0;
-
-    for (
-      int i = 0;
-      i < heightBufFilled;
-      i++
-    ) {
-      sum += heightBuffer[i];
-    }
-
-    finalHeight =
-      sum /
-      heightBufFilled;
-  }
-
-  Serial.println();
-  Serial.println(
-    "================================"
-  );
-
-  Serial.println(
-    "MEASUREMENT RESULT"
-  );
-
-  Serial.print(
-    "Weight: "
-  );
-
-  Serial.print(
-    finalWeight,
-    2
-  );
-
-  Serial.println(
-    " kg"
-  );
-
-  Serial.print(
-    "Height: "
-  );
-
-  Serial.print(
-    finalHeight,
-    1
-  );
-
-  Serial.println(
-    " cm"
-  );
-
-  Serial.println(
-    "================================"
-  );
 
   // ===================================================
   // VALIDATION
@@ -1763,7 +1756,12 @@ void runMeasurement(
     finalHeight,
     finalWeight,
     true,
-    true
+    true,
+    false,
+    true,
+    finalHeight,
+    finalWeight,
+    finalSequence
   );
 
   // ===================================================
