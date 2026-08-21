@@ -18,12 +18,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
     $lastCalibrationAt = trim((string)($_POST['last_calibration_at'] ?? ''));
     $heightOffset = (float)($_POST['calibration_offset_height'] ?? 0);
     $weightOffset = (float)($_POST['calibration_offset_weight'] ?? 0);
+    $hx711CalFactor = (float)($_POST['hx711_calibration_factor'] ?? -20892.50);
+    $mountingHeightCm = (float)($_POST['mounting_height_cm'] ?? 182.88);
 
     if ($deviceId > 0) {
         admin_execute(
-            'UPDATE devices SET location = ?, barangay_id = ?, status = ?, last_calibration_at = NULLIF(?, ""), calibration_offset_height = ?, calibration_offset_weight = ? WHERE id = ?',
-            'sissddi',
-            [$location, $barangayId, $status, $lastCalibrationAt, $heightOffset, $weightOffset, $deviceId]
+            'UPDATE devices SET location = ?, barangay_id = ?, status = ?, last_calibration_at = NULLIF(?, ""), calibration_offset_height = ?, calibration_offset_weight = ?, hx711_calibration_factor = ?, mounting_height_cm = ? WHERE id = ?',
+            'sissddddi',
+            [$location, $barangayId, $status, $lastCalibrationAt, $heightOffset, $weightOffset, $hx711CalFactor, $mountingHeightCm, $deviceId]
         );
 
         log_action((current_user()['id'] ?? null), 'UPDATE_DEVICE', 'info', 'Updated device ' . $deviceId);
@@ -32,7 +34,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
 }
 
 $devices = admin_fetch_all(
-    'SELECT d.id, d.device_code, d.location, d.barangay_id, bg.name AS barangay, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.updated_at,
+    'SELECT d.id, d.device_code, d.location, d.barangay_id, bg.name AS barangay, d.status, d.last_seen_at, d.last_calibration_at, d.calibration_offset_height, d.calibration_offset_weight, d.hx711_calibration_factor, d.mounting_height_cm, d.updated_at,
             TIMESTAMPDIFF(SECOND, d.last_seen_at, NOW()) AS seconds_since_last_seen
      FROM devices d
      LEFT JOIN barangays bg ON bg.id = d.barangay_id
@@ -157,6 +159,16 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                     <label class="admin-field">
                         <span>Weight offset (kg)</span>
                         <input type="number" step="0.001" name="calibration_offset_weight" value="<?php echo admin_e((string)($device['calibration_offset_weight'] ?? '0')); ?>">
+                    </label>
+                    <label class="admin-field">
+                        <span>HX711 calibration factor</span>
+                        <input type="number" step="0.0001" name="hx711_calibration_factor" value="<?php echo admin_e((string)($device['hx711_calibration_factor'] ?? '-20892.5')); ?>">
+                        <small class="admin-field-hint">Raw load-cell scale factor (grams per HX711 count). Fetched by the ESP32 on its next poll -- no reflash needed.</small>
+                    </label>
+                    <label class="admin-field">
+                        <span>Mounting height (cm)</span>
+                        <input type="number" step="0.01" name="mounting_height_cm" value="<?php echo admin_e((string)($device['mounting_height_cm'] ?? '182.88')); ?>">
+                        <small class="admin-field-hint">TF-Luna sensor height above an empty platform. Fetched by the ESP32 on its next poll -- no reflash needed.</small>
                     </label>
                     <div class="admin-field" style="align-content:end;">
                         <span>&nbsp;</span>

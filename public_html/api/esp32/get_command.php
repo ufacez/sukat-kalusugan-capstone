@@ -63,6 +63,29 @@ push_device_status($deviceCode, true, [
     'location' => $deviceRow['location'] ?? null,
 ]);
 
+/*
+|--------------------------------------------------------------------------
+| LIVE SENSOR CALIBRATION
+|--------------------------------------------------------------------------
+|
+| The ESP32 firmware polls this endpoint every ~2s regardless of measuring
+| state, so it doubles as the delivery channel for the two raw
+| sensor-calibration values that used to be hardcoded .ino constants:
+| HX711_CAL_FACTOR and MOUNTING_HEIGHT_CM. They ride along on every
+| response below (measuring or idle) so a value saved on the admin
+| Sensors page takes effect on the device's very next poll -- no
+| reflash required. Cast explicitly since these come back from MySQL
+| as numeric strings.
+|
+*/
+$calibration = [
+    'hx711_calibration_factor' =>
+        (float)($deviceRow['hx711_calibration_factor'] ?? -20892.50),
+
+    'mounting_height_cm' =>
+        (float)($deviceRow['mounting_height_cm'] ?? 182.88),
+];
+
 mysqli_begin_transaction($conn);
 
 $sessionStmt = mysqli_prepare(
@@ -327,6 +350,9 @@ if (
                     $sessionRow['expires_at'] ??
                     ''
                 ),
+
+            'calibration' =>
+                $calibration,
         ],
         'Measurement command dispatched.'
     );
@@ -438,6 +464,9 @@ if (
                     $sessionRow['expires_at'] ??
                     ''
                 ),
+
+            'calibration' =>
+                $calibration,
         ],
         $shouldProcess
             ? 'Processing requested.'
@@ -478,6 +507,9 @@ api_success(
 
         'measurement_active' =>
             false,
+
+        'calibration' =>
+            $calibration,
     ],
     'No command available.'
 );

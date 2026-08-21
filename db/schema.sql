@@ -174,6 +174,8 @@ CREATE TABLE `devices` (
   `last_calibration_at` date DEFAULT NULL,
   `calibration_offset_height` decimal(6,2) DEFAULT 0.00,
   `calibration_offset_weight` decimal(6,3) DEFAULT 0.000,
+  `hx711_calibration_factor` decimal(12,4) NOT NULL DEFAULT -20892.5000,
+  `mounting_height_cm` decimal(6,2) NOT NULL DEFAULT 182.88,
   `status` enum('active','maintenance','offline') NOT NULL DEFAULT 'active',
   `last_seen_at` timestamp NULL DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
@@ -184,35 +186,8 @@ CREATE TABLE `devices` (
 -- Dumping data for table `devices`
 --
 
-INSERT INTO `devices` (`id`, `device_code`, `location`, `last_calibration_at`, `calibration_offset_height`, `calibration_offset_weight`, `status`, `last_seen_at`, `created_at`, `updated_at`) VALUES
-(1, 'ESP32-KIOSK-01', 'ESP32 Kiosk', NULL, 0.00, 0.000, 'active', '2026-08-17 05:32:16', '2026-08-16 10:58:37', '2026-08-17 05:32:16');
-
--- --------------------------------------------------------
-
---
--- Table structure for table `device_sensor_settings`
---
-
-CREATE TABLE `device_sensor_settings` (
-  `id` int(10) UNSIGNED NOT NULL,
-  `device_code` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
-  `hx711_calibration_factor` decimal(12,4) NOT NULL DEFAULT 0.0000,
-  `hx711_tare_offset` decimal(10,3) NOT NULL DEFAULT 0.000,
-  `tf_luna_offset_cm` decimal(6,2) NOT NULL DEFAULT 0.00,
-  `tf_luna_scale_factor` decimal(8,4) NOT NULL DEFAULT 1.0000,
-  `height_offset_cm` decimal(6,2) NOT NULL DEFAULT 0.00,
-  `weight_offset_kg` decimal(8,4) NOT NULL DEFAULT 0.0000,
-  `last_calibration_at` timestamp NULL DEFAULT NULL,
-  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
-  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `device_sensor_settings`
---
-
-INSERT INTO `device_sensor_settings` (`id`, `device_code`, `hx711_calibration_factor`, `hx711_tare_offset`, `tf_luna_offset_cm`, `tf_luna_scale_factor`, `height_offset_cm`, `weight_offset_kg`, `last_calibration_at`, `created_at`, `updated_at`) VALUES
-(1, 'ESP32-KIOSK-01', -19964.2500, 0.000, 0.00, 1.0000, 0.00, 0.0000, '2026-08-16 13:03:51', '2026-08-16 12:49:56', '2026-08-16 13:03:51');
+INSERT INTO `devices` (`id`, `device_code`, `location`, `last_calibration_at`, `calibration_offset_height`, `calibration_offset_weight`, `hx711_calibration_factor`, `mounting_height_cm`, `status`, `last_seen_at`, `created_at`, `updated_at`) VALUES
+(1, 'ESP32-KIOSK-01', 'ESP32 Kiosk', NULL, 0.00, 0.000, -20892.5000, 182.88, 'active', '2026-08-17 05:32:16', '2026-08-16 10:58:37', '2026-08-17 05:32:16');
 
 -- --------------------------------------------------------
 

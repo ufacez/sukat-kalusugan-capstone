@@ -48,7 +48,12 @@ HX711_ADC LoadCell(
   HX711_SCK
 );
 
-const float HX711_CAL_FACTOR = -20892.50f;
+// This used to be a hardcoded const, requiring a reflash to change.
+// It is now a mutable default: fetchDeviceConfig() overwrites it from
+// the admin panel (via get_command.php) at boot and on every command
+// poll after that, so it can be recalibrated live. This value is only
+// the fallback used before the first successful server contact.
+float hx711CalFactor = -20892.50f;
 
 // =====================================================
 // TF-LUNA
@@ -63,7 +68,10 @@ HardwareSerial TF_Luna(2);
 // HEIGHT
 // =====================================================
 
-const float MOUNTING_HEIGHT_CM = 182.88f;
+// Same as hx711CalFactor above: this is now a mutable default kept live
+// in sync with the admin panel's "Mounting height (cm)" field, not a
+// fixed constant.
+float mountingHeightCm = 182.88f;
 const float HEIGHT_OFFSET_CM = 0.0f;
 
 // =====================================================
@@ -320,7 +328,7 @@ void setupHX711() {
   }
 
   LoadCell.setCalFactor(
-    HX711_CAL_FACTOR
+    hx711CalFactor
   );
 
   Serial.print("Calibration factor: ");
@@ -432,7 +440,7 @@ bool getHeightReading(
   }
 
   heightCm =
-    MOUNTING_HEIGHT_CM -
+    mountingHeightCm -
     distanceCm +
     HEIGHT_OFFSET_CM;
 
@@ -450,6 +458,63 @@ bool getHeightReading(
 // =====================================================
 // GET CURRENT COMMAND
 // =====================================================
+
+// =====================================================
+// LIVE SENSOR CALIBRATION
+// =====================================================
+//
+// get_command.php now includes a "calibration" object (hx711_calibration_
+// factor, mounting_height_cm) sourced from the devices table on every
+// single response, whether idle or mid-measurement. This device polls
+// that endpoint every COMMAND_POLL_INTERVAL regardless, so calling this
+// from getMeasurementCommand() means a value the admin saves in the
+// Sensors page reaches the device on its very next poll (worst case
+// COMMAND_POLL_INTERVAL, currently 2s) -- no reflash required.
+//
+// Only acts when a value actually changed, so this is a no-op most polls.
+
+void applyCalibrationFromServer(
+  JsonVariant& data
+) {
+
+  JsonVariant calibration =
+    data["calibration"];
+
+  if (calibration.isNull()) {
+    return;
+  }
+
+  float serverCalFactor =
+    calibration["hx711_calibration_factor"] | hx711CalFactor;
+
+  float serverMountingHeight =
+    calibration["mounting_height_cm"] | mountingHeightCm;
+
+  if (
+    fabs(serverCalFactor - hx711CalFactor) > 0.0001f
+  ) {
+
+    hx711CalFactor = serverCalFactor;
+
+    if (hx711Ready) {
+      LoadCell.setCalFactor(hx711CalFactor);
+    }
+
+    Serial.print("HX711 calibration factor updated from admin panel: ");
+    Serial.println(hx711CalFactor, 4);
+  }
+
+  if (
+    fabs(serverMountingHeight - mountingHeightCm) > 0.001f
+  ) {
+
+    mountingHeightCm = serverMountingHeight;
+
+    Serial.print("Mounting height updated from admin panel: ");
+    Serial.print(mountingHeightCm, 2);
+    Serial.println(" cm");
+  }
+}
 
 bool getMeasurementCommand(
   long& sessionId,
@@ -506,6 +571,8 @@ bool getMeasurementCommand(
   } else {
     data = doc["data"];
   }
+
+  applyCalibrationFromServer(data);
 
   sessionId =
     data["session_id"] | 0;
@@ -1717,6 +1784,36 @@ void setup() {
   );
 
   // ===================================================
+  // WIFI
+  // ===================================================
+  //
+  // Connect BEFORE touching either sensor now, so the calibration
+  // fetch just below can pull the admin panel's current values before
+  // the HX711 is tared/scaled and before the first height reading is
+  // taken. If WiFi or the server is unreachable, the hardcoded
+  // defaults above are used and the device works exactly as before.
+
+  connectWiFi();
+
+  if (WiFi.status() == WL_CONNECTED) {
+
+    Serial.println();
+    Serial.println("Fetching sensor calibration from admin panel...");
+
+    long dummySessionId = 0;
+    String dummyCommand = "";
+    String dummyStatus = "";
+    bool dummyShouldMeasure = false;
+
+    getMeasurementCommand(
+      dummySessionId,
+      dummyCommand,
+      dummyShouldMeasure,
+      dummyStatus
+    );
+  }
+
+  // ===================================================
   // HX711
   // ===================================================
 
@@ -1747,19 +1844,13 @@ void setup() {
   );
 
   Serial.print(
-    MOUNTING_HEIGHT_CM,
+    mountingHeightCm,
     1
   );
 
   Serial.println(
     " cm"
   );
-
-  // ===================================================
-  // WIFI
-  // ===================================================
-
-  connectWiFi();
 
   Serial.println();
   Serial.println(
