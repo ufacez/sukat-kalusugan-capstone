@@ -214,6 +214,22 @@
   width: 100%;
 }
 
+.nutritionist-page .nutritionist-form-grid .admin-field-checkbox {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.nutritionist-page .nutritionist-form-grid .admin-field-checkbox input[type="checkbox"] {
+  width: 18px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0;
+}
+
+.nutritionist-page .nutritionist-form-grid .admin-field-checkbox span {
+  min-width: 0;
+}
+
 @media (max-width: 1100px) {
   .nutritionist-page .nutritionist-stat-grid,
   .nutritionist-page .nutritionist-panel-grid,
@@ -228,6 +244,10 @@
   .nutritionist-page .nutritionist-panel-grid.is-balanced,
   .nutritionist-page .nutritionist-form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .nutritionist-page .nutritionist-form-grid .admin-field-checkbox {
+    grid-column: 1;
   }
 
   .nutritionist-page .nutritionist-topbar-actions {

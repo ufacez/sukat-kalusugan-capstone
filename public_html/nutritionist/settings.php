@@ -112,6 +112,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 			admin_redirect('/nutritionist/settings.php', $redirectParams + ($ok ? ['notice' => 'Event updated.'] : ['notice' => 'Event could not be updated.', 'type' => 'error']));
 		}
+
+		if ($formAction === 'update_event') {
+			admin_redirect('/nutritionist/settings.php', $redirectParams + ['notice' => 'Invalid event.', 'type' => 'error']);
+		}
 	}
 
 	if ($formAction === 'delete_event') {
@@ -123,8 +127,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			$deleteTypes = 'i' . str_repeat('i', count($deleteParams) - 1);
 
 			$ok = admin_execute("DELETE FROM nutritionist_events WHERE id = ? AND {$ownerClause}", $deleteTypes, $deleteParams);
+
 			admin_redirect('/nutritionist/settings.php', $redirectParams + ($ok ? ['notice' => 'Event removed.'] : ['notice' => 'Event could not be removed.', 'type' => 'error']));
 		}
+
+		admin_redirect('/nutritionist/settings.php', $redirectParams + ['notice' => 'Invalid event.', 'type' => 'error']);
 	}
 }
 
@@ -159,12 +166,16 @@ $editingEventId = (int)($_GET['edit_event'] ?? 0);
 $editingEvent = null;
 
 if ($editingEventId > 0) {
-	foreach ($calMonthEvents as $eventRow) {
-		if ((int)$eventRow['id'] === $editingEventId) {
-			$editingEvent = $eventRow;
-			break;
-		}
-	}
+	$editingParams = [$editingEventId];
+	$editingScope = nutritionist_scope_fragment($user, 'ne.barangay_id', $editingParams);
+	$editingEvent = admin_fetch_one(
+		"SELECT ne.id, ne.event_type, ne.title, ne.event_date, ne.event_time, ne.location, ne.notes, ne.nutritionist_id
+		 FROM nutritionist_events ne
+		 WHERE ne.id = ? AND {$editingScope}
+		 LIMIT 1",
+		str_repeat('i', count($editingParams)),
+		$editingParams
+	);
 }
 
 $profile = admin_fetch_one(
@@ -333,7 +344,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 		<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
 			<?php foreach ($calMonthEvents as $eventRow): ?>
 				<?php $eventDate = new DateTimeImmutable((string)$eventRow['event_date']); ?>
-				<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
+				<div class="nutritionist-event-row" data-event-row="<?php echo (int)$eventRow['id']; ?>" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
 					<div style="display:flex;align-items:center;gap:8px;min-width:0;">
 						<span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$eventRow['event_type'])); ?>;flex-shrink:0;"></span>
 						<div style="min-width:0;">

@@ -143,7 +143,7 @@ function admin_redirect(string $path, array $query = []): void
         $url .= (str_contains($path, '?') ? '&' : '?') . http_build_query($query);
     }
 
-    header('Location: ' . app_url($url));
+    header('Location: ' . app_url($url), true, 303);
     exit;
 }
 

@@ -448,12 +448,12 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 			<span>Purok / Sitio</span>
 			<input name="purok" value="<?php echo nutritionist_e($editChild['purok'] ?? ''); ?>" placeholder="Purok 6">
 		</label>
-		<label class="admin-field" style="flex-direction:row;align-items:center;gap:8px;">
-			<input type="checkbox" name="is_ip" value="1" style="width:auto;" <?php echo !empty($editChild['is_ip']) ? 'checked' : ''; ?>>
+		<label class="admin-field admin-field-checkbox">
+			<input type="checkbox" name="is_ip" value="1" <?php echo !empty($editChild['is_ip']) ? 'checked' : ''; ?>>
 			<span>Belongs to IP (Indigenous Peoples) group</span>
 		</label>
-		<label class="admin-field" style="flex-direction:row;align-items:center;gap:8px;">
-			<input type="checkbox" name="has_disability" value="1" style="width:auto;" <?php echo !empty($editChild['has_disability']) ? 'checked' : ''; ?>>
+		<label class="admin-field admin-field-checkbox">
+			<input type="checkbox" name="has_disability" value="1" <?php echo !empty($editChild['has_disability']) ? 'checked' : ''; ?>>
 			<span>Has a disability</span>
 		</label>
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
@@ -469,4 +469,3 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 </section>
 <?php
 nutritionist_layout_end();
-
