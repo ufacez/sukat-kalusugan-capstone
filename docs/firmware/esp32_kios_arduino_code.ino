@@ -3,13 +3,31 @@
 #include <ArduinoJson.h>
 #include <HX711_ADC.h>
 #include <math.h>
+#include <WiFiManager.h>
 
 // =====================================================
 // WIFI
 // =====================================================
+//
+// The kiosk moves between locations (public presentation, then the
+// clinic), each with a different WiFi network. Hardcoded WIFI_SSID /
+// WIFI_PASSWORD constants used to mean re-flashing the firmware every
+// time it moved. WiFiManager replaces that: connectWiFi() below tries
+// whatever network was saved last, and if that fails it opens a
+// temporary access point (name + password below) so a phone can submit
+// the new network's credentials through a page the ESP32 itself hosts
+// -- no laptop, no re-flash, no Serial Monitor needed on-site.
+//
+// SETUP_AP_NAME / SETUP_AP_PASSWORD protect that setup screen itself --
+// anyone who doesn't know this password can't join the setup network or
+// see/change what real WiFi the kiosk is pointed at. This is NOT the
+// venue WiFi password; the venue's real SSID/password get typed into
+// the form WiFiManager shows once you're connected to this setup AP.
 
-const char* WIFI_SSID = "La Familia";
-const char* WIFI_PASSWORD = "enz0p4o1931";
+const char* SETUP_AP_NAME = "SukatKalusugan-Setup";
+const char* SETUP_AP_PASSWORD = "sukat2026"; // must be 8+ characters
+
+WiFiManager wifiManager;
 
 // =====================================================
 // SERVER
@@ -134,7 +152,14 @@ unsigned long measurementSequence = 0;
 // WIFI
 // =====================================================
 
-void connectWiFi() {
+// Used once, at boot (see setup() below). Tries the last-saved network
+// first; if that fails (new venue, or nothing saved yet), it opens the
+// SETUP_AP_NAME access point and BLOCKS here until someone submits real
+// WiFi credentials through the page it hosts, or the portal times out.
+// setConfigPortalTimeout() means a failed/skipped setup doesn't hang the
+// kiosk forever -- after 3 minutes it gives up and setup() continues
+// without WiFi, same as the old "WiFi connection FAILED" fallback did.
+void connectWiFiAtBoot() {
 
   if (WiFi.status() == WL_CONNECTED) {
     return;
@@ -142,33 +167,17 @@ void connectWiFi() {
 
   Serial.println();
   Serial.println("================================");
-  Serial.println("CONNECTING TO WIFI");
+  Serial.println("CONNECTING TO WIFI (WiFiManager)");
   Serial.println("================================");
 
-  WiFi.mode(WIFI_STA);
+  wifiManager.setConfigPortalTimeout(180);
 
-  WiFi.begin(
-    WIFI_SSID,
-    WIFI_PASSWORD
+  bool connected = wifiManager.autoConnect(
+    SETUP_AP_NAME,
+    SETUP_AP_PASSWORD
   );
 
-  int attempts = 0;
-
-  while (
-    WiFi.status() != WL_CONNECTED &&
-    attempts < 40
-  ) {
-
-    delay(500);
-
-    Serial.print(".");
-
-    attempts++;
-  }
-
-  Serial.println();
-
-  if (WiFi.status() == WL_CONNECTED) {
+  if (connected) {
 
     Serial.println("WiFi connected");
 
@@ -177,8 +186,24 @@ void connectWiFi() {
 
   } else {
 
-    Serial.println("WiFi connection FAILED");
+    Serial.println("WiFi connection FAILED (setup portal timed out or was skipped)");
   }
+}
+
+// Used from loop() for ordinary reconnects during normal operation (a
+// brief drop in signal, router reboot, etc). Deliberately does NOT open
+// the setup portal -- doing that mid-operation would stop the kiosk and
+// wait on someone with a phone every time WiFi blips. It just retries
+// the already-saved network. If the kiosk has genuinely moved to a new
+// venue, power-cycle it so connectWiFiAtBoot() runs again and can open
+// the setup portal properly.
+void connectWiFi() {
+
+  if (WiFi.status() == WL_CONNECTED) {
+    return;
+  }
+
+  WiFi.reconnect();
 }
 
 // =====================================================
@@ -1792,8 +1817,12 @@ void setup() {
   // the HX711 is tared/scaled and before the first height reading is
   // taken. If WiFi or the server is unreachable, the hardcoded
   // defaults above are used and the device works exactly as before.
+  //
+  // This is the boot-time connect: tries the saved network, opens the
+  // SukatKalusugan-Setup portal if that fails (see connectWiFiAtBoot()
+  // above). loop() below uses the plain connectWiFi() reconnect instead.
 
-  connectWiFi();
+  connectWiFiAtBoot();
 
   if (WiFi.status() == WL_CONNECTED) {
 
