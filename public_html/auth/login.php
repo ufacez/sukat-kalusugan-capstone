@@ -86,7 +86,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                         <input type="checkbox" name="remember" value="1" disabled>
                         <span>Remember me</span>
                     </label>
-                    <a class="link" href="#" aria-disabled="true">Forgot password?</a>
+                    <a class="link" href="forgot-password.php">Forgot password?</a>
                 </div>
 
                 <div class="form-message" id="formMessage" aria-live="polite"></div>

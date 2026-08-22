@@ -1,0 +1,11 @@
+{
+    "name": "sukat-kalusugan/capstone",
+    "description": "Sukat Kalusugan capstone project — server-side dependencies.",
+    "require": {
+        "php": ">=7.4",
+        "phpmailer/phpmailer": "^6.9"
+    },
+    "config": {
+        "optimize-autoloader": true
+    }
+}

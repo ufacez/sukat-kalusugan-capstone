@@ -23,6 +23,28 @@ define('FIREBASE_DATABASE_URL', '');
 // Leave empty if you are using test-mode rules during development.
 define('FIREBASE_AUTH_TOKEN', '');
 
+// Outgoing email (password reset links, etc.) via Gmail SMTP + PHPMailer.
+// Leave SMTP_USER/SMTP_PASS empty to fall back to PHP's mail() and, if that
+// also fails, to logging the link — fine for local dev, not for production.
+//
+// Setup for Gmail:
+//   1. Turn on 2-Step Verification on the Gmail account you're sending from:
+//      https://myaccount.google.com/security
+//   2. Create an "App Password" (Google Account > Security > 2-Step
+//      Verification > App passwords). Gmail will not accept your normal
+//      login password for SMTP once 2FA is on.
+//   3. Put that 16-character app password below as SMTP_PASS (spaces don't
+//      matter, Google shows them in groups of 4 for readability).
+//   4. Run `composer install` in the project root so PHPMailer is available
+//      (see composer.json) — vendor/autoload.php must exist.
+define('SMTP_HOST', 'smtp.gmail.com');
+define('SMTP_PORT', '587');           // 587 = STARTTLS (recommended), 465 = SMTPS
+define('SMTP_ENCRYPTION', 'tls');     // 'tls' for port 587, 'ssl' for port 465
+define('SMTP_USER', '');              // your full Gmail address, e.g. 'yourclinic@gmail.com'
+define('SMTP_PASS', '');              // the 16-character Gmail App Password, NOT your Gmail login password
+define('MAIL_FROM_ADDRESS', '');      // usually the same as SMTP_USER
+define('MAIL_FROM_NAME', 'Sukat Kalusugan');
+
 // Growth Result Assistant (AI chatbot on the nutritionist & parent portals).
 // Leave CHATBOT_API_KEY empty to keep the chatbot disabled — the widget
 // will still render but will show a "not configured" message instead of

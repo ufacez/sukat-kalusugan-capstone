@@ -159,6 +159,10 @@
   font-weight: 600;
 }
 
+.form-message.is-success {
+  color: var(--primary-strong);
+}
+
 .auth-submit {
   border: 0;
   border-radius: var(--radius-md);
