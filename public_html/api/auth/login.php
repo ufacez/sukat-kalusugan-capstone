@@ -7,6 +7,7 @@
 
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
+require_once __DIR__ . '/../../includes/login_throttle.php';
 
 start_secure_session();
 
@@ -53,6 +54,16 @@ $password = (string)($_POST['password'] ?? '');
 
 if ($identifier === '' || $password === '') {
     login_respond_error('Email/username and password are required.', 422);
+}
+
+$lockoutSecondsRemaining = \login_lockout_seconds_remaining($identifier);
+
+if ($lockoutSecondsRemaining > 0) {
+    $minutesRemaining = (int)ceil($lockoutSecondsRemaining / 60);
+    login_respond_error(
+        'Too many failed sign-in attempts. Please try again in ' . $minutesRemaining . ' minute(s).',
+        429
+    );
 }
 
 $conn = get_db_connection();
@@ -106,6 +117,7 @@ if (is_array($staff) && password_verify($password, (string)($staff['password_has
     }
 
     log_action((int)$staff['id'], 'LOGIN', 'info', 'Staff login for ' . (string)$staff['email']);
+    \login_record_attempt($identifier, true);
     login_respond_success($_SESSION['auth']);
 }
 
@@ -148,7 +160,9 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
     ];
 
     log_action(null, 'LOGIN', 'info', 'Parent login for ' . (string)$parent['email']);
+    \login_record_attempt($identifier, true);
     login_respond_success($_SESSION['auth']);
 }
 
+\login_record_attempt($identifier, false);
 login_respond_error('Invalid email/username or password.', 401);

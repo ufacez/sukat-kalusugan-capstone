@@ -21,6 +21,16 @@ function get_db_connection(): mysqli
         $connection = mysqli_connect(DB_HOST, DB_USER, DB_PASS, DB_NAME);
 
         if ($connection === false) {
+            // Log the real reason server-side, but never echo DB host/user/error
+            // details to the browser — that's the kind of thing bootstrap_errors.php
+            // is trying to keep off the page in production.
+            error_log('Database connection failed: ' . mysqli_connect_error());
+            http_response_code(500);
+
+            if (defined('APP_ENV') && APP_ENV === 'production') {
+                die('Something went wrong. Please try again later.');
+            }
+
             die('Connection failed: ' . mysqli_connect_error());
         }
 

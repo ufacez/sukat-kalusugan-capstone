@@ -1,0 +1,20 @@
+# Sukat Kalusugan — public_html/.htaccess
+# This is the webroot. Point your host's document root here (not the
+# project root) so /db, /docs, /.git etc. are never web-accessible at all.
+
+# Force HTTPS (skip on local dev servers without a cert / behind plain HTTP proxies).
+RewriteEngine On
+RewriteCond %{HTTPS} off
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{REMOTE_ADDR} !^127\.0\.0\.1$
+RewriteCond %{REMOTE_ADDR} !^::1$
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+# Never list directory contents.
+Options -Indexes
+
+# Block access to dotfiles (.git, .env, .gitignore, etc.) if this folder
+# ever ends up nested under a project root that also has them.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>

@@ -5,6 +5,61 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 start_secure_session();
 require_permission('settings.view');
 
+$actor = current_user();
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
+    $name = trim((string)($_POST['name'] ?? ''));
+    $email = trim((string)($_POST['email'] ?? ''));
+    $username = trim((string)($_POST['username'] ?? ''));
+    $phone = trim((string)($_POST['phone'] ?? ''));
+    $currentPassword = (string)($_POST['current_password'] ?? '');
+    $password = (string)($_POST['password'] ?? '');
+
+    if ($name === '' || $email === '' || $username === '') {
+        admin_redirect('/admin/settings.php', ['notice' => 'Name, email, and username are required.', 'type' => 'error']);
+    }
+
+    $current = admin_fetch_one('SELECT password_hash FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+
+    if ($current === null) {
+        admin_redirect('/admin/settings.php', ['notice' => 'Your account could not be loaded.', 'type' => 'error']);
+    }
+
+    // Only setting a new password requires proving you know the current one —
+    // editing name/email/username/phone doesn't. This stops someone with a
+    // hijacked or left-open session from silently locking the real owner out.
+    if ($password !== '') {
+        if ($currentPassword === '' || !password_verify($currentPassword, (string)$current['password_hash'])) {
+            admin_redirect('/admin/settings.php', ['notice' => 'Current password is incorrect.', 'type' => 'error']);
+        }
+    }
+
+    $sql = 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?';
+    $params = [$name, $email, $username, $phone];
+    $types = 'ssss';
+
+    if ($password !== '') {
+        $sql .= ', password_hash = ?';
+        $params[] = password_hash($password, PASSWORD_DEFAULT);
+        $types .= 's';
+    }
+
+    $sql .= ' WHERE id = ?';
+    $params[] = (int)$actor['id'];
+    $types .= 'i';
+
+    $ok = admin_execute($sql, $types, $params);
+
+    if ($ok) {
+        $_SESSION['auth']['name'] = $name;
+        $_SESSION['auth']['email'] = $email;
+        $_SESSION['auth']['username'] = $username;
+        log_action((int)$actor['id'], 'UPDATE_OWN_ACCOUNT', 'info', 'Admin updated their own account details');
+    }
+
+    admin_redirect('/admin/settings.php', $ok ? ['notice' => 'Account updated successfully.', 'type' => 'success'] : ['notice' => 'Account could not be updated. Check for a duplicate email or username.', 'type' => 'error']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     require_permission('settings.update');
 
@@ -22,6 +77,8 @@ $settingMap = [];
 foreach ($settings as $setting) {
     $settingMap[$setting['setting_key']] = $setting;
 }
+
+$myAccount = admin_fetch_one('SELECT name, email, username, phone FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
 
 $actions = '<div class="admin-muted-block">Changes persist in the system_settings table.</div>';
 
@@ -48,6 +105,47 @@ admin_layout_start('Settings', 'Adjust global app configuration and sync behavio
         <div class="admin-stat-value"><?php echo admin_e((string)($settingMap['app_name']['setting_value'] ?? 'App')); ?></div>
         <div class="admin-stat-note">Application name</div>
     </article>
+</section>
+
+<section class="admin-section">
+    <div class="admin-section-head">
+        <div>
+            <h2 class="admin-section-title">My Account</h2>
+            <p class="admin-section-subtitle">Update your own profile and password.</p>
+        </div>
+    </div>
+
+    <form class="admin-form-grid" method="post">
+        <input type="hidden" name="update_account" value="1">
+        <label class="admin-field">
+            <span>Full name</span>
+            <input name="name" required value="<?php echo admin_e($myAccount['name'] ?? ''); ?>">
+        </label>
+        <label class="admin-field">
+            <span>Email</span>
+            <input type="email" name="email" required value="<?php echo admin_e($myAccount['email'] ?? ''); ?>">
+        </label>
+        <label class="admin-field">
+            <span>Username</span>
+            <input name="username" required value="<?php echo admin_e($myAccount['username'] ?? ''); ?>">
+        </label>
+        <label class="admin-field">
+            <span>Phone</span>
+            <input name="phone" value="<?php echo admin_e($myAccount['phone'] ?? ''); ?>" placeholder="0917...">
+        </label>
+        <label class="admin-field">
+            <span>Current Password</span>
+            <input type="password" name="current_password" autocomplete="current-password" placeholder="Only needed if setting a new password below">
+        </label>
+        <label class="admin-field">
+            <span>New Password</span>
+            <input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
+        </label>
+        <div class="admin-field" style="align-content:end;">
+            <span>&nbsp;</span>
+            <button class="admin-btn" type="submit">Save account</button>
+        </div>
+    </form>
 </section>
 
 <section class="admin-section">

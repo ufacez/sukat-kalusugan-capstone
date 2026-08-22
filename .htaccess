@@ -1,0 +1,12 @@
+# This project's real webroot is public_html/ — point your host's document
+# root there. This file only exists as a safety net in case someone points
+# it at the project root by mistake instead.
+Options -Indexes
+
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+RedirectMatch 403 ^/db/
+RedirectMatch 403 ^/docs/
+RedirectMatch 403 ^/logs/

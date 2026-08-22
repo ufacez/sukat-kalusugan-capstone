@@ -27,6 +27,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$phone = trim((string)($_POST['phone'] ?? ''));
 		$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
 		$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
+		$currentPassword = (string)($_POST['current_password'] ?? '');
 		$password = (string)($_POST['password'] ?? '');
 
 		if ($name === '' || $email === '') {
@@ -37,6 +38,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 		if ($current === null) {
 			admin_redirect('/nutritionist/settings.php', ['notice' => 'Profile could not be loaded.', 'type' => 'error']);
+		}
+
+		// Only setting a new password requires proving you know the current one —
+		// editing name/email/phone doesn't. This stops someone with a hijacked or
+		// left-open session from silently locking the real owner out.
+		if ($password !== '') {
+			if ($currentPassword === '' || !password_verify($currentPassword, (string)$current['password_hash'])) {
+				admin_redirect('/nutritionist/settings.php', ['notice' => 'Current password is incorrect.', 'type' => 'error']);
+			}
 		}
 
 		$params = [$name, $email, $phone, $barangayId, (int)$user['id']];
@@ -245,8 +255,12 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 				</select>
 			</label>
 			<label class="admin-field">
+				<span>Current Password</span>
+				<input type="password" name="current_password" autocomplete="current-password" placeholder="Only needed if setting a new password below">
+			</label>
+			<label class="admin-field">
 				<span>New Password</span>
-				<input type="password" name="password" placeholder="Leave blank to keep current password">
+				<input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
 			</label>
 			<div class="admin-field" style="align-content:end;">
 				<span>&nbsp;</span>

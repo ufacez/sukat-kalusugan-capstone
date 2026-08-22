@@ -26,7 +26,7 @@ Repository layout
   - [public_html/includes/](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/) — backend helpers and core logic
     - [includes/config.example.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/config.example.php) — example config (copy to `config.php`)
     - [includes/config.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/config.php) — runtime config (DB / Firebase constants)
-    - [includes/db.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/db.php) — PDO connection helper
+    - [includes/db.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/db.php) — shared mysqli connection helper
     - [includes/auth_middleware.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/auth_middleware.php) — session/permission helpers
     - [includes/who_calculator.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/who_calculator.php) — WHO LMS z-score functions
     - [includes/audit_logger.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/audit_logger.php) — audit logging
@@ -35,7 +35,7 @@ Repository layout
   - [db/schema.sql](C:/xampp/htdocs/sukat-kalusugan-capstone/db/schema.sql) — baseline schema
   - migration and seed files (timestamped) for recent changes
 - [docs/](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/) — developer notes and asset examples
-  - [docs/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firebase_setup.md) — instructions for enabling Firebase Realtime Database mirror
+  - [docs/firmware/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firmware/firebase_setup.md) — instructions for enabling Firebase Realtime Database mirror
   - [docs/firmware/esp32_kios_arduino_code.ino](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firmware/esp32_kios_arduino_code.ino) — example ESP32 firmware sketch
 
 Requirements
@@ -56,13 +56,13 @@ Quick start (development)
 4. Copy the example config and update database / firebase settings:
    - Copy [public_html/includes/config.example.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/config.example.php) to [public_html/includes/config.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/config.php)
    - Edit DB_HOST, DB_NAME, DB_USER, DB_PASS and (optionally) FIREBASE_DATABASE_URL and FIREBASE_AUTH_TOKEN
-5. (Optional) Follow [docs/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firebase_setup.md) to enable Firebase Realtime Database if you want live kiosk results mirrored
+5. (Optional) Follow [docs/firmware/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firmware/firebase_setup.md) to enable Firebase Realtime Database if you want live kiosk results mirrored
 6. Seed any initial data if needed using SQL files in [db/](C:/xampp/htdocs/sukat-kalusugan-capstone/db/)
 
 ESP32 / Kiosk integration
 
 - ESP32 devices post measurements to the PHP backend via endpoints in [public_html/api/esp32/](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/api/esp32/), for example `submit_measurement.php`.
-- After MySQL saves a successful measurement, the server optionally writes the latest result to Firebase under `/latest_measurements/<device_id>.json` (see [includes/firebase_sync.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/firebase_sync.php) and [docs/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firebase_setup.md)).
+- After MySQL saves a successful measurement, the server optionally writes the latest result to Firebase under `/latest_measurements/<device_id>.json` (see [includes/firebase_sync.php](C:/xampp/htdocs/sukat-kalusugan-capstone/public_html/includes/firebase_sync.php) and [docs/firmware/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firmware/firebase_setup.md)).
 - The kiosk UI reads Firebase to display live results on the tablet (`public_html/kiosk/kiosk_index.php`).
 
 Developer notes
@@ -84,6 +84,14 @@ Where to look next
 - UI: `public_html/admin/`, `public_html/nutritionist/`, `public_html/parent/`, `public_html/kiosk/` for interface pages.
 - API: `public_html/api/` organized by resource and role.
 - Database migrations and seeds: `db/` (many timestamped SQL files are included).
-- Firebase setup: [docs/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firebase_setup.md)
+- Firebase setup: [docs/firmware/firebase_setup.md](C:/xampp/htdocs/sukat-kalusugan-capstone/docs/firmware/firebase_setup.md)
+
+Before deploying (manual steps — not automatable from inside the repo)
+
+- Rotate `CHATBOT_API_KEY` — generate a fresh key and put it only in the server's `config.php` (or an env var), never in anything you zip up or share.
+- Set `APP_ENV` to `'production'` in `config.php` on the live server. This now also flips PHP error display off and error logging on (see `includes/bootstrap_errors.php`).
+- Use a dedicated, non-root MySQL user scoped to only the `sukat_kalusugan` database, with a real password, instead of the `root` / empty-password dev defaults.
+- Lock down real Firebase Realtime Database security rules before going live — do not leave the permissive test-mode rules from `docs/firmware/firebase_setup.md` in place, and set a real `FIREBASE_AUTH_TOKEN`.
+- Point your host's document root at `public_html/`, not the project root, so `db/`, `docs/`, and `.git/` are never web-accessible. `.htaccess` files are included as a safety net either way.
 
 If anything in this README is incorrect or missing for your environment, open an issue or submit a PR with the needed corrections.

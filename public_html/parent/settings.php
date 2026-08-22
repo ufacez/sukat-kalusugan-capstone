@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$phone = trim((string)($_POST['phone'] ?? ''));
 	$address = trim((string)($_POST['address'] ?? ''));
 	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
+	$currentPassword = (string)($_POST['current_password'] ?? '');
 	$password = (string)($_POST['password'] ?? '');
 	$allowedTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 
@@ -19,6 +20,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if (!in_array($parentType, $allowedTypes, true)) {
 		$parentType = 'Guardian';
+	}
+
+	// Only setting a new password requires proving you know the current one —
+	// editing name/email/phone doesn't. This stops someone with a hijacked or
+	// left-open session from silently locking the real owner out.
+	if ($password !== '') {
+		$current = admin_fetch_one('SELECT password_hash FROM parents WHERE id = ? LIMIT 1', 'i', [(int)$user['id']]);
+
+		if ($current === null || $currentPassword === '' || !password_verify($currentPassword, (string)$current['password_hash'])) {
+			admin_redirect('/parent/settings.php', ['notice' => 'Current password is incorrect.', 'type' => 'error']);
+		}
 	}
 
 	$sql = 'UPDATE parents SET name = ?, email = ?, phone = ?, address = ?, parent_type = ?';
@@ -125,8 +137,12 @@ parent_layout_start('Settings', 'Update your profile, contact details, and login
 				<input name="address" value="<?php echo parent_e((string)($profile['address'] ?? '')); ?>" placeholder="Household address">
 			</label>
 			<label class="admin-field">
+				<span>Current Password</span>
+				<input type="password" name="current_password" autocomplete="current-password" placeholder="Only needed if setting a new password below">
+			</label>
+			<label class="admin-field">
 				<span>New Password</span>
-				<input type="password" name="password" placeholder="Leave blank to keep current password">
+				<input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
 			</label>
 			<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
 				<span>&nbsp;</span>

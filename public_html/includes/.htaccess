@@ -1,0 +1,5 @@
+# Nothing in here should ever be requested directly by a browser — these
+# are require_once'd by pages/APIs, not endpoints themselves. This blocks
+# direct requests even if a host is misconfigured to serve the project
+# root instead of public_html/.
+Require all denied
