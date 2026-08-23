@@ -151,9 +151,9 @@ $appData = [
             <section class="kiosk-page-panel" data-kiosk-screen="welcome">
                 <div class="kiosk-hero-layout">
                     <div class="kiosk-hero-copy">
-                        <p class="kiosk-eyebrow">Child Nutrition Assessment</p>
-                        <h1>Healthy growth starts here.</h1>
-                        <p class="kiosk-hero-subcopy">A simple guided measurement flow for each child in the community.</p>
+                        <p class="kiosk-eyebrow">Welcome to</p>
+                        <h1>Sukat Kalusugan Kiosk</h1>
+                        <p class="kiosk-hero-subcopy">Fast, guided height and weight check-ups for every child in the community.</p>
                         <p class="kiosk-hero-note">Select a child, then start the automated measurement.</p>
                         <div class="kiosk-hero-status-row">
                             <span><strong>1</strong> Select Child</span>
@@ -173,16 +173,16 @@ $appData = [
                         <div class="kiosk-hero-date" data-kiosk-live-date>--</div>
                         <div class="kiosk-status-grid">
                             <div class="kiosk-status-item">
-                                <span>Device</span>
-                                <strong>ESP32-KIOSK-01</strong>
+                                <span>Kiosk</span>
+                                <strong><?php echo kiosk_e($deviceCode); ?></strong>
                             </div>
                             <div class="kiosk-status-item">
                                 <span>Children</span>
                                 <strong><?php echo count($childrenPayload); ?> profiles</strong>
                             </div>
                             <div class="kiosk-status-item">
-                                <span>Sync</span>
-                                <strong>Firebase Live</strong>
+                                <span>Status</span>
+                                <strong>Connected</strong>
                             </div>
                         </div>
                     </div>
@@ -316,7 +316,7 @@ $appData = [
                     </div>
                     <div class="kiosk-live-footer">
                         <div class="kiosk-live-indicator">
-                            <span class="kiosk-status-dot"></span><strong>LIVE</strong><span>ESP32 → Firebase</span>
+                            <span class="kiosk-status-dot"></span><strong>LIVE</strong><span>Streaming live readings</span>
                         </div>
                         <button
                             class="kiosk-button is-primary"
@@ -337,7 +337,7 @@ $appData = [
                             <span data-kiosk-processing-error-message>—</span>
                         </div>
                         <button class="kiosk-button is-secondary" type="button" data-kiosk-action="reset">
-                            Try Again
+                            Okay, Go Back
                         </button>
                     </div>
                     <div class="kiosk-processing-ring">
@@ -350,14 +350,7 @@ $appData = [
                             <span data-kiosk-process-stage>Processing measurement...</span>
                         </div>
                     </div>
-                    <ul class="kiosk-stage-list">
-                        <li>Weight captured</li>
-                        <li>Height captured</li>
-                        <li>Calculating growth indicators</li>
-                        <li>Classifying nutritional status</li>
-                        <li>Saving measurement to SQL</li>
-                        <li>Complete</li>
-                    </ul>
+                    <p class="kiosk-processing-note">Please wait, this only takes a few seconds.</p>
                 </article>
 
                 <article class="kiosk-panel" data-kiosk-screen="results" hidden>
@@ -378,19 +371,19 @@ $appData = [
                         </div>
                         <div class="kiosk-status-pill" data-kiosk-result-status>Pending</div>
                     </div>
-                    <div class="kiosk-result-grid kiosk-result-grid-wireframe">
-                        <div class="kiosk-result-card">
+                    <div class="kiosk-result-primary">
+                        <div class="kiosk-result-card is-primary">
                             <span>Height</span><strong data-kiosk-result-height>--.- cm</strong>
                         </div>
-                        <div class="kiosk-result-card">
+                        <div class="kiosk-result-card is-primary">
                             <span>Weight</span><strong data-kiosk-result-weight>--.-- kg</strong>
                         </div>
-                        <div class="kiosk-result-card"><span>WAZ</span><strong data-kiosk-result-waz>--</strong></div>
-                        <div class="kiosk-result-card"><span>HAZ</span><strong data-kiosk-result-haz>--</strong></div>
-                        <div class="kiosk-result-card"><span>WHZ</span><strong data-kiosk-result-whz>--</strong></div>
-                        <div class="kiosk-result-card is-wide">
-                            <span>Source</span><strong data-kiosk-result-source>ESP32 → Firebase → SQL</strong>
-                        </div>
+                    </div>
+                    <p class="kiosk-section-kicker kiosk-indicators-kicker">Growth Indicators</p>
+                    <div class="kiosk-result-grid">
+                        <div class="kiosk-result-card"><span>Weight-for-Age</span><strong data-kiosk-result-waz>--</strong></div>
+                        <div class="kiosk-result-card"><span>Height-for-Age</span><strong data-kiosk-result-haz>--</strong></div>
+                        <div class="kiosk-result-card"><span>Weight-for-Height</span><strong data-kiosk-result-whz>--</strong></div>
                     </div>
                     <div class="kiosk-panel-actions kiosk-panel-actions-bottom">
                         <button class="kiosk-button is-primary" type="button" data-kiosk-action="reset">

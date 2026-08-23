@@ -2808,7 +2808,7 @@
       {
         progress: 94,
         message:
-          "Saving measurement to SQL..."
+          "Saving measurement..."
       }
     ];
 
