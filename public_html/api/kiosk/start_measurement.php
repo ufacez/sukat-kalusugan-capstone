@@ -311,7 +311,6 @@ try {
         $conn,
         'UPDATE devices
          SET
-            status = \'MEASURING\',
             last_seen_at = NOW(),
             updated_at = NOW()
          WHERE id = ?'
