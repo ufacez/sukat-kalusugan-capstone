@@ -4,6 +4,7 @@
 #include <HX711_ADC.h>
 #include <math.h>
 #include <WiFiManager.h>
+#include <Preferences.h>
 
 // =====================================================
 // WIFI
@@ -27,14 +28,44 @@
 const char* SETUP_AP_NAME = "SukatKalusugan-Setup";
 const char* SETUP_AP_PASSWORD = "sukat2026"; // must be 8+ characters
 
+// Hold this pin LOW (BOOT button on most ESP32 dev boards, GPIO0) for
+// 3 seconds right after power-on to force the setup portal open even
+// though WiFi is already saved and working. This is what you use when
+// you're NOT changing venues -- just flipping the kiosk between the
+// live server and localhost, or between two WiFi networks you've
+// already used before. Power the board, hold BOOT, wait for the
+// "opening setup portal" message on Serial, then connect to
+// SukatKalusugan-Setup from your phone like a normal first-time setup.
+#define WIFI_RESET_BUTTON_PIN 0
+const unsigned long WIFI_RESET_HOLD_MS = 3000;
+
 WiFiManager wifiManager;
+WiFiManagerParameter* customServerUrlParam = nullptr;
+Preferences preferences;
 
 // =====================================================
 // SERVER
 // =====================================================
+//
+// SERVER_IP used to be a hardcoded const -- switching between the live
+// Azure server and a local/LAN test server meant editing this file and
+// reflashing every time. It's now a mutable value (serverBaseUrl)
+// loaded from flash (Preferences) at boot. DEFAULT_SERVER_URL below is
+// only the fallback used the very first time the kiosk ever runs, or
+// if nothing has been saved yet.
+//
+// To change it afterwards: open the same setup portal used for WiFi
+// (SETUP_AP_NAME above) -- it now shows a "Server Base URL" field next
+// to the WiFi form. Type in one of, then tap Save:
+//   http://192.168.100.164/sukat-kalusugan-capstone/   (localhost/LAN)
+//   https://<your-azure-domain-or-ip>/sukat-kalusugan-capstone/  (live)
+// No laptop, no re-flash. See WIFI_RESET_BUTTON_PIN above for how to
+// open this portal on demand, not just when WiFi is broken.
 
-const String SERVER_IP =
-  "http://192.168.100.164/sukat-kalusugan-capstone/";
+const String DEFAULT_SERVER_URL =
+  "http://192.168.100.164/sukat-kalusugan-capstone/public_html/";
+
+String serverBaseUrl = DEFAULT_SERVER_URL;
 
 const String DEVICE_ID =
   "ESP32-KIOSK-01";
@@ -159,23 +190,52 @@ unsigned long measurementSequence = 0;
 // setConfigPortalTimeout() means a failed/skipped setup doesn't hang the
 // kiosk forever -- after 3 minutes it gives up and setup() continues
 // without WiFi, same as the old "WiFi connection FAILED" fallback did.
-void connectWiFiAtBoot() {
+void connectWiFiAtBoot(bool forcePortal) {
 
-  if (WiFi.status() == WL_CONNECTED) {
-    return;
-  }
-
-  Serial.println();
-  Serial.println("================================");
-  Serial.println("CONNECTING TO WIFI (WiFiManager)");
-  Serial.println("================================");
+  // custom_server_url is added to the SAME portal WiFiManager already
+  // shows for WiFi credentials, so one screen covers "moved to a new
+  // venue" (new WiFi) and "flip live/localhost" (new server URL) at
+  // once. Its starting value is whatever is currently saved, so if the
+  // portal isn't shown this boot (WiFi just reconnects normally), the
+  // saved server URL is left untouched below.
+  wifiManager.addParameter(customServerUrlParam);
 
   wifiManager.setConfigPortalTimeout(180);
 
-  bool connected = wifiManager.autoConnect(
-    SETUP_AP_NAME,
-    SETUP_AP_PASSWORD
-  );
+  bool connected;
+
+  if (forcePortal) {
+
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("BOOT BUTTON HELD - OPENING SETUP PORTAL");
+    Serial.println("(WiFi + Server URL, on demand)");
+    Serial.println("================================");
+
+    // startConfigPortal (unlike autoConnect) opens the setup AP even
+    // though WiFi is already saved/working. Existing WiFi credentials
+    // are kept as-is unless you overwrite them on the page.
+    connected = wifiManager.startConfigPortal(
+      SETUP_AP_NAME,
+      SETUP_AP_PASSWORD
+    );
+
+  } else {
+
+    if (WiFi.status() == WL_CONNECTED) {
+      return;
+    }
+
+    Serial.println();
+    Serial.println("================================");
+    Serial.println("CONNECTING TO WIFI (WiFiManager)");
+    Serial.println("================================");
+
+    connected = wifiManager.autoConnect(
+      SETUP_AP_NAME,
+      SETUP_AP_PASSWORD
+    );
+  }
 
   if (connected) {
 
@@ -187,6 +247,28 @@ void connectWiFiAtBoot() {
   } else {
 
     Serial.println("WiFi connection FAILED (setup portal timed out or was skipped)");
+  }
+
+  // ===================================================
+  // SERVER URL - persist if it was changed on the portal
+  // ===================================================
+
+  String submittedServerUrl =
+    String(customServerUrlParam->getValue());
+
+  submittedServerUrl.trim();
+
+  if (
+    submittedServerUrl.length() > 0 &&
+    submittedServerUrl != serverBaseUrl
+  ) {
+
+    serverBaseUrl = submittedServerUrl;
+
+    preferences.putString("server_url", serverBaseUrl);
+
+    Serial.print("Server URL saved: ");
+    Serial.println(serverBaseUrl);
   }
 }
 
@@ -549,7 +631,7 @@ bool getMeasurementCommand(
 ) {
 
   String url =
-    SERVER_IP +
+    serverBaseUrl +
     GET_COMMAND_PATH +
     "?device_id=" +
     DEVICE_ID;
@@ -954,7 +1036,7 @@ bool submitFinalMeasurement(
 ) {
 
   String url =
-    SERVER_IP +
+    serverBaseUrl +
     SUBMIT_MEASUREMENT_PATH;
 
   String payload =
@@ -1809,6 +1891,56 @@ void setup() {
   );
 
   // ===================================================
+  // SAVED SETTINGS (WiFi is handled by WiFiManager itself;
+  // this loads the server URL we saved ourselves)
+  // ===================================================
+
+  preferences.begin("sukat", false);
+
+  serverBaseUrl =
+    preferences.getString("server_url", DEFAULT_SERVER_URL);
+
+  Serial.print("Server URL: ");
+  Serial.println(serverBaseUrl);
+
+  customServerUrlParam = new WiFiManagerParameter(
+    "server_url",
+    "Server Base URL (e.g. http://192.168.1.50/sukat-kalusugan-capstone/)",
+    serverBaseUrl.c_str(),
+    150
+  );
+
+  // ===================================================
+  // BOOT BUTTON - hold to force the setup portal open
+  // ===================================================
+  //
+  // Lets you change WiFi and/or the server URL any time WiFi is
+  // already working (e.g. just switching live <-> localhost, no venue
+  // change). Without this, the portal only appears when WiFi fails.
+
+  pinMode(WIFI_RESET_BUTTON_PIN, INPUT_PULLUP);
+
+  bool forcePortal = false;
+
+  if (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
+
+    Serial.println();
+    Serial.println("BOOT button held - keep holding to open setup portal...");
+
+    unsigned long pressStart = millis();
+
+    while (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
+
+      if (millis() - pressStart > WIFI_RESET_HOLD_MS) {
+        forcePortal = true;
+        break;
+      }
+
+      delay(50);
+    }
+  }
+
+  // ===================================================
   // WIFI
   // ===================================================
   //
@@ -1819,10 +1951,11 @@ void setup() {
   // defaults above are used and the device works exactly as before.
   //
   // This is the boot-time connect: tries the saved network, opens the
-  // SukatKalusugan-Setup portal if that fails (see connectWiFiAtBoot()
+  // SukatKalusugan-Setup portal if that fails, or if forcePortal is
+  // true because the BOOT button was held (see connectWiFiAtBoot()
   // above). loop() below uses the plain connectWiFi() reconnect instead.
 
-  connectWiFiAtBoot();
+  connectWiFiAtBoot(forcePortal);
 
   if (WiFi.status() == WL_CONNECTED) {
 
