@@ -31,6 +31,8 @@ function measurement_session_row_to_payload(array $row): array
             'haz' => isset($row['measurement_haz']) ? (float)$row['measurement_haz'] : null,
             'whz' => isset($row['measurement_whz']) ? (float)$row['measurement_whz'] : null,
             'nutritional_status' => (string)($row['measurement_status_text'] ?? ''),
+            'is_flagged' => !empty($row['measurement_is_flagged']),
+            'flag_reason' => isset($row['measurement_flag_reason']) ? (string)$row['measurement_flag_reason'] : null,
             'source_type' => (string)($row['measurement_source_type'] ?? 'kiosk'),
             'created_at' => (string)($row['measurement_created_at'] ?? ''),
         ];
@@ -88,6 +90,8 @@ function measurement_session_fetch_latest_for_device(mysqli $conn, string $devic
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,
             m.nutritional_status AS measurement_status_text,
+            m.is_flagged AS measurement_is_flagged,
+            m.flag_reason AS measurement_flag_reason,
             m.source_type AS measurement_source_type,
             m.created_at AS measurement_created_at
          FROM measurement_sessions s
@@ -142,6 +146,8 @@ function measurement_session_fetch_active_for_device(mysqli $conn, string $devic
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,
             m.nutritional_status AS measurement_status_text,
+            m.is_flagged AS measurement_is_flagged,
+            m.flag_reason AS measurement_flag_reason,
             m.source_type AS measurement_source_type,
             m.created_at AS measurement_created_at
          FROM measurement_sessions s
@@ -200,6 +206,8 @@ function measurement_session_fetch_by_id_for_device(
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,
             m.nutritional_status AS measurement_status_text,
+            m.is_flagged AS measurement_is_flagged,
+            m.flag_reason AS measurement_flag_reason,
             m.source_type AS measurement_source_type,
             m.created_at AS measurement_created_at
          FROM measurement_sessions s

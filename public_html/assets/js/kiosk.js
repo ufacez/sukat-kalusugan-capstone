@@ -230,6 +230,16 @@
         "[data-kiosk-result-status]"
       ),
 
+    resultFlag:
+      document.querySelector(
+        "[data-kiosk-result-flag]"
+      ),
+
+    resultFlagReason:
+      document.querySelector(
+        "[data-kiosk-result-flag-reason]"
+      ),
+
     resultHeight:
       document.querySelector(
         "[data-kiosk-result-height]"
@@ -3034,6 +3044,91 @@
   // RESULTS
   // ============================================================
 
+  /*
+   * Maps the ENUM values in measurements.nutritional_status (see
+   * who_calculator.php::classify_nutritional_status) to a status-pill
+   * color so the results screen reads at a glance instead of everyone
+   * getting the same green pill regardless of severity.
+   */
+  const STATUS_PILL_CLASSES = [
+    "is-normal",
+    "is-caution",
+    "is-danger"
+  ];
+
+  function nutritionalStatusPillClass(status) {
+    const normalized = String(
+      status || ""
+    ).trim().toLowerCase();
+
+    if (normalized === "normal") {
+      return "is-normal";
+    }
+
+    if (
+      normalized === "underweight" ||
+      normalized === "stunted" ||
+      normalized === "wasted" ||
+      normalized === "overweight"
+    ) {
+      return "is-caution";
+    }
+
+    if (
+      normalized === "severely underweight"
+    ) {
+      return "is-danger";
+    }
+
+    return "";
+  }
+
+  function applyStatusPillClass(status) {
+    if (!refs.resultStatus) {
+      return;
+    }
+
+    STATUS_PILL_CLASSES.forEach(
+      className => {
+        refs.resultStatus.classList.remove(
+          className
+        );
+      }
+    );
+
+    const pillClass =
+      nutritionalStatusPillClass(
+        status
+      );
+
+    if (pillClass) {
+      refs.resultStatus.classList.add(
+        pillClass
+      );
+    }
+  }
+
+  function applyResultFlag(
+    isFlagged,
+    reason
+  ) {
+    if (!refs.resultFlag) {
+      return;
+    }
+
+    refs.resultFlag.hidden =
+      !isFlagged;
+
+    if (
+      isFlagged &&
+      refs.resultFlagReason
+    ) {
+      refs.resultFlagReason.textContent =
+        reason ||
+        "One or more readings look unusual for this child. Please double-check height and weight.";
+    }
+  }
+
 function finishResults(
   payload,
   weight,
@@ -3133,6 +3228,30 @@ function finishResults(
     refs.resultStatus.textContent =
       nutritionalStatus;
   }
+
+  applyStatusPillClass(
+    nutritionalStatus
+  );
+
+  // ==========================================================
+  // FLAG / NEEDS REVIEW
+  // ==========================================================
+
+  const isFlagged = Boolean(
+    measurement.is_flagged ??
+    payload?.is_flagged ??
+    false
+  );
+
+  const flagReason =
+    measurement.flag_reason ??
+    payload?.flag_reason ??
+    null;
+
+  applyResultFlag(
+    isFlagged,
+    flagReason
+  );
 
   // ==========================================================
   // WAZ — WEIGHT FOR AGE
@@ -3731,6 +3850,9 @@ function finishResults(
       refs.resultStatus.textContent =
         "Pending";
     }
+
+    applyStatusPillClass("");
+    applyResultFlag(false, null);
 
     if (refs.resultSource) {
       refs.resultSource.textContent =

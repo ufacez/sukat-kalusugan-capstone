@@ -371,6 +371,13 @@ $appData = [
                         </div>
                         <div class="kiosk-status-pill" data-kiosk-result-status>Pending</div>
                     </div>
+                    <div class="kiosk-flag-banner" data-kiosk-result-flag hidden>
+                        <span class="kiosk-flag-icon">⚠</span>
+                        <div>
+                            <strong>Needs review</strong>
+                            <span data-kiosk-result-flag-reason>One or more readings look unusual for this child.</span>
+                        </div>
+                    </div>
                     <div class="kiosk-result-primary">
                         <div class="kiosk-result-card is-primary">
                             <span>Height</span><strong data-kiosk-result-height>--.- cm</strong>
