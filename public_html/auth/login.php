@@ -34,22 +34,43 @@ $notice = trim((string)($_GET['notice'] ?? ''));
 <body class="auth-page">
     <main class="auth-shell">
         <section class="auth-hero" aria-hidden="true">
-            <div class="auth-brand">
-                <div class="auth-mark">SK</div>
-                <div>
-                    <p class="auth-kicker">Sukat Kalusugan</p>
-                    <h1>Monitor growth with a cleaner clinical workflow.</h1>
+            <svg class="hero-pattern" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0,320 C80,300 120,340 200,260 C260,200 300,220 400,140" />
+                <path d="M0,360 C90,330 140,370 220,300 C280,250 330,270 400,190" />
+                <path d="M0,280 C70,260 110,300 190,220 C250,160 290,180 400,100" />
+            </svg>
+
+            <div class="mark-standalone" aria-hidden="true">
+                <svg viewBox="0 0 48 48" width="58" height="58" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path d="M6 30 L16 34 L24 18 L32 24 L42 10" stroke="var(--primary-strong)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <circle cx="6" cy="30" r="2.6" fill="var(--primary-strong)" />
+                    <circle cx="16" cy="34" r="2.6" fill="var(--primary-strong)" />
+                    <circle cx="24" cy="18" r="2.6" fill="var(--primary-strong)" />
+                    <circle cx="32" cy="24" r="2.6" fill="var(--primary-strong)" />
+                    <circle cx="42" cy="10" r="2.6" fill="var(--primary-strong)" />
+                </svg>
+                <p class="collage-kicker">Sukat<br>Kalusugan</p>
+            </div>
+
+            <h1>Sukat Kalusugan</h1>
+
+            <p class="auth-tagline">
+               Tamang <span class="hl">Sukat</span>, Eksaktong<span class="hl"> Kalidad</span>.
+            </p>
+
+            <div class="auth-footer-row">
+                <div class="auth-partner-badge">
+                    <span class="badge-dot" aria-hidden="true"></span>
+                    In partnership with the City Health Office, San Fernando, Pampanga
+                </div>
+
+                <div class="partner-logos">
+                    <!-- Drop the real logo files in here once you have permission to
+                         use them -- these are empty, aligned slots until then. -->
+                    <div class="logo-slot" title="City Government of San Fernando seal"></div>
+                    <div class="logo-slot" title="City Health Office logo"></div>
                 </div>
             </div>
-            <p class="auth-copy">
-                Access the child nutrition monitoring system for staff and parents.
-                Manage appointments, measurements, and reports from one secure portal.
-            </p>
-            <ul class="auth-highlights">
-                <li>Role-aware redirect for admin, nutritionist, and parent accounts</li>
-                <li>Secure PHP session handling with reusable API endpoints</li>
-                <li>Designed to fit the existing wireframe direction</li>
-            </ul>
         </section>
 
         <section class="auth-card" aria-labelledby="sign-in-title">
@@ -70,7 +91,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             <form class="auth-form" id="loginForm" action="../api/auth/login.php" method="post" novalidate>
                 <label class="field" for="identifier">
                     <span>Email or username</span>
-                    <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="admin@sukat.ph or johndoe12" required>
+                    <input id="identifier" name="identifier" type="text" autocomplete="username" placeholder="Enter your email or username" required>
                 </label>
 
                 <label class="field" for="password">
