@@ -59,11 +59,6 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </p>
 
             <div class="auth-footer-row">
-                <div class="auth-partner-badge">
-                    <span class="badge-dot" aria-hidden="true"></span>
-                    In partnership with the City Health Office, San Fernando, Pampanga
-                </div>
-
                 <div class="partner-logos">
                     <!-- Drop the real logo files in here once you have permission to
                          use them -- these are empty, aligned slots until then. -->
