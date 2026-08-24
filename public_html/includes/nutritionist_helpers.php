@@ -94,9 +94,10 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<a class="admin-logout" href="' . nutritionist_e($logoutUrl) . '">Sign out</a>';
     echo '</div>';
     echo '</aside>';
+    echo '<div class="admin-sidebar-overlay" data-admin-sidebar-overlay></div>';
     echo '<div class="admin-main">';
     echo '<header class="admin-topbar">';
-    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation">☰</button>';
+    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">☰</button>';
     echo '<div class="admin-pagehead">';
     echo '<p class="admin-kicker">Nutritionist Panel</p>';
     echo '<h1>' . nutritionist_e($title) . '</h1>';

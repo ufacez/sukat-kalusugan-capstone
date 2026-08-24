@@ -95,9 +95,10 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<a class="admin-logout" href="' . parent_e($logoutUrl) . '">Sign out</a>';
     echo '</div>';
     echo '</aside>';
+    echo '<div class="admin-sidebar-overlay" data-admin-sidebar-overlay></div>';
     echo '<div class="admin-main">';
     echo '<header class="admin-topbar">';
-    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation">☰</button>';
+    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">☰</button>';
     echo '<div class="admin-pagehead">';
     echo '<p class="admin-kicker">Parent Portal</p>';
     echo '<h1>' . parent_e($title) . '</h1>';
