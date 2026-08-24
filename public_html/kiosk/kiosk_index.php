@@ -2,6 +2,33 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 require_once __DIR__ . '/../includes/kiosk_helpers.php';
+require_once __DIR__ . '/../includes/auth_middleware.php';
+
+/*
+|--------------------------------------------------------------------------
+| STAFF-ONLY ACCESS
+|--------------------------------------------------------------------------
+|
+| This page previously had no authentication at all -- fine when the
+| server only lived on a local network, not fine now that it's public.
+| It shows real children's names, ages, barangay, and nutritional status
+| (sensitive personal information about minors), so it needs to require
+| a real login, same as every other staff-facing page.
+|
+| Not gated behind a specific require_permission() code on purpose: no
+| "kiosk.view" permission exists in role_permissions yet, and gating on
+| an unseeded code would silently lock out the nutritionist role (only
+| admin bypasses permission checks). This mirrors what
+| require_permission() itself does to block parent accounts, without
+| depending on a permission row that may not exist for every staff role.
+*/
+start_secure_session();
+
+$currentUser = current_user();
+
+if ($currentUser === null || ($currentUser['type'] ?? null) === 'parent') {
+    deny_access('Please sign in to continue.', 401);
+}
 
 // Same convention the ESP32 endpoints use (device_ping.php, get_command.php,
 // etc.): the physical unit / kiosk browser identifies itself with a
@@ -9,6 +36,7 @@ require_once __DIR__ . '/../includes/kiosk_helpers.php';
 // deployments that never pass one keep working unchanged.
 $deviceCode = trim((string)($_GET['device'] ?? 'ESP32-KIOSK-01'));
 $kioskBarangay = kiosk_resolve_device_barangay($deviceCode);
+
 
 $childrenScopeSql = '';
 $childrenScopeParams = [];

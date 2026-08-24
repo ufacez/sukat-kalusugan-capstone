@@ -60,9 +60,20 @@ function start_secure_session(): void
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
 
+    // A kiosk session needs to survive a full clinic day of intermittent
+    // use, not just whatever the server's default session.gc_maxlifetime
+    // happens to be (often ~24 minutes of inactivity on a stock PHP
+    // install). Setting this explicitly means staff never get silently
+    // logged out mid-shift because of a server default nobody set on
+    // purpose. 12 hours comfortably covers one operating day; the browser
+    // still forgets the cookie on its own if the device is ever restarted.
+    $sessionLifetimeSeconds = 12 * 60 * 60;
+
+    ini_set('session.gc_maxlifetime', (string)$sessionLifetimeSeconds);
+
     session_name('sukat_kalusugan_session');
     session_set_cookie_params([
-        'lifetime' => 0,
+        'lifetime' => $sessionLifetimeSeconds,
         'path' => '/',
         'secure' => $isHttps,
         'httponly' => true,
