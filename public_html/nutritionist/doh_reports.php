@@ -169,7 +169,14 @@ foreach ($summaryRows as $row) {
 	}
 }
 
-$actions = '<button type="button" class="admin-btn" onclick="window.print()">Print / Save as PDF</button>';
+$exportUrl = app_url('/nutritionist/doh_reports_export.php') . '?' . http_build_query([
+	'report' => $reportType,
+	'age_band' => $ageBand,
+	'barangay_id' => $barangayFilter,
+]);
+
+$actions = '<a class="admin-btn" href="' . nutritionist_e($exportUrl) . '">Export to Excel</a>'
+	. '<button type="button" class="admin-btn-secondary" onclick="window.print()">Print / Save as PDF</button>';
 
 nutritionist_layout_start('DOH Reports', 'Category rosters and barangay summary matching the eOPT Plus community-level tool.', 'doh_reports', $actions);
 ?>
