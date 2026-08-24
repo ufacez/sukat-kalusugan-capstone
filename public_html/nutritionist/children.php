@@ -40,6 +40,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	}
 
 	$firstName = trim((string)($_POST['first_name'] ?? ''));
+	$middleName = trim((string)($_POST['middle_name'] ?? ''));
 	$lastName = trim((string)($_POST['last_name'] ?? ''));
 	$birthdate = trim((string)($_POST['birthdate'] ?? ''));
 	$sex = trim((string)($_POST['sex'] ?? 'Male'));
@@ -51,7 +52,13 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	$hasDisability = isset($_POST['has_disability']) ? 1 : 0;
 	$parentId = (int)($_POST['parent_id'] ?? 0);
 
-	if ($firstName === '' || $lastName === '' || $birthdate === '' || $parentId <= 0) {
+	if (
+		!admin_is_valid_name_part($firstName, true)
+		|| !admin_is_valid_name_part($middleName, false)
+		|| !admin_is_valid_name_part($lastName, true)
+		|| $birthdate === ''
+		|| $parentId <= 0
+	) {
 		admin_redirect('/nutritionist/children.php', ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
 	}
 
@@ -76,10 +83,10 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 
 		$ok = admin_execute(
 			'UPDATE children
-			 SET child_code = ?, first_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, address = ?, purok = ?, is_ip = ?, has_disability = ?, parent_id = ?
+			 SET child_code = ?, first_name = ?, middle_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, address = ?, purok = ?, is_ip = ?, has_disability = ?, parent_id = ?
 			 WHERE id = ?',
-			'sssssissiiii',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId, $childId]
+			'ssssssissiiii',
+			[$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId, $childId]
 		);
 
 		admin_redirect(
@@ -94,10 +101,10 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 		$childCode = nutritionist_next_child_code();
 
 		$ok = admin_execute(
-			'INSERT INTO children (child_code, first_name, last_name, birthdate, sex, barangay_id, address, purok, is_ip, has_disability, parent_id)
-			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssissiii',
-			[$childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId]
+			'INSERT INTO children (child_code, first_name, middle_name, last_name, birthdate, sex, barangay_id, address, purok, is_ip, has_disability, parent_id)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			'ssssssissiiii',
+			[$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $address, $purok, $isIp, $hasDisability, $parentId]
 		);
 
 		admin_redirect(
@@ -127,6 +134,7 @@ $children = admin_fetch_all(
 		c.id,
 		c.child_code,
 		c.first_name,
+		c.middle_name,
 		c.last_name,
 		c.birthdate,
 		c.sex,
@@ -187,6 +195,18 @@ $parents = admin_fetch_all(
 	[]
 );
 $barangays = admin_barangay_options();
+$childBarangayMap = [];
+foreach ($barangays as $barangay) {
+	$childBarangayMap[(string)$barangay['name']] = (int)$barangay['id'];
+}
+$selectedChildBarangayId = $editChild['barangay_id'] ?? ($user['barangay_id'] ?? null);
+$selectedChildBarangayName = '';
+foreach ($barangays as $barangay) {
+	if ((int)$barangay['id'] === (int)$selectedChildBarangayId) {
+		$selectedChildBarangayName = (string)$barangay['name'];
+		break;
+	}
+}
 
 $statuses = ['All', 'Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Wasted', 'Overweight'];
 $filteredChildren = array_values(array_filter(
@@ -257,13 +277,13 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 					$status = (string)($child['nutritional_status'] ?? 'Pending');
 					$pillClass = nutritionist_child_status_class($status);
 					?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . $child['parent_name'] . ' ' . $status)); ?>">
+					<tr data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . $child['parent_name'] . ' ' . $status)); ?>">
 						<td style="font-family:monospace;color:var(--admin-muted);"><?php echo nutritionist_e($child['child_code']); ?></td>
 						<td>
 							<div style="display:flex;align-items:center;gap:8px;">
 								<div class="admin-pill <?php echo $pillClass; ?>" style="min-width:30px;justify-content:center;border-radius:50%;padding:0.35rem 0.5rem;"><?php echo nutritionist_e(substr($child['first_name'], 0, 1) . substr($child['last_name'], 0, 1)); ?></div>
 								<div>
-									<div style="font-size:13px;font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
+									<div style="font-size:13px;font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
 									<div style="font-size:10px;color:var(--admin-muted);margin-top:1px;"><?php echo nutritionist_e((string)$child['birthdate']); ?></div>
 								</div>
 							</div>
@@ -277,7 +297,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 							<div class="admin-actions">
 								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>">View</a>
 								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?edit=' . (int)$child['id']) . '#child-form'); ?>">Edit</a>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?>?');">
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?>?');">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
 									<button class="admin-btn-danger" type="submit">Delete</button>
@@ -300,7 +320,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 						<?php echo nutritionist_e(substr((string)$selectedChild['first_name'], 0, 1) . substr((string)$selectedChild['last_name'], 0, 1)); ?>
 					</div>
 				</div>
-				<h2 style="margin:0;font-size:16px;font-weight:700;color:var(--admin-text);"><?php echo nutritionist_e($selectedChild['first_name'] . ' ' . $selectedChild['last_name']); ?></h2>
+				<h2 style="margin:0;font-size:16px;font-weight:700;color:var(--admin-text);"><?php echo nutritionist_e(trim($selectedChild['first_name'] . ' ' . ($selectedChild['middle_name'] ?? '') . ' ' . $selectedChild['last_name'])); ?></h2>
 				<div style="color:var(--admin-muted);font-size:12px;margin:4px 0 10px;"><?php echo nutritionist_e((string)$selectedChild['child_code']); ?></div>
 				<span class="admin-pill <?php echo nutritionist_child_status_class((string)($selectedChild['nutritional_status'] ?? 'Pending')); ?>"><?php echo nutritionist_e((string)($selectedChild['nutritional_status'] ?? 'Pending')); ?></span>
 			</div>
@@ -406,18 +426,25 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 		</div>
 	</div>
 
-	<form method="post" class="nutritionist-form-grid">
+	<form method="post" class="nutritionist-form-grid" data-validate-form>
 		<input type="hidden" name="action" value="<?php echo $editChild !== null ? 'update' : 'create'; ?>">
 		<?php if ($editChild !== null): ?>
 			<input type="hidden" name="id" value="<?php echo (int)$editChild['id']; ?>">
 		<?php endif; ?>
 		<label class="admin-field">
-			<span>First Name</span>
-			<input name="first_name" required value="<?php echo nutritionist_e($editChild['first_name'] ?? ''); ?>" placeholder="Juan">
+			<span>First name<span class="admin-required">*</span></span>
+			<input name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo nutritionist_e($editChild['first_name'] ?? ''); ?>" placeholder="Juan">
+			<span class="admin-field-message"></span>
 		</label>
 		<label class="admin-field">
-			<span>Last Name</span>
-			<input name="last_name" required value="<?php echo nutritionist_e($editChild['last_name'] ?? ''); ?>" placeholder="Dela Cruz">
+			<span>Middle name</span>
+			<input name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo nutritionist_e($editChild['middle_name'] ?? ''); ?>" placeholder="Santos">
+			<span class="admin-field-message"></span>
+		</label>
+		<label class="admin-field">
+			<span>Surname<span class="admin-required">*</span></span>
+			<input name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo nutritionist_e($editChild['last_name'] ?? ''); ?>" placeholder="Dela Cruz">
+			<span class="admin-field-message"></span>
 		</label>
 		<label class="admin-field">
 			<span>Birthdate</span>
@@ -430,18 +457,23 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 				<option value="Female" <?php echo (($editChild['sex'] ?? '') === 'Female') ? 'selected' : ''; ?>>Female</option>
 			</select>
 		</label>
-		<label class="admin-field">
-			<span>Barangay</span>
-			<select name="barangay_id">
-				<option value="">-- Select barangay --</option>
-				<?php
-				$selectedBarangayId = $editChild['barangay_id'] ?? ($user['barangay_id'] ?? null);
-				foreach ($barangays as $barangay):
-				?>
-					<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)$selectedBarangayId === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
+		<div class="admin-field-wide">
+			<div class="admin-csfp-picker" data-csfp-child-picker data-csfp-selected="<?php echo nutritionist_e($selectedChildBarangayName); ?>" data-csfp-map="<?php echo nutritionist_e(json_encode($childBarangayMap)); ?>">
+				<label class="admin-field">
+					<span>Province<span class="admin-required">*</span></span>
+					<select disabled><option>Province of Pampanga</option></select>
+				</label>
+				<label class="admin-field">
+					<span>City / Municipality<span class="admin-required">*</span></span>
+					<select disabled><option>City of San Fernando</option></select>
+				</label>
+				<label class="admin-field">
+					<span>Barangay<span class="admin-required">*</span></span>
+					<select data-csfp="barangay" name="barangay_id" <?php echo $editChild ? '' : 'required'; ?> disabled><option value="">Loading barangays...</option></select>
+				</label>
+			</div>
+			<div class="admin-address-status" data-csfp-status></div>
+		</div>
 		<label class="admin-field">
 			<span>Parent/Guardian</span>
 			<select name="parent_id" required>
@@ -453,7 +485,7 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 		</label>
 		<label class="admin-field" style="grid-column:1 / -1;">
 			<span>Address</span>
-			<input name="address" value="<?php echo nutritionist_e($editChild['address'] ?? ''); ?>" placeholder="Home address">
+			<input name="address" data-csfp-address value="<?php echo nutritionist_e($editChild['address'] ?? ''); ?>" placeholder="House no. / street / purok">
 		</label>
 		<label class="admin-field">
 			<span>Purok / Sitio</span>

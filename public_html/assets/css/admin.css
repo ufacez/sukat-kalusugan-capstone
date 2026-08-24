@@ -300,6 +300,29 @@
   border-radius: 18px;
 }
 
+.admin-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.admin-pagination-status {
+  color: var(--admin-muted);
+  font-size: 0.82rem;
+}
+
+.admin-pagination-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.admin-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .admin-table {
   width: 100%;
   border-collapse: collapse;
@@ -577,7 +600,7 @@
 
 .admin-csfp-picker {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -715,6 +738,7 @@
 
   .admin-field-row,
   .admin-address-picker,
+  .admin-csfp-picker,
   .admin-pw-checklist {
     grid-template-columns: 1fr;
     flex-direction: column;

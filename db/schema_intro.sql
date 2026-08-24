@@ -76,6 +76,7 @@ CREATE TABLE children (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     child_code      VARCHAR(20) NOT NULL UNIQUE,         -- e.g. CHD-0001
     first_name      VARCHAR(100) NOT NULL,
+    middle_name     VARCHAR(60) NULL,
     last_name       VARCHAR(100) NOT NULL,
     birthdate       DATE NOT NULL,
     sex             ENUM('Male','Female') NOT NULL,

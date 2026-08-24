@@ -438,9 +438,60 @@
       });
   }
 
+  function initCsfpChildForm(root) {
+    const barangaySelect = root.querySelector('[data-csfp="barangay"]');
+    const addressInput = root.closest("form")?.querySelector("[data-csfp-address]");
+    const status = root.parentElement.querySelector("[data-csfp-status]");
+    const savedName = root.getAttribute("data-csfp-selected") || "";
+    let barangayMap = {};
+
+    try {
+      barangayMap = JSON.parse(root.getAttribute("data-csfp-map") || "{}");
+    } catch (err) {
+      barangayMap = {};
+    }
+
+    if (!barangaySelect || !addressInput) {
+      return;
+    }
+
+    function setStatus(text, isError) {
+      if (!status) return;
+      status.textContent = text || "";
+      status.classList.toggle("is-error", !!isError);
+    }
+
+    setStatus("Loading CSFP barangays...");
+    fetch("../api/admin/csfp_barangays.php")
+      .then((response) => {
+        if (!response.ok) throw new Error("CSFP barangay API request failed");
+        return response.json();
+      })
+      .then((data) => {
+        const barangays = (data.barangays || []).map((name) => ({ code: barangayMap[name] || name, name }));
+        fillSelect(barangaySelect, barangays, "-- Select barangay --");
+        if (savedName) {
+          barangaySelect.value = String(barangayMap[savedName] || savedName);
+        }
+        barangaySelect.disabled = false;
+        setStatus("");
+      })
+      .catch(() => {
+        setStatus("Couldn't load the local CSFP barangay list.", true);
+      });
+
+    barangaySelect.addEventListener("change", () => {
+      const barangayName = barangaySelect.selectedOptions[0]?.dataset.name || "";
+      const street = addressInput.value.split(",")[0].trim();
+      const parts = [street, barangayName ? "Brgy. " + barangayName : "", "City of San Fernando", "Pampanga"].filter(Boolean);
+      addressInput.value = parts.join(", ");
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     initValidation(document);
     document.querySelectorAll("[data-psgc-picker]").forEach((root) => initPsgcPicker(root));
     document.querySelectorAll("[data-csfp-barangay-picker]").forEach((root) => initCsfpBarangayForm(root));
+    document.querySelectorAll("[data-csfp-child-picker]").forEach((root) => initCsfpChildForm(root));
   });
 })();

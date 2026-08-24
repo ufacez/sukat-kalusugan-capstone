@@ -131,7 +131,7 @@ admin_layout_start('Parents', 'Parent accounts and linked child records.', 'pare
             </div>
         </div>
         <label class="admin-field">
-            <span>Barangay (health worker scope)</span>
+            <span>Barangay</span>
             <select name="barangay_id">
                 <option value="">-- Not set --</option>
                 <?php foreach ($barangays as $barangay): ?>

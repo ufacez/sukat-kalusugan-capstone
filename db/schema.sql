@@ -140,6 +140,7 @@ CREATE TABLE `children` (
   `id` int(10) UNSIGNED NOT NULL,
   `child_code` varchar(20) NOT NULL,
   `first_name` varchar(100) NOT NULL,
+  `middle_name` varchar(60) DEFAULT NULL,
   `last_name` varchar(100) NOT NULL,
   `birthdate` date NOT NULL,
   `sex` enum('Male','Female') NOT NULL,
