@@ -86,7 +86,7 @@ const String DEVICE_ID =
 // LAN-only address. Must match ESP32_DEVICE_KEY in config.php exactly,
 // on BOTH the live server and your local XAMPP config.php.
 const String DEVICE_KEY =
-  "PASTE_THE_SAME_VALUE_HERE_AS_ESP32_DEVICE_KEY_IN_CONFIG_PHP";
+  "26b247f1b2ffb005e5b65802fd73ca0453b69299e06b2f8816113d0029f2d993";
 
 // These are deliberately just "api/..." now, with NO "sukat-kalusugan-
 // capstone/public_html/" baked in. Azure's document root points

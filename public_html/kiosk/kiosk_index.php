@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 require_once __DIR__ . '/../includes/kiosk_helpers.php';
+require_once __DIR__ . '/../includes/auth_middleware.php';
 
 
 // Same convention the ESP32 endpoints use (device_ping.php, get_command.php,
@@ -101,7 +102,7 @@ $appData = [
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
     'barangay' => $kioskBarangay,
     'endpoints' => [
-        'ping' => '../api/esp32/device_ping.php',
+        'ping' => '../api/kiosk/device_status.php',
         'command' => '../api/esp32/get_command.php',
         'startMeasurement' => '../api/kiosk/start_measurement.php',
         'requestProcess' => '../api/kiosk/request_process.php',
@@ -127,8 +128,8 @@ $appData = [
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta name="theme-color" content="#0b6e4f" />
         <title>Sukat Kalusugan | Kiosk</title>
-        <link rel="stylesheet" href="../assets/css/app.css?v=<?php echo @filemtime(__DIR__ . '/../assets/css/app.css') ?: time(); ?>" />
-        <link rel="stylesheet" href="../assets/css/kiosk.css?v=<?php echo @filemtime(__DIR__ . '/../assets/css/kiosk.css') ?: time(); ?>" />
+        <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/app.css?v=' . (@filemtime(__DIR__ . '/../assets/css/app.css') ?: time()))); ?>" />
+        <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/kiosk.css?v=' . (@filemtime(__DIR__ . '/../assets/css/kiosk.css') ?: time()))); ?>" />
     </head>
     <body class="kiosk-page">
         <main class="kiosk-shell">
