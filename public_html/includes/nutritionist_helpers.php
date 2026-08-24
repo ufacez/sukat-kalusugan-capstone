@@ -15,6 +15,7 @@ function nutritionist_nav_items(): array
         ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php')],
         ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
         ['key' => 'who_reference', 'label' => 'WHO Reference', 'href' => app_url('/nutritionist/who_reference.php')],
+        ['key' => 'risk_map', 'label' => 'Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'reports', 'label' => 'Reports', 'href' => app_url('/nutritionist/reports.php')],

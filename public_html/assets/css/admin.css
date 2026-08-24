@@ -802,3 +802,199 @@
     flex-direction: column;
   }
 }
+.admin-riskmap-canvas {
+  width: 100%;
+  height: 480px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface-alt);
+}
+
+.admin-riskmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 0.82rem;
+  color: var(--admin-muted);
+}
+
+.admin-riskmap-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-riskmap-swatch {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  flex: none;
+}
+
+/* --- GeoMapper-style layout: map + right sidebar --- */
+.admin-riskmap-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-riskmap-mapwrap {
+  position: relative;
+}
+
+.admin-riskmap-canvas-v2 {
+  width: 100%;
+  height: 560px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface-alt);
+}
+
+.admin-riskmap-sidebar {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.admin-riskmap-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 14px 16px 16px;
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-riskmap-card-title {
+  margin: 0 0 10px;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+}
+
+.admin-riskmap-legend-v2 {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.admin-riskmap-legend-v2 li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.86rem;
+  color: var(--admin-text);
+}
+
+.admin-riskmap-legend-text {
+  flex: 1;
+}
+
+.admin-riskmap-legend-text em {
+  display: block;
+  font-style: normal;
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+}
+
+.admin-riskmap-legend-count {
+  font-weight: 700;
+  color: var(--admin-text);
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  border-radius: 999px;
+  min-width: 24px;
+  text-align: center;
+  padding: 1px 8px;
+  font-size: 0.78rem;
+}
+
+.admin-riskmap-chartwrap {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 8px;
+}
+
+.admin-riskmap-chartwrap canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+.admin-riskmap-chartcaption {
+  text-align: center;
+  margin: 0;
+}
+
+/* Leaflet controls: basemap gallery */
+.admin-riskmap-basemaps {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-riskmap-basemap-btn {
+  border: none;
+  background: transparent;
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.admin-riskmap-basemap-btn:hover {
+  background: var(--admin-surface-alt);
+}
+
+.admin-riskmap-basemap-btn.is-active {
+  background: var(--admin-primary);
+  color: #ffffff;
+}
+
+/* Leaflet control: barangay search */
+.admin-riskmap-search {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  box-shadow: var(--admin-shadow);
+  padding: 4px;
+}
+
+.admin-riskmap-search-input {
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 0.85rem;
+  padding: 6px 10px;
+  width: 200px;
+  color: var(--admin-text);
+  font-family: inherit;
+}
+
+@media (max-width: 900px) {
+  .admin-riskmap-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-riskmap-canvas-v2 {
+    height: 420px;
+  }
+
+  .admin-riskmap-search-input {
+    width: 140px;
+  }
+}
