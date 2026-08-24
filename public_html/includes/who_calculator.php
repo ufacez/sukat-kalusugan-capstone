@@ -136,9 +136,21 @@ function calculate_haz(float $height_cm, int $age_months, string $sex): float
 	return round(who_lms_z_score($height_cm, $reference['L'], $reference['M'], $reference['S']), 2);
 }
 
-function calculate_whz(float $weight_kg, float $height_cm, string $sex): float
+/**
+ * WHO publishes weight-for-length (recumbent, 0-23 months) and
+ * weight-for-height (standing, 24-60 months) as two separate curves that
+ * legitimately disagree over the 65-110cm range they both cover, because
+ * the correct one depends on how the child was actually measured, not on
+ * height alone. This picks the curve by $age_months (<24 -> length,
+ * >=24 -> height), matching the DOH e-OPT Plus "Nut_StatusTool" sheet
+ * (cell AD10) and the who_weight_for_length migration this table was
+ * added for.
+ */
+function calculate_whz(float $weight_kg, float $height_cm, int $age_months, string $sex): float
 {
-	$reference = who_lookup_reference('who_weight_for_height', $sex, 'height_cm', $height_cm)
+	$table = $age_months < 24 ? 'who_weight_for_length' : 'who_weight_for_height';
+
+	$reference = who_lookup_reference($table, $sex, 'height_cm', $height_cm)
 		?? who_fallback_reference('whz', $height_cm);
 
 	return round(who_lms_z_score($weight_kg, $reference['L'], $reference['M'], $reference['S']), 2);
@@ -295,7 +307,7 @@ function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_mont
 {
 	$waz = calculate_waz($weight_kg, $age_months, $sex);
 	$haz = calculate_haz($height_cm, $age_months, $sex);
-	$whz = calculate_whz($weight_kg, $height_cm, $sex);
+	$whz = calculate_whz($weight_kg, $height_cm, $age_months, $sex);
 	$flag = flag_measurement($waz, $haz, $whz);
 
 	return [

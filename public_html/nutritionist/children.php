@@ -55,6 +55,17 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 		admin_redirect('/nutritionist/children.php', ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
 	}
 
+	// WHO growth reference tables only cover 0-60 completed months. Past
+	// that, calculate_waz()/calculate_haz()/calculate_whz() fall through to
+	// who_fallback_reference() and silently return a fabricated z-score
+	// instead of a real WHO-derived one, which would misinform staff. Block
+	// registration past that ceiling instead of letting it happen quietly.
+	$registrationAgeMonths = doh_age_in_months($birthdate);
+
+	if ($registrationAgeMonths === null || $registrationAgeMonths > 60) {
+		admin_redirect('/nutritionist/children.php', ['notice' => 'Birthdate must be valid and the child must be 60 months (5 years) old or younger — WHO growth references only cover 0-60 months.', 'type' => 'error']);
+	}
+
 	if (!in_array($sex, ['Male', 'Female'], true)) {
 		$sex = 'Male';
 	}
