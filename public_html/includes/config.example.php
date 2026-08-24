@@ -15,6 +15,15 @@ define('DB_PASS', '');   // XAMPP default root password is usually empty
 
 define('APP_ENV', 'development'); // 'development' | 'production'
 
+// Shared secret the ESP32 kiosk sends in an X-Device-Key header on every
+// request to public_html/api/esp32/*. Without this, anyone who can reach
+// the server (real risk now that it's public, not LAN-only) could submit
+// fake measurements just by knowing the device_id string, which is not a
+// secret. Generate a real random value for production, e.g. in a
+// terminal: php -r "echo bin2hex(random_bytes(32));"
+// Must match DEVICE_KEY in the ESP32 firmware (.ino) exactly.
+define('ESP32_DEVICE_KEY', '');
+
 // Firebase Realtime Database setup (leave empty until you create the project)
 define('FIREBASE_DATABASE_URL', '');
 // Example: define('FIREBASE_DATABASE_URL', 'https://your-project-default-rtdb.firebaseio.com');

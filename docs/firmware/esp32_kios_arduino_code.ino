@@ -39,6 +39,14 @@ const char* SETUP_AP_PASSWORD = "sukat2026"; // must be 8+ characters
 #define WIFI_RESET_BUTTON_PIN 0
 const unsigned long WIFI_RESET_HOLD_MS = 3000;
 
+// How long, after boot has already started, you have to START pressing
+// BOOT. This window opens only AFTER the chip has already decided to
+// boot normally -- pressing BOOT during the actual power-on/reset
+// instant (holding it while plugging in the cable) can instead trip
+// the ESP32's built-in flashing mode, which never reaches this code at
+// all. So: power it on / press RESET like normal, THEN press BOOT.
+const unsigned long WIFI_RESET_WINDOW_MS = 5000;
+
 WiFiManager wifiManager;
 WiFiManagerParameter* customServerUrlParam = nullptr;
 Preferences preferences;
@@ -57,24 +65,48 @@ Preferences preferences;
 // To change it afterwards: open the same setup portal used for WiFi
 // (SETUP_AP_NAME above) -- it now shows a "Server Base URL" field next
 // to the WiFi form. Type in one of, then tap Save:
-//   http://192.168.100.164/sukat-kalusugan-capstone/   (localhost/LAN)
-//   https://<your-azure-domain-or-ip>/sukat-kalusugan-capstone/  (live)
+//   https://sukatkalusugan.app/                                      (live, Azure + domain + SSL)
+//   http://192.168.100.164/sukat-kalusugan-capstone/public_html/    (localhost/LAN, XAMPP)
 // No laptop, no re-flash. See WIFI_RESET_BUTTON_PIN above for how to
 // open this portal on demand, not just when WiFi is broken.
 
 const String DEFAULT_SERVER_URL =
-  "http://192.168.100.164/sukat-kalusugan-capstone/public_html/";
+  "https://sukatkalusugan.app/";
 
 String serverBaseUrl = DEFAULT_SERVER_URL;
 
 const String DEVICE_ID =
   "ESP32-KIOSK-01";
 
+// Sent as an X-Device-Key header on every request to our own server
+// (not Firebase, which has its own auth). Without this, the device_id
+// string alone -- a guessable, non-secret value -- was the only thing
+// standing between the public internet and being able to submit fake
+// measurements, now that the server is a public domain instead of a
+// LAN-only address. Must match ESP32_DEVICE_KEY in config.php exactly,
+// on BOTH the live server and your local XAMPP config.php.
+const String DEVICE_KEY =
+  "PASTE_THE_SAME_VALUE_HERE_AS_ESP32_DEVICE_KEY_IN_CONFIG_PHP";
+
+// These are deliberately just "api/..." now, with NO "sukat-kalusugan-
+// capstone/public_html/" baked in. Azure's document root points
+// directly at public_html/, so the live URL is just
+// http://52.230.96.22/api/esp32/get_command.php.
+//
+// For local/XAMPP testing later, where the URL is instead
+// http://<local-ip>/sukat-kalusugan-capstone/public_html/..., that
+// extra "sukat-kalusugan-capstone/public_html/" part goes in the
+// Server Base URL field itself (typed into the setup portal), not
+// here -- e.g. Server Base URL =
+// "http://192.168.100.164/sukat-kalusugan-capstone/public_html/"
+// That way these two path constants never need to change, no matter
+// which server you point the kiosk at.
+
 const String GET_COMMAND_PATH =
-  "public_html/api/esp32/get_command.php";
+  "api/esp32/get_command.php";
 
 const String SUBMIT_MEASUREMENT_PATH =
-  "public_html/api/esp32/submit_measurement.php";
+  "api/esp32/submit_measurement.php";
 
 // =====================================================
 // FIREBASE
@@ -307,6 +339,7 @@ String httpGet(
 
   http.begin(url);
   http.setTimeout(2000);
+  http.addHeader("X-Device-Key", DEVICE_KEY);
 
   httpCode = http.GET();
 
@@ -346,6 +379,7 @@ String httpPostForm(
     "Content-Type",
     "application/x-www-form-urlencoded"
   );
+  http.addHeader("X-Device-Key", DEVICE_KEY);
 
   httpCode = http.POST(formBody);
 
@@ -1902,42 +1936,65 @@ void setup() {
 
   Serial.print("Server URL: ");
   Serial.println(serverBaseUrl);
-
+9
   customServerUrlParam = new WiFiManagerParameter(
     "server_url",
-    "Server Base URL (e.g. http://192.168.1.50/sukat-kalusugan-capstone/)",
+    "Server Base URL (e.g. http://192.168.100.164/sukat-kalusugan-capstone/public_html/)",
     serverBaseUrl.c_str(),
     150
   );
 
   // ===================================================
-  // BOOT BUTTON - hold to force the setup portal open
+  // BOOT BUTTON - press (AFTER power-on) to force the setup portal open
   // ===================================================
   //
   // Lets you change WiFi and/or the server URL any time WiFi is
   // already working (e.g. just switching live <-> localhost, no venue
   // change). Without this, the portal only appears when WiFi fails.
+  //
+  // IMPORTANT: this deliberately does NOT check the button instantly at
+  // power-on. Holding BOOT low during the actual power-on/reset instant
+  // is how the ESP32 enters its built-in USB flashing mode -- code
+  // never runs in that case, so an instant check here would never work
+  // reliably and would sometimes hijack the boot itself. Instead, the
+  // chip boots normally first, and only then do we open a few-second
+  // window where pressing BOOT is just a normal button read.
 
   pinMode(WIFI_RESET_BUTTON_PIN, INPUT_PULLUP);
 
+  Serial.println();
+  Serial.println("================================");
+  Serial.println("Press and HOLD the BOOT button now");
+  Serial.println("to open WiFi/Server setup...");
+  Serial.println("(you have a few seconds)");
+  Serial.println("================================");
+
   bool forcePortal = false;
 
-  if (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
+  unsigned long windowStart = millis();
 
-    Serial.println();
-    Serial.println("BOOT button held - keep holding to open setup portal...");
+  while (millis() - windowStart < WIFI_RESET_WINDOW_MS) {
 
-    unsigned long pressStart = millis();
+    if (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
 
-    while (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
+      Serial.println("BOOT detected - keep holding to confirm...");
 
-      if (millis() - pressStart > WIFI_RESET_HOLD_MS) {
-        forcePortal = true;
-        break;
+      unsigned long pressStart = millis();
+
+      while (digitalRead(WIFI_RESET_BUTTON_PIN) == LOW) {
+
+        if (millis() - pressStart > WIFI_RESET_HOLD_MS) {
+          forcePortal = true;
+          break;
+        }
+
+        delay(50);
       }
 
-      delay(50);
+      break;
     }
+
+    delay(50);
   }
 
   // ===================================================

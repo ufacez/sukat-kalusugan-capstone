@@ -7,6 +7,8 @@ require_once __DIR__ . '/../../includes/firebase_sync.php';
 
 api_require_method(['GET', 'POST']);
 
+api_require_device_key();
+
 $payload = api_payload();
 
 $deviceCode = api_string(

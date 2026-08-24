@@ -124,6 +124,27 @@ function api_normalize_enum(mixed $value, array $allowed, string $default): stri
     return in_array($text, $allowed, true) ? $text : $default;
 }
 
+/**
+ * Validate the ESP32's shared device key before processing any request
+ * from the kiosk hardware. Previously these endpoints trusted the plain
+ * device_id string alone, which is guessable/enumerable and not a secret
+ * -- fine on a LAN-only server, not fine now that the server is public.
+ * Sends a 401 and halts execution if the key is missing or wrong.
+ */
+function api_require_device_key(): void
+{
+    $headers = function_exists('getallheaders') ? getallheaders() : [];
+    $headers = is_array($headers) ? array_change_key_case($headers, CASE_LOWER) : [];
+
+    $providedKey = trim((string)($headers['x-device-key'] ?? ''));
+
+    $expectedKey = defined('ESP32_DEVICE_KEY') ? (string)ESP32_DEVICE_KEY : '';
+
+    if ($expectedKey === '' || !hash_equals($expectedKey, $providedKey)) {
+        api_error('Invalid or missing device key.', 401);
+    }
+}
+
 function api_require_staff_session(array $allowedRoles = ['admin', 'nutritionist']): array
 {
     $user = current_user();

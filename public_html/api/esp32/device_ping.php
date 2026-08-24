@@ -5,6 +5,8 @@ require_once __DIR__ . '/../../includes/firebase_sync.php';
 
 api_require_method(['GET', 'POST']);
 
+api_require_device_key();
+
 $deviceCode = api_string($_GET['device'] ?? $_POST['device_id'] ?? $_POST['deviceCode'] ?? 'ESP32-KIOSK-01', 'ESP32-KIOSK-01');
 
 $conn = get_db_connection();
