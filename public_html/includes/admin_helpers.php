@@ -121,6 +121,89 @@ function admin_find_role_id(string $roleName): int
 }
 
 /**
+ * Best-effort split of a single "name" column into first / middle / last
+ * name parts, used to pre-fill the Add/Edit forms when editing a record
+ * that only ever stored one combined name string.
+ */
+function admin_split_full_name(?string $fullName): array
+{
+    $fullName = trim(preg_replace('/\s+/', ' ', (string)$fullName));
+
+    if ($fullName === '') {
+        return ['first' => '', 'middle' => '', 'last' => ''];
+    }
+
+    $parts = explode(' ', $fullName);
+
+    if (count($parts) === 1) {
+        return ['first' => $parts[0], 'middle' => '', 'last' => ''];
+    }
+
+    $first = array_shift($parts);
+    $last = array_pop($parts);
+    $middle = implode(' ', $parts);
+
+    return ['first' => $first, 'middle' => $middle, 'last' => $last];
+}
+
+/**
+ * Recombine first / middle / last name inputs into the single "name"
+ * column used everywhere else in the app (dashboards, reports, audit
+ * logs, session display, etc.), so no other file needs to change.
+ */
+function admin_combine_name(string $first, string $middle, string $last): string
+{
+    $parts = array_filter(
+        [trim($first), trim($middle), trim($last)],
+        static fn(string $part): bool => $part !== ''
+    );
+
+    return trim(preg_replace('/\s+/', ' ', implode(' ', $parts)));
+}
+
+/**
+ * A name part (first/middle/last) may contain letters, spaces, hyphens,
+ * apostrophes, and periods (e.g. "Jr.", "Sto. Niño", "D'Angelo").
+ */
+function admin_is_valid_name_part(string $value, bool $required = true): bool
+{
+    $value = trim($value);
+
+    if ($value === '') {
+        return !$required;
+    }
+
+    return (bool)preg_match("/^[A-Za-zÀ-ÖØ-öø-ÿ.'\\-\\s]{2,60}$/u", $value);
+}
+
+/**
+ * Philippine mobile numbers: 11 digits, always starting with 09
+ * (e.g. 0917xxxxxxx). Spaces/dashes are stripped before checking.
+ */
+function admin_is_valid_ph_mobile(string $phone): bool
+{
+    $digitsOnly = preg_replace('/[^0-9]/', '', $phone);
+
+    return (bool)preg_match('/^09\d{9}$/', (string)$digitsOnly);
+}
+
+/**
+ * Strong password: at least 8 characters with an uppercase letter,
+ * a lowercase letter, a number, and a special character.
+ */
+function admin_is_strong_password(string $password): bool
+{
+    if (strlen($password) < 8) {
+        return false;
+    }
+
+    return preg_match('/[a-z]/', $password) === 1
+        && preg_match('/[A-Z]/', $password) === 1
+        && preg_match('/[0-9]/', $password) === 1
+        && preg_match('/[^A-Za-z0-9]/', $password) === 1;
+}
+
+/**
  * Shared dropdown source for every "assign a barangay" form across the
  * admin, nutritionist, and settings pages. Active barangays only, sorted
  * by name so the <select> stays predictable.
@@ -230,6 +313,7 @@ function admin_layout_end(): void
     echo '</div>';
     echo '</div>';
     echo '<script src="' . admin_e(app_url('/assets/js/admin.js')) . '"></script>';
+    echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
     echo '</body>';
     echo '</html>';
 }

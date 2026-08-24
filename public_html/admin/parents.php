@@ -16,6 +16,7 @@ $editingParent = $editingId > 0 ? admin_fetch_one(
     'i',
     [$editingId]
 ) : null;
+$editingNameParts = admin_split_full_name($editingParent['name'] ?? '');
 
 $parents = admin_fetch_all(
     'SELECT
@@ -81,32 +82,56 @@ admin_layout_start('Parents', 'Parent accounts and linked child records.', 'pare
         </div>
     </div>
 
-    <form class="admin-form-grid" method="post" action="<?php echo admin_e(app_url($editingParent ? '/api/admin/parents_update.php' : '/api/admin/parents_create.php')); ?>">
+    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url($editingParent ? '/api/admin/parents_update.php' : '/api/admin/parents_create.php')); ?>">
         <?php if ($editingParent): ?>
             <input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">
         <?php endif; ?>
+
+        <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
+
+        <div class="admin-field-wide">
+            <div class="admin-field-row">
+                <label class="admin-field">
+                    <span>First name<span class="admin-required">*</span></span>
+                    <input id="parent_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo admin_e($editingNameParts['first']); ?>" placeholder="Juan">
+                    <span class="admin-field-message"></span>
+                </label>
+                <label class="admin-field">
+                    <span>Middle name</span>
+                    <input id="parent_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo admin_e($editingNameParts['middle']); ?>" placeholder="Reyes">
+                    <span class="admin-field-message"></span>
+                </label>
+                <label class="admin-field">
+                    <span>Surname<span class="admin-required">*</span></span>
+                    <input id="parent_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo admin_e($editingNameParts['last']); ?>" placeholder="Dela Cruz">
+                    <span class="admin-field-message"></span>
+                </label>
+            </div>
+        </div>
+
         <label class="admin-field">
-            <span>Full name</span>
-            <input name="name" required value="<?php echo admin_e($editingParent['name'] ?? ''); ?>" placeholder="Juan Dela Cruz">
+            <span>Email<span class="admin-required">*</span></span>
+            <input id="parent_email" type="email" name="email" required data-validate="email" value="<?php echo admin_e($editingParent['email'] ?? ''); ?>" placeholder="juan@example.com">
+            <span class="admin-field-message"></span>
         </label>
+        <div class="admin-field-wide">
+            <div class="admin-field-row">
+                <label class="admin-field">
+                    <span>Mobile number<span class="admin-required">*</span></span>
+                    <input id="parent_phone" name="phone" required data-validate="phone-ph" value="<?php echo admin_e($editingParent['phone'] ?? ''); ?>" placeholder="09171234567">
+                    <span class="admin-field-message"></span>
+                <label class="admin-field">
+                    <span>Relationship<span class="admin-required">*</span></span>
+                    <select name="parent_type" required>
+                        <?php foreach ($parentTypes as $type): ?>
+                            <option value="<?php echo admin_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo admin_e($type); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+            </div>
+        </div>
         <label class="admin-field">
-            <span>Email</span>
-            <input type="email" name="email" required value="<?php echo admin_e($editingParent['email'] ?? ''); ?>" placeholder="juan@example.com">
-        </label>
-        <label class="admin-field">
-            <span>Phone</span>
-            <input name="phone" value="<?php echo admin_e($editingParent['phone'] ?? ''); ?>" placeholder="0917...">
-        </label>
-        <label class="admin-field">
-            <span>Relationship</span>
-            <select name="parent_type" required>
-                <?php foreach ($parentTypes as $type): ?>
-                    <option value="<?php echo admin_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo admin_e($type); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="admin-field">
-            <span>Barangay</span>
+            <span>Barangay (health worker scope)</span>
             <select name="barangay_id">
                 <option value="">-- Not set --</option>
                 <?php foreach ($barangays as $barangay): ?>
@@ -114,23 +139,66 @@ admin_layout_start('Parents', 'Parent accounts and linked child records.', 'pare
                 <?php endforeach; ?>
             </select>
         </label>
-        <label class="admin-field admin-field-wide">
-            <span>Address</span>
-            <input name="address" value="<?php echo admin_e($editingParent['address'] ?? ''); ?>" placeholder="House no., street, barangay">
-        </label>
+
+        <div class="admin-field-wide">
+            <span style="font-size:0.88rem;font-weight:700;color:var(--admin-text);">Home address</span>
+            <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="parent_address">
+                <label class="admin-field">
+                    <span>Province</span>
+                    <select data-psgc="province"><option value="">Loading provinces…</option></select>
+                </label>
+                <label class="admin-field">
+                    <span>City / Municipality</span>
+                    <select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
+                </label>
+                <label class="admin-field">
+                    <span>Barangay</span>
+                    <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
+                </label>
+            </div>
+            <label class="admin-field" style="margin-top:10px;">
+                <span>House no. / street / purok</span>
+                <input data-psgc="street" placeholder="143 Purok 6">
+            </label>
+            <div class="admin-address-status" data-psgc-status></div>
+            <label class="admin-field" style="margin-top:10px;">
+                <span>Full address</span>
+                <textarea id="parent_address" name="address"><?php echo admin_e($editingParent['address'] ?? ''); ?></textarea>
+                <span class="admin-field-hint">Auto-filled from the picker above; you can still edit it directly.</span>
+            </label>
+        </div>
+
         <label class="admin-field">
-            <span>Status</span>
+            <span>Status<span class="admin-required">*</span></span>
             <select name="status" required>
                 <option value="active" <?php echo (($editingParent['status'] ?? 'active') === 'active') ? 'selected' : ''; ?>>Active</option>
                 <option value="inactive" <?php echo (($editingParent['status'] ?? 'active') === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
             </select>
         </label>
-        <label class="admin-field">
-            <span><?php echo $editingParent ? 'New password (optional)' : 'Password'; ?></span>
-            <input type="password" name="password" <?php echo $editingParent ? '' : 'required'; ?> placeholder="<?php echo $editingParent ? 'Leave blank to keep current password' : 'Create a strong password'; ?>">
+
+        <label class="admin-field admin-field-wide">
+            <span><?php echo $editingParent ? 'New password (optional)' : 'Password'; ?><?php echo $editingParent ? '' : '<span class="admin-required">*</span>'; ?></span>
+            <input id="parent_password" type="password" name="password" <?php echo $editingParent ? '' : 'required'; ?> data-validate="password" autocomplete="new-password" placeholder="<?php echo $editingParent ? 'Leave blank to keep current password' : 'Create a strong password'; ?>">
+            <span class="admin-field-message"></span>
+            <ul class="admin-pw-checklist" data-pw-checklist-for="parent_password">
+                <li data-pw-rule="length">At least 8 characters</li>
+                <li data-pw-rule="upper">One uppercase letter</li>
+                <li data-pw-rule="lower">One lowercase letter</li>
+                <li data-pw-rule="number">One number</li>
+                <li data-pw-rule="special">One special character</li>
+            </ul>
+            <div class="admin-pw-strength" data-pw-strength-for="parent_password">
+                <div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
+                <div class="admin-pw-strength-label"></div>
+            </div>
         </label>
-        <div class="admin-field" style="align-content:end;">
-            <span>&nbsp;</span>
+        <label class="admin-field admin-field-wide">
+            <span><?php echo $editingParent ? 'Confirm new password' : 'Confirm password'; ?><?php echo $editingParent ? '' : '<span class="admin-required">*</span>'; ?></span>
+            <input id="parent_password_confirm" type="password" name="password_confirm" <?php echo $editingParent ? '' : 'required'; ?> data-validate="confirm-password" data-match="parent_password" autocomplete="new-password" placeholder="Re-type the password">
+            <span class="admin-field-message"></span>
+        </label>
+
+        <div class="admin-field admin-field-wide" style="align-content:end;">
             <button class="admin-btn" type="submit"><?php echo $editingParent ? 'Save changes' : 'Create parent'; ?></button>
         </div>
     </form>

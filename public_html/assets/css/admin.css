@@ -452,6 +452,150 @@
   line-height: 1.35;
 }
 
+/* ---- Required-field asterisk ---- */
+.admin-required {
+  color: var(--admin-danger);
+  margin-left: 2px;
+}
+
+.admin-field span.admin-required {
+  color: var(--admin-danger);
+}
+
+/* ---- Live field validation states ---- */
+.admin-field input,
+.admin-field select {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-field.is-valid input,
+.admin-field.is-valid select {
+  border-color: #2f9e5c;
+  box-shadow: 0 0 0 3px rgba(47, 158, 92, 0.12);
+}
+
+.admin-field.is-invalid input,
+.admin-field.is-invalid select {
+  border-color: var(--admin-danger);
+  box-shadow: 0 0 0 3px rgba(201, 59, 59, 0.1);
+}
+
+.admin-field-message {
+  font-size: 0.76rem;
+  font-weight: 600;
+  line-height: 1.35;
+  min-height: 1em;
+}
+
+.admin-field.is-valid .admin-field-message {
+  color: #2f9e5c;
+}
+
+.admin-field.is-invalid .admin-field-message {
+  color: var(--admin-danger);
+}
+
+.admin-field-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.admin-field-row .admin-field {
+  flex: 1;
+}
+
+.admin-field-row input,
+.admin-field-row select {
+  height: 52px;
+  box-sizing: border-box;
+}
+
+/* ---- Password strength checklist ---- */
+.admin-pw-checklist {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3px 10px;
+}
+
+.admin-pw-checklist li {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.admin-pw-checklist li::before {
+  content: "○";
+  font-size: 0.7rem;
+  color: var(--admin-muted);
+}
+
+.admin-pw-checklist li.is-met {
+  color: #2f9e5c;
+}
+
+.admin-pw-checklist li.is-met::before {
+  content: "✓";
+  color: #2f9e5c;
+}
+
+.admin-pw-strength-track {
+  margin-top: 8px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--admin-border);
+  overflow: hidden;
+}
+
+.admin-pw-strength-fill {
+  height: 100%;
+  width: 0%;
+  border-radius: 999px;
+  background: var(--admin-danger);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.admin-pw-strength-label {
+  font-size: 0.76rem;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--admin-muted);
+}
+
+/* ---- PSGC address picker ---- */
+.admin-address-picker {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-csfp-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.admin-address-picker .admin-field select[disabled] {
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+}
+
+.admin-address-status {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+}
+
+.admin-address-status.is-error {
+  color: var(--admin-danger);
+}
+
 .admin-toolbar {
   display: flex;
   gap: 10px;
@@ -567,5 +711,12 @@
 
   .admin-section {
     padding: 16px;
+  }
+
+  .admin-field-row,
+  .admin-address-picker,
+  .admin-pw-checklist {
+    grid-template-columns: 1fr;
+    flex-direction: column;
   }
 }

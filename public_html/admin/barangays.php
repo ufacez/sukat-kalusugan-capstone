@@ -70,14 +70,24 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
         <?php if ($editingBarangay): ?>
             <input type="hidden" name="id" value="<?php echo (int)$editingBarangay['id']; ?>">
         <?php endif; ?>
-        <label class="admin-field">
-            <span>Barangay name</span>
-            <input name="name" required value="<?php echo admin_e($editingBarangay['name'] ?? ''); ?>" placeholder="Bagong Silang">
-        </label>
-        <label class="admin-field">
-            <span>City / Municipality</span>
-            <input name="city_municipality" value="<?php echo admin_e($editingBarangay['city_municipality'] ?? ''); ?>" placeholder="City of San Fernando, Pampanga">
-        </label>
+        <div class="admin-field-wide">
+            <div class="admin-csfp-picker" data-csfp-barangay-picker>
+                <label class="admin-field">
+                    <span>City / Municipality</span>
+                    <select disabled><option>City of San Fernando, Pampanga</option></select>
+                </label>
+                <label class="admin-field">
+                    <span>Barangay</span>
+                    <select data-csfp="barangay" <?php echo $editingBarangay ? '' : 'required'; ?> disabled><option value="">Loading barangays...</option></select>
+                </label>
+            </div>
+            <div class="admin-address-status" data-csfp-status></div>
+            <input type="hidden" name="name" value="<?php echo admin_e($editingBarangay['name'] ?? ''); ?>">
+            <input type="hidden" name="city_municipality" value="<?php echo admin_e($editingBarangay['city_municipality'] ?? 'City of San Fernando, Pampanga'); ?>">
+            <?php if ($editingBarangay): ?>
+                <div class="admin-field-hint">Current saved barangay: <?php echo admin_e($editingBarangay['name']); ?>, <?php echo admin_e($editingBarangay['city_municipality'] ?? ''); ?>. Select a new official location to replace it.</div>
+            <?php endif; ?>
+        </div>
         <label class="admin-field">
             <span>Status</span>
             <select name="status" required>
