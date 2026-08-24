@@ -66,7 +66,7 @@ if ($reportType !== 'summary' && isset($categories[$reportType])) {
 			c.last_name,
 			c.sex,
 			c.birthdate,
-			c.purok,
+			
 			c.is_ip,
 			c.has_disability,
 			bg.name AS barangay,

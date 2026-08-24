@@ -119,6 +119,7 @@ function nutritionist_layout_end(): void
     echo '</div>';
     echo '</div>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js')) . '"></script>';
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
 
     $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'staff'];
     echo '<script>window.CHATBOT_CONFIG = ' . json_encode($chatbotConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';

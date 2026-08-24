@@ -24,7 +24,7 @@ if ($kioskBarangay !== null) {
 }
 
 $children = kiosk_fetch_all(
-    "SELECT c.id,c.child_code,c.first_name,c.last_name,c.birthdate,c.sex,c.barangay_id,bg.name AS barangay,c.address,
+    "SELECT c.id,c.child_code,c.first_name,c.last_name,c.birthdate,c.sex,c.barangay_id,bg.name AS barangay,
             p.name AS parent_name,p.parent_type,p.status AS parent_status,
             lm.measurement_date,lm.height_cm,lm.weight_kg,lm.waz,lm.haz,lm.whz,lm.nutritional_status
      FROM children c

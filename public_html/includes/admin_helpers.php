@@ -13,7 +13,6 @@ function admin_nav_items(): array
     return [
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/admin/dashboard.php')],
         ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php')],
-        ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php')],
         ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php')],
         ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php')],
         ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php')],

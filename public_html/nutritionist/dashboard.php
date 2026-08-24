@@ -24,7 +24,7 @@ $children = admin_fetch_all(
 		c.sex,
 		c.barangay_id,
 		bg.name AS barangay,
-		c.address,
+		
 		p.name AS parent_name,
 		p.status AS parent_status,
 		lm.measurement_date,
