@@ -199,6 +199,7 @@
 
 .admin-content {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -702,7 +703,7 @@
   }
 
   .admin-shell {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     overflow-x: hidden;
   }
 
@@ -735,6 +736,9 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    order: -1;
+    margin-right: auto;
+    flex-shrink: 0;
   }
 
   .admin-topbar {
@@ -754,7 +758,7 @@
   }
 
   .admin-panel-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-sidebar-overlay {
@@ -783,7 +787,7 @@
   .admin-grid-3,
   .admin-grid-6,
   .admin-form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .admin-section {
@@ -794,7 +798,7 @@
   .admin-address-picker,
   .admin-csfp-picker,
   .admin-pw-checklist {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     flex-direction: column;
   }
 }

@@ -127,7 +127,7 @@
 }
 
 .parent-page .parent-form-grid.is-single {
-  grid-template-columns: 1fr;
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .parent-page .parent-form-grid input,
@@ -156,7 +156,7 @@
   .parent-page .parent-stat-grid,
   .parent-page .parent-panel-grid,
   .parent-page .parent-card-grid {
-    grid-template-columns: 1fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
@@ -165,7 +165,7 @@
   .parent-page .parent-panel-grid,
   .parent-page .parent-card-grid,
   .parent-page .parent-form-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .parent-page .admin-topbar-actions {
