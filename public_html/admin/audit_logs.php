@@ -26,22 +26,18 @@ admin_layout_start('Audit Logs', 'Track account, sensor, and system events.', 'a
     <article class="admin-card">
         <div class="admin-stat-label">Info</div>
         <div class="admin-stat-value"><?php echo (int)$levelCounts['info']; ?></div>
-        <div class="admin-stat-note">General events</div>
     </article>
     <article class="admin-card">
         <div class="admin-stat-label">Warnings</div>
         <div class="admin-stat-value"><?php echo (int)$levelCounts['warning']; ?></div>
-        <div class="admin-stat-note">Needs review</div>
     </article>
     <article class="admin-card">
         <div class="admin-stat-label">Critical</div>
         <div class="admin-stat-value"><?php echo (int)$levelCounts['danger']; ?></div>
-        <div class="admin-stat-note">High priority</div>
     </article>
     <article class="admin-card">
         <div class="admin-stat-label">Total</div>
         <div class="admin-stat-value"><?php echo count($logs); ?></div>
-        <div class="admin-stat-note">Stored audit events</div>
     </article>
 </section>
 

@@ -7,7 +7,16 @@ require_permission('roles_permissions.view');
 
 $roles = admin_fetch_all('SELECT id, name, description FROM roles ORDER BY name ASC');
 $permissions = admin_fetch_all('SELECT id, code, description FROM permissions ORDER BY code ASC');
-$selectedRoleId = (int)($_POST['role_id'] ?? $_GET['role_id'] ?? ($roles[0]['id'] ?? 0));
+
+$firstSelectableRole = null;
+foreach ($roles as $role) {
+    if (strtolower((string)$role['name']) !== 'nutritionist') {
+        $firstSelectableRole = $role;
+        break;
+    }
+}
+
+$selectedRoleId = (int)($_POST['role_id'] ?? $_GET['role_id'] ?? ($firstSelectableRole['id'] ?? 0));
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_permissions'])) {
     require_permission('roles_permissions.update');
@@ -41,6 +50,12 @@ foreach ($roles as $role) {
     $roleStats[$role['id']] = admin_scalar('SELECT COUNT(*) FROM role_permissions WHERE role_id = ?', 'i', [(int)$role['id']]);
 }
 
+// The nutritionist role is managed separately and shouldn't appear as an
+// option in the role picker below — it's still shown in the stat cards above.
+$dropdownRoles = array_values(array_filter($roles, static function ($role) {
+    return strtolower((string)$role['name']) !== 'nutritionist';
+}));
+
 $actions = '<div class="admin-muted-block">Use the checkbox matrix to assign access.</div>';
 
 admin_layout_start('Roles & Permissions', 'Define access rules for admin and staff accounts.', 'roles_permissions', $actions);
@@ -50,7 +65,6 @@ admin_layout_start('Roles & Permissions', 'Define access rules for admin and sta
         <article class="admin-card">
             <div class="admin-stat-label"><?php echo admin_e(ucfirst($role['name'])); ?></div>
             <div class="admin-stat-value"><?php echo (int)($roleStats[$role['id']] ?? 0); ?></div>
-            <div class="admin-stat-note"><?php echo admin_e($role['description'] ?? ''); ?></div>
         </article>
     <?php endforeach; ?>
 </section>
@@ -68,7 +82,7 @@ admin_layout_start('Roles & Permissions', 'Define access rules for admin and sta
         <label class="admin-field" style="max-width:320px;">
             <span>Role</span>
             <select name="role_id">
-                <?php foreach ($roles as $role): ?>
+                <?php foreach ($dropdownRoles as $role): ?>
                     <option value="<?php echo (int)$role['id']; ?>" <?php echo $selectedRoleId === (int)$role['id'] ? 'selected' : ''; ?>><?php echo admin_e(ucfirst($role['name'])); ?></option>
                 <?php endforeach; ?>
             </select>
