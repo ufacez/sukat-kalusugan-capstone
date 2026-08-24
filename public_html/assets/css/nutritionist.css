@@ -254,3 +254,45 @@
     width: 100%;
   }
 }
+
+/* Parent/Guardian search typeahead (children.php Add/Edit form) */
+.admin-typeahead-results {
+  position: absolute;
+  z-index: 20;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--admin-surface, #fff);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  padding: 4px;
+}
+
+.admin-typeahead-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: none;
+  background: none;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--admin-text);
+  cursor: pointer;
+}
+
+.admin-typeahead-item:hover,
+.admin-typeahead-item:focus {
+  background: var(--admin-surface-alt, #f7f7f5);
+  outline: none;
+}
+
+.admin-typeahead-empty {
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--admin-muted);
+}

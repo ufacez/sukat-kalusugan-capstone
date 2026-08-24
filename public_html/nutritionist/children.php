@@ -44,10 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$lastName = trim((string)($_POST['last_name'] ?? ''));
 	$birthdate = trim((string)($_POST['birthdate'] ?? ''));
 	$sex = trim((string)($_POST['sex'] ?? 'Male'));
-	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
-$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
-	$address = trim((string)($_POST['address'] ?? ''));
-	$purok = trim((string)($_POST['purok'] ?? ''));
 	$isIp = isset($_POST['is_ip']) ? 1 : 0;
 	$hasDisability = isset($_POST['has_disability']) ? 1 : 0;
 	$parentId = (int)($_POST['parent_id'] ?? 0);
@@ -61,6 +57,24 @@ $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 	) {
 		admin_redirect('/nutritionist/children.php', ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
 	}
+
+	// A child's household barangay and address are the same as their
+	// parent/guardian's -- there's no separate "where does the child live"
+	// concept in this system. Rather than asking the nutritionist to
+	// re-enter (and potentially mismatch) a barangay/address that's already
+	// on file for the parent, inherit both directly from the selected
+	// Parent/Guardian record. This also removes the old free-standing
+	// Province/City/Barangay picker and Address/Purok fields, which
+	// duplicated data already captured once when the parent was created.
+	$parentRecord = admin_fetch_one('SELECT barangay_id, address FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+
+	if ($parentRecord === null) {
+		admin_redirect('/nutritionist/children.php', ['notice' => 'Selected parent/guardian could not be found.', 'type' => 'error']);
+	}
+
+	$barangayId = $parentRecord['barangay_id'] !== null ? (int)$parentRecord['barangay_id'] : null;
+	$address = (string)($parentRecord['address'] ?? '');
+	$purok = null;
 
 	// WHO growth reference tables only cover 0-60 completed months. Past
 	// that, calculate_waz()/calculate_haz()/calculate_whz() fall through to
@@ -188,25 +202,13 @@ foreach ($children as $child) {
 
 $parentsParams = [];
 $parents = admin_fetch_all(
-	"SELECT p.id, p.name, p.parent_type, p.status, p.phone, p.address
+	"SELECT p.id, p.name, p.parent_type, p.status, p.phone, p.address, p.barangay_id, bg.name AS barangay_name
 	 FROM parents p
+	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
 	 ORDER BY p.name ASC",
 	'',
 	[]
 );
-$barangays = admin_barangay_options();
-$childBarangayMap = [];
-foreach ($barangays as $barangay) {
-	$childBarangayMap[(string)$barangay['name']] = (int)$barangay['id'];
-}
-$selectedChildBarangayId = $editChild['barangay_id'] ?? ($user['barangay_id'] ?? null);
-$selectedChildBarangayName = '';
-foreach ($barangays as $barangay) {
-	if ((int)$barangay['id'] === (int)$selectedChildBarangayId) {
-		$selectedChildBarangayName = (string)$barangay['name'];
-		break;
-	}
-}
 
 $statuses = ['All', 'Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Wasted', 'Overweight'];
 $filteredChildren = array_values(array_filter(
@@ -330,7 +332,6 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 					['Age', (doh_age_in_months((string)$selectedChild['birthdate']) ?? 0) . ' months'],
 					['Sex', $selectedChild['sex']],
 					['Barangay', $selectedChild['barangay']],
-					['Purok', $selectedChild['purok'] ?? ''],
 					['Parent', $selectedChild['parent_name']],
 					['Address', $selectedChild['address']],
 					['IP Group', !empty($selectedChild['is_ip']) ? 'Yes' : 'No'],
@@ -457,40 +458,43 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 				<option value="Female" <?php echo (($editChild['sex'] ?? '') === 'Female') ? 'selected' : ''; ?>>Female</option>
 			</select>
 		</label>
-		<div class="admin-field-wide">
-			<div class="admin-csfp-picker" data-csfp-child-picker data-csfp-selected="<?php echo nutritionist_e($selectedChildBarangayName); ?>" data-csfp-map="<?php echo nutritionist_e(json_encode($childBarangayMap)); ?>">
-				<label class="admin-field">
-					<span>Province<span class="admin-required">*</span></span>
-					<select disabled><option>Province of Pampanga</option></select>
-				</label>
-				<label class="admin-field">
-					<span>City / Municipality<span class="admin-required">*</span></span>
-					<select disabled><option>City of San Fernando</option></select>
-				</label>
-				<label class="admin-field">
-					<span>Barangay<span class="admin-required">*</span></span>
-					<select data-csfp="barangay" name="barangay_id" <?php echo $editChild ? '' : 'required'; ?> disabled><option value="">Loading barangays...</option></select>
-				</label>
+		<label class="admin-field" style="grid-column:1 / -1;position:relative;">
+			<span>Parent/Guardian<span class="admin-required">*</span></span>
+			<input type="hidden" name="parent_id" data-child-parent-id value="<?php echo (int)($editChild['parent_id'] ?? 0); ?>">
+			<input
+				type="text"
+				autocomplete="off"
+				placeholder="Search parent/guardian by name…"
+				data-child-parent-search
+				value="<?php
+					$initialParentName = '';
+					foreach ($parents as $parent) {
+						if ((int)$parent['id'] === (int)($editChild['parent_id'] ?? 0)) {
+							$initialParentName = $parent['name'];
+							break;
+						}
+					}
+					echo nutritionist_e($initialParentName);
+				?>"
+			>
+			<div class="admin-typeahead-results" data-child-parent-results hidden></div>
+			<p class="admin-mini" style="margin-top:6px;">The child's barangay and address are taken automatically from the selected parent/guardian's own record.</p>
+			<div class="admin-address-status" data-child-household-preview>
+				<?php if ($editChild !== null): ?>
+					Household: <?php echo nutritionist_e((string)($editChild['address'] ?? '—')); ?><?php echo $editChild['barangay'] ? ' · Brgy. ' . nutritionist_e((string)$editChild['barangay']) : ''; ?>
+				<?php endif; ?>
 			</div>
-			<div class="admin-address-status" data-csfp-status></div>
-		</div>
-		<label class="admin-field">
-			<span>Parent/Guardian</span>
-			<select name="parent_id" required>
-					<option value="">-- Select Parent --</option>
-				<?php foreach ($parents as $parent): ?>
-						<option value="<?php echo (int)$parent['id']; ?>" <?php echo (int)($editChild['parent_id'] ?? 0) === (int)$parent['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($parent['name'] . ' · ' . $parent['parent_type'] . ' · ' . ($parent['status'] ?? 'unknown')); ?></option>
-				<?php endforeach; ?>
-			</select>
 		</label>
-		<label class="admin-field" style="grid-column:1 / -1;">
-			<span>Address</span>
-			<input name="address" data-csfp-address value="<?php echo nutritionist_e($editChild['address'] ?? ''); ?>" placeholder="House no. / street / purok">
-		</label>
-		<label class="admin-field">
-			<span>Purok / Sitio</span>
-			<input name="purok" value="<?php echo nutritionist_e($editChild['purok'] ?? ''); ?>" placeholder="Purok 6">
-		</label>
+		<script type="application/json" data-child-parent-source><?php
+			echo json_encode(array_map(static function (array $parent): array {
+				return [
+					'id' => (int)$parent['id'],
+					'name' => (string)$parent['name'],
+					'address' => (string)($parent['address'] ?? ''),
+					'barangay' => (string)($parent['barangay_name'] ?? ''),
+				];
+			}, $parents), JSON_HEX_TAG | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE);
+		?></script>
 		<label class="admin-field admin-field-checkbox">
 			<input type="checkbox" name="is_ip" value="1" <?php echo !empty($editChild['is_ip']) ? 'checked' : ''; ?>>
 			<span>Belongs to IP (Indigenous Peoples) group</span>
@@ -510,5 +514,135 @@ nutritionist_layout_start('Children & Growth', 'Registered children, latest grow
 		</div>
 	</form>
 </section>
+<script>
+(function () {
+	var form = document.querySelector('.nutritionist-form-grid');
+	var hiddenId = document.querySelector('[data-child-parent-id]');
+	var searchInput = document.querySelector('[data-child-parent-search]');
+	var resultsBox = document.querySelector('[data-child-parent-results]');
+	var preview = document.querySelector('[data-child-household-preview]');
+	var sourceTag = document.querySelector('[data-child-parent-source]');
+
+	if (!form || !hiddenId || !searchInput || !resultsBox || !preview || !sourceTag) {
+		return;
+	}
+
+	var parents = [];
+
+	try {
+		parents = JSON.parse(sourceTag.textContent || '[]');
+	} catch (err) {
+		parents = [];
+	}
+
+	function renderPreview(parent) {
+		if (!parent) {
+			preview.textContent = '';
+			return;
+		}
+
+		var parts = [];
+
+		if (parent.address) {
+			parts.push(parent.address);
+		}
+
+		if (parent.barangay) {
+			parts.push('Brgy. ' + parent.barangay);
+		}
+
+		preview.textContent = parts.length > 0 ? 'Household: ' + parts.join(' · ') : 'This parent has no address/barangay on file yet.';
+	}
+
+	function clearSelection() {
+		hiddenId.value = '';
+		renderPreview(null);
+	}
+
+	function closeResults() {
+		resultsBox.hidden = true;
+		resultsBox.innerHTML = '';
+	}
+
+	function selectParent(parent) {
+		hiddenId.value = String(parent.id);
+		searchInput.value = parent.name;
+		renderPreview(parent);
+		closeResults();
+	}
+
+	function showResults(matches) {
+		resultsBox.innerHTML = '';
+
+		if (matches.length === 0) {
+			var empty = document.createElement('div');
+			empty.className = 'admin-typeahead-empty';
+			empty.textContent = 'No matching parent/guardian.';
+			resultsBox.appendChild(empty);
+			resultsBox.hidden = false;
+			return;
+		}
+
+		matches.slice(0, 20).forEach(function (parent) {
+			var item = document.createElement('button');
+			item.type = 'button';
+			item.className = 'admin-typeahead-item';
+			item.textContent = parent.name;
+			item.addEventListener('click', function () {
+				selectParent(parent);
+			});
+			resultsBox.appendChild(item);
+		});
+
+		resultsBox.hidden = false;
+	}
+
+	searchInput.addEventListener('input', function () {
+		var term = searchInput.value.trim().toLowerCase();
+
+		// Typing invalidates whatever was previously selected until the
+		// nutritionist actually picks a result again.
+		hiddenId.value = '';
+		renderPreview(null);
+
+		if (term === '') {
+			closeResults();
+			return;
+		}
+
+		showResults(parents.filter(function (parent) {
+			return parent.name.toLowerCase().indexOf(term) !== -1;
+		}));
+	});
+
+	searchInput.addEventListener('focus', function () {
+		if (searchInput.value.trim() !== '' && hiddenId.value === '') {
+			searchInput.dispatchEvent(new Event('input'));
+		}
+	});
+
+	document.addEventListener('click', function (event) {
+		if (!event.target.closest('[data-child-parent-search]') && !event.target.closest('[data-child-parent-results]')) {
+			closeResults();
+		}
+	});
+
+	form.addEventListener('submit', function (event) {
+		if (!hiddenId.value) {
+			event.preventDefault();
+			searchInput.focus();
+			searchInput.setCustomValidity('Please search for and select a parent/guardian from the list.');
+			searchInput.reportValidity();
+			return;
+		}
+
+		searchInput.setCustomValidity('');
+	});
+
+	searchInput.addEventListener('input', function () {
+		searchInput.setCustomValidity('');
+	});
+})();
+</script>
 <?php
 nutritionist_layout_end();
