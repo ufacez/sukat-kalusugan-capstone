@@ -18,6 +18,32 @@ function parent_nav_items(): array
     ];
 }
 
+function parent_grouped_nav_items(): array
+{
+    return [
+        [
+            'label' => 'Overview',
+            'items' => [
+                ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/parent/dashboard.php'), 'icon' => 'dashboard'],
+            ],
+        ],
+        [
+            'label' => 'Health Tracking',
+            'items' => [
+                ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php'), 'icon' => 'children'],
+                ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php'), 'icon' => 'linechart'],
+                ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php'), 'icon' => 'calendar'],
+            ],
+        ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
+    ];
+}
+
 function parent_require_access(): array
 {
     $user = current_user();
@@ -54,7 +80,6 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
 {
     $currentUser = parent_require_access();
     $flash = admin_flash_message();
-    $navItems = parent_nav_items();
     $logoutUrl = app_url('/api/auth/logout.php');
     $userName = $currentUser['name'] ?? 'Parent';
 
@@ -72,6 +97,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<body class="admin-page parent-page">';
     echo '<div class="admin-shell">';
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
+
     echo '<div class="admin-brand">';
     echo '<div class="admin-brand-mark">SK</div>';
     echo '<div>';
@@ -79,14 +105,25 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<div class="admin-brand-sub">Parent portal</div>';
     echo '</div>';
     echo '</div>';
+
     echo '<nav class="admin-nav">';
-
-    foreach ($navItems as $item) {
-        $isActive = $item['key'] === $activeSection ? ' is-active' : '';
-        echo '<a class="admin-nav-link' . $isActive . '" href="' . parent_e($item['href']) . '">' . parent_e($item['label']) . '</a>';
+    foreach (parent_grouped_nav_items() as $groupIndex => $group) {
+        echo '<div class="admin-nav-group">';
+        echo '<div class="admin-nav-section"><span class="admin-nav-label">' . parent_e($group['label']) . '</span></div>';
+        foreach ($group['items'] as $item) {
+            $isActive = $item['key'] === $activeSection ? ' is-active' : '';
+            $iconHtml = admin_sidebar_icon($item['icon']);
+            echo '<a class="admin-nav-link' . $isActive . '" href="' . parent_e($item['href']) . '">';
+            if ($iconHtml !== '') {
+                echo $iconHtml;
+            }
+            echo '<span>' . parent_e($item['label']) . '</span>';
+            echo '</a>';
+        }
+        echo '</div>';
     }
-
     echo '</nav>';
+
     echo '<div class="admin-sidebar-footer">';
     echo '<div class="admin-session-card">';
     echo '<div class="admin-session-role">Parent</div>';
@@ -94,11 +131,14 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '</div>';
     echo '<a class="admin-logout" href="' . parent_e($logoutUrl) . '">Sign out</a>';
     echo '</div>';
+
     echo '</aside>';
     echo '<div class="admin-sidebar-overlay" data-admin-sidebar-overlay></div>';
     echo '<div class="admin-main">';
     echo '<header class="admin-topbar">';
-    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">☰</button>';
+    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
+    echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
+    echo '</button>';
     echo '<div class="admin-pagehead">';
     echo '<p class="admin-kicker">Parent Portal</p>';
     echo '<h1>' . parent_e($title) . '</h1>';

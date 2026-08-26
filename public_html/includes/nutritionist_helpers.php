@@ -23,6 +23,42 @@ function nutritionist_nav_items(): array
     ];
 }
 
+function nutritionist_grouped_nav_items(): array
+{
+    return [
+        [
+            'label' => 'Overview',
+            'items' => [
+                ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/nutritionist/dashboard.php'), 'icon' => 'dashboard'],
+            ],
+        ],
+        [
+            'label' => 'Clinical',
+            'items' => [
+                ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php'), 'icon' => 'children'],
+                ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php'), 'icon' => 'clipboard'],
+                ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
+                ['key' => 'who_reference', 'label' => 'WHO Reference', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
+            ],
+        ],
+        [
+            'label' => 'Community',
+            'items' => [
+                ['key' => 'risk_map', 'label' => 'Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
+                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
+            ],
+        ],
+        [
+            'label' => 'Operations',
+            'items' => [
+                ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php'), 'icon' => 'calendar'],
+                ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php'), 'icon' => 'document'],
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
+    ];
+}
+
 function nutritionist_require_access(): array
 {
     $user = current_user();
@@ -54,7 +90,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     $userName = $currentUser['name'] ?? 'Nutritionist';
     $userRole = $currentUser['role'] ?? 'nutritionist';
     $flash = admin_flash_message();
-    $navItems = nutritionist_nav_items();
     $logoutUrl = app_url('/api/auth/logout.php');
 
     echo '<!doctype html>';
@@ -71,6 +106,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<body class="admin-page nutritionist-page">';
     echo '<div class="admin-shell">';
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
+
     echo '<div class="admin-brand">';
     echo '<div class="admin-brand-mark">SK</div>';
     echo '<div>';
@@ -78,14 +114,25 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<div class="admin-brand-sub">Nutritionist console</div>';
     echo '</div>';
     echo '</div>';
+
     echo '<nav class="admin-nav">';
-
-    foreach ($navItems as $item) {
-        $isActive = $item['key'] === $activeSection ? ' is-active' : '';
-        echo '<a class="admin-nav-link' . $isActive . '" href="' . nutritionist_e($item['href']) . '">' . nutritionist_e($item['label']) . '</a>';
+    foreach (nutritionist_grouped_nav_items() as $groupIndex => $group) {
+        echo '<div class="admin-nav-group">';
+        echo '<div class="admin-nav-section"><span class="admin-nav-label">' . nutritionist_e($group['label']) . '</span></div>';
+        foreach ($group['items'] as $item) {
+            $isActive = $item['key'] === $activeSection ? ' is-active' : '';
+            $iconHtml = admin_sidebar_icon($item['icon']);
+            echo '<a class="admin-nav-link' . $isActive . '" href="' . nutritionist_e($item['href']) . '">';
+            if ($iconHtml !== '') {
+                echo $iconHtml;
+            }
+            echo '<span>' . nutritionist_e($item['label']) . '</span>';
+            echo '</a>';
+        }
+        echo '</div>';
     }
-
     echo '</nav>';
+
     echo '<div class="admin-sidebar-footer">';
     echo '<div class="admin-session-card">';
     echo '<div class="admin-session-role">' . nutritionist_e(ucfirst($userRole)) . '</div>';
@@ -93,11 +140,14 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '</div>';
     echo '<a class="admin-logout" href="' . nutritionist_e($logoutUrl) . '">Sign out</a>';
     echo '</div>';
+
     echo '</aside>';
     echo '<div class="admin-sidebar-overlay" data-admin-sidebar-overlay></div>';
     echo '<div class="admin-main">';
     echo '<header class="admin-topbar">';
-    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">☰</button>';
+    echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
+    echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
+    echo '</button>';
     echo '<div class="admin-pagehead">';
     echo '<p class="admin-kicker">Nutritionist Panel</p>';
     echo '<h1>' . nutritionist_e($title) . '</h1>';
