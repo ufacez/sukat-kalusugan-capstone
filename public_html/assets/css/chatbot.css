@@ -9,30 +9,34 @@
   z-index: 1000;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 18px;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 0;
   border: none;
-  border-radius: 999px;
+  border-radius: 50%;
   background: var(--admin-primary);
   color: #ffffff;
-  font-weight: 700;
-  font-size: 0.92rem;
   box-shadow: var(--admin-shadow);
   cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.15s;
 }
 
 .chatbot-launcher:hover {
-  filter: brightness(1.05);
+  transform: scale(1.08);
+  box-shadow: 0 6px 24px rgba(11, 110, 79, 0.35);
+  background: var(--admin-primary);
+  filter: brightness(1.1);
 }
 
-.chatbot-launcher .chatbot-launcher-icon {
-  display: inline-flex;
-  align-items: center;
+.chatbot-launcher:active {
+  transform: scale(0.95);
 }
 
-.chatbot-launcher .chatbot-launcher-icon svg {
-  width: 20px;
-  height: 20px;
+.chatbot-launcher svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
 }
 
 .chatbot-panel {

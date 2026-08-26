@@ -135,37 +135,37 @@ $exportUrl = app_url('/nutritionist/who_reference_export.php') . '?' . http_buil
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e($exportUrl) . '">' . admin_action_icon('export') . ' Export</a>'
 	. ' <a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/who_analysis.php')) . '">' . admin_action_icon('back') . ' WHO Analysis</a>';
 
-nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Standards LMS values used for every z-score calculation.', 'who_reference', $actions);
+nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Standards LMS values.', 'who_reference', $actions);
 ?>
 <section class="nutritionist-panel" style="margin-bottom:20px;">
 	<div class="nutritionist-table-head" style="margin-bottom:10px;flex-wrap:wrap;gap:10px;">
-		<div style="display:flex;gap:8px;flex-wrap:wrap;">
+		<div style="display:flex;gap:6px;flex-wrap:wrap;">
 			<?php foreach ($indicators as $key => $def): ?>
 				<a
 					href="<?php echo nutritionist_e(who_reference_url($key, $sex, $ageRange, $search)); ?>"
-					class="admin-btn-secondary"
-					style="<?php echo $key === $indicator ? 'background:var(--admin-primary);color:#fff;border-color:var(--admin-primary);' : ''; ?>"
+					class="admin-pill <?php echo $key === $indicator ? 'is-success' : 'is-muted'; ?>"
+					style="text-decoration:none;"
 				><?php echo nutritionist_e($def['label']); ?></a>
 			<?php endforeach; ?>
 		</div>
-		<div style="display:flex;gap:8px;">
+		<div style="display:flex;gap:6px;">
 			<?php foreach (['Male', 'Female'] as $sexOption): ?>
 				<a
 					href="<?php echo nutritionist_e(who_reference_url($indicator, $sexOption, $ageRange, $search)); ?>"
-					class="admin-btn-secondary"
-					style="<?php echo $sexOption === $sex ? 'background:var(--admin-primary);color:#fff;border-color:var(--admin-primary);' : ''; ?>"
+					class="admin-pill <?php echo $sexOption === $sex ? 'is-success' : 'is-muted'; ?>"
+					style="text-decoration:none;"
 				><?php echo nutritionist_e($sexOption); ?></a>
 			<?php endforeach; ?>
 		</div>
 	</div>
 
 	<?php if ($config['column'] === 'age_months'): ?>
-	<div class="nutritionist-table-head" style="margin-bottom:14px;flex-wrap:wrap;gap:10px;">
-		<div style="display:flex;gap:8px;flex-wrap:wrap;">
+	<div style="margin-bottom:14px;">
+		<div style="display:flex;gap:6px;flex-wrap:wrap;">
 			<?php foreach ([
 				'all' => 'All (0-60mo)',
-				'old' => '2-5 years (24-60mo) - our scope',
-				'young' => '0-2 years (0-23mo)',
+				'old' => '2-5 years',
+				'young' => '0-2 years',
 			] as $rangeKey => $rangeLabel): ?>
 				<a
 					href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $rangeKey, $search)); ?>"
@@ -179,60 +179,45 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 
 	<?php if ($rowCount === 0): ?>
 		<div class="admin-flash is-error">
-			No reference rows found for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).
-			The <code><?php echo nutritionist_e($config['table']); ?></code> table looks empty — run
-			<code>db/20260826_who_reference_rebuild_expanded.sql</code> against the database.
+			No reference data for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).
 		</div>
 	<?php else: ?>
-		<div class="admin-mini" style="margin-bottom:12px;">
-			<?php echo nutritionist_e($config['label']); ?> · <?php echo nutritionist_e($sex); ?>
-			· <?php echo (int)$rowCount; ?> reference points
-			· range <?php echo nutritionist_e((string)$minX); ?>&ndash;<?php echo nutritionist_e((string)$maxX); ?> <?php echo nutritionist_e($config['columnLabel']); ?>
-			· Source: WHO Child Growth Standards (2006)
+		<div class="admin-mini" style="margin-bottom:0;color:var(--admin-muted);">
+			<?php echo nutritionist_e($config['label']); ?> &middot; <?php echo nutritionist_e($sex); ?>
+			&middot; <?php echo (int)$rowCount; ?> rows
+			&middot; <?php echo nutritionist_e((string)$minX); ?>&ndash;<?php echo nutritionist_e((string)$maxX); ?> <?php echo nutritionist_e($config['columnLabel']); ?>
 		</div>
 	<?php endif; ?>
 </section>
 
-<section class="nutritionist-panel" style="margin-bottom:20px;">
-	<h2 class="admin-section-title" style="margin-bottom:12px;">How the SD columns are calculated</h2>
-	<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(260px, 1fr));gap:14px;">
-		<div class="admin-mini" style="background:var(--admin-surface-alt, #f8f9fb);padding:12px 14px;border-radius:8px;">
-			<code style="display:block;white-space:pre-wrap;">X = M &times; (1 + L&middot;S&middot;z)^(1/L)&nbsp;&nbsp;&nbsp;if L &ne; 0
-X = M &times; e^(S&middot;z)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if L = 0</code>
+<section class="nutritionist-panel" style="margin-bottom:20px;padding:16px;">
+	<div class="who-import-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+		<div class="who-import-label" style="display:flex;align-items:center;gap:8px;color:var(--admin-muted);font-size:0.85rem;">
+			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
+			<span>Importing: <strong><?php echo nutritionist_e($config['label']); ?> &middot; <?php echo nutritionist_e($sex); ?></strong></span>
 		</div>
-		<div class="admin-mini" style="background:var(--admin-surface-alt, #f8f9fb);padding:12px 14px;border-radius:8px;">
-			<code style="display:block;white-space:pre-wrap;">z = [ (X / M)^L &minus; 1 ] / (L&middot;S)&nbsp;&nbsp;if L &ne; 0
-z = ln(X / M) / S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if L = 0</code>
-		</div>
+		<form class="who-import-actions" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>" method="post" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
+			<input type="hidden" name="action" value="import">
+			<input type="hidden" name="indicator" value="<?php echo nutritionist_e($indicator); ?>">
+			<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
+			<label class="admin-btn-secondary" style="cursor:pointer;margin:0;white-space:nowrap;">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
+				Choose .xlsx file
+				<input type="file" name="who_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required style="display:none;">
+			</label>
+			<button type="submit" class="admin-btn" style="white-space:nowrap;">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
+				Import
+			</button>
+		</form>
 	</div>
-</section>
-
-<section class="nutritionist-panel" style="margin-bottom:20px;">
-	<h2 class="admin-section-title" style="margin-bottom:2px;">Import from official WHO LMS 2006 .xlsx</h2>
-	<p class="admin-section-subtitle" style="margin-bottom:12px;">
-		Upload a WHO Child Growth Standards LMS workbook (.xlsx only) to add or replace rows for the indicator
-		and sex selected above. Works with WHO's daily "expanded" tables (a <code>Day</code> column — these get
-		interpolated onto the 0–60 month grid this app uses, the same way WHO derives its own monthly tables
-		from the daily ones) or a table that already has one row per month, or one row per length/height value.
-	</p>
-	<form action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>" method="post" enctype="multipart/form-data" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;">
-		<input type="hidden" name="action" value="import">
-		<input type="hidden" name="indicator" value="<?php echo nutritionist_e($indicator); ?>">
-		<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
-		<span class="admin-mini">Importing into: <strong><?php echo nutritionist_e($config['label']); ?> &middot; <?php echo nutritionist_e($sex); ?></strong> (change indicator/sex above first if needed)</span>
-		<input type="file" name="who_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required>
-		<button type="submit" class="admin-btn-primary">Import .xlsx</button>
-	</form>
 </section>
 
 <?php if ($rowCount > 0): ?>
 <section class="nutritionist-panel">
 	<div class="nutritionist-table-head" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;"><?php echo nutritionist_e($config['label']); ?> Reference (<?php echo nutritionist_e($sex); ?>)</h2>
-			<p class="admin-section-subtitle">L, M, S values and the derived SD bands used to classify a child's z-score.</p>
-		</div>
-		<input class="admin-search" data-admin-filter="#who-reference-table" type="search" placeholder="Search <?php echo nutritionist_e($config['columnLabel']); ?>" style="min-width:220px;">
+		<h2 class="admin-section-title" style="margin-bottom:0;"><?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>)</h2>
+		<input class="admin-search" data-admin-filter="#who-reference-table" type="search" placeholder="Search <?php echo nutritionist_e($config['columnLabel']); ?>" style="min-width:200px;max-width:240px;">
 	</div>
 
 	<div class="nutritionist-table-wrap">
@@ -243,13 +228,7 @@ z = ln(X / M) / S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb
 					<th>L</th>
 					<th>M</th>
 					<th>S</th>
-					<th>-3 SD</th>
-					<th>-2 SD</th>
-					<th>-1 SD</th>
-					<th>Median</th>
-					<th>+1 SD</th>
-					<th>+2 SD</th>
-					<th>+3 SD</th>
+					<th style="text-align:center;">Median</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -260,17 +239,11 @@ z = ln(X / M) / S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nb
 					$x = $row['x'];
 				?>
 					<tr data-filter-text="<?php echo nutritionist_e(strtolower((string)$x)); ?>">
-						<td style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e((string)$x); ?></td>
+						<td style="font-weight:600;"><?php echo nutritionist_e((string)$x); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($L, 4)); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($M, 4)); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($S, 5)); ?></td>
-						<td style="color:#c0392b;"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, -3), 2)); ?></td>
-						<td style="color:#d35400;"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, -2), 2)); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, -1), 2)); ?></td>
-						<td style="font-weight:700;color:var(--admin-primary);"><?php echo nutritionist_e(number_format($M, 2)); ?> <?php echo nutritionist_e($config['unit']); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, 1), 2)); ?></td>
-						<td style="color:#d35400;"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, 2), 2)); ?></td>
-						<td style="color:#c0392b;"><?php echo nutritionist_e(number_format(who_reference_sd($L, $M, $S, 3), 2)); ?></td>
+						<td style="text-align:center;font-weight:700;color:var(--admin-primary);"><?php echo nutritionist_e(number_format($M, 2)); ?> <?php echo nutritionist_e($config['unit']); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>

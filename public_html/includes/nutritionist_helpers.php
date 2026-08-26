@@ -115,7 +115,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
 
     echo '<div class="admin-brand">';
-    echo '<div class="admin-brand-mark">SK</div>';
+    echo '<div class="admin-brand-mark"><img src="' . nutritionist_e(app_url('/assets/images/logo.jpg')) . '" alt="Sukat Kalusugan" class="admin-brand-img"></div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
     echo '<div class="admin-brand-sub">Nutritionist console</div>';
@@ -154,7 +154,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<div class="admin-session-role">' . nutritionist_e(ucfirst($userRole)) . '</div>';
     echo '<div class="admin-session-name">' . nutritionist_e($userName) . '</div>';
     echo '</div>';
-    echo '<a class="admin-logout" href="' . nutritionist_e($logoutUrl) . '">Sign out</a>';
+    echo '<a class="admin-logout" href="' . nutritionist_e($logoutUrl) . '">' . admin_action_icon('logout') . ' Sign out</a>';
     echo '</div>';
 
     echo '</aside>';

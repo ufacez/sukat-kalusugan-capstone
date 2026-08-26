@@ -49,15 +49,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </svg>
 
             <div class="mark-standalone" aria-hidden="true">
-                <svg viewBox="0 0 48 48" width="58" height="58" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                    <path d="M6 30 L16 34 L24 18 L32 24 L42 10" stroke="var(--primary-strong)" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <circle cx="6" cy="30" r="2.6" fill="var(--primary-strong)" />
-                    <circle cx="16" cy="34" r="2.6" fill="var(--primary-strong)" />
-                    <circle cx="24" cy="18" r="2.6" fill="var(--primary-strong)" />
-                    <circle cx="32" cy="24" r="2.6" fill="var(--primary-strong)" />
-                    <circle cx="42" cy="10" r="2.6" fill="var(--primary-strong)" />
-                </svg>
-                <p class="collage-kicker">Sukat<br>Kalusugan</p>
+                <img src="../assets/images/logo.jpg" alt="Sukat Kalusugan" class="mark-standalone-img">
             </div>
 
             <h1>Sukat Kalusugan</h1>

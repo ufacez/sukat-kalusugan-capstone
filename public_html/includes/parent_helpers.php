@@ -103,7 +103,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
 
     echo '<div class="admin-brand">';
-    echo '<div class="admin-brand-mark">SK</div>';
+    echo '<div class="admin-brand-mark"><img src="' . parent_e(app_url('/assets/images/logo.jpg')) . '" alt="Sukat Kalusugan" class="admin-brand-img"></div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
     echo '<div class="admin-brand-sub">Parent portal</div>';
@@ -142,7 +142,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<div class="admin-session-role">Parent</div>';
     echo '<div class="admin-session-name">' . parent_e($userName) . '</div>';
     echo '</div>';
-    echo '<a class="admin-logout" href="' . parent_e($logoutUrl) . '">Sign out</a>';
+    echo '<a class="admin-logout" href="' . parent_e($logoutUrl) . '">' . admin_action_icon('logout') . ' Sign out</a>';
     echo '</div>';
 
     echo '</aside>';
