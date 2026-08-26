@@ -30,5 +30,3 @@ public_html/test/*
 
 # Private Excel/reference files
 public_html/data/*
-
-tools/*
