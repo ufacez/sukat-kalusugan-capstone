@@ -25,7 +25,7 @@ if ($editId > 0 && $editingBarangay === null) {
 
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/barangays.php'))
-    . '">Back to barangays</a>';
+    . '">' . admin_action_icon('back') . ' Barangays</a>';
 
 admin_layout_start(
     $editingBarangay ? 'Edit Barangay' : 'Add Barangay',

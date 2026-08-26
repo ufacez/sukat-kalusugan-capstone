@@ -309,7 +309,7 @@ $parents = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="'
     . nutritionist_e(app_url('/nutritionist/children.php'))
-    . '">Back to children</a>';
+    . '">' . admin_action_icon('back') . ' Children</a>';
 
 nutritionist_layout_start(
     $editChild !== null ? 'Edit Child' : 'Add Child',

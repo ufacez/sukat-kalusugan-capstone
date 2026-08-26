@@ -121,10 +121,10 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 								<?php elseif (in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
 									<span class="admin-mini">No action available</span>
 								<?php else: ?>
-									<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');">
+									<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');" style="display:inline;">
 										<input type="hidden" name="action" value="cancel">
 										<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
-										<button class="admin-btn-danger" type="submit">Cancel</button>
+										<button class="admin-icon-btn admin-icon-btn-danger" title="Cancel" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 									</form>
 								<?php endif; ?>
 							</td>

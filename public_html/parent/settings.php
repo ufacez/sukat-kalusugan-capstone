@@ -75,7 +75,7 @@ if ($profile === null) {
 $childCount = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ?', 'i', [(int)$user['id']]);
 $appointmentCount = admin_scalar('SELECT COUNT(*) FROM appointments WHERE parent_id = ?', 'i', [(int)$user['id']]);
 
-$actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/dashboard.php')) . '">Back to dashboard</a>';
+$actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
 
 parent_layout_start('Settings', 'Update your profile, contact details, and login password.', 'settings', $actions);
 ?>

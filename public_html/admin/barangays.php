@@ -93,10 +93,10 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
                         <td><span class="admin-pill <?php echo (string)$barangay['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst((string)$barangay['status'])); ?></span></td>
                         <td>
                             <div class="admin-actions">
-                                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangay_form.php?id=' . (int)$barangay['id'])); ?>">Edit</a>
-                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_delete.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($barangay['name']); ?>? Records linked to it will keep their history but lose the barangay assignment.');">
+                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/barangay_form.php?id=' . (int)$barangay['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_delete.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($barangay['name']); ?>? Records linked to it will keep their history but lose the barangay assignment.');" style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$barangay['id']; ?>">
-                                    <button class="admin-btn-danger" type="submit">Delete</button>
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
                                 </form>
                             </div>
                         </td>

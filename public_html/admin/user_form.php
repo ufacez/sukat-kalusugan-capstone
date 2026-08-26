@@ -35,7 +35,7 @@ $editingNameParts = admin_split_full_name($editingUser['name'] ?? '');
 
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/users.php'))
-    . '">Back to users</a>';
+    . '">' . admin_action_icon('back') . ' Users</a>';
 
 admin_layout_start(
     $editingUser ? 'Edit User' : 'Add User',

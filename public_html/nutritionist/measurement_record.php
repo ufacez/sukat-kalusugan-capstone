@@ -36,7 +36,7 @@ $preselectedChildId = (int)($_GET['child'] ?? 0);
 
 $actions = '<a class="admin-btn-secondary" href="'
     . nutritionist_e(app_url('/nutritionist/children.php'))
-    . '">Back to children</a>';
+    . '">' . admin_action_icon('back') . ' Children</a>';
 
 nutritionist_layout_start(
     'Record Manual Measurement',

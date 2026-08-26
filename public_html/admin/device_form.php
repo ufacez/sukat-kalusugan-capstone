@@ -72,7 +72,7 @@ $deviceStatus = (string)($device['status'] ?? 'offline');
 
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/sensors.php'))
-    . '">Back to sensors</a>';
+    . '">' . admin_action_icon('back') . ' Sensors</a>';
 
 admin_layout_start('Edit Device', 'Update location, assignment, status, and calibration offsets.', 'sensors', $actions);
 ?>

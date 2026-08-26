@@ -160,7 +160,7 @@ $barangays = admin_barangay_options();
 
 $actions = '<a class="admin-btn-secondary" href="'
 	. nutritionist_e(app_url('/nutritionist/parents.php'))
-	. '">Back to parents</a>';
+	. '">' . admin_action_icon('back') . ' Parents</a>';
 
 nutritionist_layout_start(
 	$editingParent ? 'Edit Parent' : 'Add Parent',

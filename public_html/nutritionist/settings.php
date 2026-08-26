@@ -201,7 +201,7 @@ $profile = admin_fetch_one(
 
 $barangays = admin_barangay_options();
 
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/dashboard.php')) . '">Back to dashboard</a>';
+$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
 
 nutritionist_layout_start('Settings', 'Manage your profile and account details.', 'settings', $actions);
 ?>
@@ -367,12 +367,12 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 						</div>
 					</div>
 					<div class="admin-actions">
-						<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>">Edit</a>
-						<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/settings.php')); ?>" onsubmit="return confirm('Remove this event?');">
+						<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>"><?php echo admin_action_icon('edit'); ?></a>
+						<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/settings.php')); ?>" onsubmit="return confirm('Remove this event?');" style="display:inline;">
 							<input type="hidden" name="action" value="delete_event">
 							<input type="hidden" name="id" value="<?php echo (int)$eventRow['id']; ?>">
 							<input type="hidden" name="cal_month" value="<?php echo nutritionist_e($calMonthParam); ?>">
-							<button class="admin-btn-danger" type="submit">Delete</button>
+							<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 						</form>
 					</div>
 				</div>

@@ -162,11 +162,11 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 						<td><span class="admin-pill <?php echo $parent['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo nutritionist_e(ucfirst($parent['status'])); ?></span></td>
 						<td>
 							<div class="admin-actions">
-								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>">Edit</a>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($parent['name']); ?>?');">
+								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($parent['name']); ?>?');" style="display:inline;">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
-									<button class="admin-btn-danger" type="submit">Delete</button>
+									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 								</form>
 							</div>
 						</td>

@@ -460,6 +460,9 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: 12px;
+  padding: 10px 16px;
+  background: var(--admin-surface-alt);
+  border-radius: 12px;
 }
 
 .admin-pagination-status {
@@ -550,6 +553,7 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 6px;
   min-height: 42px;
   padding: 0 14px;
   border-radius: 12px;
@@ -557,6 +561,13 @@
   text-decoration: none;
   cursor: pointer;
   font-weight: 700;
+}
+.admin-btn svg,
+.admin-btn-secondary svg,
+.admin-btn-danger svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .admin-btn {
@@ -574,6 +585,67 @@
   background: var(--admin-btn-danger-bg);
   color: var(--admin-danger);
   border-color: var(--admin-btn-danger-border);
+}
+
+.admin-icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border-radius: 10px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-btn-secondary-bg);
+  color: var(--admin-text);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  position: relative;
+}
+.admin-icon-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+}
+.admin-icon-btn:hover {
+  background: var(--admin-primary);
+  color: var(--admin-text-on-primary);
+  border-color: var(--admin-primary);
+}
+.admin-icon-btn.admin-icon-btn-danger {
+  color: var(--admin-danger);
+  border-color: var(--admin-btn-danger-border);
+  background: var(--admin-btn-danger-bg);
+}
+.admin-icon-btn.admin-icon-btn-danger:hover {
+  background: var(--admin-danger);
+  color: #fff;
+  border-color: var(--admin-danger);
+}
+.admin-icon-btn.admin-icon-btn-primary {
+  background: var(--admin-primary);
+  color: var(--admin-text-on-primary);
+  border-color: var(--admin-primary);
+}
+.admin-icon-btn.admin-icon-btn-primary:hover {
+  opacity: 0.85;
+}
+
+.admin-icon-btn[title]:hover::after {
+  content: attr(title);
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--admin-text);
+  color: var(--admin-surface);
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
 }
 
 .admin-form-grid {

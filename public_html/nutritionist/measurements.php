@@ -207,7 +207,7 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 								<span style="color:var(--admin-muted);">—</span>
 							<?php endif; ?>
 						</td>
-						<td><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$measurement['child_id'])); ?>">View child</a></td>
+						<td><a class="admin-icon-btn" title="View child" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$measurement['child_id'])); ?>"><?php echo admin_action_icon('view'); ?></a></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>

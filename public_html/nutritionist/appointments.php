@@ -301,10 +301,10 @@ nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT 
 										<?php endforeach; ?>
 									</select>
 								</form>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" onsubmit="return confirm('Delete this appointment?');">
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" onsubmit="return confirm('Delete this appointment?');" style="display:inline;">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
-									<button class="admin-btn-danger" type="submit">Delete</button>
+									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 								</form>
 							</div>
 						</td>
@@ -384,11 +384,11 @@ nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT 
 						</td>
 						<td>
 							<?php if ($isOpen): ?>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>"
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" style="display:inline;"
 									onsubmit="return confirm('Verify that a NEW measurement was recorded for this child? The follow-up only completes when a re-measurement exists.');">
 									<input type="hidden" name="action" value="complete_followup">
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
-									<button class="admin-btn-secondary" type="submit" title="Completes only if a re-measurement exists on or after the due date (±7 days)">Verify re-measurement</button>
+									<button class="admin-icon-btn admin-icon-btn-primary" type="submit" title="Verify re-measurement"><?php echo admin_action_icon('verify'); ?></button>
 								</form>
 							<?php else: ?>
 								<span class="admin-mini"><?php echo nutritionist_e(ucfirst((string)$appointment['status'])); ?></span>

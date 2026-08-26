@@ -109,7 +109,7 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)($device['last_calibration_at'] ?? 'n/a')); ?></td>
                         <td>
                             <div class="admin-actions">
-                                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/device_form.php?id=' . (int)$device['id'])); ?>">Edit</a>
+                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/device_form.php?id=' . (int)$device['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
                             </div>
                         </td>
                     </tr>

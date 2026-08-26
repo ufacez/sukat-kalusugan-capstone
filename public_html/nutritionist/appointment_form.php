@@ -69,7 +69,7 @@ $preselectedChildId = (int)($_GET['child'] ?? 0);
 
 $actions = '<a class="admin-btn-secondary" href="'
 	. nutritionist_e(app_url('/nutritionist/appointments.php'))
-	. '">Back to appointments</a>';
+	. '">' . admin_action_icon('back') . ' Appointments</a>';
 
 nutritionist_layout_start('Schedule Appointment', 'Create a new follow-up visit for a child in your scope.', 'appointments', $actions);
 ?>

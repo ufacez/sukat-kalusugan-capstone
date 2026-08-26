@@ -522,87 +522,16 @@ nutritionist_layout_start(
                         </td>
 
                         <td>
-
                             <div class="admin-actions">
-
-                                <a
-                                    class="admin-btn-secondary"
-                                    href="<?php echo nutritionist_e(
-                                        app_url(
-                                            '/nutritionist/measurement_record.php?child='
-                                            . (int)$child['id']
-                                        )
-                                    ); ?>"
-                                    title="Record a manual measurement for this child"
-                                >
-                                    Measure
-                                </a>
-
-                                <a
-                                    class="admin-btn-secondary"
-                                    href="<?php echo nutritionist_e(
-                                        app_url(
-                                            '/nutritionist/children.php?view='
-                                            . (int)$child['id']
-                                        )
-                                    ); ?>"
-                                >
-                                    View
-                                </a>
-
-                                <a
-                                    class="admin-btn-secondary"
-                                    href="<?php echo nutritionist_e(
-                                        app_url(
-                                            '/nutritionist/child_form.php?id='
-                                            . (int)$child['id']
-                                        )
-                                    ); ?>"
-                                >
-                                    Edit
-                                </a>
-
-                                <form
-                                    method="post"
-                                    action="<?php echo nutritionist_e(
-                                        app_url('/nutritionist/children.php')
-                                    ); ?>"
-                                    onsubmit="return confirm('Delete <?php
-                                        echo nutritionist_e(
-                                            trim(
-                                                $child['first_name']
-                                                . ' '
-                                                . ($child['middle_name'] ?? '')
-                                                . ' '
-                                                . $child['last_name']
-                                            )
-                                        );
-                                    ?>?');"
-                                >
-
-                                    <input
-                                        type="hidden"
-                                        name="action"
-                                        value="delete"
-                                    >
-
-                                    <input
-                                        type="hidden"
-                                        name="id"
-                                        value="<?php echo (int)$child['id']; ?>"
-                                    >
-
-                                    <button
-                                        class="admin-btn-danger"
-                                        type="submit"
-                                    >
-                                        Delete
-                                    </button>
-
+                                <a class="admin-icon-btn admin-icon-btn-primary" title="Measure" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('measure'); ?></a>
+                                <a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('view'); ?></a>
+                                <a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?>?');" style="display:inline;">
+                                    <input type="hidden" name="action" value="delete">
+                                    <input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
                                 </form>
-
                             </div>
-
                         </td>
 
                     </tr>

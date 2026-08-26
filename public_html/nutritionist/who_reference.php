@@ -132,8 +132,8 @@ function who_reference_url(string $indicator, string $sex, string $range, string
 
 $exportUrl = app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange]);
 
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e($exportUrl) . '">Export .xlsx</a>'
-	. ' <a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/who_analysis.php')) . '">Back to WHO Analysis</a>';
+$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e($exportUrl) . '">' . admin_action_icon('export') . ' Export</a>'
+	. ' <a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/who_analysis.php')) . '">' . admin_action_icon('back') . ' WHO Analysis</a>';
 
 nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Standards LMS values used for every z-score calculation.', 'who_reference', $actions);
 ?>

@@ -734,8 +734,10 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 						<td><?php echo nutritionist_e($spec['axis']); ?></td>
 						<td style="text-align:right;font-weight:600;"><?php echo (int)($listCounts[$code] ?? 0); ?></td>
 						<td>
-							<a class="admin-btn-secondary" href="<?php echo nutritionist_e($viewLink); ?>" style="margin-right:6px;">View</a>
-							<a class="admin-btn" href="<?php echo nutritionist_e($exportLink); ?>">Export .xlsx</a>
+							<div class="admin-actions">
+								<a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e($viewLink); ?>"><?php echo admin_action_icon('view'); ?></a>
+								<a class="admin-icon-btn admin-icon-btn-primary" title="Export .xlsx" href="<?php echo nutritionist_e($exportLink); ?>"><?php echo admin_action_icon('export'); ?></a>
+							</div>
 						</td>
 					</tr>
 				<?php endforeach; ?>

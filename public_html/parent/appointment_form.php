@@ -82,7 +82,7 @@ $nutritionists = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="'
 	. parent_e(app_url('/parent/appointments.php'))
-	. '">Back to appointments</a>';
+	. '">' . admin_action_icon('back') . ' Appointments</a>';
 
 parent_layout_start('Request Appointment', 'Submit a follow-up request for any linked child.', 'appointments', $actions);
 ?>
