@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/parent_helpers.php';
+require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 $user = parent_require_access();
 $parent = admin_fetch_one(
@@ -25,7 +26,6 @@ $children = admin_fetch_all(
 		c.birthdate,
 		c.sex,
 		bg.name AS barangay,
-		c.address,
 		lm.measurement_date,
 		lm.height_cm,
 		lm.weight_kg,
@@ -57,6 +57,7 @@ $appointments = admin_fetch_all(
 		a.scheduled_at,
 		a.status,
 		a.notes,
+		a.appointment_type,
 		c.first_name,
 		c.last_name,
 		c.child_code,
@@ -162,6 +163,15 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 		<?php else: ?>
 			<div class="parent-card-grid">
 				<?php foreach (array_slice($children, 0, 4) as $child): ?>
+					<?php
+					$childSchedule = followup_card_state(
+						(string)$child['birthdate'],
+						($child['measurement_date'] ?? null) !== null ? (string)$child['measurement_date'] : null,
+						($child['wfa_status'] ?? null) !== null ? (string)$child['wfa_status'] : null,
+						($child['hfa_status'] ?? null) !== null ? (string)$child['hfa_status'] : null,
+						($child['wfh_status'] ?? null) !== null ? (string)$child['wfh_status'] : null
+					);
+					?>
 					<article class="parent-panel" style="padding:14px;box-shadow:none;">
 						<div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start;">
 							<div>
@@ -171,6 +181,17 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 							<span class="admin-pill <?php echo parent_status_class((string)($child['nutritional_status'] ?? 'Pending')); ?>"><?php echo parent_e((string)($child['nutritional_status'] ?? 'Pending')); ?></span>
 						</div>
 						<div style="margin-top:10px;font-size:0.9rem;color:var(--admin-muted);">Last measurement: <?php echo parent_e((string)($child['measurement_date'] ?? 'n/a')); ?></div>
+						<?php if ($childSchedule['due'] !== null): ?>
+							<div style="margin-top:6px;font-size:0.85rem;color:var(--admin-muted);">
+								Next measurement:
+								<span style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($childSchedule['due']); ?></span>
+							</div>
+							<div style="margin-top:4px;">
+								<span class="admin-pill <?php echo $childSchedule['class']; ?>" title="EOPT follow-up schedule compliance">
+									<?php echo parent_e($childSchedule['label']); ?>
+								</span>
+							</div>
+						<?php endif; ?>
 						<div class="admin-mini" style="margin-top:4px;">Barangay: <?php echo parent_e((string)($child['barangay'] ?? '')); ?></div>
 					</article>
 				<?php endforeach; ?>
@@ -196,6 +217,9 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 						<div>
 							<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($appointment['first_name'] . ' ' . $appointment['last_name']); ?></div>
 							<div class="admin-mini"><?php echo parent_e((string)$appointment['scheduled_at']); ?> · <?php echo parent_e((string)$appointment['nutritionist_name']); ?></div>
+							<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup'): ?>
+								<span class="admin-pill is-danger" style="margin-top:4px;font-size:10px;">Auto follow-up · mandatory</span>
+							<?php endif; ?>
 						</div>
 						<span class="admin-pill <?php echo parent_status_class((string)$appointment['status']); ?>"><?php echo parent_e(ucfirst((string)$appointment['status'])); ?></span>
 					</div>

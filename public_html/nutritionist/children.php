@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
+require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 function nutritionist_child_status_class(?string $status): string
 {
@@ -221,6 +222,18 @@ if ($selectedChild !== null) {
         'i',
         $measurementParams
     );
+
+    $openFollowup = admin_fetch_one(
+        "SELECT id, scheduled_at, status, followup_track, followup_category
+         FROM appointments
+         WHERE child_id = ?
+           AND appointment_type = 'followup'
+           AND status IN ('pending', 'confirmed')
+         ORDER BY scheduled_at ASC
+         LIMIT 1",
+        'i',
+        [(int)$selectedChild['id']]
+    );
 }
 
 
@@ -306,6 +319,7 @@ nutritionist_layout_start(
                     <th>Barangay</th>
                     <th>Parent</th>
                     <th>Status</th>
+                    <th>Next Due</th>
                     <th>Actions</th>
                 </tr>
 
@@ -331,6 +345,14 @@ nutritionist_layout_start(
                     $pillClass =
                         nutritionist_child_status_class($status);
 
+                    $schedule = followup_card_state(
+                        (string)$child['birthdate'],
+                        ($child['measurement_date'] ?? null) !== null ? (string)$child['measurement_date'] : null,
+                        ($child['wfa_status'] ?? null) !== null ? (string)$child['wfa_status'] : null,
+                        ($child['hfa_status'] ?? null) !== null ? (string)$child['hfa_status'] : null,
+                        ($child['wfh_status'] ?? null) !== null ? (string)$child['wfh_status'] : null
+                    );
+
                     ?>
 
                     <tr
@@ -350,6 +372,8 @@ nutritionist_layout_start(
                                     . $child['parent_name']
                                     . ' '
                                     . $status
+                                    . ' '
+                                    . $schedule['label']
                                 )
                             );
                         ?>"
@@ -435,6 +459,31 @@ nutritionist_layout_start(
                             <span class="admin-pill <?php echo $pillClass; ?>">
                                 <?php echo nutritionist_e($status); ?>
                             </span>
+                        </td>
+
+                        <td>
+
+                            <div
+                                style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;"
+                            >
+
+                                <span
+                                    class="admin-pill <?php echo $schedule['class']; ?>"
+                                    title="EOPT schedule compliance flag"
+                                >
+                                    <?php echo nutritionist_e($schedule['label']); ?>
+                                </span>
+
+                                <span style="font-size:10px;color:var(--admin-muted);">
+                                    <?php
+                                    echo $schedule['due'] !== null
+                                        ? nutritionist_e('Next: ' . $schedule['due'])
+                                        : '—';
+                                    ?>
+                                </span>
+
+                            </div>
+
                         </td>
 
                         <td>
@@ -765,6 +814,62 @@ nutritionist_layout_start(
             </div>
 
         <?php endif; ?>
+
+        <?php
+
+        $selectedSchedule = followup_card_state(
+            (string)$selectedChild['birthdate'],
+            ($selectedChild['measurement_date'] ?? null) !== null ? (string)$selectedChild['measurement_date'] : null,
+            ($selectedChild['wfa_status'] ?? null) !== null ? (string)$selectedChild['wfa_status'] : null,
+            ($selectedChild['hfa_status'] ?? null) !== null ? (string)$selectedChild['hfa_status'] : null,
+            ($selectedChild['wfh_status'] ?? null) !== null ? (string)$selectedChild['wfh_status'] : null
+        );
+
+        ?>
+
+        <div
+            style="margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border);"
+        >
+
+            <div
+                style="font-weight:700;font-size:12px;color:var(--admin-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;"
+            >
+                EOPT Follow-up Schedule
+            </div>
+
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--admin-surface-alt,#f7f7f5);border-radius:8px;padding:10px 12px;margin-bottom:8px;"
+            >
+
+                <span style="font-size:12px;color:var(--admin-muted);">
+                    Next measurement due
+                </span>
+
+                <span style="font-size:12px;font-weight:700;color:var(--admin-text);">
+                    <?php echo $selectedSchedule['due'] !== null ? nutritionist_e($selectedSchedule['due']) : '—'; ?>
+                </span>
+
+            </div>
+
+            <div
+                style="display:flex;justify-content:space-between;align-items:center;gap:8px;"
+            >
+
+                <span class="admin-pill <?php echo $selectedSchedule['class']; ?>">
+                    <?php echo nutritionist_e($selectedSchedule['label']); ?>
+                </span>
+
+                <?php if ($openFollowup !== null): ?>
+                    <span class="admin-mini">
+                        Follow-up booked:
+                        <?php echo nutritionist_e(date('M j, Y', strtotime((string)$openFollowup['scheduled_at']))); ?>
+                        · <?php echo nutritionist_e($openFollowup['followup_track'] === 'quarterly' ? 'Quarterly' : 'Monthly'); ?>
+                    </span>
+                <?php endif; ?>
+
+            </div>
+
+        </div>
 
     </article>
 

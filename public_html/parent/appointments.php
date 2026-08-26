@@ -12,12 +12,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$ok = admin_execute(
 			'UPDATE appointments
 			 SET status = ?
-			 WHERE id = ? AND parent_id = ? AND status NOT IN (?, ?)',
-			'siiss',
-			['cancelled', $appointmentId, (int)$user['id'], 'completed', 'cancelled']
+			 WHERE id = ? AND parent_id = ? AND status NOT IN (?, ?)
+			   AND appointment_type <> ?',
+			'ssiiss',
+			['cancelled', $appointmentId, (int)$user['id'], 'completed', 'cancelled', 'followup']
 		);
 
-		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Appointment could not be cancelled.', 'type' => 'error']);
+		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Appointment could not be cancelled. Mandatory EOPT follow-ups cannot be cancelled.', 'type' => 'error']);
 	}
 }
 
@@ -27,6 +28,7 @@ $appointments = admin_fetch_all(
 		a.scheduled_at,
 		a.status,
 		a.notes,
+		a.appointment_type,
 		c.first_name,
 		c.last_name,
 		c.child_code,
@@ -107,9 +109,16 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 								<div class="admin-mini"><?php echo parent_e((string)($appointment['nutritionist_barangay'] ?? '')); ?></div>
 							</td>
 							<td><span class="admin-pill <?php echo parent_status_class((string)$appointment['status']); ?>"><?php echo parent_e(ucfirst((string)$appointment['status'])); ?></span></td>
-							<td style="color:var(--admin-muted);"><?php echo parent_e((string)($appointment['notes'] ?? '')); ?></td>
+							<td style="color:var(--admin-muted);">
+								<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup'): ?>
+									<span class="admin-pill is-danger" style="margin-right:6px;">Auto follow-up · mandatory</span>
+								<?php endif; ?>
+								<?php echo parent_e((string)($appointment['notes'] ?? '')); ?>
+							</td>
 							<td>
-								<?php if (in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
+								<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup' && !in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
+									<span class="admin-mini">Required re-measurement — cannot be cancelled</span>
+								<?php elseif (in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
 									<span class="admin-mini">No action available</span>
 								<?php else: ?>
 									<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');">

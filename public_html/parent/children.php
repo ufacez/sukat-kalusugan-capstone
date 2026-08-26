@@ -14,7 +14,6 @@ $children = admin_fetch_all(
 		c.birthdate,
 		c.sex,
 		bg.name AS barangay,
-		c.address,
 		p.name AS parent_name,
 		p.parent_type,
 		p.phone AS parent_phone,

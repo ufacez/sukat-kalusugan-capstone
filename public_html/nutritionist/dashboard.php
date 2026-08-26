@@ -274,7 +274,7 @@ $makePoints = static function (array $values) use ($chartXs, $toY): string {
 
 $actions = implode(' ', [
 	'<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">Open children</a>',
-	'<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/reports.php')) . '">View reports</a>',
+	'<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports.php')) . '">EOPT reports</a>',
 ]);
 
 nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth analysis, and appointment oversight.', 'dashboard', $actions);
