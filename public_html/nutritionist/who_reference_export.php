@@ -8,7 +8,8 @@ nutritionist_require_access();
 $indicators = [
 	'waz' => ['label' => 'Weight-for-Age', 'table' => 'who_weight_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
 	'haz' => ['label' => 'Height-for-Age', 'table' => 'who_height_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'whz' => ['label' => 'Weight-for-Height', 'table' => 'who_weight_for_height', 'column' => 'height_cm', 'columnLabel' => 'Height/Length (cm)'],
+	'whz' => ['label' => 'Weight-for-Height (2-5y)', 'table' => 'who_weight_for_height', 'column' => 'height_cm', 'columnLabel' => 'Height (cm)'],
+	'wfl' => ['label' => 'Weight-for-Length (0-2y)', 'table' => 'who_weight_for_length', 'column' => 'height_cm', 'columnLabel' => 'Length (cm)'],
 ];
 
 $indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
@@ -18,15 +19,15 @@ if (!isset($indicators[$indicator])) {
 }
 
 $sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
-$ageRange = (string)($_GET['range'] ?? 'old');
+$ageRange = (string)($_GET['range'] ?? 'all');
 
 if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
-	$ageRange = 'old';
+	$ageRange = 'all';
 }
 
 $rangeBounds = [
-	'young' => ['age_months' => [0, 23], 'height_cm' => [0, 64.9]],
-	'old' => ['age_months' => [24, 60], 'height_cm' => [65, 999]],
+	'young' => ['age_months' => [0, 23]],
+	'old' => ['age_months' => [24, 60]],
 	'all' => null,
 ];
 
@@ -35,7 +36,7 @@ $sql = "SELECT {$config['column']} AS x, L, M, S FROM {$config['table']} WHERE s
 $types = 's';
 $params = [$sex];
 
-if ($rangeBounds[$ageRange] !== null) {
+if ($rangeBounds[$ageRange] !== null && $config['column'] === 'age_months') {
 	[$low, $high] = $rangeBounds[$ageRange][$config['column']];
 	$sql .= " AND {$config['column']} BETWEEN ? AND ?";
 	$types .= 'dd';

@@ -9,7 +9,8 @@ $user = nutritionist_require_access();
 $indicators = [
 	'waz' => ['label' => 'Weight-for-Age', 'table' => 'who_weight_for_age', 'unit' => 'kg', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
 	'haz' => ['label' => 'Height-for-Age', 'table' => 'who_height_for_age', 'unit' => 'cm', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'whz' => ['label' => 'Weight-for-Height', 'table' => 'who_weight_for_height', 'unit' => 'kg', 'column' => 'height_cm', 'columnLabel' => 'Height (cm)'],
+	'whz' => ['label' => 'Weight-for-Height (2-5y)', 'table' => 'who_weight_for_height', 'unit' => 'kg', 'column' => 'height_cm', 'columnLabel' => 'Height (cm)'],
+	'wfl' => ['label' => 'Weight-for-Length (0-2y)', 'table' => 'who_weight_for_length', 'unit' => 'kg', 'column' => 'height_cm', 'columnLabel' => 'Length (cm)'],
 ];
 
 // Import runs before anything is echoed, since it redirects back to this
@@ -70,21 +71,21 @@ if (!isset($indicators[$indicator])) {
 $sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
 $search = trim((string)($_GET['q'] ?? ''));
 
-// Program scope is 2-5 year olds (24-60 months), so that's the default view.
-// "young" = 0-24mo (not our scope, kept for completeness), "old" = 24-60mo (our scope), "all" = everything.
-$ageRange = (string)($_GET['range'] ?? 'old');
+// For age-based indicators (WAZ, HAZ), "young" = 0-23mo, "old" = 24-60mo, "all" = 0-60mo.
+// For height-based indicators (WHZ, WFL), each table already contains only its valid range
+// (WHZ = standing height 65-120cm, WFL = recumbent length 45-110cm), so range filtering is skipped.
+$ageRange = (string)($_GET['range'] ?? 'all');
 
 if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
-	$ageRange = 'old';
+	$ageRange = 'all';
 }
 
-// who_weight_for_height is keyed by height_cm, not age, but it was seeded from two
-// separate WHO source tables: 45.0-64.5cm came from the birth-2y (recumbent length)
-// table, and 65.0-120.0cm came from the 2-5y (standing height) table. So filtering
-// by height_cm >= 65 lines up with the 24-60mo / "our scope" range for this indicator too.
+// who_weight_for_height contains only the standing-height curve (65.0-120.0cm, 2-5y).
+// who_weight_for_length contains only the recumbent-length curve (45.0-110.0cm, 0-2y).
+// The age-based tables (who_weight_for_age, who_height_for_age) cover 0-60 months.
 $rangeBounds = [
-	'young' => ['age_months' => [0, 23], 'height_cm' => [0, 64.9]],
-	'old' => ['age_months' => [24, 60], 'height_cm' => [65, 999]],
+	'young' => ['age_months' => [0, 23]],
+	'old' => ['age_months' => [24, 60]],
 	'all' => null,
 ];
 
@@ -93,7 +94,7 @@ $sql = "SELECT {$config['column']} AS x, L, M, S FROM {$config['table']} WHERE s
 $types = 's';
 $params = [$sex];
 
-if ($rangeBounds[$ageRange] !== null) {
+if ($rangeBounds[$ageRange] !== null && $config['column'] === 'age_months') {
 	[$low, $high] = $rangeBounds[$ageRange][$config['column']];
 	$sql .= " AND {$config['column']} BETWEEN ? AND ?";
 	$types .= 'dd';
@@ -158,12 +159,13 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 		</div>
 	</div>
 
+	<?php if ($config['column'] === 'age_months'): ?>
 	<div class="nutritionist-table-head" style="margin-bottom:14px;flex-wrap:wrap;gap:10px;">
 		<div style="display:flex;gap:8px;flex-wrap:wrap;">
 			<?php foreach ([
+				'all' => 'All (0-60mo)',
 				'old' => '2-5 years (24-60mo) - our scope',
 				'young' => '0-2 years (0-23mo)',
-				'all' => 'All (0-60mo)',
 			] as $rangeKey => $rangeLabel): ?>
 				<a
 					href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $rangeKey, $search)); ?>"
@@ -173,12 +175,13 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 			<?php endforeach; ?>
 		</div>
 	</div>
+	<?php endif; ?>
 
 	<?php if ($rowCount === 0): ?>
 		<div class="admin-flash is-error">
 			No reference rows found for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).
 			The <code><?php echo nutritionist_e($config['table']); ?></code> table looks empty — run
-			<code>db/20260817_who_growth_reference_seed.sql</code> against the database.
+			<code>db/20260826_who_reference_rebuild_expanded.sql</code> against the database.
 		</div>
 	<?php else: ?>
 		<div class="admin-mini" style="margin-bottom:12px;">

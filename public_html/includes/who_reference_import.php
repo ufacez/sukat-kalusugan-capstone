@@ -4,8 +4,9 @@
  *
  * Helper functions for importing official WHO LMS 2006 reference tables
  * (.xlsx only) into who_weight_for_age / who_height_for_age /
- * who_weight_for_height, and for exporting the current contents of those
- * tables back out to .xlsx. Used by nutritionist/who_reference.php.
+ * who_weight_for_height / who_weight_for_length, and for exporting the
+ * current contents of those tables back out to .xlsx. Used by
+ * nutritionist/who_reference.php.
  */
 
 require_once __DIR__ . '/xlsx_lite.php';
