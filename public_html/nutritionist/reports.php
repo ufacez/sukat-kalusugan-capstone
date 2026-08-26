@@ -32,7 +32,7 @@ $statusCounts = [
 	'Overweight' => 0,
 ];
 
-$wfaCounts = ['SUW' => 0, 'MUW' => 0, 'Normal' => 0];
+$wfaCounts = ['SUW' => 0, 'MUW' => 0, 'Normal' => 0, 'OW' => 0];
 $hfaCounts = ['SSt' => 0, 'MSt' => 0, 'Normal' => 0, 'Tall' => 0];
 $wfhCounts = ['SW/SAM' => 0, 'MW/MAM' => 0, 'Normal' => 0, 'OW' => 0, 'Ob' => 0];
 

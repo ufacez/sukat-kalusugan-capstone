@@ -140,7 +140,7 @@ function doh_summary_bucket(): array
 	];
 }
 
-$wfaSummary = ['SUW' => doh_summary_bucket(), 'MUW' => doh_summary_bucket(), 'Normal' => doh_summary_bucket()];
+$wfaSummary = ['SUW' => doh_summary_bucket(), 'MUW' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket()];
 $hfaSummary = ['SSt' => doh_summary_bucket(), 'MSt' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'Tall' => doh_summary_bucket()];
 $wfhSummary = ['SW/SAM' => doh_summary_bucket(), 'MW/MAM' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket(), 'Ob' => doh_summary_bucket()];
 $flaggedTotal = 0;

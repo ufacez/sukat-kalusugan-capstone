@@ -208,14 +208,11 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 /**
  * DOH Operation Timbang Plus (eOPT Plus) classifies WFA, HFA, and WFH as
  * three independent axes rather than collapsing them into one label. These
- * match the exact cutoffs used in the DOH "Nut_StatusTool" reference sheet.
- *
- * WFA deliberately has no overweight/obese category -- DOH classifies
- * weight-related overweight/obesity through WFH instead, since WFA alone
- * can't distinguish a tall-heavy child from an overweight one. A waz above
- * +2 returns null here; the WFH axis is what carries that signal.
+ * match the exact cutoffs used in the DOH "Nut_StatusTool" reference sheet,
+ * verified against the e-OPT Plus workbook in public_html/data/ (which emits
+ * OW on the weight-for-age axis for children above +2SD).
  */
-function classify_wfa_status(float $waz): ?string
+function classify_wfa_status(float $waz): string
 {
 	if ($waz < -3) {
 		return 'SUW';
@@ -229,7 +226,7 @@ function classify_wfa_status(float $waz): ?string
 		return 'Normal';
 	}
 
-	return null;
+	return 'OW';
 }
 
 function classify_hfa_status(float $haz): string

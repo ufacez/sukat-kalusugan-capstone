@@ -115,7 +115,7 @@ if ($reportType === 'summary') {
 		'Total' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
 	];
 
-	$wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket()];
+	$wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
 	$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
 	$wfhSummary = ['SW/SAM' => $bucket(), 'MW/MAM' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
 
