@@ -255,8 +255,36 @@
     grid-column: 1;
   }
 
-  .nutritionist-page .nutritionist-topbar-actions {
+  .nutritionist-page .admin-topbar-actions {
     width: 100%;
+  }
+
+  .nutritionist-page .nutritionist-table {
+    min-width: 560px;
+  }
+
+  .nutritionist-page .nutritionist-table th,
+  .nutritionist-page .nutritionist-table td {
+    padding: 8px 8px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .nutritionist-page .nutritionist-table th {
+    font-size: 0.68rem;
+  }
+
+  .nutritionist-page .nutritionist-patient-table {
+    min-width: 800px;
+  }
+
+  .nutritionist-page .admin-pagehead h1 {
+    font-size: 1.4rem;
+  }
+
+  .nutritionist-page .nutritionist-toolbar {
+    flex-direction: column;
+    align-items: stretch;
   }
 }
 

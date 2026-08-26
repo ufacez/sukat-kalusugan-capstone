@@ -173,9 +173,9 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo '<div class="admin-topbar-actions">' . $actionsHtml . '</div>';
+    echo '<a href="' . nutritionist_e(app_url('/nutritionist/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
-    echo '<a href="' . nutritionist_e(app_url('/nutritionist/settings.php')) . '" class="admin-settings-link" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '</div>';
     echo '</div>';
     echo '</header>';

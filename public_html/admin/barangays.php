@@ -30,7 +30,7 @@ $activeCount = count(array_filter($barangays, static fn(array $b): bool => (stri
 $totalChildren = array_sum(array_map(static fn(array $b): int => (int)$b['children_count'], $barangays));
 $totalKiosks = array_sum(array_map(static fn(array $b): int => (int)$b['kiosks_count'], $barangays));
 
-$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/barangay_form.php')) . '"><?php echo admin_action_icon(\'add\'); ?> Add barangay</a>';
+$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/barangay_form.php')) . '">' . admin_action_icon('add') . ' Add barangay</a>';
 
 admin_layout_start('Barangays', 'The master list every child, parent, nutritionist, and kiosk is scoped to.', 'barangays', $actions);
 ?>

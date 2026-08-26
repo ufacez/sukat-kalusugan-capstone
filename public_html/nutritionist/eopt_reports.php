@@ -492,7 +492,6 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 					<th>WFA</th>
 					<th>HFA</th>
 					<th>WFH</th>
-					</tr>
 				</tr>
 			</thead>
 			<tbody>
@@ -668,7 +667,6 @@ $infantCountRows = admin_fetch_all(
 );
 $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 ?>
-?>
 <section class="nutritionist-card" style="margin-bottom:20px;">
 	<header class="nutritionist-card-head">
 		<h3>Monitoring Lists — V2 Combined View &amp; Export</h3>
@@ -680,8 +678,8 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 				<tr>
 					<th style="width:28%;">List</th>
 					<th style="width:32%;">Axis / Definition</th>
-					<th style="width:8%;text-align:right;">Children</th>
-					<th style="width:32%;">Actions</th>
+					<th style="width:10%;text-align:right;">Children</th>
+					<th style="width:30%;">Actions</th>
 				</tr>
 			</thead>
 			<tbody>

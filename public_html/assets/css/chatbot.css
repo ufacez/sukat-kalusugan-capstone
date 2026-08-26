@@ -26,8 +26,13 @@
 }
 
 .chatbot-launcher .chatbot-launcher-icon {
-  font-size: 1.05rem;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+}
+
+.chatbot-launcher .chatbot-launcher-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 .chatbot-panel {
@@ -75,10 +80,22 @@
   background: transparent;
   border: none;
   color: #ffffff;
-  font-size: 1.2rem;
-  line-height: 1;
   cursor: pointer;
   padding: 4px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.chatbot-close:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.chatbot-close svg {
+  width: 18px;
+  height: 18px;
 }
 
 .chatbot-child-row {
@@ -185,11 +202,21 @@
 .chatbot-send {
   border: none;
   border-radius: 10px;
-  padding: 0 16px;
+  padding: 0 14px;
   background: var(--admin-primary);
   color: #ffffff;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 38px;
+}
+
+.chatbot-send svg {
+  width: 18px;
+  height: 18px;
 }
 
 .chatbot-send:disabled {

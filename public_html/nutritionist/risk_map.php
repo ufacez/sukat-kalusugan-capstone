@@ -369,29 +369,54 @@ nutritionist_layout_start('Barangay Risk Map', $subtitle, 'risk_map');
             var input = L.DomUtil.create('input', 'admin-riskmap-search-input', container);
             input.type = 'text';
             input.placeholder = 'Find a barangay\u2026';
-            input.setAttribute('list', 'risk-map-barangay-list');
 
-            var datalist = document.getElementById('risk-map-barangay-list');
-            if (!datalist) {
-                datalist = document.createElement('datalist');
-                datalist.id = 'risk-map-barangay-list';
-                document.body.appendChild(datalist);
+            var dropdown = L.DomUtil.create('div', 'admin-riskmap-search-dropdown', container);
+            dropdown.style.display = 'none';
+
+            var names = Object.keys(STATS_BY_NAME).map(function (k) { return STATS_BY_NAME[k].name; });
+
+            function showDropdown(query) {
+                dropdown.innerHTML = '';
+                if (!query) { dropdown.style.display = 'none'; return; }
+                var lower = query.toLowerCase();
+                var matches = names.filter(function (n) { return n.toLowerCase().indexOf(lower) !== -1; }).slice(0, 8);
+                if (matches.length === 0) { dropdown.style.display = 'none'; return; }
+                matches.forEach(function (name) {
+                    var item = document.createElement('div');
+                    item.className = 'admin-riskmap-search-item';
+                    item.textContent = name;
+                    item.addEventListener('mousedown', function (e) {
+                        e.preventDefault();
+                        input.value = name;
+                        dropdown.style.display = 'none';
+                        if (this._onSearch) { this._onSearch(name); }
+                    }.bind(this));
+                    dropdown.appendChild(item);
+                }.bind(this));
+                dropdown.style.display = 'block';
             }
-            Object.keys(STATS_BY_NAME).forEach(function (key) {
-                var opt = document.createElement('option');
-                opt.value = STATS_BY_NAME[key].name;
-                datalist.appendChild(opt);
-            });
+
+            L.DomEvent.on(input, 'input', function () {
+                showDropdown.call(this, input.value);
+            }, this);
 
             L.DomEvent.on(input, 'keydown', function (e) {
-                if (e.key === 'Enter' && this._onSearch) {
-                    this._onSearch(input.value);
+                if (e.key === 'Enter') {
+                    dropdown.style.display = 'none';
+                    if (this._onSearch) { this._onSearch(input.value); }
                 }
+                if (e.key === 'Escape') { dropdown.style.display = 'none'; }
             }, this);
+
+            L.DomEvent.on(input, 'blur', function () {
+                setTimeout(function () { dropdown.style.display = 'none'; }, 150);
+            });
 
             L.DomEvent.disableClickPropagation(container);
             L.DomEvent.disableScrollPropagation(container);
 
+            this._dropdown = dropdown;
+            this._input = input;
             return container;
         },
         onSearch: function (fn) {

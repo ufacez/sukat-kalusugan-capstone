@@ -59,7 +59,7 @@ $summary = [
 ];
 
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '"><?php echo admin_action_icon(\'view\'); ?> Manage users</a>';
+$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('view') . ' Manage users</a>';
 
 admin_layout_start('Dashboard', 'System overview, account health, and device status.', 'dashboard', $actions);
 ?>

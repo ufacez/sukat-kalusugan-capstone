@@ -181,4 +181,28 @@
   .parent-page .admin-topbar-actions {
     width: 100%;
   }
+
+  .parent-page .parent-table {
+    min-width: 500px;
+  }
+
+  .parent-page .parent-table th,
+  .parent-page .parent-table td {
+    padding: 8px 8px;
+    font-size: 0.8rem;
+    white-space: nowrap;
+  }
+
+  .parent-page .parent-table th {
+    font-size: 0.68rem;
+  }
+
+  .parent-page .admin-pagehead h1 {
+    font-size: 1.4rem;
+  }
+
+  .parent-page .parent-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

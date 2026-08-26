@@ -436,12 +436,11 @@
 .admin-topbar-profile {
   display: flex;
   align-items: center;
-  gap: 10px;
 }
 .admin-avatar {
   width: 34px;
   height: 34px;
-  border-radius: 10px;
+  border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -450,19 +449,26 @@
   color: #fff;
   flex-shrink: 0;
 }
-.admin-settings-link {
+.admin-topbar-settings {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
   color: var(--admin-muted);
-  transition: color 0.15s;
+  text-decoration: none;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
 }
-.admin-settings-link:hover {
+.admin-topbar-settings:hover {
   color: var(--admin-text);
+  background: var(--admin-surface);
 }
-.admin-settings-link svg {
+.admin-topbar-settings svg {
   width: 20px;
   height: 20px;
+  fill: none;
 }
 
 .admin-sidebar-toggle {
@@ -1192,6 +1198,10 @@
     background: var(--admin-bg);
   }
 
+  .admin-topbar-right {
+    gap: 10px;
+  }
+
   .admin-topbar-actions {
     width: 100%;
   }
@@ -1220,6 +1230,42 @@
 @media (max-width: 720px) {
   .admin-topbar {
     flex-direction: column;
+    gap: 12px;
+  }
+
+  .admin-topbar-left {
+    width: 100%;
+  }
+
+  .admin-topbar-right {
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .admin-topbar-actions {
+    width: 100%;
+    order: -1;
+  }
+
+  .admin-topbar-actions .admin-btn,
+  .admin-topbar-actions .admin-btn-secondary,
+  .admin-topbar-actions .admin-btn-danger,
+  .admin-topbar-actions button {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.82rem;
+    padding: 0 10px;
+    min-height: 38px;
+  }
+
+  .admin-topbar-actions .admin-btn svg,
+  .admin-topbar-actions .admin-btn-secondary svg,
+  .admin-topbar-actions .admin-btn-danger svg,
+  .admin-topbar-actions button svg {
+    width: 14px;
+    height: 14px;
   }
 
   .admin-grid-cards,
@@ -1239,6 +1285,98 @@
   .admin-pw-checklist {
     grid-template-columns: minmax(0, 1fr);
     flex-direction: column;
+  }
+
+  /* Tables: horizontal scroll with fade hint */
+  .admin-table-wrap {
+    position: relative;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .admin-table {
+    min-width: 600px;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 10px 10px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+
+  .admin-table th {
+    font-size: 0.7rem;
+  }
+
+  /* Pagination: stack and wrap */
+  .admin-pagination {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .admin-pagination-status {
+    font-size: 0.75rem;
+    text-align: center;
+  }
+
+  .admin-pagination-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+
+  .admin-page-num {
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.78rem;
+  }
+
+  .admin-page-ellipsis {
+    min-width: 20px;
+    height: 30px;
+  }
+
+  /* Toolbar */
+  .admin-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* Card padding */
+  .admin-card {
+    padding: 14px;
+  }
+
+  /* Pagehead */
+  .admin-pagehead h1 {
+    font-size: 1.4rem;
+  }
+
+  /* Sidebar toggle */
+  .admin-sidebar-toggle {
+    width: 38px;
+    height: 38px;
+  }
+
+  /* Stat values */
+  .admin-stat-value {
+    font-size: 1.3rem;
+  }
+
+  /* Risk map */
+  .admin-riskmap-canvas {
+    height: 300px;
+  }
+
+  .admin-riskmap-canvas-v2 {
+    height: 280px;
   }
 }
 .admin-riskmap-canvas {
@@ -1406,6 +1544,7 @@
 
 /* Leaflet control: barangay search */
 .admin-riskmap-search {
+  position: relative;
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: 12px;
@@ -1422,6 +1561,41 @@
   width: 200px;
   color: var(--admin-text);
   font-family: inherit;
+}
+
+.admin-riskmap-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: 4px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.12);
+  max-height: 220px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.admin-riskmap-search-item {
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  color: var(--admin-text);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.admin-riskmap-search-item:first-child {
+  border-radius: 10px 10px 0 0;
+}
+
+.admin-riskmap-search-item:last-child {
+  border-radius: 0 0 10px 10px;
+}
+
+.admin-riskmap-search-item:hover {
+  background: var(--admin-surface-alt);
 }
 
 @media (max-width: 900px) {
