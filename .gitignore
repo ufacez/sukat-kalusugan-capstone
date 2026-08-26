@@ -27,3 +27,6 @@ composer.lock
 
 # --- Debug / throwaway scripts ---
 test_connection.php
+
+# Private Excel/reference files
+public_html/data/*
