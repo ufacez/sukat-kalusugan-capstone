@@ -28,6 +28,14 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <title>Sukat Kalusugan | Forgot Password</title>
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
+    <script>
+    (function(){
+    var t=localStorage.getItem("theme");
+    if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme:dark)").matches)){
+    document.documentElement.setAttribute("data-theme","dark");
+    }
+    })();
+    </script>
 </head>
 
 <body class="auth-page">

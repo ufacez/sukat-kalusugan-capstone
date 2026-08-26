@@ -69,9 +69,8 @@ function parent_status_class(?string $status): string
 
     return match ($normalized) {
         'normal', 'confirmed', 'completed', 'active', 'n' => 'is-success',
-        'overweight', 'pending', 'ow', 'muw', 'mst', 'mw/mam' => 'is-warn',
-        'cancelled', 'inactive', 'suw', 'sst', 'sw/sam', 'ob' => 'is-danger',
-        'tall' => 'is-muted',
+        'overweight', 'moderately wasted', 'pending', 'ow', 'uw', 'st', 'mw', 't' => 'is-warn',
+        'cancelled', 'inactive', 'suw', 'sst', 'sw', 'ob', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
         default => 'is-muted',
     };
 }
@@ -93,6 +92,14 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/chatbot.css')) . '">';
+    echo '<script>';
+    echo '(function(){';
+    echo 'var t=localStorage.getItem("theme");';
+    echo 'if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme:dark)").matches)){';
+    echo 'document.documentElement.setAttribute("data-theme","dark");';
+    echo '}';
+    echo '})();';
+    echo '</script>';
     echo '</head>';
     echo '<body class="admin-page parent-page">';
     echo '<div class="admin-shell">';
@@ -125,6 +132,12 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '</nav>';
 
     echo '<div class="admin-sidebar-footer">';
+    echo '<div class="admin-nav-group sidebar-theme-toggle">';
+    echo '<button type="button" data-theme-toggle>';
+    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>';
+    echo '<span class="theme-toggle-label">Dark Mode</span>';
+    echo '</button>';
+    echo '</div>';
     echo '<div class="admin-session-card">';
     echo '<div class="admin-session-role">Parent</div>';
     echo '<div class="admin-session-name">' . parent_e($userName) . '</div>';

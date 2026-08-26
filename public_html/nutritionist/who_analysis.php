@@ -97,11 +97,14 @@ nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and class
 		<div style="display:grid;gap:10px;">
 			<?php foreach ([
 				['Normal', 'All z-scores within accepted range'],
-				['Underweight', 'Weight-for-age below expected range'],
-				['Severely Underweight', 'Immediate nutritional intervention needed'],
-				['Stunted', 'Height-for-age below expected range'],
-				['Wasted', 'Weight-for-height below expected range'],
-				['Overweight', 'Above the healthy range'],
+				['Underweight', 'WFA below expected range (UW)'],
+				['Severely Underweight', 'WFA critically low (SUW)'],
+				['Stunted', 'HFA below expected range (St)'],
+				['Severely Stunted', 'HFA critically low (SSt)'],
+				['Moderately Wasted', 'WFH below expected range (MW)'],
+				['Severely Wasted', 'WFH critically low (SW)'],
+				['Overweight', 'WFH above expected range (OW)'],
+				['Obese', 'WFH critically high (Ob)'],
 			] as [$label, $description]): ?>
 				<div class="admin-list-item" style="padding:10px 0;">
 					<span class="admin-pill <?php echo nutritionist_status_class($label); ?>"><?php echo nutritionist_e($label); ?></span>

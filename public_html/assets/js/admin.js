@@ -1,4 +1,34 @@
 (function () {
+  // Theme toggle
+  const themeToggle = document.querySelector("[data-theme-toggle]");
+  if (themeToggle) {
+    const getPreferredTheme = () => {
+      const stored = localStorage.getItem("theme");
+      if (stored) return stored;
+      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    };
+
+    const applyTheme = (theme) => {
+      document.documentElement.setAttribute("data-theme", theme);
+      localStorage.setItem("theme", theme);
+      const label = themeToggle.querySelector(".theme-toggle-label");
+      if (label) label.textContent = theme === "dark" ? "Light Mode" : "Dark Mode";
+    };
+
+    applyTheme(getPreferredTheme());
+
+    themeToggle.addEventListener("click", () => {
+      const current = document.documentElement.getAttribute("data-theme");
+      applyTheme(current === "dark" ? "light" : "dark");
+    });
+
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
+      if (!localStorage.getItem("theme")) {
+        applyTheme(e.matches ? "dark" : "light");
+      }
+    });
+  }
+
   const sidebar = document.querySelector("[data-admin-sidebar]");
   const toggle = document.querySelector("[data-admin-sidebar-toggle]");
   let overlay = document.querySelector("[data-admin-sidebar-overlay]");

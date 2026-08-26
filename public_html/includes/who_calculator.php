@@ -160,21 +160,19 @@ function calculate_whz(float $weight_kg, float $height_cm, int $age_months, stri
  * WHO treats underweight (WAZ), stunting (HAZ), and wasting (WHZ) as three
  * independent classifications -- a child can be stunted with a healthy
  * weight-for-height, or wasted without being underweight-for-age. The
- * `measurements.nutritional_status` column is a single-value ENUM
- * ('Normal','Underweight','Severely Underweight','Stunted','Wasted',
- * 'Overweight'), so this returns the single most clinically severe label
- * that applies, evaluating each axis independently -- WHZ no longer feeds
- * into the underweight check, which was the original bug (it meant 'Wasted'
- * could never actually be returned, and a low WHZ could mislabel a child as
- * 'Underweight' based on the wrong indicator).
+ * `measurements.nutritional_status` column stores the single most clinically
+ * severe label that applies, evaluating each axis independently.
  *
- * If your program wants a child's full status (e.g. stunted AND wasted
- * shown together), that needs a schema change -- either separate columns
- * per axis, or widening the ENUM -- since one ENUM column can only hold one
- * value. Worth raising with your adviser; this fix keeps today's schema
- * working correctly without requiring that migration yet.
- *
- * NOTE: BMI-for-age is not implemented here -- flag for adviser review.
+ * Categories returned:
+ *   Severely Underweight  (WAZ < -3)
+ *   Underweight           (WAZ < -2)
+ *   Severely Stunted      (HAZ < -3)
+ *   Stunted               (HAZ < -2)
+ *   Severely Wasted       (WHZ < -3)
+ *   Moderately Wasted     (WHZ < -2)
+ *   Obese                 (WHZ > 3)
+ *   Overweight            (WHZ > 2)
+ *   Normal
  */
 function classify_nutritional_status(float $waz, float $haz, float $whz): string
 {
@@ -182,20 +180,28 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 		return 'Severely Underweight';
 	}
 
+	if ($haz < -3) {
+		return 'Severely Stunted';
+	}
+
 	if ($whz < -3) {
-		return 'Wasted';
+		return 'Severely Wasted';
 	}
 
 	if ($waz < -2) {
 		return 'Underweight';
 	}
 
-	if ($whz < -2) {
-		return 'Wasted';
-	}
-
 	if ($haz < -2) {
 		return 'Stunted';
+	}
+
+	if ($whz < -2) {
+		return 'Moderately Wasted';
+	}
+
+	if ($whz > 3) {
+		return 'Obese';
 	}
 
 	if ($whz > 2) {

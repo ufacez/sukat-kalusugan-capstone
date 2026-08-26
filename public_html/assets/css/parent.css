@@ -27,6 +27,12 @@
   color: #fff;
 }
 
+[data-theme="dark"] .parent-page .parent-stat-card.is-featured,
+[data-theme="dark"] .parent-page .parent-hero {
+  background: linear-gradient(180deg, #0e3248 0%, #122e42 100%);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
 .parent-page .parent-stat-card.is-featured .admin-stat-note,
 .parent-page .parent-stat-card.is-featured .parent-stat-label,
 .parent-page .parent-hero .admin-section-subtitle,
@@ -88,6 +94,10 @@
   color: #fff;
 }
 
+[data-theme="dark"] .parent-page .parent-badge {
+  background: rgba(255, 255, 255, 0.06);
+}
+
 .parent-page .parent-table-wrap {
   overflow: auto;
   border: 1px solid var(--admin-border);
@@ -97,7 +107,7 @@
 .parent-page .parent-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--admin-table-bg);
 }
 
 .parent-page .parent-table thead {

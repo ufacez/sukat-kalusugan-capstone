@@ -23,6 +23,11 @@
   color: #fff;
 }
 
+[data-theme="dark"] .nutritionist-page .nutritionist-stat-card.is-featured {
+  background: linear-gradient(180deg, #0a2a1f 0%, #0f3525 100%);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
 .nutritionist-page .nutritionist-stat-label {
   display: flex;
   align-items: center;
@@ -83,7 +88,7 @@
   padding: 0.4rem 0.75rem;
   border-radius: 999px;
   border: 1px solid var(--admin-border);
-  background: #fff;
+  background: var(--admin-surface);
   color: var(--admin-text);
   font-size: 0.74rem;
   font-weight: 700;
@@ -164,7 +169,7 @@
 .nutritionist-page .nutritionist-table {
   width: 100%;
   border-collapse: collapse;
-  background: #fff;
+  background: var(--admin-table-bg);
 }
 
 .nutritionist-page .nutritionist-table thead {

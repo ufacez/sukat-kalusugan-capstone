@@ -207,10 +207,10 @@ CREATE TABLE `measurements` (
   `waz` decimal(5,2) DEFAULT NULL,
   `haz` decimal(5,2) DEFAULT NULL,
   `whz` decimal(5,2) DEFAULT NULL,
-  `nutritional_status` enum('Normal','Underweight','Severely Underweight','Stunted','Wasted','Overweight') DEFAULT NULL,
-  `wfa_status` enum('SUW','MUW','Normal') DEFAULT NULL,
-  `hfa_status` enum('SSt','MSt','Normal','Tall') DEFAULT NULL,
-  `wfh_status` enum('SW/SAM','MW/MAM','Normal','OW','Ob') DEFAULT NULL,
+  `nutritional_status` enum('Normal','Underweight','Severely Underweight','Stunted','Severely Stunted','Wasted','Severely Wasted','Moderately Wasted','Overweight','Obese') DEFAULT NULL,
+  `wfa_status` enum('SUW','UW','Normal','OW') DEFAULT NULL,
+  `hfa_status` enum('SSt','St','Normal','T') DEFAULT NULL,
+  `wfh_status` enum('SW','MW','Normal','OW','Ob') DEFAULT NULL,
   `is_flagged` tinyint(1) NOT NULL DEFAULT 0,
   `flag_reason` varchar(150) DEFAULT NULL,
   `device_id` int(10) UNSIGNED DEFAULT NULL,
@@ -223,15 +223,15 @@ CREATE TABLE `measurements` (
 --
 
 INSERT INTO `measurements` (`id`, `child_id`, `height_cm`, `weight_kg`, `age_months`, `measurement_date`, `source_type`, `waz`, `haz`, `whz`, `nutritional_status`, `wfa_status`, `hfa_status`, `wfh_status`, `is_flagged`, `flag_reason`, `device_id`, `recorded_by`, `created_at`) VALUES
-(1, 1, 100.40, 3.910, 42, '2026-08-17', 'kiosk', -11.73, 0.14, -21.48, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:19:07'),
-(2, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:35:39'),
-(3, 1, 100.50, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.16, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:36:55'),
-(4, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:37:20'),
-(5, 1, 100.40, 3.880, 42, '2026-08-17', 'kiosk', -11.80, 0.14, -21.63, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:37:46'),
-(6, 1, 100.40, 3.840, 42, '2026-08-17', 'kiosk', -11.89, 0.14, -21.83, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:40:59'),
-(7, 1, 100.40, 3.870, 42, '2026-08-17', 'kiosk', -11.82, 0.14, -21.68, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:51:54'),
-(8, 1, 100.40, 4.340, 42, '2026-08-17', 'kiosk', -10.78, 0.14, -19.46, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:52:28'),
-(9, 1, 99.10, 3.560, 42, '2026-08-17', 'kiosk', -12.59, -0.19, -22.99, 'Severely Underweight', 'SUW', 'Normal', 'SW/SAM', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 05:21:31');
+(1, 1, 100.40, 3.910, 42, '2026-08-17', 'kiosk', -11.73, 0.14, -21.48, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:19:07'),
+(2, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:35:39'),
+(3, 1, 100.50, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.16, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:36:55'),
+(4, 1, 100.40, 3.890, 42, '2026-08-17', 'kiosk', -11.78, 0.14, -21.58, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:37:20'),
+(5, 1, 100.40, 3.880, 42, '2026-08-17', 'kiosk', -11.80, 0.14, -21.63, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:37:46'),
+(6, 1, 100.40, 3.840, 42, '2026-08-17', 'kiosk', -11.89, 0.14, -21.83, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:40:59'),
+(7, 1, 100.40, 3.870, 42, '2026-08-17', 'kiosk', -11.82, 0.14, -21.68, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:51:54'),
+(8, 1, 100.40, 4.340, 42, '2026-08-17', 'kiosk', -10.78, 0.14, -19.46, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 04:52:28'),
+(9, 1, 99.10, 3.560, 42, '2026-08-17', 'kiosk', -12.59, -0.19, -22.99, 'Severely Underweight', 'SUW', 'Normal', 'SW', 1, 'WAZ out of range; WHZ out of range', 1, NULL, '2026-08-17 05:21:31');
 
 -- --------------------------------------------------------
 

@@ -16,6 +16,36 @@
   --radius-sm: 10px;
   --font-display: "Trebuchet MS", "Segoe UI", sans-serif;
   --font-body: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --field-bg: #ffffff;
+  --flash-error-bg: #fff4f4;
+  --flash-error-border: rgba(201, 59, 59, 0.24);
+  --flash-notice-border: rgba(11, 110, 79, 0.18);
+  --input-focus-border: rgba(11, 110, 79, 0.45);
+  --input-focus-glow: rgba(11, 110, 79, 0.12);
+  --input-placeholder: #8aa299;
+  --page-gradient-start: #f7faf8;
+}
+
+[data-theme="dark"] {
+  --bg: #0f1a14;
+  --surface: #162019;
+  --surface-alt: #1c2b23;
+  --border: #2a3d32;
+  --text: #dce8e1;
+  --muted: #8fa89a;
+  --primary: #2ec57a;
+  --primary-strong: #3dd88a;
+  --accent: #f5b942;
+  --error: #ef5350;
+  --shadow: 0 30px 80px rgba(0, 0, 0, 0.3);
+  --field-bg: #162019;
+  --flash-error-bg: rgba(239, 83, 80, 0.08);
+  --flash-error-border: rgba(239, 83, 80, 0.25);
+  --flash-notice-border: rgba(46, 197, 122, 0.2);
+  --input-focus-border: rgba(46, 197, 122, 0.45);
+  --input-focus-glow: rgba(46, 197, 122, 0.12);
+  --input-placeholder: #5a7a6a;
+  --page-gradient-start: #0f1a14;
 }
 
 * {
@@ -42,7 +72,22 @@ body {
       rgba(242, 169, 59, 0.16),
       transparent 28%
     ),
-    linear-gradient(180deg, #f7faf8 0%, var(--bg) 100%);
+    linear-gradient(180deg, var(--page-gradient-start) 0%, var(--bg) 100%);
+}
+
+[data-theme="dark"] body {
+  background:
+    radial-gradient(
+      circle at top left,
+      rgba(46, 197, 122, 0.06),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at right 20%,
+      rgba(245, 185, 66, 0.04),
+      transparent 28%
+    ),
+    linear-gradient(180deg, var(--page-gradient-start) 0%, var(--bg) 100%);
 }
 
 a {
@@ -78,13 +123,13 @@ select {
 }
 
 .flash-error {
-  border-color: rgba(201, 59, 59, 0.24);
-  background: #fff4f4;
+  border-color: var(--flash-error-border);
+  background: var(--flash-error-bg);
   color: var(--error);
 }
 
 .flash-notice {
-  border-color: rgba(11, 110, 79, 0.18);
+  border-color: var(--flash-notice-border);
   background: var(--surface-alt);
 }
 
@@ -103,7 +148,7 @@ select {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: 0.95rem 1rem;
-  background: #fff;
+  background: var(--field-bg);
   color: var(--text);
   transition:
     border-color 160ms ease,
@@ -112,13 +157,13 @@ select {
 }
 
 .field input::placeholder {
-  color: #8aa299;
+  color: var(--input-placeholder);
 }
 
 .field input:focus {
   outline: none;
-  border-color: rgba(11, 110, 79, 0.45);
-  box-shadow: 0 0 0 4px rgba(11, 110, 79, 0.12);
+  border-color: var(--input-focus-border);
+  box-shadow: 0 0 0 4px var(--input-focus-glow);
 }
 
 .link {

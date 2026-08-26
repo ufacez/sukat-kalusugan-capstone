@@ -94,8 +94,14 @@
   border-radius: 8px;
   border: 1px solid var(--admin-border);
   font-size: 0.85rem;
-  background: #ffffff;
+  background: var(--admin-surface);
   color: var(--admin-text);
+}
+
+[data-theme="dark"] .chatbot-child-row select,
+[data-theme="dark"] .chatbot-child-row input {
+  background: #162019;
+  border-color: #2a3d32;
 }
 
 .chatbot-messages {
@@ -142,8 +148,18 @@
 
 .chatbot-bubble.is-error {
   align-self: flex-start;
-  background: #fbe9e9;
+  background: rgba(239, 83, 80, 0.1);
   color: var(--admin-danger);
+}
+
+[data-theme="dark"] .chatbot-bubble.is-error {
+  background: rgba(239, 83, 80, 0.15);
+}
+
+[data-theme="dark"] .chatbot-input-row textarea {
+  background: #162019;
+  border-color: #2a3d32;
+  color: var(--admin-text);
 }
 
 .chatbot-input-row {

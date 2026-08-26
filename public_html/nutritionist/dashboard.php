@@ -10,8 +10,6 @@ $today = new DateTimeImmutable('today');
 // deleting meetings/Oplan Timbang entries happens on the Settings page
 // (see nutritionist/settings.php, "Manage Calendar" section).
 
-$range = (string)($_GET['range'] ?? 'Today');
-
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 $children = admin_fetch_all(
@@ -167,30 +165,7 @@ $parents = admin_fetch_all(
 	$parentsParams
 );
 
-$statusCounts = [
-	'Normal' => 0,
-	'Underweight' => 0,
-	'Severely Underweight' => 0,
-	'Stunted' => 0,
-	'Wasted' => 0,
-	'Overweight' => 0,
-	'Pending' => 0,
-];
-
-foreach ($children as $child) {
-	$status = (string)($child['nutritional_status'] ?? 'Pending');
-
-	if (!isset($statusCounts[$status])) {
-		$statusCounts[$status] = 0;
-	}
-
-	$statusCounts[$status]++;
-}
-
-$atRiskChildren = array_values(array_filter(
-	$children,
-	static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true),
-));
+$atRiskChildren = [];
 
 $upcomingAppointments = array_values(array_filter(
 	$appointments,
@@ -198,26 +173,6 @@ $upcomingAppointments = array_values(array_filter(
 		$scheduled = new DateTimeImmutable((string)$appointment['scheduled_at']);
 
 		return $scheduled >= $today;
-	}
-));
-
-$selectedChildren = array_values(array_filter(
-	$children,
-	static function (array $child) use ($range, $today): bool {
-		$measurementDate = (string)($child['measurement_date'] ?? '');
-
-		if ($measurementDate === '') {
-			return $range === 'Today';
-		}
-
-		$date = new DateTimeImmutable($measurementDate);
-
-		return match ($range) {
-			'Weekly' => $date >= $today->modify('-7 days'),
-			'Monthly' => $date >= $today->modify('-30 days'),
-			'Yearly' => $date >= $today->modify('-365 days'),
-			default => $date->format('Y-m-d') === $today->format('Y-m-d'),
-		};
 	}
 ));
 
@@ -451,143 +406,70 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 	</article>
 </section>
 
-<section class="nutritionist-panel-grid is-balanced">
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Priority Alerts</div>
-		<?php if ($atRiskChildren === []): ?>
-			<div class="admin-stat-note">No priority alerts right now.</div>
-		<?php endif; ?>
-		<?php foreach (array_slice($atRiskChildren, 0, 3) as $child): ?>
-			<?php
-			$status = (string)($child['nutritional_status'] ?? 'Pending');
-			$statusClass = in_array($status, ['Severely Underweight', 'Stunted', 'Wasted'], true) ? 'is-danger' : 'is-warn';
-			$bgColor = $statusClass === 'is-danger' ? '#fff4f4' : '#fff8ea';
-			?>
-			<div class="admin-list-item" style="padding:10px 12px;border-bottom:1px solid var(--admin-border);margin-bottom:8px;background:<?php echo $bgColor; ?>;border-radius:8px;">
-				<div>
-					<div style="font-size:12px;font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
-					<div class="admin-mini" style="margin-top:3px;">WAZ <?php echo nutritionist_e((string)($child['waz'] ?? 'n/a')); ?> · HAZ <?php echo nutritionist_e((string)($child['haz'] ?? 'n/a')); ?> · WHZ <?php echo nutritionist_e((string)($child['whz'] ?? 'n/a')); ?></div>
-					<div class="admin-mini" style="margin-top:2px;">WFA <?php echo nutritionist_e((string)($child['wfa_status'] ?? '—')); ?> · HFA <?php echo nutritionist_e((string)($child['hfa_status'] ?? '—')); ?> · WFH <?php echo nutritionist_e((string)($child['wfh_status'] ?? '—')); ?></div>
-				</div>
-				<div class="admin-pill <?php echo $statusClass; ?>"><?php echo nutritionist_e($status); ?></div>
-			</div>
-		<?php endforeach; ?>
-	</article>
-
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Nutritional Status</div>
-		<?php foreach (['Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Wasted', 'Overweight'] as $status): ?>
-			<?php
-			$count = (int)($statusCounts[$status] ?? 0);
-			$pct = count($children) > 0 ? (int)round(($count / count($children)) * 100) : 0;
-			$barColor = match ($status) {
-				'Normal' => 'var(--admin-primary)',
-				'Underweight' => 'var(--admin-accent)',
-				'Severely Underweight' => 'var(--admin-danger)',
-				'Stunted' => '#7048E8',
-				'Wasted' => '#4a9fd5',
-				default => '#b08900',
-			};
-			?>
-			<div style="margin-bottom:10px;">
-				<div style="display:flex;justify-content:space-between;margin-bottom:4px;align-items:center;">
-					<span class="admin-pill <?php echo $status === 'Normal' ? 'is-success' : ($status === 'Overweight' ? 'is-warn' : 'is-danger'); ?>"><?php echo nutritionist_e($status); ?></span>
-					<span class="admin-mini"><?php echo $count; ?> (<?php echo $pct; ?>%)</span>
-				</div>
-				<div style="height:7px;border-radius:999px;background:var(--admin-bg);overflow:hidden;">
-					<div style="width:<?php echo max($pct, $count > 0 ? 3 : 0); ?>%;height:100%;border-radius:999px;background:<?php echo nutritionist_e($barColor); ?>;"></div>
-				</div>
-			</div>
-		<?php endforeach; ?>
-	</article>
-</section>
-
 <section class="nutritionist-panel">
-	<div class="nutritionist-table-head" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;">Patient Overview</h2>
-			<p class="admin-section-subtitle">Registered children and their current growth status</p>
-		</div>
-		<div class="nutritionist-chip-row">
-			<?php foreach (['Today', 'Weekly', 'Monthly', 'Yearly'] as $filter): ?>
-				<a class="nutritionist-chip<?php echo $range === $filter ? ' is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/dashboard.php?range=' . urlencode($filter))); ?>"><?php echo nutritionist_e($filter); ?></a>
-			<?php endforeach; ?>
-		</div>
-	</div>
+	<div class="admin-section-title" style="margin-bottom:12px;">Measurement Status Breakdown</div>
+	<div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;">
+		<?php
+		$breakdown = [
+			['label' => 'Overweight', 'abbr' => 'OW', 'color' => '#b08900', 'key' => 'OW'],
+			['label' => 'Underweight', 'abbr' => 'UW', 'color' => 'var(--admin-accent)', 'key' => 'UW'],
+			['label' => 'Severely Underweight', 'abbr' => 'SUW', 'color' => 'var(--admin-danger)', 'key' => 'SUW'],
+			['label' => 'Stunted', 'abbr' => 'St', 'color' => '#7048E8', 'key' => 'St'],
+			['label' => 'Severely Stunted', 'abbr' => 'SSt', 'color' => '#5f3dc4', 'key' => 'SSt'],
+			['label' => 'Obese', 'abbr' => 'Ob', 'color' => '#e8590c', 'key' => 'Ob'],
+			['label' => 'Moderately Wasted', 'abbr' => 'MW', 'color' => '#4a9fd5', 'key' => 'MW'],
+			['label' => 'Severely Wasted', 'abbr' => 'SW', 'color' => '#c92a2a', 'key' => 'SW'],
+		];
 
-	<div class="nutritionist-table-wrap">
-		<table class="nutritionist-table">
-			<thead>
-				<tr>
-					<th></th>
-					<th>No</th>
-					<th>Name</th>
-					<th>Age</th>
-					<th>Date of Birth</th>
-					<th>Status</th>
-					<th>WFA</th>
-					<th>HFA</th>
-					<th>WFH</th>
-					<th>Barangay</th>
-					<th>Parent</th>
-					<th>Action</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ($selectedChildren as $index => $child): ?>
-					<?php
-					$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
-					$birthdate = null;
-					$birthdateValue = trim((string)($child['birthdate'] ?? ''));
+		$wfaCounts = array_fill_keys(['SUW', 'UW', 'Normal', 'OW'], 0);
+		$hfaCounts = array_fill_keys(['SSt', 'St', 'Normal', 'T'], 0);
+		$wfhCounts = array_fill_keys(['SW', 'MW', 'Normal', 'OW', 'Ob'], 0);
 
-					if ($birthdateValue !== '') {
-						try {
-							$birthdate = new DateTimeImmutable($birthdateValue);
-						} catch (Exception $exception) {
-							$birthdate = null;
-						}
-					}
+		foreach ($children as $child) {
+			$wfa = (string)($child['wfa_status'] ?? '');
+			$hfa = (string)($child['hfa_status'] ?? '');
+			$wfh = (string)($child['wfh_status'] ?? '');
+			if (isset($wfaCounts[$wfa])) $wfaCounts[$wfa]++;
+			if (isset($hfaCounts[$hfa])) $hfaCounts[$hfa]++;
+			if (isset($wfhCounts[$wfh])) $wfhCounts[$wfh]++;
+		}
 
-					$status = (string)($child['nutritional_status'] ?? 'Pending');
-					$pillClass = $status === 'Normal' ? 'is-success' : ($status === 'Overweight' ? 'is-warn' : 'is-danger');
-					?>
-					<tr>
-						<td><input type="checkbox"></td>
-						<td style="color:var(--admin-muted);font-size:11px;"><?php echo str_pad((string)($index + 1), 2, '0', STR_PAD_LEFT); ?></td>
-						<td>
-							<div style="display:flex;align-items:center;gap:8px;">
-								<div class="admin-pill <?php echo $pillClass; ?>" style="min-width:30px;justify-content:center;border-radius:50%;padding:0.35rem 0.5rem;"><?php echo nutritionist_e(substr($child['first_name'], 0, 1) . substr($child['last_name'], 0, 1)); ?></div>
-								<div>
-									<div style="font-weight:600;font-size:12px;color:var(--admin-text);"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
-									<div style="font-size:10px;color:var(--admin-muted);margin-top:1px;"><?php echo nutritionist_e((string)$child['sex']); ?></div>
-								</div>
-							</div>
-						</td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo (int)$ageMonths; ?> mo</td>
-						<td style="color:var(--admin-muted);font-size:12px;white-space:nowrap;"><?php echo nutritionist_e($birthdate?->format('d M Y') ?? '—'); ?></td>
-						<td><span class="admin-pill <?php echo $pillClass; ?>"><?php echo nutritionist_e($status); ?></span></td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['wfa_status'] ?? '—')); ?></td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['hfa_status'] ?? '—')); ?></td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['wfh_status'] ?? '—')); ?></td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)($child['barangay'] ?? '')); ?></td>
-						<td style="color:var(--admin-muted);font-size:12px;"><?php echo nutritionist_e((string)$child['parent_name']); ?></td>
-						<td>
-							<div class="admin-actions">
-								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>">View</a>
-								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id'])); ?>">Edit</a>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?>?');">
-									<input type="hidden" name="action" value="delete">
-									<input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
-									<button class="admin-btn-danger" type="submit">Delete</button>
-								</form>
-							</div>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
+		$total = max(count($children), 1);
+
+		$abbrMap = [
+			'OW' => ['count' => $wfaCounts['OW'] + $wfhCounts['OW'], 'source' => 'WFA+WFH'],
+			'UW' => ['count' => $wfaCounts['UW'], 'source' => 'WFA'],
+			'SUW' => ['count' => $wfaCounts['SUW'], 'source' => 'WFA'],
+			'St' => ['count' => $hfaCounts['St'], 'source' => 'HFA'],
+			'SSt' => ['count' => $hfaCounts['SSt'], 'source' => 'HFA'],
+			'Ob' => ['count' => $wfhCounts['Ob'], 'source' => 'WFH'],
+			'MW' => ['count' => $wfhCounts['MW'], 'source' => 'WFH'],
+			'SW' => ['count' => $wfhCounts['SW'], 'source' => 'WFH'],
+		];
+		?>
+		<?php foreach ($breakdown as $item): ?>
+			<?php
+			$info = $abbrMap[$item['key']] ?? ['count' => 0, 'source' => ''];
+			$count = (int)$info['count'];
+			$pct = (int)round(($count / $total) * 100);
+			?>
+			<div style="border:1px solid var(--admin-border);border-radius:10px;padding:12px 14px;background:var(--admin-surface);">
+				<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+					<span style="font-size:12px;font-weight:700;color:var(--admin-text);"><?php echo nutritionist_e($item['label']); ?></span>
+					<span style="font-size:11px;font-weight:700;padding:2px 7px;border-radius:999px;background:<?php echo nutritionist_e($item['color']); ?>;color:#fff;"><?php echo nutritionist_e($item['abbr']); ?></span>
+				</div>
+				<div style="display:flex;align-items:baseline;gap:6px;">
+					<span style="font-size:20px;font-weight:700;color:var(--admin-text);"><?php echo $count; ?></span>
+					<span style="font-size:11px;color:var(--admin-muted);">(<?php echo $pct; ?>%)</span>
+				</div>
+				<div style="height:5px;border-radius:999px;background:var(--admin-bg);overflow:hidden;margin-top:6px;">
+					<div style="width:<?php echo max($pct, $count > 0 ? 3 : 0); ?>%;height:100%;border-radius:999px;background:<?php echo nutritionist_e($item['color']); ?>;"></div>
+				</div>
+			</div>
+		<?php endforeach; ?>
 	</div>
 </section>
+
 <script>
 (function () {
 	var dayCells = document.querySelectorAll('.nutritionist-calendar-day[data-calendar-day]');

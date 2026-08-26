@@ -44,8 +44,11 @@ $statusCounts = [
 	'Underweight' => 0,
 	'Severely Underweight' => 0,
 	'Stunted' => 0,
-	'Wasted' => 0,
+	'Severely Stunted' => 0,
+	'Moderately Wasted' => 0,
+	'Severely Wasted' => 0,
 	'Overweight' => 0,
+	'Obese' => 0,
 ];
 
 foreach ($measurements as $measurement) {
@@ -97,7 +100,7 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 <section class="nutritionist-panel-grid is-balanced">
 	<article class="nutritionist-panel">
 		<div class="admin-section-title" style="margin-bottom:12px;">Status Breakdown</div>
-		<?php foreach (['Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Wasted', 'Overweight'] as $status): ?>
+		<?php foreach (['Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Severely Stunted', 'Moderately Wasted', 'Severely Wasted', 'Overweight', 'Obese'] as $status): ?>
 			<?php
 			$count = (int)($statusCounts[$status] ?? 0);
 			$pct = count($measurements) > 0 ? (int)round(($count / count($measurements)) * 100) : 0;
@@ -106,7 +109,10 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 				'Underweight' => 'var(--admin-accent)',
 				'Severely Underweight' => 'var(--admin-danger)',
 				'Stunted' => '#7048E8',
-				'Wasted' => '#4a9fd5',
+				'Severely Stunted' => '#5f3dc4',
+				'Moderately Wasted' => '#4a9fd5',
+				'Severely Wasted' => '#c92a2a',
+				'Obese' => '#e8590c',
 				default => '#b08900',
 			};
 			?>

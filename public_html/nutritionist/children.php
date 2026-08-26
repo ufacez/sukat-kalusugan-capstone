@@ -171,8 +171,11 @@ $statuses = [
     'Underweight',
     'Severely Underweight',
     'Stunted',
-    'Wasted',
-    'Overweight'
+    'Severely Stunted',
+    'Moderately Wasted',
+    'Severely Wasted',
+    'Overweight',
+    'Obese'
 ];
 
 $filteredChildren = array_values(
