@@ -206,11 +206,9 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 }
 
 /**
- * DOH Operation Timbang Plus (eOPT Plus) classifies WFA, HFA, and WFH as
- * three independent axes rather than collapsing them into one label. These
- * match the exact cutoffs used in the DOH "Nut_StatusTool" reference sheet,
- * verified against the e-OPT Plus workbook in public_html/data/ (which emits
- * OW on the weight-for-age axis for children above +2SD).
+ * DOH e-OPT Plus weight-for-age classification, using the community-tool
+ * coding legend (verified against public_html/data/refrence_stanrddeviations.xlsx):
+ *   SUW < -3SD | UW -3..-2SD | Normal -2..+2SD | OW > +2SD
  */
 function classify_wfa_status(float $waz): string
 {
@@ -219,7 +217,7 @@ function classify_wfa_status(float $waz): string
 	}
 
 	if ($waz < -2) {
-		return 'MUW';
+		return 'UW';
 	}
 
 	if ($waz <= 2) {
@@ -229,6 +227,10 @@ function classify_wfa_status(float $waz): string
 	return 'OW';
 }
 
+/**
+ * DOH e-OPT Plus height-for-age classification:
+ *   SSt < -3SD | St -3..-2SD | Normal -2..+2SD | T > +2SD
+ */
 function classify_hfa_status(float $haz): string
 {
 	if ($haz < -3) {
@@ -236,24 +238,28 @@ function classify_hfa_status(float $haz): string
 	}
 
 	if ($haz < -2) {
-		return 'MSt';
+		return 'St';
 	}
 
 	if ($haz <= 2) {
 		return 'Normal';
 	}
 
-	return 'Tall';
+	return 'T';
 }
 
+/**
+ * DOH e-OPT Plus weight-for-length/height classification:
+ *   SW < -3SD | MW -3..-2SD | Normal -2..+2SD | OW +2..+3SD | Ob > +3SD
+ */
 function classify_wfh_status(float $whz): string
 {
 	if ($whz < -3) {
-		return 'SW/SAM';
+		return 'SW';
 	}
 
 	if ($whz < -2) {
-		return 'MW/MAM';
+		return 'MW';
 	}
 
 	if ($whz <= 2) {

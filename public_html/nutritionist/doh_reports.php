@@ -13,13 +13,13 @@ $user = nutritionist_require_access();
  * different follow-up than a child flagged on just one.
  */
 $categories = [
-	'sw_sam' => ['label' => 'Severely Wasted (SAM)', 'sheet' => 'List_SW(SAM)', 'condition' => "m.wfh_status = 'SW/SAM'"],
-	'mw_mam' => ['label' => 'Moderately Wasted (MAM)', 'sheet' => 'List_MW(MAM)', 'condition' => "m.wfh_status = 'MW/MAM'"],
-	'stunted' => ['label' => 'Stunted (Moderate & Severe)', 'sheet' => 'List_MSt&SSt', 'condition' => "m.hfa_status IN ('MSt','SSt')"],
+	'sw_sam' => ['label' => 'Severely Wasted (SAM)', 'sheet' => 'List_SW(SAM)', 'condition' => "m.wfh_status = 'SW'"],
+	'mw_mam' => ['label' => 'Moderately Wasted (MAM)', 'sheet' => 'List_MW(MAM)', 'condition' => "m.wfh_status = 'MW'"],
+	'stunted' => ['label' => 'Stunted (Moderate & Severe)', 'sheet' => 'List_MSt&SSt', 'condition' => "m.hfa_status IN ('St','SSt')"],
 	'ow_ob' => ['label' => 'Overweight & Obese', 'sheet' => 'List_OW&Ob', 'condition' => "m.wfh_status IN ('OW','Ob')"],
-	'underweight_stunted' => ['label' => 'Underweight + Stunted (double burden)', 'sheet' => 'List_MUW,SUW,MSt&SSt', 'condition' => "m.wfa_status IN ('MUW','SUW') AND m.hfa_status IN ('MSt','SSt')"],
-	'stunted_wasted' => ['label' => 'Stunted + Wasted (double burden)', 'sheet' => 'List_MSt,SSt,MW&SW', 'condition' => "m.hfa_status IN ('MSt','SSt') AND m.wfh_status IN ('MW/MAM','SW/SAM')"],
-	'stunted_overweight' => ['label' => 'Stunted + Overweight/Obese (double burden)', 'sheet' => 'List_MSt,SSt,OW&Ob', 'condition' => "m.hfa_status IN ('MSt','SSt') AND m.wfh_status IN ('OW','Ob')"],
+	'underweight_stunted' => ['label' => 'Underweight + Stunted (double burden)', 'sheet' => 'List_MUW,SUW,MSt&SSt', 'condition' => "m.wfa_status IN ('UW','SUW') AND m.hfa_status IN ('St','SSt')"],
+	'stunted_wasted' => ['label' => 'Stunted + Wasted (double burden)', 'sheet' => 'List_MSt,SSt,MW&SW', 'condition' => "m.hfa_status IN ('St','SSt') AND m.wfh_status IN ('MW','SW')"],
+	'stunted_overweight' => ['label' => 'Stunted + Overweight/Obese (double burden)', 'sheet' => 'List_MSt,SSt,OW&Ob', 'condition' => "m.hfa_status IN ('St','SSt') AND m.wfh_status IN ('OW','Ob')"],
 	'flagged' => ['label' => 'Flagged for Review', 'sheet' => '(not in eOPT — added here)', 'condition' => "m.is_flagged = 1"],
 ];
 
@@ -140,9 +140,9 @@ function doh_summary_bucket(): array
 	];
 }
 
-$wfaSummary = ['SUW' => doh_summary_bucket(), 'MUW' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket()];
-$hfaSummary = ['SSt' => doh_summary_bucket(), 'MSt' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'Tall' => doh_summary_bucket()];
-$wfhSummary = ['SW/SAM' => doh_summary_bucket(), 'MW/MAM' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket(), 'Ob' => doh_summary_bucket()];
+$wfaSummary = ['SUW' => doh_summary_bucket(), 'UW' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket()];
+$hfaSummary = ['SSt' => doh_summary_bucket(), 'St' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'T' => doh_summary_bucket()];
+$wfhSummary = ['SW' => doh_summary_bucket(), 'MW' => doh_summary_bucket(), 'Normal' => doh_summary_bucket(), 'OW' => doh_summary_bucket(), 'Ob' => doh_summary_bucket()];
 $flaggedTotal = 0;
 $totalChildren = count($summaryRows);
 

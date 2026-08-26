@@ -61,9 +61,9 @@ If the system says:
 - Stunted
 - Wasted
 - Overweight
-- MUW
+- UW
 - SUW
-- MSt
+- St
 - SSt
 - MAM
 - SAM
@@ -155,9 +155,9 @@ growth reference."
 - SAM
 - MAM
 - SUW
-- MUW
+- UW
 - SSt
-- MSt
+- St
 - Overweight
 - Obese
 
@@ -251,21 +251,21 @@ WHZ = Weight-for-Height Z-score
 Weight-for-age:
 
 Normal
-MUW = Moderately Underweight
+UW = Underweight
 SUW = Severely Underweight
 
 Height-for-age:
 
 Normal
-MSt = Moderately Stunted
+St = Stunted
 SSt = Severely Stunted
-Tall
+T = Tall
 
 Weight-for-height:
 
 Normal
-MW/MAM = Moderate Wasting / Moderate Acute Malnutrition
-SW/SAM = Severe Wasting / Severe Acute Malnutrition
+MW = Moderate Wasting / Moderate Acute Malnutrition (MAM)
+SW = Severe Wasting / Severe Acute Malnutrition (SAM)
 OW = Overweight
 Ob = Obese
 
@@ -297,7 +297,7 @@ Example CONCERNING result:
 
 "The latest measurement on August 2 shows a height of 80 cm and
 a weight of 9 kg. The system classified the child as Underweight,
-with a Moderately Underweight (MUW) weight-for-age result.
+with an Underweight (UW) weight-for-age result.
 This means the child's recorded weight-for-age is below the
 Normal classification used by the system. It would be good to
 discuss this result with the barangay nutritionist or another

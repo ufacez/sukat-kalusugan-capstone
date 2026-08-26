@@ -150,9 +150,9 @@ function nutritionist_status_class(?string $status): string
 
     return match ($normalized) {
         'normal', 'confirmed', 'completed', 'active', 'n' => 'is-success',
-        'overweight', 'pending', 'ow', 'muw', 'mst', 'mw/mam' => 'is-warn',
-        'cancelled', 'inactive', 'suw', 'sst', 'sw/sam', 'ob' => 'is-danger',
-        'tall' => 'is-muted',
+        'overweight', 'pending', 'ow', 'uw', 'muw', 'st', 'mst', 'mw', 'mw/mam' => 'is-warn',
+        'cancelled', 'inactive', 'suw', 'sst', 'sw', 'sw/sam', 'ob' => 'is-danger',
+        'tall', 't' => 'is-muted',
         default => 'is-danger',
     };
 }

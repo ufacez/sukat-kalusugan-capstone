@@ -10,13 +10,13 @@ $user = nutritionist_require_access();
  * conditions) so the exported workbook always matches what's on screen.
  */
 $categories = [
-	'sw_sam' => ['label' => 'Severely Wasted (SAM)', 'condition' => "m.wfh_status = 'SW/SAM'"],
-	'mw_mam' => ['label' => 'Moderately Wasted (MAM)', 'condition' => "m.wfh_status = 'MW/MAM'"],
-	'stunted' => ['label' => 'Stunted (Moderate & Severe)', 'condition' => "m.hfa_status IN ('MSt','SSt')"],
+	'sw_sam' => ['label' => 'Severely Wasted (SAM)', 'condition' => "m.wfh_status = 'SW'"],
+	'mw_mam' => ['label' => 'Moderately Wasted (MAM)', 'condition' => "m.wfh_status = 'MW'"],
+	'stunted' => ['label' => 'Stunted (Moderate & Severe)', 'condition' => "m.hfa_status IN ('St','SSt')"],
 	'ow_ob' => ['label' => 'Overweight & Obese', 'condition' => "m.wfh_status IN ('OW','Ob')"],
-	'underweight_stunted' => ['label' => 'Underweight + Stunted (double burden)', 'condition' => "m.wfa_status IN ('MUW','SUW') AND m.hfa_status IN ('MSt','SSt')"],
-	'stunted_wasted' => ['label' => 'Stunted + Wasted (double burden)', 'condition' => "m.hfa_status IN ('MSt','SSt') AND m.wfh_status IN ('MW/MAM','SW/SAM')"],
-	'stunted_overweight' => ['label' => 'Stunted + Overweight/Obese (double burden)', 'condition' => "m.hfa_status IN ('MSt','SSt') AND m.wfh_status IN ('OW','Ob')"],
+	'underweight_stunted' => ['label' => 'Underweight + Stunted (double burden)', 'condition' => "m.wfa_status IN ('UW','SUW') AND m.hfa_status IN ('St','SSt')"],
+	'stunted_wasted' => ['label' => 'Stunted + Wasted (double burden)', 'condition' => "m.hfa_status IN ('St','SSt') AND m.wfh_status IN ('MW','SW')"],
+	'stunted_overweight' => ['label' => 'Stunted + Overweight/Obese (double burden)', 'condition' => "m.hfa_status IN ('St','SSt') AND m.wfh_status IN ('OW','Ob')"],
 	'flagged' => ['label' => 'Flagged for Review', 'condition' => "m.is_flagged = 1"],
 ];
 
@@ -115,9 +115,9 @@ if ($reportType === 'summary') {
 		'Total' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
 	];
 
-	$wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
-	$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
-	$wfhSummary = ['SW/SAM' => $bucket(), 'MW/MAM' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
+	$wfaSummary = ['SUW' => $bucket(), 'UW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
+	$hfaSummary = ['SSt' => $bucket(), 'St' => $bucket(), 'Normal' => $bucket(), 'T' => $bucket()];
+	$wfhSummary = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
 
 	foreach ($summaryRows as $row) {
 		$sexLabel = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';

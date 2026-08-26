@@ -32,9 +32,9 @@ $statusCounts = [
 	'Overweight' => 0,
 ];
 
-$wfaCounts = ['SUW' => 0, 'MUW' => 0, 'Normal' => 0, 'OW' => 0];
-$hfaCounts = ['SSt' => 0, 'MSt' => 0, 'Normal' => 0, 'Tall' => 0];
-$wfhCounts = ['SW/SAM' => 0, 'MW/MAM' => 0, 'Normal' => 0, 'OW' => 0, 'Ob' => 0];
+$wfaCounts = ['SUW' => 0, 'UW' => 0, 'Normal' => 0, 'OW' => 0];
+$hfaCounts = ['SSt' => 0, 'St' => 0, 'Normal' => 0, 'T' => 0];
+$wfhCounts = ['SW' => 0, 'MW' => 0, 'Normal' => 0, 'OW' => 0, 'Ob' => 0];
 
 $appointmentCounts = [
 	'pending' => 0,
