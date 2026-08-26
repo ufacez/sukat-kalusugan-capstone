@@ -72,11 +72,11 @@ function followup_category_label(string $category): string
 {
 	$names = [
 		'SUW' => 'Severely Underweight',
-		'UW' => 'Underweight',
+		'MUW' => 'Moderately Underweight',
 		'SSt' => 'Severely Stunted',
-		'St' => 'Stunted',
+		'MSt' => 'Moderately Stunted',
 		'SW' => 'Severely Wasted',
-		'MW' => 'Wasted (Moderate)',
+		'MW' => 'Moderately Wasted',
 		'OW' => 'Overweight',
 		'Ob' => 'Obese',
 	];
@@ -106,9 +106,9 @@ function followup_abnormal_codes(?string $wfa, ?string $hfa, ?string $wfh): arra
 	foreach (['wfa' => $wfa, 'hfa' => $hfa, 'wfh' => $wfh] as $axis => $value) {
 		$value = (string)$value;
 
-		if ($axis === 'wfa' && in_array($value, ['SUW', 'UW'], true)) {
+		if ($axis === 'wfa' && in_array($value, ['SUW', 'UW', 'MUW'], true)) {
 			$codes[] = $value;
-		} elseif ($axis === 'hfa' && in_array($value, ['SSt', 'St'], true)) {
+		} elseif ($axis === 'hfa' && in_array($value, ['SSt', 'St', 'MSt'], true)) {
 			$codes[] = $value;
 		} elseif ($axis === 'wfh' && in_array($value, ['SW', 'MW', 'OW', 'Ob'], true)) {
 			$codes[] = $value;

@@ -256,8 +256,9 @@ nutritionist_layout_start(
     }
 
     function statusPillClass(status) {
-        if (status === 'Normal') return 'is-success';
-        if (status === 'Overweight') return 'is-warn';
+        if (status === 'Normal' || status === 'Tall') return 'is-success';
+        if (status === 'Moderately Underweight' || status === 'Moderately Stunted' || status === 'Moderately Wasted') return 'is-warn';
+        if (status === 'Overweight' || status === 'Obese') return 'is-orange';
         if (!status || status === 'Pending') return 'is-muted';
         return 'is-danger';
     }

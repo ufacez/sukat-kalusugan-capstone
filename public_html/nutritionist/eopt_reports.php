@@ -181,8 +181,8 @@ if ($view === 'monthly') {
 		WHERE {$scope}{$barangayFilterSql}
 		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
 		  AND (
-			lm.wfa_status IN ('SUW','UW','OW')
-			OR lm.hfa_status IN ('SSt','St')
+			lm.wfa_status IN ('SUW','UW','MUW','OW')
+			OR lm.hfa_status IN ('SSt','St','MSt')
 			OR lm.wfh_status IN ('SW','MW','OW','Ob')
 		  )
 		ORDER BY c.last_name ASC, c.first_name ASC",
@@ -292,11 +292,11 @@ $exportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build
  */
 $listCodes = [
 	'SUW' => ['sheet' => 'List_SUW', 'title' => 'SEVERELY UNDERWEIGHT (SUW)', 'axis' => 'Weight-for-Age',            'condition' => "lm.wfa_status = 'SUW'"],
-	'UW'  => ['sheet' => 'List_UW',  'title' => 'UNDERWEIGHT (UW)',          'axis' => 'Weight-for-Age',            'condition' => "lm.wfa_status = 'UW'"],
+	'MUW' => ['sheet' => 'List_MUW', 'title' => 'MODERATELY UNDERWEIGHT (MUW)', 'axis' => 'Weight-for-Age',         'condition' => "lm.wfa_status IN ('UW','MUW')"],
 	'SSt' => ['sheet' => 'List_SSt', 'title' => 'SEVERELY STUNTED (SSt)',    'axis' => 'Height-for-Age',            'condition' => "lm.hfa_status = 'SSt'"],
-	'St'  => ['sheet' => 'List_St',  'title' => 'STUNTED (St)',               'axis' => 'Height-for-Age',            'condition' => "lm.hfa_status = 'St'"],
+	'MSt' => ['sheet' => 'List_MSt', 'title' => 'MODERATELY STUNTED (MSt)',  'axis' => 'Height-for-Age',            'condition' => "lm.hfa_status IN ('St','MSt')"],
 	'SW'  => ['sheet' => 'List_SW',  'title' => 'SEVERELY WASTED (SW)',       'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'SW'"],
-	'W'   => ['sheet' => 'List_W',   'title' => 'WASTED — MODERATE (MW)',     'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'MW'"],
+	'MW'  => ['sheet' => 'List_MW',  'title' => 'MODERATELY WASTED (MW)',     'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'MW'"],
 	'OW'  => ['sheet' => 'List_OW',  'title' => 'OVERWEIGHT (OW)',            'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status = 'OW')"],
 	'Ob'  => ['sheet' => 'List_Ob',  'title' => 'OBESE (Ob)',                'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'Ob'"],
 ];
@@ -587,14 +587,14 @@ $listCountRows = admin_fetch_all(
 	array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
 );
 
-$listCounts = ['SUW' => 0, 'UW' => 0, 'SSt' => 0, 'St' => 0, 'SW' => 0, 'W' => 0, 'OW' => 0, 'Ob' => 0];
+$listCounts = ['SUW' => 0, 'MUW' => 0, 'SSt' => 0, 'MSt' => 0, 'SW' => 0, 'MW' => 0, 'OW' => 0, 'Ob' => 0];
 foreach ($listCountRows as $cr) {
 	if (($cr['wfa_status'] ?? null) === 'SUW') { $listCounts['SUW']++; }
-	if (($cr['wfa_status'] ?? null) === 'UW')  { $listCounts['UW']++; }
+	if (($cr['wfa_status'] ?? null) === 'UW' || ($cr['wfa_status'] ?? null) === 'MUW')  { $listCounts['MUW']++; }
 	if (($cr['hfa_status'] ?? null) === 'SSt') { $listCounts['SSt']++; }
-	if (($cr['hfa_status'] ?? null) === 'St')  { $listCounts['St']++; }
+	if (($cr['hfa_status'] ?? null) === 'St' || ($cr['hfa_status'] ?? null) === 'MSt')  { $listCounts['MSt']++; }
 	if (($cr['wfh_status'] ?? null) === 'SW')  { $listCounts['SW']++; }
-	if (($cr['wfh_status'] ?? null) === 'MW')  { $listCounts['W']++; }
+	if (($cr['wfh_status'] ?? null) === 'MW')  { $listCounts['MW']++; }
 	if (($cr['wfa_status'] ?? null) === 'OW' || ($cr['wfh_status'] ?? null) === 'OW') { $listCounts['OW']++; }
 	if (($cr['wfh_status'] ?? null) === 'Ob')  { $listCounts['Ob']++; }
 }

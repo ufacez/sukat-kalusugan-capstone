@@ -164,14 +164,14 @@ function calculate_whz(float $weight_kg, float $height_cm, int $age_months, stri
  * severe label that applies, evaluating each axis independently.
  *
  * Categories returned:
- *   Severely Underweight  (WAZ < -3)
- *   Underweight           (WAZ < -2)
- *   Severely Stunted      (HAZ < -3)
- *   Stunted               (HAZ < -2)
- *   Severely Wasted       (WHZ < -3)
- *   Moderately Wasted     (WHZ < -2)
- *   Obese                 (WHZ > 3)
- *   Overweight            (WHZ > 2)
+ *   Severely Underweight   (WAZ < -3)
+ *   Severely Stunted       (HAZ < -3)
+ *   Severely Wasted        (WHZ < -3)
+ *   Moderately Underweight (WAZ < -2)
+ *   Moderately Stunted     (HAZ < -2)
+ *   Moderately Wasted      (WHZ < -2)
+ *   Obese                  (WHZ > 3)
+ *   Overweight             (WHZ > 2)
  *   Normal
  */
 function classify_nutritional_status(float $waz, float $haz, float $whz): string
@@ -189,11 +189,11 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 	}
 
 	if ($waz < -2) {
-		return 'Underweight';
+		return 'Moderately Underweight';
 	}
 
 	if ($haz < -2) {
-		return 'Stunted';
+		return 'Moderately Stunted';
 	}
 
 	if ($whz < -2) {
@@ -214,7 +214,7 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 /**
  * DOH e-OPT Plus weight-for-age classification, using the community-tool
  * coding legend (verified against public_html/data/refrence_stanrddeviations.xlsx):
- *   SUW < -3SD | UW -3..-2SD | Normal -2..+2SD | OW > +2SD
+ *   SUW < -3SD | MUW -3..-2SD | Normal -2..+2SD | OW > +2SD
  */
 function classify_wfa_status(float $waz): string
 {
@@ -223,7 +223,7 @@ function classify_wfa_status(float $waz): string
 	}
 
 	if ($waz < -2) {
-		return 'UW';
+		return 'MUW';
 	}
 
 	if ($waz <= 2) {
@@ -235,7 +235,7 @@ function classify_wfa_status(float $waz): string
 
 /**
  * DOH e-OPT Plus height-for-age classification:
- *   SSt < -3SD | St -3..-2SD | Normal -2..+2SD | T > +2SD
+ *   SSt < -3SD | MSt -3..-2SD | Normal -2..+2SD | T > +2SD
  */
 function classify_hfa_status(float $haz): string
 {
@@ -244,7 +244,7 @@ function classify_hfa_status(float $haz): string
 	}
 
 	if ($haz < -2) {
-		return 'St';
+		return 'MSt';
 	}
 
 	if ($haz <= 2) {

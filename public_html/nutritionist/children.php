@@ -7,8 +7,9 @@ require_once __DIR__ . '/../includes/followup_scheduler.php';
 function nutritionist_child_status_class(?string $status): string
 {
     return match ($status) {
-        'Normal' => 'is-success',
-        'Overweight' => 'is-warn',
+        'Normal', 'Tall' => 'is-success',
+        'Moderately Underweight', 'Moderately Stunted', 'Moderately Wasted' => 'is-warn',
+        'Overweight', 'Obese' => 'is-orange',
         'Pending' => 'is-muted',
         default => 'is-danger',
     };

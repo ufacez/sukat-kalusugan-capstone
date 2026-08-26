@@ -412,17 +412,17 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		<?php
 		$breakdown = [
 			['label' => 'Overweight', 'abbr' => 'OW', 'color' => '#b08900', 'key' => 'OW'],
-			['label' => 'Underweight', 'abbr' => 'UW', 'color' => 'var(--admin-accent)', 'key' => 'UW'],
+			['label' => 'Moderately Underweight', 'abbr' => 'MUW', 'color' => 'var(--admin-accent)', 'key' => 'MUW'],
 			['label' => 'Severely Underweight', 'abbr' => 'SUW', 'color' => 'var(--admin-danger)', 'key' => 'SUW'],
-			['label' => 'Stunted', 'abbr' => 'St', 'color' => '#7048E8', 'key' => 'St'],
+			['label' => 'Moderately Stunted', 'abbr' => 'MSt', 'color' => '#7048E8', 'key' => 'MSt'],
 			['label' => 'Severely Stunted', 'abbr' => 'SSt', 'color' => '#5f3dc4', 'key' => 'SSt'],
 			['label' => 'Obese', 'abbr' => 'Ob', 'color' => '#e8590c', 'key' => 'Ob'],
 			['label' => 'Moderately Wasted', 'abbr' => 'MW', 'color' => '#4a9fd5', 'key' => 'MW'],
 			['label' => 'Severely Wasted', 'abbr' => 'SW', 'color' => '#c92a2a', 'key' => 'SW'],
 		];
 
-		$wfaCounts = array_fill_keys(['SUW', 'UW', 'Normal', 'OW'], 0);
-		$hfaCounts = array_fill_keys(['SSt', 'St', 'Normal', 'T'], 0);
+		$wfaCounts = array_fill_keys(['SUW', 'MUW', 'Normal', 'OW'], 0);
+		$hfaCounts = array_fill_keys(['SSt', 'MSt', 'Normal', 'T'], 0);
 		$wfhCounts = array_fill_keys(['SW', 'MW', 'Normal', 'OW', 'Ob'], 0);
 
 		foreach ($children as $child) {
@@ -438,9 +438,9 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 		$abbrMap = [
 			'OW' => ['count' => $wfaCounts['OW'] + $wfhCounts['OW'], 'source' => 'WFA+WFH'],
-			'UW' => ['count' => $wfaCounts['UW'], 'source' => 'WFA'],
+			'MUW' => ['count' => $wfaCounts['MUW'], 'source' => 'WFA'],
 			'SUW' => ['count' => $wfaCounts['SUW'], 'source' => 'WFA'],
-			'St' => ['count' => $hfaCounts['St'], 'source' => 'HFA'],
+			'MSt' => ['count' => $hfaCounts['MSt'], 'source' => 'HFA'],
 			'SSt' => ['count' => $hfaCounts['SSt'], 'source' => 'HFA'],
 			'Ob' => ['count' => $wfhCounts['Ob'], 'source' => 'WFH'],
 			'MW' => ['count' => $wfhCounts['MW'], 'source' => 'WFH'],

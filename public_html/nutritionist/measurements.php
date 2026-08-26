@@ -41,9 +41,9 @@ $measurements = admin_fetch_all(
 
 $statusCounts = [
 	'Normal' => 0,
-	'Underweight' => 0,
+	'Moderately Underweight' => 0,
 	'Severely Underweight' => 0,
-	'Stunted' => 0,
+	'Moderately Stunted' => 0,
 	'Severely Stunted' => 0,
 	'Moderately Wasted' => 0,
 	'Severely Wasted' => 0,
@@ -90,15 +90,15 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 
 <section class="nutritionist-panel">
 	<div class="admin-section-title" style="margin-bottom:12px;">Status Breakdown</div>
-		<?php foreach (['Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Severely Stunted', 'Moderately Wasted', 'Severely Wasted', 'Overweight', 'Obese'] as $status): ?>
+		<?php foreach (['Normal', 'Moderately Underweight', 'Severely Underweight', 'Moderately Stunted', 'Severely Stunted', 'Moderately Wasted', 'Severely Wasted', 'Overweight', 'Obese'] as $status): ?>
 			<?php
 			$count = (int)($statusCounts[$status] ?? 0);
 			$pct = count($measurements) > 0 ? (int)round(($count / count($measurements)) * 100) : 0;
 			$barColor = match ($status) {
 				'Normal' => 'var(--admin-primary)',
-				'Underweight' => 'var(--admin-accent)',
+				'Moderately Underweight' => 'var(--admin-accent)',
 				'Severely Underweight' => 'var(--admin-danger)',
-				'Stunted' => '#7048E8',
+				'Moderately Stunted' => '#7048E8',
 				'Severely Stunted' => '#5f3dc4',
 				'Moderately Wasted' => '#4a9fd5',
 				'Severely Wasted' => '#c92a2a',

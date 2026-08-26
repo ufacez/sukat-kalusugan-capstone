@@ -177,8 +177,8 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 				</div>
 				<?php
 				$dohLabels = [
-					'SUW' => 'Severely underweight', 'UW' => 'Underweight', 'Normal' => 'Normal',
-					'SSt' => 'Severely stunted', 'St' => 'Stunted', 'T' => 'Tall for age',
+					'SUW' => 'Severely underweight', 'MUW' => 'Moderately underweight', 'Normal' => 'Normal',
+					'SSt' => 'Severely stunted', 'MSt' => 'Moderately stunted', 'T' => 'Tall for age',
 					'SW' => 'Severe wasting (SAM)', 'MW' => 'Moderate wasting (MAM)', 'OW' => 'Overweight', 'Ob' => 'Obese',
 				];
 				$wfaLabel = $dohLabels[$selectedChild['wfa_status'] ?? ''] ?? null;

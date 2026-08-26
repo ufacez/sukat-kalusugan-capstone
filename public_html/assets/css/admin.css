@@ -14,6 +14,8 @@
   --admin-pill-success-bg: #e5f5ee;
   --admin-pill-warn-bg: #fff4df;
   --admin-pill-warn-text: #9a6510;
+  --admin-pill-orange-bg: #fff0e5;
+  --admin-pill-orange-text: #b45309;
   --admin-pill-danger-bg: #fde8e8;
   --admin-pill-muted-bg: #edf2ef;
   --admin-flash-bg: #f1fbf6;
@@ -51,6 +53,8 @@
   --admin-pill-success-bg: rgba(46, 197, 122, 0.15);
   --admin-pill-warn-bg: rgba(245, 185, 66, 0.15);
   --admin-pill-warn-text: #f5b942;
+  --admin-pill-orange-bg: rgba(249, 159, 56, 0.15);
+  --admin-pill-orange-text: #f9a738;
   --admin-pill-danger-bg: rgba(239, 83, 80, 0.15);
   --admin-pill-muted-bg: rgba(143, 168, 154, 0.15);
   --admin-flash-bg: rgba(46, 197, 122, 0.08);
@@ -517,6 +521,11 @@
 .admin-pill.is-warn {
   background: var(--admin-pill-warn-bg);
   color: var(--admin-pill-warn-text);
+}
+
+.admin-pill.is-orange {
+  background: var(--admin-pill-orange-bg);
+  color: var(--admin-pill-orange-text);
 }
 
 .admin-pill.is-danger {

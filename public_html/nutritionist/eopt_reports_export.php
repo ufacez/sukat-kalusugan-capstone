@@ -154,11 +154,11 @@ function eopt_fetch_list(
  */
 $listsSpec = [
 	['code' => 'SUW', 'sheet' => 'List_SUW', 'title' => 'SEVERELY UNDERWEIGHT (SUW)', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status = 'SUW'"],
-	['code' => 'UW',  'sheet' => 'List_UW',  'title' => 'UNDERWEIGHT (UW)',         'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status = 'UW'"],
-	['code' => 'SSt', 'sheet' => 'List_SSt', 'title' => 'SEVERELY STUNTED (SSt)',   'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status = 'SSt'"],
-	['code' => 'St',  'sheet' => 'List_St',  'title' => 'STUNTED (St)',             'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status = 'St'"],
+	['code' => 'MUW', 'sheet' => 'List_MUW', 'title' => 'MODERATELY UNDERWEIGHT (MUW)', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status IN ('UW','MUW')"],
+	['code' => 'SSt', 'sheet' => 'List_SSt', 'title' => 'SEVERELY STUNTED (SSt)', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status = 'SSt'"],
+	['code' => 'MSt', 'sheet' => 'List_MSt', 'title' => 'MODERATELY STUNTED (MSt)', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status IN ('St','MSt')"],
 	['code' => 'SW',  'sheet' => 'List_SW',  'title' => 'SEVERELY WASTED (SW)',     'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'SW'"],
-	['code' => 'W',   'sheet' => 'List_W',   'title' => 'WASTED — MODERATE (MW)',   'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'MW'"],
+	['code' => 'MW',  'sheet' => 'List_MW',  'title' => 'MODERATELY WASTED (MW)',   'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'MW'"],
 	['code' => 'OW',  'sheet' => 'List_OW',  'title' => 'OVERWEIGHT (OW)',          'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status = 'OW')"],
 	['code' => 'Ob',  'sheet' => 'List_Ob',  'title' => 'OBESE (Ob)',               'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'Ob'"],
 ];
@@ -223,8 +223,8 @@ $bucket = static fn(): array => [
 	'Total' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
 ];
 
-$wfaSummary = ['SUW' => $bucket(), 'UW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
-$hfaSummary = ['SSt' => $bucket(), 'St' => $bucket(), 'Normal' => $bucket(), 'T' => $bucket()];
+$wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
+$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'T' => $bucket()];
 $wfhSummary = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
 
 foreach ($summaryRows as $row) {
