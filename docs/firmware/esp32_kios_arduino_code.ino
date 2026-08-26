@@ -9,7 +9,7 @@
 // =====================================================
 // WIFI
 // =====================================================
-//
+//ww
 // The kiosk moves between locations (public presentation, then the
 // clinic), each with a different WiFi network. Hardcoded WIFI_SSID /
 // WIFI_PASSWORD constants used to mean re-flashing the firmware every
