@@ -65,7 +65,7 @@ $parents = admin_fetch_all(
 		p.status,
 		COUNT(DISTINCT c.id) AS children_count,
 		COUNT(DISTINCT a.id) AS appointment_count,
-		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal', 'Overweight') THEN 1 ELSE 0 END) AS follow_up_count,
+		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count,
 		MAX(lm.measurement_date) AS latest_measurement
 	 FROM parents p
 	 LEFT JOIN barangays bg ON bg.id = p.barangay_id

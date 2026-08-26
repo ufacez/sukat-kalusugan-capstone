@@ -9,8 +9,9 @@ $user = nutritionist_require_access();
  *
  * "At risk" mirrors the same definition already used on
  * nutritionist/who_analysis.php: the child's LATEST measurement is
- * anything other than Normal or Overweight (i.e. Underweight, Severely
- * Underweight, Stunted, or Wasted).
+ * anything other than Normal (i.e. Moderately Underweight, Severely Underweight,
+ * Moderately Stunted, Severely Stunted, Moderately Wasted, Severely Wasted,
+ * Overweight, or Obese).
  *
  * Non-admin nutritionists are scoped to their assigned barangay, same as
  * every other nutritionist page (see nutritionist_scope_fragment()).
@@ -26,7 +27,7 @@ $barangayStats = admin_fetch_all(
         b.status,
         COUNT(c.id) AS children_count,
         SUM(CASE WHEN lm.measurement_date IS NOT NULL THEN 1 ELSE 0 END) AS measured_count,
-        SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal', 'Overweight') THEN 1 ELSE 0 END) AS at_risk_count
+        SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS at_risk_count
      FROM barangays b
      LEFT JOIN children c ON c.barangay_id = b.id
      LEFT JOIN measurements lm ON lm.id = (
@@ -135,7 +136,7 @@ nutritionist_layout_start('Barangay Risk Map', $subtitle, 'risk_map');
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">GeoMapper &mdash; Nutritional Risk Exposure</h2>
-            <p class="admin-section-subtitle">Colored by the share of measured children currently classified Underweight, Stunted, or Wasted. Click a barangay for details.</p>
+            <p class="admin-section-subtitle">Colored by the share of measured children currently classified with a nutritional concern. Click a barangay for details.</p>
         </div>
     </div>
 

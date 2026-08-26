@@ -6,12 +6,15 @@ require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 function nutritionist_child_status_class(?string $status): string
 {
-    return match ($status) {
-        'Normal', 'Tall' => 'is-success',
-        'Moderately Underweight', 'Moderately Stunted', 'Moderately Wasted' => 'is-warn',
-        'Overweight', 'Obese' => 'is-orange',
-        'Pending' => 'is-muted',
-        default => 'is-danger',
+    $normalized = strtolower(trim((string)$status));
+
+    return match ($normalized) {
+        'normal', 'tall', 't' => 'is-success',
+        'moderately underweight', 'moderately stunted', 'moderately wasted', 'muw', 'mst', 'mw' => 'is-warn',
+        'overweight', 'obese', 'ow', 'ob' => 'is-orange',
+        'pending' => 'is-muted',
+        'suw', 'sst', 'sw', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
+        default => 'is-muted',
     };
 }
 
@@ -97,10 +100,36 @@ $children = admin_fetch_all(
         lm.waz,
         lm.haz,
         lm.whz,
-        lm.nutritional_status,
-        lm.wfa_status,
-        lm.hfa_status,
-        lm.wfh_status
+        COALESCE(lm.nutritional_status, CASE
+            WHEN lm.waz < -3 THEN 'Severely Underweight'
+            WHEN lm.haz < -3 THEN 'Severely Stunted'
+            WHEN lm.whz < -3 THEN 'Severely Wasted'
+            WHEN lm.waz < -2 THEN 'Moderately Underweight'
+            WHEN lm.haz < -2 THEN 'Moderately Stunted'
+            WHEN lm.whz < -2 THEN 'Moderately Wasted'
+            WHEN lm.whz > 3 THEN 'Obese'
+            WHEN lm.whz > 2 THEN 'Overweight'
+            ELSE 'Normal'
+        END) AS nutritional_status,
+        COALESCE(lm.wfa_status, CASE
+            WHEN lm.waz < -3 THEN 'SUW'
+            WHEN lm.waz < -2 THEN 'MUW'
+            WHEN lm.waz > 2 THEN 'OW'
+            ELSE 'Normal'
+        END) AS wfa_status,
+        COALESCE(lm.hfa_status, CASE
+            WHEN lm.haz < -3 THEN 'SSt'
+            WHEN lm.haz < -2 THEN 'MSt'
+            WHEN lm.haz > 2 THEN 'Tall'
+            ELSE 'Normal'
+        END) AS hfa_status,
+        COALESCE(lm.wfh_status, CASE
+            WHEN lm.whz < -3 THEN 'SW'
+            WHEN lm.whz < -2 THEN 'MW'
+            WHEN lm.whz > 3 THEN 'Ob'
+            WHEN lm.whz > 2 THEN 'OW'
+            ELSE 'Normal'
+        END) AS wfh_status
 
      FROM children c
 
@@ -169,14 +198,16 @@ $parents = admin_fetch_all(
 $statuses = [
     'All',
     'Normal',
-    'Underweight',
+    'Moderately Underweight',
     'Severely Underweight',
-    'Stunted',
+    'Moderately Stunted',
     'Severely Stunted',
     'Moderately Wasted',
     'Severely Wasted',
     'Overweight',
-    'Obese'
+    'Obese',
+    'Tall',
+    'Pending',
 ];
 
 $filteredChildren = array_values(

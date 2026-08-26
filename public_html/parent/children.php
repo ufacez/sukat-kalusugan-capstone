@@ -6,7 +6,7 @@ require_once __DIR__ . '/../includes/who_calculator.php';
 $user = parent_require_access();
 
 $children = admin_fetch_all(
-	'SELECT
+	"SELECT
 		c.id,
 		c.child_code,
 		c.first_name,
@@ -24,10 +24,36 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status,
-		lm.wfa_status,
-		lm.hfa_status,
-		lm.wfh_status
+		COALESCE(lm.nutritional_status, CASE
+			WHEN lm.waz < -3 THEN 'Severely Underweight'
+			WHEN lm.haz < -3 THEN 'Severely Stunted'
+			WHEN lm.whz < -3 THEN 'Severely Wasted'
+			WHEN lm.waz < -2 THEN 'Moderately Underweight'
+			WHEN lm.haz < -2 THEN 'Moderately Stunted'
+			WHEN lm.whz < -2 THEN 'Moderately Wasted'
+			WHEN lm.whz > 3 THEN 'Obese'
+			WHEN lm.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(lm.wfa_status, CASE
+			WHEN lm.waz < -3 THEN 'SUW'
+			WHEN lm.waz < -2 THEN 'MUW'
+			WHEN lm.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(lm.hfa_status, CASE
+			WHEN lm.haz < -3 THEN 'SSt'
+			WHEN lm.haz < -2 THEN 'MSt'
+			WHEN lm.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(lm.wfh_status, CASE
+			WHEN lm.whz < -3 THEN 'SW'
+			WHEN lm.whz < -2 THEN 'MW'
+			WHEN lm.whz > 3 THEN 'Ob'
+			WHEN lm.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -39,7 +65,7 @@ $children = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE c.parent_id = ?
-	 ORDER BY c.last_name ASC, c.first_name ASC',
+	 ORDER BY c.last_name ASC, c.first_name ASC",
 	'i',
 	[(int)$user['id']]
 );
@@ -74,7 +100,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 	</article>
 	<article class="parent-stat-card">
 		<div class="parent-stat-label">Needs follow-up</div>
-		<div class="admin-stat-value"><?php echo count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true))); ?></div>
+		<div class="admin-stat-value"><?php echo count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal'], true))); ?></div>
 		<div class="admin-stat-note">Latest flagged children</div>
 	</article>
 	<article class="parent-stat-card">
@@ -176,11 +202,11 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 					</div>
 				</div>
 				<?php
-				$dohLabels = [
-					'SUW' => 'Severely underweight', 'MUW' => 'Moderately underweight', 'Normal' => 'Normal',
-					'SSt' => 'Severely stunted', 'MSt' => 'Moderately stunted', 'T' => 'Tall for age',
-					'SW' => 'Severe wasting (SAM)', 'MW' => 'Moderate wasting (MAM)', 'OW' => 'Overweight', 'Ob' => 'Obese',
-				];
+			$dohLabels = [
+				'SUW' => 'Severely underweight', 'MUW' => 'Moderately underweight', 'Normal' => 'Normal',
+				'SSt' => 'Severely stunted', 'MSt' => 'Moderately stunted', 'Tall' => 'Tall for age',
+				'SW' => 'Severe wasting (SAM)', 'MW' => 'Moderate wasting (MAM)', 'OW' => 'Overweight', 'Ob' => 'Obese',
+			];
 				$wfaLabel = $dohLabels[$selectedChild['wfa_status'] ?? ''] ?? null;
 				$hfaLabel = $dohLabels[$selectedChild['hfa_status'] ?? ''] ?? null;
 				$wfhLabel = $dohLabels[$selectedChild['wfh_status'] ?? ''] ?? null;

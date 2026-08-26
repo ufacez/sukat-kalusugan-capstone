@@ -3051,9 +3051,11 @@
    * getting the same green pill regardless of severity.
    */
   const STATUS_PILL_CLASSES = [
-    "is-normal",
-    "is-caution",
-    "is-danger"
+    "is-success",
+    "is-warn",
+    "is-orange",
+    "is-danger",
+    "is-muted"
   ];
 
   function nutritionalStatusPillClass(status) {
@@ -3061,26 +3063,51 @@
       status || ""
     ).trim().toLowerCase();
 
-    if (normalized === "normal") {
-      return "is-normal";
+    // Green (success)
+    if (normalized === "normal" || normalized === "tall") {
+      return "is-success";
     }
 
+    // Yellow (warn) — moderate categories
     if (
-      normalized === "underweight" ||
-      normalized === "stunted" ||
-      normalized === "wasted" ||
-      normalized === "overweight"
+      normalized === "moderately underweight" ||
+      normalized === "moderately stunted" ||
+      normalized === "moderately wasted" ||
+      normalized === "muw" ||
+      normalized === "mst" ||
+      normalized === "mw"
     ) {
-      return "is-caution";
+      return "is-warn";
     }
 
+    // Orange — overweight/obese
     if (
-      normalized === "severely underweight"
+      normalized === "overweight" ||
+      normalized === "obese" ||
+      normalized === "ow" ||
+      normalized === "ob"
+    ) {
+      return "is-orange";
+    }
+
+    // Red (danger) — severe categories
+    if (
+      normalized === "severely underweight" ||
+      normalized === "severely stunted" ||
+      normalized === "severely wasted" ||
+      normalized === "suw" ||
+      normalized === "sst" ||
+      normalized === "sw"
     ) {
       return "is-danger";
     }
 
-    return "";
+    // Muted — pending
+    if (normalized === "pending" || normalized === "") {
+      return "is-muted";
+    }
+
+    return "is-muted";
   }
 
   function applyStatusPillClass(status) {

@@ -159,7 +159,12 @@ CREATE TABLE measurements (
     waz                 DECIMAL(5,2) NULL,                -- weight-for-age z-score
     haz                 DECIMAL(5,2) NULL,                -- height-for-age z-score
     whz                 DECIMAL(5,2) NULL,                -- weight-for-height z-score
-    nutritional_status  ENUM('Normal','Underweight','Severely Underweight','Stunted','Wasted','Overweight') NULL,
+    nutritional_status  ENUM('Normal','Moderately Underweight','Severely Underweight','Moderately Stunted','Severely Stunted','Moderately Wasted','Severely Wasted','Overweight','Obese') NULL,
+    wfa_status          ENUM('SUW','MUW','Normal','OW') NULL,
+    hfa_status          ENUM('SSt','MSt','Normal','Tall') NULL,
+    wfh_status          ENUM('SW','MW','Normal','OW','Ob') NULL,
+    is_flagged          TINYINT(1) NOT NULL DEFAULT 0,
+    flag_reason         VARCHAR(150) NULL,
     device_id           INT UNSIGNED NULL,                -- which ESP32/kiosk took this reading
     recorded_by         INT UNSIGNED NULL,                -- staff user, only set for manual entries
     created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

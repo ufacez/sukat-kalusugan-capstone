@@ -181,18 +181,39 @@ function api_require_parent_session(): array
 
 function api_measurement_classification(float $waz, float $haz, float $whz): string
 {
-    if ($waz < -3 || $whz < -3) {
+    // V2 DOH e-OPT Plus classification (canonical labels)
+    // WFA axis
+    if ($waz < -3) {
         return 'Severely Underweight';
     }
-
-    if ($waz < -2 || $whz < -2) {
-        return 'Underweight';
+    if ($waz < -2) {
+        return 'Moderately Underweight';
+    }
+    if ($waz > 2) {
+        return 'Overweight';
     }
 
+    // HFA axis
+    if ($haz < -3) {
+        return 'Severely Stunted';
+    }
     if ($haz < -2) {
-        return 'Stunted';
+        return 'Moderately Stunted';
+    }
+    if ($haz > 2) {
+        return 'Tall';
     }
 
+    // WFH axis
+    if ($whz < -3) {
+        return 'Severely Wasted';
+    }
+    if ($whz < -2) {
+        return 'Moderately Wasted';
+    }
+    if ($whz > 3) {
+        return 'Obese';
+    }
     if ($whz > 2) {
         return 'Overweight';
     }

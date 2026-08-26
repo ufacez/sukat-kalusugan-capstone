@@ -251,7 +251,7 @@ function classify_hfa_status(float $haz): string
 		return 'Normal';
 	}
 
-	return 'T';
+	return 'Tall';
 }
 
 /**

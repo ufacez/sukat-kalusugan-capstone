@@ -31,10 +31,36 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status,
-		lm.wfa_status,
-		lm.hfa_status,
-		lm.wfh_status
+		COALESCE(lm.nutritional_status, CASE
+			WHEN lm.waz < -3 THEN 'Severely Underweight'
+			WHEN lm.haz < -3 THEN 'Severely Stunted'
+			WHEN lm.whz < -3 THEN 'Severely Wasted'
+			WHEN lm.waz < -2 THEN 'Moderately Underweight'
+			WHEN lm.haz < -2 THEN 'Moderately Stunted'
+			WHEN lm.whz < -2 THEN 'Moderately Wasted'
+			WHEN lm.whz > 3 THEN 'Obese'
+			WHEN lm.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(lm.wfa_status, CASE
+			WHEN lm.waz < -3 THEN 'SUW'
+			WHEN lm.waz < -2 THEN 'MUW'
+			WHEN lm.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(lm.hfa_status, CASE
+			WHEN lm.haz < -3 THEN 'SSt'
+			WHEN lm.haz < -2 THEN 'MSt'
+			WHEN lm.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(lm.wfh_status, CASE
+			WHEN lm.whz < -3 THEN 'SW'
+			WHEN lm.whz < -2 THEN 'MW'
+			WHEN lm.whz > 3 THEN 'Ob'
+			WHEN lm.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -62,10 +88,36 @@ $measurements = admin_fetch_all(
 		m.waz,
 		m.haz,
 		m.whz,
-		m.nutritional_status,
-		m.wfa_status,
-		m.hfa_status,
-		m.wfh_status,
+		COALESCE(m.nutritional_status, CASE
+			WHEN m.waz < -3 THEN 'Severely Underweight'
+			WHEN m.haz < -3 THEN 'Severely Stunted'
+			WHEN m.whz < -3 THEN 'Severely Wasted'
+			WHEN m.waz < -2 THEN 'Moderately Underweight'
+			WHEN m.haz < -2 THEN 'Moderately Stunted'
+			WHEN m.whz < -2 THEN 'Moderately Wasted'
+			WHEN m.whz > 3 THEN 'Obese'
+			WHEN m.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(m.wfa_status, CASE
+			WHEN m.waz < -3 THEN 'SUW'
+			WHEN m.waz < -2 THEN 'MUW'
+			WHEN m.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(m.hfa_status, CASE
+			WHEN m.haz < -3 THEN 'SSt'
+			WHEN m.haz < -2 THEN 'MSt'
+			WHEN m.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(m.wfh_status, CASE
+			WHEN m.whz < -3 THEN 'SW'
+			WHEN m.whz < -2 THEN 'MW'
+			WHEN m.whz > 3 THEN 'Ob'
+			WHEN m.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status,
 		m.source_type,
 		c.first_name,
 		c.last_name,
@@ -149,7 +201,7 @@ $parents = admin_fetch_all(
 		p.address,
 		p.status,
 		COUNT(DISTINCT c.id) AS children_count,
-		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal', 'Overweight') THEN 1 ELSE 0 END) AS follow_up_count
+		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count
 	 FROM parents p
 	 LEFT JOIN children c ON c.parent_id = p.id AND {$parentsScope}
 	 LEFT JOIN measurements lm ON lm.id = (
@@ -179,19 +231,24 @@ $upcomingAppointments = array_values(array_filter(
 $chartMonths = [];
 $chartData = [
 	'Normal' => [],
+	'Moderately Underweight' => [],
 	'Severely Underweight' => [],
-	'Underweight' => [],
-	'Stunted' => [],
+	'Moderately Stunted' => [],
+	'Severely Stunted' => [],
+	'Moderately Wasted' => [],
+	'Severely Wasted' => [],
+	'Overweight' => [],
+	'Obese' => [],
 ];
 
 for ($offset = 7; $offset >= 0; $offset--) {
 	$month = $today->modify('-' . $offset . ' months');
 	$key = $month->format('Y-m');
 	$chartMonths[] = $month->format('M');
-	$chartData['Normal'][$key] = 0;
-	$chartData['Severely Underweight'][$key] = 0;
-	$chartData['Underweight'][$key] = 0;
-	$chartData['Stunted'][$key] = 0;
+	foreach ($chartData as $status => &$monthData) {
+		$monthData[$key] = 0;
+	}
+	unset($monthData);
 }
 
 foreach ($measurements as $measurement) {
@@ -210,9 +267,14 @@ foreach ($measurements as $measurement) {
 
 $seriesColors = [
 	'Normal' => '#1A8F68',
+	'Moderately Underweight' => '#E67E22',
 	'Severely Underweight' => '#E03131',
-	'Underweight' => '#E67E22',
-	'Stunted' => '#7048E8',
+	'Moderately Stunted' => '#7048E8',
+	'Severely Stunted' => '#5f3dc4',
+	'Moderately Wasted' => '#4a9fd5',
+	'Severely Wasted' => '#c92a2a',
+	'Overweight' => '#b08900',
+	'Obese' => '#e8590c',
 ];
 
 $chartXs = [56, 110, 164, 218, 272, 326, 380, 420];

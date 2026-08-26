@@ -43,7 +43,7 @@ $rows = admin_fetch_all(
 );
 
 $analyzed = array_values(array_filter($rows, static fn(array $row): bool => $row['measurement_date'] !== null));
-$flagged = array_values(array_filter($rows, static fn(array $row): bool => !in_array((string)($row['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true)));
+$flagged = array_values(array_filter($rows, static fn(array $row): bool => !in_array((string)($row['nutritional_status'] ?? 'Pending'), ['Normal'], true)));
 $normal = array_values(array_filter($rows, static fn(array $row): bool => (string)($row['nutritional_status'] ?? '') === 'Normal'));
 
 $avgWaz = 0.0;
@@ -95,17 +95,18 @@ nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and class
 	<article class="nutritionist-panel">
 		<div class="admin-section-title" style="margin-bottom:12px;">Classification Guide</div>
 		<div style="display:grid;gap:10px;">
-			<?php foreach ([
-				['Normal', 'All z-scores within accepted range'],
-				['Underweight', 'WFA below expected range (UW)'],
-				['Severely Underweight', 'WFA critically low (SUW)'],
-				['Stunted', 'HFA below expected range (St)'],
-				['Severely Stunted', 'HFA critically low (SSt)'],
-				['Moderately Wasted', 'WFH below expected range (MW)'],
-				['Severely Wasted', 'WFH critically low (SW)'],
-				['Overweight', 'WFH above expected range (OW)'],
-				['Obese', 'WFH critically high (Ob)'],
-			] as [$label, $description]): ?>
+		<?php foreach ([
+			['Normal', 'All z-scores within accepted range'],
+			['Moderately Underweight', 'WFA below expected range (MUW)'],
+			['Severely Underweight', 'WFA critically low (SUW)'],
+			['Moderately Stunted', 'HFA below expected range (MSt)'],
+			['Severely Stunted', 'HFA critically low (SSt)'],
+			['Moderately Wasted', 'WFH below expected range (MW)'],
+			['Severely Wasted', 'WFH critically low (SW)'],
+			['Overweight', 'WFH above expected range (OW)'],
+			['Obese', 'WFH critically high (Ob)'],
+			['Tall', 'HFA above expected range'],
+		] as [$label, $description]): ?>
 				<div class="admin-list-item" style="padding:10px 0;">
 					<span class="admin-pill <?php echo nutritionist_status_class($label); ?>"><?php echo nutritionist_e($label); ?></span>
 					<span class="admin-mini" style="max-width:72%;text-align:right;"><?php echo nutritionist_e($description); ?></span>

@@ -331,6 +331,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 	$contentTypeOverrides = '';
 	$workbookSheets = '';
 	$workbookRels = '';
+	$sheetXmlParts = [];
 
 	foreach (array_values($sheets) as $index => $spec) {
 		$sheetNumber = $index + 1;
@@ -340,14 +341,15 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 		$workbookSheets .= '<sheet name="' . htmlspecialchars($safeName, ENT_XML1) . '" sheetId="' . $sheetNumber . '" r:id="rId' . $sheetNumber . '"/>';
 		$workbookRels .= '<Relationship Id="rId' . $sheetNumber . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' . $sheetNumber . '.xml"/>';
 
-		$zip->addFromString('xl/worksheets/sheet' . $sheetNumber . '.xml',
+		$sheetXmlParts['xl/worksheets/sheet' . $sheetNumber . '.xml'] =
 			'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
 			'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+			'<sheetFormatPr defaultRowHeight="15"/>' .
 			xlsx_lite_sheet_body_xml($spec) .
-			'</worksheet>'
-		);
+			'</worksheet>';
 	}
 
+	// Write infrastructure files FIRST (OOXML recommended order), then sheets.
 	$zip->addFromString('[Content_Types].xml',
 		'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
 		'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' .
@@ -382,6 +384,11 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 	);
 
 	$zip->addFromString('xl/styles.xml', xlsx_lite_styles_xml());
+
+	// Write sheet XML parts last.
+	foreach ($sheetXmlParts as $partName => $xmlContent) {
+		$zip->addFromString($partName, $xmlContent);
+	}
 
 	$zip->close();
 

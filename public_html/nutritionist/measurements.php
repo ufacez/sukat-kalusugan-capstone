@@ -17,10 +17,36 @@ $measurements = admin_fetch_all(
 		m.waz,
 		m.haz,
 		m.whz,
-		m.nutritional_status,
-		m.wfa_status,
-		m.hfa_status,
-		m.wfh_status,
+		COALESCE(m.nutritional_status, CASE
+			WHEN m.waz < -3 THEN 'Severely Underweight'
+			WHEN m.haz < -3 THEN 'Severely Stunted'
+			WHEN m.whz < -3 THEN 'Severely Wasted'
+			WHEN m.waz < -2 THEN 'Moderately Underweight'
+			WHEN m.haz < -2 THEN 'Moderately Stunted'
+			WHEN m.whz < -2 THEN 'Moderately Wasted'
+			WHEN m.whz > 3 THEN 'Obese'
+			WHEN m.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(m.wfa_status, CASE
+			WHEN m.waz < -3 THEN 'SUW'
+			WHEN m.waz < -2 THEN 'MUW'
+			WHEN m.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(m.hfa_status, CASE
+			WHEN m.haz < -3 THEN 'SSt'
+			WHEN m.haz < -2 THEN 'MSt'
+			WHEN m.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(m.wfh_status, CASE
+			WHEN m.whz < -3 THEN 'SW'
+			WHEN m.whz < -2 THEN 'MW'
+			WHEN m.whz > 3 THEN 'Ob'
+			WHEN m.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status,
 		m.is_flagged,
 		m.flag_reason,
 		c.id AS child_id,
@@ -59,7 +85,7 @@ foreach ($measurements as $measurement) {
 	}
 }
 
-$atRiskCount = count(array_filter($measurements, static fn(array $measurement): bool => !in_array((string)($measurement['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true)));
+$atRiskCount = count(array_filter($measurements, static fn(array $measurement): bool => !in_array((string)($measurement['nutritional_status'] ?? 'Pending'), ['Normal'], true)));
 $flaggedCount = count(array_filter($measurements, static fn(array $measurement): bool => !empty($measurement['is_flagged'])));
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">View children</a>';
 

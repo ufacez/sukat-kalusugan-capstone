@@ -18,7 +18,7 @@ if ($parent === null) {
 }
 
 $children = admin_fetch_all(
-	'SELECT
+	"SELECT
 		c.id,
 		c.child_code,
 		c.first_name,
@@ -32,10 +32,36 @@ $children = admin_fetch_all(
 		lm.waz,
 		lm.haz,
 		lm.whz,
-		lm.nutritional_status,
-		lm.wfa_status,
-		lm.hfa_status,
-		lm.wfh_status
+		COALESCE(lm.nutritional_status, CASE
+			WHEN lm.waz < -3 THEN 'Severely Underweight'
+			WHEN lm.haz < -3 THEN 'Severely Stunted'
+			WHEN lm.whz < -3 THEN 'Severely Wasted'
+			WHEN lm.waz < -2 THEN 'Moderately Underweight'
+			WHEN lm.haz < -2 THEN 'Moderately Stunted'
+			WHEN lm.whz < -2 THEN 'Moderately Wasted'
+			WHEN lm.whz > 3 THEN 'Obese'
+			WHEN lm.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(lm.wfa_status, CASE
+			WHEN lm.waz < -3 THEN 'SUW'
+			WHEN lm.waz < -2 THEN 'MUW'
+			WHEN lm.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(lm.hfa_status, CASE
+			WHEN lm.haz < -3 THEN 'SSt'
+			WHEN lm.haz < -2 THEN 'MSt'
+			WHEN lm.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(lm.wfh_status, CASE
+			WHEN lm.whz < -3 THEN 'SW'
+			WHEN lm.whz < -2 THEN 'MW'
+			WHEN lm.whz > 3 THEN 'Ob'
+			WHEN lm.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status
 	 FROM children c
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 LEFT JOIN measurements lm ON lm.id = (
@@ -46,7 +72,7 @@ $children = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE c.parent_id = ?
-	 ORDER BY c.last_name ASC, c.first_name ASC',
+	 ORDER BY c.last_name ASC, c.first_name ASC",
 	'i',
 	[(int)$user['id']]
 );
@@ -72,17 +98,43 @@ $appointments = admin_fetch_all(
 );
 
 $recentMeasurements = admin_fetch_all(
-	'SELECT
+	"SELECT
 		m.measurement_date,
 		m.height_cm,
 		m.weight_kg,
 		m.waz,
 		m.haz,
 		m.whz,
-		m.nutritional_status,
-		m.wfa_status,
-		m.hfa_status,
-		m.wfh_status,
+		COALESCE(m.nutritional_status, CASE
+			WHEN m.waz < -3 THEN 'Severely Underweight'
+			WHEN m.haz < -3 THEN 'Severely Stunted'
+			WHEN m.whz < -3 THEN 'Severely Wasted'
+			WHEN m.waz < -2 THEN 'Moderately Underweight'
+			WHEN m.haz < -2 THEN 'Moderately Stunted'
+			WHEN m.whz < -2 THEN 'Moderately Wasted'
+			WHEN m.whz > 3 THEN 'Obese'
+			WHEN m.whz > 2 THEN 'Overweight'
+			ELSE 'Normal'
+		END) AS nutritional_status,
+		COALESCE(m.wfa_status, CASE
+			WHEN m.waz < -3 THEN 'SUW'
+			WHEN m.waz < -2 THEN 'MUW'
+			WHEN m.waz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfa_status,
+		COALESCE(m.hfa_status, CASE
+			WHEN m.haz < -3 THEN 'SSt'
+			WHEN m.haz < -2 THEN 'MSt'
+			WHEN m.haz > 2 THEN 'Tall'
+			ELSE 'Normal'
+		END) AS hfa_status,
+		COALESCE(m.wfh_status, CASE
+			WHEN m.whz < -3 THEN 'SW'
+			WHEN m.whz < -2 THEN 'MW'
+			WHEN m.whz > 3 THEN 'Ob'
+			WHEN m.whz > 2 THEN 'OW'
+			ELSE 'Normal'
+		END) AS wfh_status,
 		c.first_name,
 		c.last_name,
 		c.child_code
@@ -90,13 +142,13 @@ $recentMeasurements = admin_fetch_all(
 	 INNER JOIN children c ON c.id = m.child_id
 	 WHERE c.parent_id = ?
 	 ORDER BY m.measurement_date DESC, m.id DESC
-	 LIMIT 8',
+	 LIMIT 8",
 	'i',
 	[(int)$user['id']]
 );
 
 $childrenCount = count($children);
-$atRiskCount = count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true)));
+$atRiskCount = count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal'], true)));
 $upcomingAppointments = count(array_filter($appointments, static function (array $appointment): bool {
 	$scheduled = new DateTimeImmutable((string)$appointment['scheduled_at']);
 

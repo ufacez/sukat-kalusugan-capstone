@@ -101,7 +101,9 @@ function eopt_fetch_list(
 	string $barangayFilterSql,
 	array $barangayFilterParams,
 	string $conditionSql,
-	string $anchorParam
+	string $anchorParam,
+	int $ageMin = 0,
+	int $ageMax = 59
 ): array {
 	// The anchor date appears TWICE in the statement — once in the SELECT
 	// age snapshot and once in the WHERE band filter — so it leads and
@@ -111,12 +113,14 @@ function eopt_fetch_list(
 
 	return admin_fetch_all(
 		"SELECT
+			c.id,
 			c.child_code,
 			c.first_name,
 			c.middle_name,
 			c.last_name,
 			c.sex,
 			c.birthdate,
+			c.purok,
 			bg.name AS barangay,
 			p.name AS parent_name,
 			lm.id AS measurement_id,
@@ -138,7 +142,7 @@ function eopt_fetch_list(
 			LIMIT 1
 		 )
 		 WHERE {$scope}{$barangayFilterSql}
-		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$ageMin} AND {$ageMax}
 		   AND {$conditionSql}
 		 ORDER BY c.last_name ASC, c.first_name ASC",
 		$types,
@@ -148,19 +152,27 @@ function eopt_fetch_list(
 
 /*
  |--------------------------------------------------------------------------
- | The eight official monitoring lists — SAME TEMPLATE, DIFFERENT LIST.
+ | The eight V2 monitoring lists — combined categories
  | Each list can also be exported on its own via &list=CODE.
  |--------------------------------------------------------------------------
  */
 $listsSpec = [
-	['code' => 'SUW', 'sheet' => 'List_SUW', 'title' => 'SEVERELY UNDERWEIGHT (SUW)', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status = 'SUW'"],
-	['code' => 'MUW', 'sheet' => 'List_MUW', 'title' => 'MODERATELY UNDERWEIGHT (MUW)', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status IN ('UW','MUW')"],
-	['code' => 'SSt', 'sheet' => 'List_SSt', 'title' => 'SEVERELY STUNTED (SSt)', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status = 'SSt'"],
-	['code' => 'MSt', 'sheet' => 'List_MSt', 'title' => 'MODERATELY STUNTED (MSt)', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status IN ('St','MSt')"],
-	['code' => 'SW',  'sheet' => 'List_SW',  'title' => 'SEVERELY WASTED (SW)',     'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'SW'"],
-	['code' => 'MW',  'sheet' => 'List_MW',  'title' => 'MODERATELY WASTED (MW)',   'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'MW'"],
-	['code' => 'OW',  'sheet' => 'List_OW',  'title' => 'OVERWEIGHT (OW)',          'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status = 'OW')"],
-	['code' => 'Ob',  'sheet' => 'List_Ob',  'title' => 'OBESE (Ob)',               'axis' => 'Weight-for-Length/Height', 'condition' => "lm.wfh_status = 'Ob'"],
+	['code' => '0-23', 'sheet' => 'List_0_23', 'title' => 'CHILDREN 0-23 MONTHS OLD', 'axis' => 'All children (monthly weighing)',
+	 'condition' => '1=1', 'age_min' => 0, 'age_max' => 23, 'is_infant' => true],
+	['code' => 'MW', 'sheet' => 'List_MW', 'title' => 'MODERATELY WASTED', 'axis' => 'Weight-for-Height',
+	 'condition' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'SW', 'sheet' => 'List_SW', 'title' => 'SEVERELY WASTED', 'axis' => 'Weight-for-Height',
+	 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'MSt_SSt', 'sheet' => 'List_MSt_SSt', 'title' => 'MODERATELY OR SEVERELY STUNTED', 'axis' => 'Height-for-Age',
+	 'condition' => "lm.hfa_status IN ('St','SSt')", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'OW_Ob', 'sheet' => 'List_OW_Ob', 'title' => 'OVERWEIGHT OR OBESE', 'axis' => 'Weight-for-Age / Weight-for-Height',
+	 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'MUW_SUW_MSt_SSt', 'sheet' => 'List_MUW_SUW_MSt_SSt', 'title' => 'MODERATELY/SEVERELY UNDERWEIGHT + MODERATELY/SEVERELY STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age',
+	 'condition' => "(lm.wfa_status IN ('UW','SUW') AND lm.hfa_status IN ('St','SSt'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'MSt_SSt_MW_SW', 'sheet' => 'List_MSt_SSt_MW_SW', 'title' => 'MODERATELY/SEVERELY STUNTED + MODERATELY/SEVERELY WASTED', 'axis' => 'Height-for-Age + Weight-for-Height',
+	 'condition' => "(lm.hfa_status IN ('St','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	['code' => 'MSt_SSt_OW_Ob', 'sheet' => 'List_MSt_SSt_OW_Ob', 'title' => 'MODERATELY/SEVERELY STUNTED + OVERWEIGHT OR OBESE', 'axis' => 'Height-for-Age + Weight-for-Height',
+	 'condition' => "(lm.hfa_status IN ('St','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 ];
 
 /*
@@ -178,23 +190,23 @@ $isSingleList = $listParamKey !== '' && isset($codeLowerMap[$listParamKey]);
 $listParam = $isSingleList ? $codeLowerMap[$listParamKey]['code'] : $listParamRaw;
 $activeSpecs = $isSingleList ? [$codeLowerMap[$listParamKey]] : $listsSpec;
 
-$listColumns = ['No.', 'Name of Child (Surname, First Name, M.I.)', 'Sex', 'Date of Birth', 'Age (mos)', 'Barangay', 'Parent/Guardian', 'Weight (kg)', 'Height (cm)', 'WFA', 'HFA', 'WFH', 'Date Measured', 'Monitoring Track'];
-$listWidths = [6, 38, 9, 14, 10, 20, 26, 11, 11, 9, 9, 9, 15, 22];
+$listColumns = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
+for ($m = 1; $m <= 6; $m++) {
+	$listColumns[] = "Month #$m Date";
+	$listColumns[] = "Month #$m Intervention";
+	$listColumns[] = "Month #$m Status";
+}
+$listWidths = array_merge(
+	[6, 18, 26, 38, 9, 14, 11, 11, 9, 9, 9],
+	array_fill(0, 18, 15)
+);
 
 $sheets = [];
 
 /*
- |--------------------------------------------------------------------------
- | Sheet 1 — Summary (NutStatusBrgy-style sex-disaggregated counts)
- |--------------------------------------------------------------------------
- */
-/*
- |--------------------------------------------------------------------------
  | Sheet 1 — Summary (NutStatusBrgy-style sex-disaggregated counts).
  | Skipped in single-list export mode.
- |--------------------------------------------------------------------------
  */
-$sheets = [];
 
 if (!$isSingleList) {
 $summaryRows = admin_fetch_all(
@@ -224,7 +236,7 @@ $bucket = static fn(): array => [
 ];
 
 $wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
-$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'T' => $bucket()];
+$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
 $wfhSummary = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
 
 foreach ($summaryRows as $row) {
@@ -315,19 +327,25 @@ foreach ($activeSpecs as $listIndex => $spec) {
 		$barangayFilterSql,
 		$barangayFilterParams,
 		$spec['condition'],
-		$anchorParam
+		$anchorParam,
+		$spec['age_min'] ?? 0,
+		$spec['age_max'] ?? 59
 	);
 
 	$totalCols = count($listColumns);
 	$outRows = [];
 
 	$titleLines = [
-		'Republic of the Philippines',
-		'Department of Health',
-		'National Nutrition Council',
-		'OPERATION TIMBANG (OPT) PLUS — ' . $year,
-		'MONITORING LIST FOR ' . $spec['title'] . ' PRESCHOOL CHILDREN (0-59 MONTHS OLD)',
+		'BARANGAY: ' . strtoupper($barangayName),
+		'MUNICIPALITY: _______________',
+		'PROVINCE: _______________',
+		'YEAR: ' . $year,
+		'# OF CHILDREN: ' . count($rows),
+		'NOTE: ' . ($spec['is_infant'] ? 'Every child <24 months is weighed monthly.' . PHP_EOL . 'PRINTING INSTRUCTIONS: _______________' : 'PRINTING INSTRUCTIONS: _______________'),
 	];
+
+	$mergeRow = $totalCols - 1;
+	$mergeRange = 'A' . ($outRows ? count($outRows) + 1 : '1') . ':' . 'Z' . ($outRows ? count($outRows) + 1 : '1');
 
 	foreach ($titleLines as $lineIdx => $lineText) {
 		$styleKey = ['org', 'org', 'org', 'title', 'subtitle'][$lineIdx];
@@ -369,35 +387,37 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	}
 	$outRows[] = $headerRow;
 
+	$visitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
+	$visitTo = $anchorDate->format('Y-m-d');
+
 	foreach ($rows as $seq => $row) {
-		$classifTrack = followup_classify_child([
-			'birthdate' => (string)$row['birthdate'],
-			'measurement_date' => (string)$row['measurement_date'],
-			'wfa_status' => $row['wfa_status'],
-			'hfa_status' => $row['hfa_status'],
-			'wfh_status' => $row['wfh_status'],
-		], $anchorDate)['track'];
-
-		$trackLabel = $classifTrack === 'quarterly' ? 'Quarterly (Apr/Jul/Oct)' : ($classifTrack === 'monthly' ? 'Monthly' : '—');
-
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
+		$visits = followup_fetch_visits((int)$row['id'], $visitFrom, $visitTo, 6);
 
-		$outRows[] = [
+		$dataRow = [
 			['v' => $seq + 1, 's' => 'cell_center'],
+			['v' => (string)($row['purok'] ?? ''), 's' => 'cell'],
+			['v' => (string)$row['parent_name'], 's' => 'cell'],
 			['v' => $fullName, 's' => 'cell'],
 			['v' => (string)$row['sex'], 's' => 'cell_center'],
 			['v' => (string)$row['birthdate'], 's' => 'cell_center'],
-			['v' => (int)$row['age_months'], 's' => 'cell_center'],
-			['v' => (string)($row['barangay'] ?? ''), 's' => 'cell'],
-			['v' => (string)$row['parent_name'], 's' => 'cell'],
-			['v' => (float)$row['weight_kg'], 's' => 'cell_num'],
-			['v' => (float)$row['height_cm'], 's' => 'cell_num'],
+			['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
+			['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
 			['v' => (string)($row['wfa_status'] ?? ''), 's' => 'cell_center'],
 			['v' => (string)($row['hfa_status'] ?? ''), 's' => 'cell_center'],
 			['v' => (string)($row['wfh_status'] ?? ''), 's' => 'cell_center'],
-			['v' => (string)$row['measurement_date'], 's' => 'cell_center'],
-			['v' => $trackLabel, 's' => 'cell'],
 		];
+
+		$visitMap = [];
+		foreach ($visits as $v) { $visitMap[] = $v; }
+		for ($m = 0; $m < 6; $m++) {
+			$v = $visitMap[$m] ?? null;
+			$dataRow[] = ['v' => $v ? date('m-d-y', strtotime((string)$v['scheduled_at'])) : '', 's' => 'cell_center'];
+			$dataRow[] = ['v' => $v ? (string)($v['intervention_notes'] ?? $v['intervention_type'] ?? '') : '', 's' => 'cell'];
+			$dataRow[] = ['v' => $v ? (string)($v['nutritional_status'] ?? '') : '', 's' => 'cell_center'];
+		}
+
+		$outRows[] = $dataRow;
 	}
 
 	// Totals row — part of the standard form footer.
@@ -426,7 +446,18 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	}
 
 	// Title block spans the full grid width on every list sheet.
-	$merges = ['A1:N1', 'A2:N2', 'A3:N3', 'A4:N4', 'A5:N5'];
+	// Convert column count to Excel letter (1=A, 27=AA, etc.)
+	$colIdx = $totalCols;
+	$lastCol = '';
+	while ($colIdx > 0) {
+		$colIdx--;
+		$lastCol = chr(65 + ($colIdx % 26)) . $lastCol;
+		$colIdx = intdiv($colIdx, 26);
+	}
+	$merges = array_map(
+		fn($r) => "A{$r}:{$lastCol}{$r}",
+		range(1, 7)
+	);
 
 	$sheets[] = [
 		'name' => $spec['sheet'],
@@ -436,7 +467,9 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	];
 }
 
-$tmpPath = tempnam(sys_get_temp_dir(), 'eopt_report_') . '.xlsx';
+$tmpBase = tempnam(sys_get_temp_dir(), 'eopt_report_');
+$tmpPath = $tmpBase . '.xlsx';
+@unlink($tmpBase);
 
 if (!xlsx_lite_write_workbook($tmpPath, $sheets)) {
 	$redirectParams = $isSingleList

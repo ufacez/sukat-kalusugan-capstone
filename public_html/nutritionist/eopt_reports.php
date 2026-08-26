@@ -12,8 +12,8 @@ $user = nutritionist_require_access();
  * MONTHLY view (April to December):
  *   Roster 1 · ALL children aged 0-23 months, regardless of status;
  *   Roster 2 · older children 24-59 months who are MALNOURISHED
- *              (Obese / Overweight / Underweight / Stunted / Wasted /
- *              Severely Underweight / Severely Stunted / Severely Wasted);
+ *              (Obese / Overweight / Moderately Underweight / Severely Underweight /
+ *              Moderately Stunted / Severely Stunted / Moderately Wasted / Severely Wasted);
  *   Roster 3 · older children 24-59 months still without any measurement
  *              (they must be found and baselined).
  *
@@ -94,6 +94,7 @@ $baseSelect = "SELECT
 	c.last_name,
 	c.sex,
 	c.birthdate,
+	c.purok,
 	bg.name AS barangay,
 	p.name AS parent_name,
 	p.phone AS parent_phone";
@@ -180,9 +181,9 @@ if ($view === 'monthly') {
 		{$latestJoin}
 		WHERE {$scope}{$barangayFilterSql}
 		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
-		  AND (
-			lm.wfa_status IN ('SUW','UW','MUW','OW')
-			OR lm.hfa_status IN ('SSt','St','MSt')
+		AND (
+			lm.wfa_status IN ('SUW','MUW','OW')
+			OR lm.hfa_status IN ('SSt','MSt')
 			OR lm.wfh_status IN ('SW','MW','OW','Ob')
 		  )
 		ORDER BY c.last_name ASC, c.first_name ASC",
@@ -286,19 +287,83 @@ $exportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build
 
 /*
  |--------------------------------------------------------------------------
- | SINGLE-LIST VIEW MODE — &list=SUW|UW|SSt|St|SW|W|OW|Ob
+ | SINGLE-LIST VIEW MODE — V2 combined monitoring lists
  | Renders the roster for one monitoring list and an Export button.
  |--------------------------------------------------------------------------
  */
 $listCodes = [
-	'SUW' => ['sheet' => 'List_SUW', 'title' => 'SEVERELY UNDERWEIGHT (SUW)', 'axis' => 'Weight-for-Age',            'condition' => "lm.wfa_status = 'SUW'"],
-	'MUW' => ['sheet' => 'List_MUW', 'title' => 'MODERATELY UNDERWEIGHT (MUW)', 'axis' => 'Weight-for-Age',         'condition' => "lm.wfa_status IN ('UW','MUW')"],
-	'SSt' => ['sheet' => 'List_SSt', 'title' => 'SEVERELY STUNTED (SSt)',    'axis' => 'Height-for-Age',            'condition' => "lm.hfa_status = 'SSt'"],
-	'MSt' => ['sheet' => 'List_MSt', 'title' => 'MODERATELY STUNTED (MSt)',  'axis' => 'Height-for-Age',            'condition' => "lm.hfa_status IN ('St','MSt')"],
-	'SW'  => ['sheet' => 'List_SW',  'title' => 'SEVERELY WASTED (SW)',       'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'SW'"],
-	'MW'  => ['sheet' => 'List_MW',  'title' => 'MODERATELY WASTED (MW)',     'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'MW'"],
-	'OW'  => ['sheet' => 'List_OW',  'title' => 'OVERWEIGHT (OW)',            'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status = 'OW')"],
-	'Ob'  => ['sheet' => 'List_Ob',  'title' => 'OBESE (Ob)',                'axis' => 'Weight-for-Length/Height',  'condition' => "lm.wfh_status = 'Ob'"],
+	'0-23' => [
+		'sheet' => 'List_0_23',
+		'title' => 'MONITORING LIST FOR CHILDREN 0-23 MONTHS OLD',
+		'axis' => 'All children (monthly weighing)',
+		'condition' => '1=1',
+		'age_min' => 0,
+		'age_max' => 23,
+		'is_infant' => true,
+	],
+	'MW' => [
+		'sheet' => 'List_MW',
+		'title' => 'MONITORING LIST FOR MODERATELY WASTED CHILDREN 0-59 MONTHS OLD',
+		'axis' => 'Weight-for-Height',
+		'condition' => "lm.wfh_status = 'MW'",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'SW' => [
+		'sheet' => 'List_SW',
+		'title' => 'MONITORING LIST FOR SEVERELY WASTED CHILDREN 0-59 MONTHS OLD',
+		'axis' => 'Weight-for-Height',
+		'condition' => "lm.wfh_status = 'SW'",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'MSt_SSt' => [
+		'sheet' => 'List_MSt_SSt',
+		'title' => 'MONITORING LIST FOR MODERATELY OR SEVERELY STUNTED CHILDREN 0-59 MONTHS OLD',
+		'axis' => 'Height-for-Age',
+		'condition' => "lm.hfa_status IN ('St','SSt')",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'OW_Ob' => [
+		'sheet' => 'List_OW_Ob',
+		'title' => 'MONITORING LIST FOR OVERWEIGHT OR OBESE CHILDREN 0-59 MONTHS OLD',
+		'axis' => 'Weight-for-Age / Weight-for-Height',
+		'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'MUW_SUW_MSt_SSt' => [
+		'sheet' => 'List_MUW_SUW_MSt_SSt',
+		'title' => 'MODERATELY/SEVERELY UNDERWEIGHT + MODERATELY/SEVERELY STUNTED 0-59 MONTHS OLD',
+		'axis' => 'Weight-for-Age + Height-for-Age',
+		'condition' => "(lm.wfa_status IN ('UW','SUW') AND lm.hfa_status IN ('St','SSt'))",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'MSt_SSt_MW_SW' => [
+		'sheet' => 'List_MSt_SSt_MW_SW',
+		'title' => 'MODERATELY/SEVERELY STUNTED + MODERATELY/SEVERELY WASTED 0-59 MONTHS OLD',
+		'axis' => 'Height-for-Age + Weight-for-Height',
+		'condition' => "(lm.hfa_status IN ('St','SSt') AND lm.wfh_status IN ('MW','SW'))",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
+	'MSt_SSt_OW_Ob' => [
+		'sheet' => 'List_MSt_SSt_OW_Ob',
+		'title' => 'MODERATELY/SEVERELY STUNTED + OVERWEIGHT OR OBESE 0-59 MONTHS OLD',
+		'axis' => 'Height-for-Age + Weight-for-Height',
+		'condition' => "(lm.hfa_status IN ('St','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))",
+		'age_min' => 0,
+		'age_max' => 59,
+		'is_infant' => false,
+	],
 ];
 // Case-insensitive lookup so ?list=ob, ?list=OB, ?list=Ob all work.
 $listParamRaw = trim((string)($_GET['list'] ?? ''));
@@ -336,7 +401,7 @@ if ($isSingleList) {
 	$listRows = admin_fetch_all(
 		"SELECT
 		c.id, c.child_code, c.first_name, c.middle_name, c.last_name,
-		c.sex, c.birthdate,
+		c.sex, c.birthdate, c.purok AS address,
 		bg.name AS barangay, p.name AS parent_name, p.phone AS parent_phone,
 		lm.measurement_date, lm.age_months, lm.height_cm, lm.weight_kg,
 		lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.waz, lm.haz, lm.whz, lm.is_flagged
@@ -345,7 +410,7 @@ if ($isSingleList) {
 		LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		{$latestJoin}
 		WHERE {$scope}{$barangayFilterSql}
-		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$spec['age_min']} AND {$spec['age_max']}
 		  AND {$spec['condition']}
 		ORDER BY c.last_name ASC, c.first_name ASC",
 		$listParamTypes . 's',
@@ -412,53 +477,68 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 <?php if ($listRows === []): ?>
 	<div class="admin-mini" style="margin-top:8px;">No children currently match this monitoring list for the selected filters.</div>
 <?php else: ?>
-	<div class="nutritionist-table-wrap">
-		<table class="nutritionist-table">
+	<?php
+	$visitFrom = ($listAnchorDate ?? $anchorDate)->modify('-5 months')->format('Y-m-d');
+	$visitTo = ($listAnchorDate ?? $anchorDate)->format('Y-m-d');
+	?>
+	<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+		<table class="nutritionist-table" style="min-width:1400px;">
 			<thead>
 				<tr>
 					<th>No.</th>
-					<th>Child</th>
+					<th>Address</th>
+					<th>Mother / Caregiver</th>
+					<th>Full Name of Child</th>
 					<th>Sex</th>
-					<th>Age</th>
-					<th>Barangay</th>
-					<th>Parent / Guardian</th>
-					<th>Measured</th>
-					<th>Weight</th>
-					<th>Height</th>
+					<th>Birthdate</th>
+					<th>Height (cm)</th>
+					<th>Weight (kg)</th>
 					<th>WFA</th>
 					<th>HFA</th>
 					<th>WFH</th>
-					<th>Status</th>
+					<?php for ($m = 1; $m <= 6; $m++): ?>
+						<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
+					<?php endfor; ?>
+				</tr>
+				<tr>
+					<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+					<?php for ($m = 1; $m <= 6; $m++): ?>
+						<th style="font-weight:400;font-size:10px;">Date</th>
+						<th style="font-weight:400;font-size:10px;">Intervention</th>
+						<th style="font-weight:400;font-size:10px;">Status</th>
+					<?php endfor; ?>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ($listRows as $i => $row): ?>
 					<?php
-						$abnormalCodes = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
-						$pillClass = 'is-danger';
+						$visits = followup_fetch_visits((int)$row['id'], $visitFrom, $visitTo, 6);
+						$visitMap = [];
+						foreach ($visits as $v) {
+							$visitMap[] = $v;
+						}
 					?>
 					<tr>
 						<td><?php echo $i + 1; ?></td>
+						<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
+						<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 						<td>
 							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
 							<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
 						</td>
 						<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-						<td><?php echo (int)($row['age_months'] ?? 0); ?> mo</td>
-						<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
-						<td>
-							<?php echo nutritionist_e((string)$row['parent_name']); ?>
-							<?php if (!empty($row['parent_phone'])): ?>
-								<div class="admin-mini"><?php echo nutritionist_e((string)$row['parent_phone']); ?></div>
-							<?php endif; ?>
-						</td>
-						<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? '')); ?></td>
-						<td><?php echo number_format((float)($row['weight_kg'] ?? 0), 2); ?> kg</td>
-						<td><?php echo number_format((float)($row['height_cm'] ?? 0), 1); ?> cm</td>
+						<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
+						<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '—'; ?></td>
+						<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '—'; ?></td>
 						<td><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
 						<td><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
 						<td><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
-						<td><span class="admin-pill <?php echo $pillClass; ?>"><?php echo nutritionist_e(followup_category_label(implode('+', $abnormalCodes) ?: 'Normal')); ?></span></td>
+						<?php for ($m = 0; $m < 6; $m++): ?>
+							<?php $visit = $visitMap[$m] ?? null; ?>
+							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
+							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
+							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
+						<?php endfor; ?>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -467,7 +547,7 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 <?php endif; ?>
 
 <div class="admin-mini" style="margin-top:16px;">
-	This is one of the eight official monitoring lists. The matching <code><?php echo nutritionist_e($spec['sheet']); ?></code> sheet uses the same DOH-formatted template as the rest of the workbook.
+	This is one of the eight official V2 monitoring lists. The matching <code><?php echo nutritionist_e($spec['sheet']); ?></code> sheet uses the same DOH-formatted template with follow-up visit columns as the rest of the workbook.
 </div>
 
 <?php else: ?>
@@ -572,7 +652,7 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 <?php
 /*
  |--------------------------------------------------------------------------
- | MONITORING LISTS HUB — view/export each of the eight official lists
+ | MONITORING LISTS HUB — V2 combined lists
  | Counts pulled live from the same population used by the export.
  |--------------------------------------------------------------------------
  */
@@ -587,22 +667,39 @@ $listCountRows = admin_fetch_all(
 	array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
 );
 
-$listCounts = ['SUW' => 0, 'MUW' => 0, 'SSt' => 0, 'MSt' => 0, 'SW' => 0, 'MW' => 0, 'OW' => 0, 'Ob' => 0];
+$listCounts = array_fill_keys(array_keys($listCodes), 0);
 foreach ($listCountRows as $cr) {
-	if (($cr['wfa_status'] ?? null) === 'SUW') { $listCounts['SUW']++; }
-	if (($cr['wfa_status'] ?? null) === 'UW' || ($cr['wfa_status'] ?? null) === 'MUW')  { $listCounts['MUW']++; }
-	if (($cr['hfa_status'] ?? null) === 'SSt') { $listCounts['SSt']++; }
-	if (($cr['hfa_status'] ?? null) === 'St' || ($cr['hfa_status'] ?? null) === 'MSt')  { $listCounts['MSt']++; }
-	if (($cr['wfh_status'] ?? null) === 'SW')  { $listCounts['SW']++; }
-	if (($cr['wfh_status'] ?? null) === 'MW')  { $listCounts['MW']++; }
-	if (($cr['wfa_status'] ?? null) === 'OW' || ($cr['wfh_status'] ?? null) === 'OW') { $listCounts['OW']++; }
-	if (($cr['wfh_status'] ?? null) === 'Ob')  { $listCounts['Ob']++; }
+	$wfa = $cr['wfa_status'] ?? null;
+	$hfa = $cr['hfa_status'] ?? null;
+	$wfh = $cr['wfh_status'] ?? null;
+
+	if ($wfh === 'MW') { $listCounts['MW']++; }
+	if ($wfh === 'SW') { $listCounts['SW']++; }
+	if (in_array($hfa, ['St', 'SSt'], true)) { $listCounts['MSt_SSt']++; }
+	if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) { $listCounts['OW_Ob']++; }
+	if (in_array($wfa, ['UW', 'SUW'], true) && in_array($hfa, ['St', 'SSt'], true)) { $listCounts['MUW_SUW_MSt_SSt']++; }
+	if (in_array($hfa, ['St', 'SSt'], true) && in_array($wfh, ['MW', 'SW'], true)) { $listCounts['MSt_SSt_MW_SW']++; }
+	if (in_array($hfa, ['St', 'SSt'], true) && ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) { $listCounts['MSt_SSt_OW_Ob']++; }
 }
+
+$infantCountRows = admin_fetch_all(
+	"SELECT COUNT(*) AS cnt FROM children c
+	 LEFT JOIN measurements lm ON lm.id = (
+		SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+		ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+	 )
+	 WHERE {$scope}{$barangayFilterSql}
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 23",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
+	array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
+);
+$listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
+?>
 ?>
 <section class="nutritionist-card" style="margin-bottom:20px;">
 	<header class="nutritionist-card-head">
-		<h3>Monitoring Lists — Individual View &amp; Export</h3>
-		<p class="admin-mini" style="margin:0;">Eight official lists for the selected reporting period. Click <strong>View</strong> for the on-screen roster, or <strong>Export .xlsx</strong> to download the same DOH-formatted sheet on its own.</p>
+		<h3>Monitoring Lists — V2 Combined View &amp; Export</h3>
+		<p class="admin-mini" style="margin:0;">Eight official V2 monitoring lists for the selected reporting period. Click <strong>View</strong> for the on-screen roster, or <strong>Export .xlsx</strong> to download the DOH-formatted sheet.</p>
 	</header>
 	<div class="nutritionist-table-wrap" style="padding:0;">
 		<table class="nutritionist-table" style="margin:0;">
@@ -635,7 +732,7 @@ foreach ($listCountRows as $cr) {
 					<tr>
 						<td><strong><?php echo nutritionist_e($spec['sheet']); ?></strong><div class="admin-mini"><?php echo nutritionist_e($spec['title']); ?></div></td>
 						<td><?php echo nutritionist_e($spec['axis']); ?></td>
-						<td style="text-align:right;font-weight:600;"><?php echo (int)$listCounts[$code]; ?></td>
+						<td style="text-align:right;font-weight:600;"><?php echo (int)($listCounts[$code] ?? 0); ?></td>
 						<td>
 							<a class="admin-btn-secondary" href="<?php echo nutritionist_e($viewLink); ?>" style="margin-right:6px;">View</a>
 							<a class="admin-btn" href="<?php echo nutritionist_e($exportLink); ?>">Export .xlsx</a>
@@ -652,50 +749,72 @@ foreach ($listCountRows as $cr) {
 	<section class="nutritionist-panel" style="margin-bottom:20px;">
 		<div class="admin-section-title" style="margin-bottom:2px;">Roster 1 — All Infants &amp; Toddlers (0–23 Months)</div>
 		<div class="admin-mini" style="margin-bottom:12px;">Every child below 24 months is weighed EVERY month regardless of nutritional status · <?php echo count($infantRows); ?> children · ages as of <?php echo nutritionist_e($anchorDate->format('M j, Y')); ?></div>
-		<div class="nutritionist-table-wrap">
-			<table class="nutritionist-table">
+		<?php
+		$rosterVisitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
+		$rosterVisitTo = $anchorDate->format('Y-m-d');
+		?>
+		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+			<table class="nutritionist-table" style="min-width:1400px;">
 				<thead>
 					<tr>
 						<th>No.</th>
-						<th>Child</th>
+						<th>Address</th>
+						<th>Mother / Caregiver</th>
+						<th>Full Name of Child</th>
 						<th>Sex</th>
 						<th>Birthdate</th>
-						<th>Barangay</th>
-						<th>Parent / Guardian</th>
-						<th>Weight (kg)</th>
 						<th>Height (cm)</th>
+						<th>Weight (kg)</th>
 						<th>WFA</th>
 						<th>HFA</th>
 						<th>WFH</th>
-						<th>Last Measured</th>
+						<?php for ($m = 1; $m <= 6; $m++): ?>
+							<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
+						<?php endfor; ?>
+					</tr>
+					<tr>
+						<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+						<?php for ($m = 1; $m <= 6; $m++): ?>
+							<th style="font-weight:400;font-size:10px;">Date</th>
+							<th style="font-weight:400;font-size:10px;">Intervention</th>
+							<th style="font-weight:400;font-size:10px;">Status</th>
+						<?php endfor; ?>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ($infantRows === []): ?>
-						<tr><td colspan="12" style="color:var(--admin-muted);text-align:center;padding:24px;">No children aged 0–23 months in scope.</td></tr>
+						<tr><td colspan="29" style="color:var(--admin-muted);text-align:center;padding:24px;">No children aged 0–23 months in scope.</td></tr>
 					<?php endif; ?>
 					<?php foreach ($infantRows as $i => $row): ?>
+						<?php
+						$visits = followup_fetch_visits((int)$row['id'], $rosterVisitFrom, $rosterVisitTo, 6);
+						$visitMap = [];
+						foreach ($visits as $v) { $visitMap[] = $v; }
+						?>
 						<tr style="<?php echo !empty($row['is_flagged']) ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
 							<td><?php echo $i + 1; ?></td>
+							<td><?php echo nutritionist_e((string)($row['purok'] ?? '')); ?></td>
+							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 							<td>
 								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
 								<div class="admin-mini">
 									<?php echo nutritionist_e((string)$row['child_code']); ?>
-									<?php if (!empty($row['is_ip'])): ?> · IP<?php endif; ?>
-									<?php if (!empty($row['has_disability'])): ?> · PWD<?php endif; ?>
 									<?php if (!empty($row['is_flagged'])): ?> · <span style="color:#E03131;">⚠ flagged</span><?php endif; ?>
 								</div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
 							<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
-							<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
-							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
 							<td><?php echo $row['height_cm'] !== null ? nutritionist_e((string)$row['height_cm']) : '—'; ?></td>
+							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? 'Not measured')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? 'Not measured')); ?></span></td>
-							<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? 'Never')); ?></td>
+							<?php for ($m = 0; $m < 6; $m++): ?>
+								<?php $visit = $visitMap[$m] ?? null; ?>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
+							<?php endfor; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -705,36 +824,55 @@ foreach ($listCountRows as $cr) {
 
 	<section class="nutritionist-panel" style="margin-bottom:20px;">
 		<div class="admin-section-title" style="margin-bottom:2px;">Roster 2 — Malnourished Older Children (24–59 Months)</div>
-		<div class="admin-mini" style="margin-bottom:12px;">Underweight (UW/SUW) · Stunted (St/SSt) · Wasted (MW/SW) · Overweight (OW/Obese) — followed up EVERY month until recovery · <?php echo count($malnourishedRows); ?> children</div>
-		<div class="nutritionist-table-wrap">
-			<table class="nutritionist-table">
+		<div class="admin-mini" style="margin-bottom:12px;">Children with abnormal WFA/HFA/WFH — followed up EVERY month until recovery · <?php echo count($malnourishedRows); ?> children</div>
+		<?php
+		$roster2VisitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
+		$roster2VisitTo = $anchorDate->format('Y-m-d');
+		?>
+		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+			<table class="nutritionist-table" style="min-width:1400px;">
 				<thead>
 					<tr>
 						<th>No.</th>
-						<th>Child</th>
+						<th>Address</th>
+						<th>Mother / Caregiver</th>
+						<th>Full Name of Child</th>
 						<th>Sex</th>
 						<th>Age</th>
-						<th>Barangay</th>
-						<th>Parent / Guardian</th>
-						<th>Category</th>
-						<th>Weight (kg)</th>
 						<th>Height (cm)</th>
+						<th>Weight (kg)</th>
 						<th>WFA</th>
 						<th>HFA</th>
 						<th>WFH</th>
-						<th>Last Measured</th>
+						<th>Category</th>
+						<?php for ($m = 1; $m <= 6; $m++): ?>
+							<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
+						<?php endfor; ?>
+					</tr>
+					<tr>
+						<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
+						<?php for ($m = 1; $m <= 6; $m++): ?>
+							<th style="font-weight:400;font-size:10px;">Date</th>
+							<th style="font-weight:400;font-size:10px;">Intervention</th>
+							<th style="font-weight:400;font-size:10px;">Status</th>
+						<?php endfor; ?>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ($malnourishedRows === []): ?>
-						<tr><td colspan="13" style="color:var(--admin-muted);text-align:center;padding:24px;">No malnourished children aged 24–59 months — great news.</td></tr>
+						<tr><td colspan="29" style="color:var(--admin-muted);text-align:center;padding:24px;">No malnourished children aged 24–59 months — great news.</td></tr>
 					<?php endif; ?>
 					<?php foreach ($malnourishedRows as $i => $row): ?>
 						<?php
 						$categoryCodes = implode('+', followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null));
+						$visits = followup_fetch_visits((int)$row['id'], $roster2VisitFrom, $roster2VisitTo, 6);
+						$visitMap = [];
+						foreach ($visits as $v) { $visitMap[] = $v; }
 						?>
 						<tr style="<?php echo !empty($row['is_flagged']) ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
 							<td><?php echo $i + 1; ?></td>
+							<td><?php echo nutritionist_e((string)($row['purok'] ?? '')); ?></td>
+							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 							<td>
 								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
 								<div class="admin-mini">
@@ -743,19 +881,19 @@ foreach ($listCountRows as $cr) {
 								</div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td><?php echo nutritionist_e((string)($row['age_months'] ?? '—')); ?> mo</td>
-							<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
-							<td>
-								<div><?php echo nutritionist_e((string)$row['parent_name']); ?></div>
-								<div class="admin-mini"><?php echo nutritionist_e((string)($row['parent_phone'] ?? '')); ?></div>
-							</td>
-							<td><span class="admin-pill is-danger"><?php echo nutritionist_e(followup_category_label($categoryCodes) ?: 'At risk'); ?></span></td>
-							<td><?php echo nutritionist_e((string)$row['weight_kg']); ?></td>
+							<td><?php echo (int)($row['age_months'] ?? 0); ?> mo</td>
 							<td><?php echo nutritionist_e((string)$row['height_cm']); ?></td>
+							<td><?php echo nutritionist_e((string)$row['weight_kg']); ?></td>
 							<td><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
 							<td><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
 							<td><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)$row['measurement_date']); ?></td>
+							<td><span class="admin-pill is-danger"><?php echo nutritionist_e(followup_category_label($categoryCodes) ?: 'At risk'); ?></span></td>
+							<?php for ($m = 0; $m < 6; $m++): ?>
+								<?php $visit = $visitMap[$m] ?? null; ?>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
+								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
+							<?php endfor; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -883,7 +1021,7 @@ foreach ($listCountRows as $cr) {
 <?php endif; ?>
 
 <div class="admin-mini" style="margin-top:16px;">
-	Export generates the official-format Excel workbook: one sheet per monitoring list (List_SUW · List_UW · List_SSt · List_St · List_SW · List_W · List_OW · List_Ob) plus the barangay summary — same grid template on every sheet. Each list can also be exported on its own via the Monitoring Lists panel above, or viewed at <code>?list=SUW</code>.
+	Export generates the official V2 format Excel workbook: one sheet per monitoring list (List_0_23 · List_MW · List_SW · List_MSt_SSt · List_OW_Ob · List_MUW_SUW_MSt_SSt · List_MSt_SSt_MW_SW · List_MSt_SSt_OW_Ob) plus the barangay summary — with follow-up visit columns on every sheet. Each list can also be exported on its own via the Monitoring Lists panel above, or viewed at <code>?list=MW</code>.
 </div>
 
 <?php endif; ?>

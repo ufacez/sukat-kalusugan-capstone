@@ -56,17 +56,21 @@ Do NOT replace the application's result with your own interpretation.
 
 If the system says:
 - Normal
-- Underweight
+- Moderately Underweight
 - Severely Underweight
-- Stunted
-- Wasted
+- Moderately Stunted
+- Severely Stunted
+- Moderately Wasted
+- Severely Wasted
 - Overweight
-- UW
+- Obese
+- Tall
+- MUW
 - SUW
-- St
+- MSt
 - SSt
-- MAM
-- SAM
+- MW
+- SW
 - OW
 - Ob
 
@@ -251,21 +255,21 @@ WHZ = Weight-for-Height Z-score
 Weight-for-age:
 
 Normal
-UW = Underweight
+MUW = Moderately Underweight
 SUW = Severely Underweight
 
 Height-for-age:
 
 Normal
-St = Stunted
+MSt = Moderately Stunted
 SSt = Severely Stunted
-T = Tall
+Tall = Tall for age
 
 Weight-for-height:
 
 Normal
-MW = Moderate Wasting / Moderate Acute Malnutrition (MAM)
-SW = Severe Wasting / Severe Acute Malnutrition (SAM)
+MW = Moderately Wasted / Moderate Acute Malnutrition (MAM)
+SW = Severely Wasted / Severe Acute Malnutrition (SAM)
 OW = Overweight
 Ob = Obese
 

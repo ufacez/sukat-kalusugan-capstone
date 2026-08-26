@@ -453,3 +453,41 @@ function followup_sync_for_scope(array $user): array
 
 	return ['generated' => $generated, 'completed' => $completed];
 }
+
+/**
+ * Fetches up to $limit follow-up appointments for a child within a date
+ * range, joined to their linked measurement for nutritional status.
+ * Returns an array of [scheduled_at, intervention_type, intervention_notes,
+ * appt_status, nutritional_status].
+ */
+function followup_fetch_visits(int $childId, string $fromDate, string $toDate, int $limit = 6): array
+{
+	$conn = get_db_connection();
+
+	$stmt = mysqli_prepare(
+		$conn,
+		"SELECT a.scheduled_at, a.intervention_type, a.intervention_notes,
+		        a.status AS appt_status,
+		        m.nutritional_status
+		 FROM appointments a
+		 LEFT JOIN measurements m ON m.id = a.source_measurement_id
+		 WHERE a.child_id = ?
+		   AND a.appointment_type = 'followup'
+		   AND a.scheduled_at BETWEEN ? AND ?
+		 ORDER BY a.scheduled_at ASC
+		 LIMIT ?"
+	);
+
+	if ($stmt === false) {
+		return [];
+	}
+
+	$limitInt = (int)$limit;
+	mysqli_stmt_bind_param($stmt, 'issi', $childId, $fromDate, $toDate, $limitInt);
+	mysqli_stmt_execute($stmt);
+	$result = mysqli_stmt_get_result($stmt);
+	$rows = $result instanceof mysqli_result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
+	mysqli_stmt_close($stmt);
+
+	return $rows;
+}

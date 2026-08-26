@@ -615,16 +615,32 @@
   background: var(--sk-mint);
   border-color: rgba(11, 110, 79, 0.25);
 }
-.kiosk-status-pill.is-caution {
+.kiosk-status-pill.is-success {
+  color: var(--sk-green-dark);
+  background: var(--sk-mint);
+  border-color: rgba(11, 110, 79, 0.25);
+}
+.kiosk-status-pill.is-caution,
+.kiosk-status-pill.is-warn {
   color: #8a5a00;
   background: #fff3d6;
   border-color: #f0c766;
+}
+.kiosk-status-pill.is-orange {
+  color: #9a4d00;
+  background: #fff0e0;
+  border-color: #f0a050;
 }
 .kiosk-status-pill.is-danger {
   color: #fff;
   background: var(--sk-danger);
   border-color: var(--sk-danger);
   box-shadow: 0 6px 16px rgba(216, 93, 93, 0.3);
+}
+.kiosk-status-pill.is-muted {
+  color: #888;
+  background: #f0f0f0;
+  border-color: #ddd;
 }
 .kiosk-flag-banner {
   display: flex;
