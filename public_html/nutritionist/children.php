@@ -275,10 +275,10 @@ if ($selectedChild !== null) {
 $actions = '<div class="admin-actions">'
     . '<a class="admin-btn-secondary" href="'
     . nutritionist_e(app_url('/nutritionist/measurement_record.php'))
-    . '">Record measurement</a>'
+    . '">' . admin_action_icon('measure') . ' Record measurement</a>'
     . '<a class="admin-btn" href="'
     . nutritionist_e(app_url('/nutritionist/child_form.php'))
-    . '">Add child</a>'
+    . '">' . admin_action_icon('add') . ' Add child</a>'
     . '</div>';
 
 nutritionist_layout_start(

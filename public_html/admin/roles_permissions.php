@@ -102,7 +102,7 @@ admin_layout_start('Roles & Permissions', 'Define access rules for admin and sta
         </div>
 
         <div>
-            <button class="admin-btn" type="submit">Save permissions</button>
+            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save permissions</button>
         </div>
     </form>
 </section>

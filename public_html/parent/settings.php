@@ -146,7 +146,7 @@ parent_layout_start('Settings', 'Update your profile, contact details, and login
 			</label>
 			<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
 				<span>&nbsp;</span>
-				<button class="admin-btn" type="submit">Save profile</button>
+				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save profile</button>
 			</div>
 		</form>
 	</article>

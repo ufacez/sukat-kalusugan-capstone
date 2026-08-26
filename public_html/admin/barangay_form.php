@@ -75,9 +75,9 @@ admin_layout_start(
             <span>&nbsp;</span>
             <div class="admin-actions">
                 <?php if ($editingBarangay): ?>
-                    <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangays.php')); ?>">Cancel</a>
+                    <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangays.php')); ?>"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
                 <?php endif; ?>
-                <button class="admin-btn" type="submit"><?php echo $editingBarangay ? 'Save changes' : 'Create barangay'; ?></button>
+                <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> <?php echo $editingBarangay ? 'Save changes' : 'Create barangay'; ?></button>
             </div>
         </div>
     </form>

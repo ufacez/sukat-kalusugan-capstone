@@ -46,7 +46,7 @@ foreach ($measurements as $measurement) {
 	}
 }
 
-$actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/children.php')) . '">Children</a>';
+$actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/children.php')) . '">' . admin_action_icon('children') . ' Children</a>';
 
 parent_layout_start('Growth History', 'Measurement history and WHO-linked growth results per child.', 'growth_history', $actions);
 ?>

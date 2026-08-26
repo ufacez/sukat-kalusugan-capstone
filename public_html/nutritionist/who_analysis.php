@@ -64,7 +64,7 @@ if ($counted > 0) {
 	$avgWhz /= $counted;
 }
 
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">Open measurements</a>';
+$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('open') . ' Open measurements</a>';
 
 nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and classification review.', 'who_analysis', $actions);
 ?>

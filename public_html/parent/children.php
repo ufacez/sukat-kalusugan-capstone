@@ -83,7 +83,7 @@ if (isset($_GET['view'])) {
 	}
 }
 
-$actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointments.php')) . '">Request appointment</a>';
+$actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointments.php')) . '">' . admin_action_icon('calendar') . ' Request appointment</a>';
 
 parent_layout_start('Children', 'All children linked to your parent account and their latest growth results.', 'children', $actions);
 ?>
@@ -167,7 +167,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 				<h2 class="admin-section-title" style="margin-bottom:2px;">Selected Child</h2>
 				<p class="admin-section-subtitle">Quick details for the chosen child.</p>
 			</div>
-			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/growth_history.php')); ?>">Open growth history</a>
+			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/growth_history.php')); ?>"><?php echo admin_action_icon('open'); ?> Open growth history</a>
 		</div>
 
 		<?php $selectedChild = $selectedChild ?? ($children[0] ?? null); ?>

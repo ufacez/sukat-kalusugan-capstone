@@ -296,9 +296,9 @@ nutritionist_layout_start(
 		</label>
 
 		<div class="admin-field admin-field-wide" style="align-content:end;">
-			<button class="admin-btn" type="submit"><?php echo $editingParent ? 'Save changes' : 'Create parent'; ?></button>
+			<button class="admin-btn" type="submit"><?php echo admin_action_icon('save') . ' ' . ($editingParent ? 'Save changes' : 'Create parent'); ?></button>
 			<?php if ($editingParent): ?>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" style="margin-left:8px;">Cancel</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
 			<?php endif; ?>
 		</div>
 	</form>

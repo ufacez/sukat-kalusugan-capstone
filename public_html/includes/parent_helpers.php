@@ -35,12 +35,6 @@ function parent_grouped_nav_items(): array
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php'), 'icon' => 'calendar'],
             ],
         ],
-        [
-            'label' => 'Account',
-            'items' => [
-                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
-            ],
-        ],
     ];
 }
 
@@ -110,11 +104,14 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
 
     echo '<div class="admin-brand">';
     echo '<div class="admin-brand-mark">SK</div>';
-    echo '<div>';
+    echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
     echo '<div class="admin-brand-sub">Parent portal</div>';
     echo '</div>';
     echo '</div>';
+    echo '<button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse title="Toggle sidebar">';
+    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
+    echo '</button>';
 
     echo '<nav class="admin-nav">';
     foreach (parent_grouped_nav_items() as $groupIndex => $group) {
@@ -152,6 +149,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<div class="admin-sidebar-overlay" data-admin-sidebar-overlay></div>';
     echo '<div class="admin-main">';
     echo '<header class="admin-topbar">';
+    echo '<div class="admin-topbar-left">';
     echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
     echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
     echo '</button>';
@@ -160,7 +158,14 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<h1>' . parent_e($title) . '</h1>';
     echo '<p>' . parent_e($subtitle) . '</p>';
     echo '</div>';
+    echo '</div>';
+    echo '<div class="admin-topbar-right">';
     echo '<div class="admin-topbar-actions">' . $actionsHtml . '</div>';
+    echo '<div class="admin-topbar-profile">';
+    echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
+    echo '<a href="' . parent_e(app_url('/parent/settings.php')) . '" class="admin-settings-link" title="Settings">' . admin_action_icon('settings') . '</a>';
+    echo '</div>';
+    echo '</div>';
     echo '</header>';
 
     if ($flash !== null) {

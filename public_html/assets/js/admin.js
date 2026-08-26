@@ -87,6 +87,25 @@
     });
   }
 
+  // Sidebar collapse (desktop)
+  const collapseBtn = document.querySelector("[data-admin-sidebar-collapse]");
+  const shell = document.querySelector(".admin-shell");
+  if (collapseBtn && shell) {
+    const savedCollapse = localStorage.getItem("sidebar_collapsed");
+    if (savedCollapse === "true" && window.innerWidth > 920) {
+      shell.classList.add("is-collapsed");
+    }
+    collapseBtn.addEventListener("click", () => {
+      shell.classList.toggle("is-collapsed");
+      localStorage.setItem("sidebar_collapsed", shell.classList.contains("is-collapsed"));
+    });
+    window.addEventListener("resize", () => {
+      if (window.innerWidth <= 920) {
+        shell.classList.remove("is-collapsed");
+      }
+    });
+  }
+
   document.querySelectorAll("[data-admin-confirm]").forEach((button) => {
     button.addEventListener("click", (event) => {
       const message = button.getAttribute("data-admin-confirm");
@@ -99,6 +118,28 @@
 
   const paginatedTables = document.querySelectorAll("table.admin-table, table.nutritionist-table, table.parent-table");
   const pageSize = 10;
+  const chevronLeft = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
+  const chevronRight = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>';
+
+  function buildPageNumbers(current, total) {
+    if (total <= 7) {
+      return Array.from({ length: total }, (_, i) => {
+        const p = i + 1;
+        return '<button type="button" class="admin-page-num' + (p === current ? ' is-active' : '') + '" data-page="' + p + '">' + p + '</button>';
+      }).join('');
+    }
+    let pages = [1];
+    if (current > 3) pages.push('…');
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) {
+      pages.push(i);
+    }
+    if (current < total - 2) pages.push('…');
+    pages.push(total);
+    return pages.map(p => {
+      if (p === '…') return '<span class="admin-page-ellipsis">…</span>';
+      return '<button type="button" class="admin-page-num' + (p === current ? ' is-active' : '') + '" data-page="' + p + '">' + p + '</button>';
+    }).join('');
+  }
 
   paginatedTables.forEach((table) => {
     const rows = Array.from(table.querySelectorAll("tbody tr"));
@@ -108,10 +149,11 @@
     const pagination = document.createElement("div");
 
     pagination.className = "admin-pagination";
-    pagination.innerHTML = '<span class="admin-pagination-status"></span><div class="admin-pagination-actions"><button type="button" class="admin-btn-secondary admin-pagination-prev">Previous</button><button type="button" class="admin-btn-secondary admin-pagination-next">Next</button></div>';
+    pagination.innerHTML = '<span class="admin-pagination-status"></span><div class="admin-pagination-actions"><button type="button" class="admin-icon-btn admin-pagination-prev" title="Previous">' + chevronLeft + '</button><div class="admin-pagination-numbers"></div><button type="button" class="admin-icon-btn admin-pagination-next" title="Next">' + chevronRight + '</button></div>';
     table.parentElement.appendChild(pagination);
 
     const status = pagination.querySelector(".admin-pagination-status");
+    const numbersEl = pagination.querySelector(".admin-pagination-numbers");
     const previousButton = pagination.querySelector(".admin-pagination-prev");
     const nextButton = pagination.querySelector(".admin-pagination-next");
 
@@ -126,9 +168,20 @@
         row.style.display = visibleRows.has(row) ? "" : "none";
       });
 
-      status.textContent = filteredRows.length === 0 ? "No records" : `Showing ${start + 1}-${end} of ${filteredRows.length}`;
+      status.textContent = filteredRows.length === 0 ? "No records" : "Page " + currentPage + " of " + pageCount;
+      numbersEl.innerHTML = buildPageNumbers(currentPage, pageCount);
+
+      numbersEl.querySelectorAll("[data-page]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          currentPage = parseInt(btn.dataset.page, 10);
+          render();
+        });
+      });
+
       previousButton.disabled = currentPage === 1;
       nextButton.disabled = currentPage === pageCount;
+      previousButton.style.display = pageCount <= 1 ? "none" : "";
+      nextButton.style.display = pageCount <= 1 ? "none" : "";
       pagination.hidden = rows.length === 0;
     }
 

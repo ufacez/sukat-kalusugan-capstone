@@ -214,11 +214,11 @@ $followUpCompleted = count(array_filter($followUpAppointments, static fn(array $
 $actions = '<div class="admin-actions">'
 	. '<form method="post" action="' . nutritionist_e(app_url('/nutritionist/appointments.php')) . '" style="display:inline;">'
 	. '<input type="hidden" name="action" value="sync_followups">'
-	. '<button class="admin-btn-secondary" type="submit">Sync EOPT follow-ups</button>'
+	. '<button class="admin-btn-secondary" type="submit">' . admin_action_icon('sync') . ' Sync EOPT follow-ups</button>'
 	. '</form>'
 	. '<a class="admin-btn" href="'
 	. nutritionist_e(app_url('/nutritionist/appointment_form.php'))
-	. '">New appointment</a>'
+	. '">' . admin_action_icon('add') . ' New appointment</a>'
 	. '</div>';
 
 nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT follow-ups, and enforce mandatory re-measurements.', 'appointments', $actions);

@@ -146,7 +146,7 @@ admin_layout_start(
         </label>
 
         <div class="admin-field admin-field-wide" style="align-content:end;">
-            <button class="admin-btn" type="submit"><?php echo $editingUser ? 'Save changes' : 'Create user'; ?></button>
+            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> <?php echo $editingUser ? 'Save changes' : 'Create user'; ?></button>
         </div>
     </form>
 </section>

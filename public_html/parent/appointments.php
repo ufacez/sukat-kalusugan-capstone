@@ -50,7 +50,7 @@ $completedCount = count(array_filter($appointments, static fn(array $appointment
 
 $actions = '<a class="admin-btn" href="'
 	. parent_e(app_url('/parent/appointment_form.php'))
-	. '">Request appointment</a>';
+	. '">' . admin_action_icon('calendar') . ' Request appointment</a>';
 
 parent_layout_start('Appointments', 'Request follow-ups and manage your appointment schedule.', 'appointments', $actions);
 ?>

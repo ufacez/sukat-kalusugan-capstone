@@ -140,7 +140,7 @@ admin_layout_start('Settings', 'Manage your account details.', 'settings');
         </label>
         <div class="admin-field" style="align-content:end;">
             <span>&nbsp;</span>
-            <button class="admin-btn" type="submit">Save account</button>
+            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save account</button>
         </div>
     </form>
 </section>

@@ -125,7 +125,7 @@ parent_layout_start('Request Appointment', 'Submit a follow-up request for any l
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
 			<span>&nbsp;</span>
 			<div class="admin-actions">
-				<button class="admin-btn" type="submit">Submit request</button>
+				<button class="admin-btn" type="submit"><?php echo admin_action_icon('add'); ?> Submit request</button>
 			</div>
 		</div>
 	</form>

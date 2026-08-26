@@ -140,7 +140,7 @@ admin_layout_start('Edit Device', 'Update location, assignment, status, and cali
         <div class="admin-field admin-field-wide" style="align-content:end;">
             <span>&nbsp;</span>
             <div class="admin-actions">
-                <button class="admin-btn" type="submit">Save sensor settings</button>
+                <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save sensor settings</button>
             </div>
         </div>
     </form>

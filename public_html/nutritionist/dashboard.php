@@ -290,8 +290,8 @@ $makePoints = static function (array $values) use ($chartXs, $toY): string {
 };
 
 $actions = implode(' ', [
-	'<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">Open children</a>',
-	'<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports.php')) . '">EOPT reports</a>',
+	'<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">' . admin_action_icon('open') . ' Open children</a>',
+	'<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports.php')) . '">' . admin_action_icon('document') . ' EOPT reports</a>',
 ]);
 
 nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth analysis, and appointment oversight.', 'dashboard', $actions);
@@ -360,10 +360,10 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		<div class="nutritionist-toolbar" style="margin-bottom:12px;">
 			<h2 class="admin-section-title" style="margin:0;">Calendar</h2>
 			<div style="display:flex;align-items:center;gap:6px;">
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&lt;</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_left'); ?></a>
 				<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&gt;</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php') . '#calendar-management'); ?>" style="min-height:24px;padding:0 10px;line-height:24px;">Manage</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_right'); ?></a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php') . '#calendar-management'); ?>" style="min-height:24px;padding:0 10px;line-height:24px;"><?php echo admin_action_icon('edit'); ?> Manage</a>
 			</div>
 		</div>
 

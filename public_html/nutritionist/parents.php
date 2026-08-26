@@ -91,7 +91,7 @@ $atRiskCount = count(array_filter($parents, static fn(array $parent): bool => (i
 
 $actions = '<a class="admin-btn" href="'
 	. nutritionist_e(app_url('/nutritionist/parent_form.php'))
-	. '">Add parent</a>';
+	. '">' . admin_action_icon('add') . ' Add parent</a>';
 
 nutritionist_layout_start('Parents', 'Linked guardians and household contact information.', 'parents', $actions);
 ?>

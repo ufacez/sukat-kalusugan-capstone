@@ -59,7 +59,7 @@ $summary = [
 ];
 
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">Manage users</a>';
+$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '"><?php echo admin_action_icon(\'view\'); ?> Manage users</a>';
 
 admin_layout_start('Dashboard', 'System overview, account health, and device status.', 'dashboard', $actions);
 ?>
@@ -93,7 +93,7 @@ admin_layout_start('Dashboard', 'System overview, account health, and device sta
                 <h2 class="admin-section-title">Recent Audit Activity</h2>
                 <p class="admin-section-subtitle">Latest security and operational events.</p>
             </div>
-            <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/audit_logs.php')); ?>">View all</a>
+            <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/audit_logs.php')); ?>"><?php echo admin_action_icon('view'); ?> View all</a>
         </div>
         <div class="admin-list">
             <?php foreach ($recentLogs as $log): ?>
@@ -124,7 +124,7 @@ admin_layout_start('Dashboard', 'System overview, account health, and device sta
                 <h2 class="admin-section-title">Device Status</h2>
                 <p class="admin-section-subtitle">Current kiosk and hardware inventory.</p>
             </div>
-            <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/sensors.php')); ?>">Open sensors</a>
+            <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/sensors.php')); ?>"><?php echo admin_action_icon('open'); ?> Open sensors</a>
         </div>
         <div class="admin-list">
             <?php foreach ($devices as $device): ?>

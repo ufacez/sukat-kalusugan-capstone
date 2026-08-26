@@ -215,7 +215,7 @@ nutritionist_layout_start(
                     type="submit"
                     id="manual-measurement-submit"
                 >
-                    Save measurement
+                    <?php echo admin_action_icon('save'); ?> Save measurement
                 </button>
 
             </div>

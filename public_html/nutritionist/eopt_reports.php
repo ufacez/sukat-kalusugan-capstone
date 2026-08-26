@@ -418,8 +418,8 @@ if ($isSingleList) {
 	);
 }
 
-$actions = '<a class="admin-btn" href="' . nutritionist_e($exportUrl) . '">Export eOPT Workbook (.xlsx)</a>'
-	. '<button type="button" class="admin-btn-secondary" onclick="window.print()">Print / Save as PDF</button>';
+$actions = '<a class="admin-btn" href="' . nutritionist_e($exportUrl) . '">' . admin_action_icon('export') . ' Export eOPT Workbook (.xlsx)</a>'
+	. '<button type="button" class="admin-btn-secondary" onclick="window.print()">' . admin_action_icon('print') . ' Print / Save as PDF</button>';
 
 nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring rosters — monthly and quarterly views following the DOH schedule.', 'eopt_reports', $actions);
 ?>
@@ -477,16 +477,12 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 <?php if ($listRows === []): ?>
 	<div class="admin-mini" style="margin-top:8px;">No children currently match this monitoring list for the selected filters.</div>
 <?php else: ?>
-	<?php
-	$visitFrom = ($listAnchorDate ?? $anchorDate)->modify('-5 months')->format('Y-m-d');
-	$visitTo = ($listAnchorDate ?? $anchorDate)->format('Y-m-d');
-	?>
-	<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-		<table class="nutritionist-table" style="min-width:1400px;">
-			<thead>
-				<tr>
-					<th>No.</th>
-					<th>Address</th>
+		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+			<table class="nutritionist-table" style="min-width:900px;">
+				<thead>
+					<tr>
+						<th>No.</th>
+						<th>Address</th>
 					<th>Mother / Caregiver</th>
 					<th>Full Name of Child</th>
 					<th>Sex</th>
@@ -496,28 +492,11 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 					<th>WFA</th>
 					<th>HFA</th>
 					<th>WFH</th>
-					<?php for ($m = 1; $m <= 6; $m++): ?>
-						<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
-					<?php endfor; ?>
-				</tr>
-				<tr>
-					<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
-					<?php for ($m = 1; $m <= 6; $m++): ?>
-						<th style="font-weight:400;font-size:10px;">Date</th>
-						<th style="font-weight:400;font-size:10px;">Intervention</th>
-						<th style="font-weight:400;font-size:10px;">Status</th>
-					<?php endfor; ?>
+					</tr>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ($listRows as $i => $row): ?>
-					<?php
-						$visits = followup_fetch_visits((int)$row['id'], $visitFrom, $visitTo, 6);
-						$visitMap = [];
-						foreach ($visits as $v) {
-							$visitMap[] = $v;
-						}
-					?>
 					<tr>
 						<td><?php echo $i + 1; ?></td>
 						<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
@@ -533,12 +512,6 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 						<td><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
 						<td><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
 						<td><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
-						<?php for ($m = 0; $m < 6; $m++): ?>
-							<?php $visit = $visitMap[$m] ?? null; ?>
-							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
-							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
-							<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
-						<?php endfor; ?>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>
@@ -751,12 +724,8 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 	<section class="nutritionist-panel" style="margin-bottom:20px;">
 		<div class="admin-section-title" style="margin-bottom:2px;">Roster 1 — All Infants &amp; Toddlers (0–23 Months)</div>
 		<div class="admin-mini" style="margin-bottom:12px;">Every child below 24 months is weighed EVERY month regardless of nutritional status · <?php echo count($infantRows); ?> children · ages as of <?php echo nutritionist_e($anchorDate->format('M j, Y')); ?></div>
-		<?php
-		$rosterVisitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
-		$rosterVisitTo = $anchorDate->format('Y-m-d');
-		?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:1400px;">
+			<table class="nutritionist-table" style="min-width:900px;">
 				<thead>
 					<tr>
 						<th>No.</th>
@@ -769,40 +738,21 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 						<th>Weight (kg)</th>
 						<th>WFA</th>
 						<th>HFA</th>
-						<th>WFH</th>
-						<?php for ($m = 1; $m <= 6; $m++): ?>
-							<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
-						<?php endfor; ?>
-					</tr>
-					<tr>
-						<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
-						<?php for ($m = 1; $m <= 6; $m++): ?>
-							<th style="font-weight:400;font-size:10px;">Date</th>
-							<th style="font-weight:400;font-size:10px;">Intervention</th>
-							<th style="font-weight:400;font-size:10px;">Status</th>
-						<?php endfor; ?>
+					<th>WFH</th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ($infantRows === []): ?>
-						<tr><td colspan="29" style="color:var(--admin-muted);text-align:center;padding:24px;">No children aged 0–23 months in scope.</td></tr>
+						<tr><td colspan="11" style="color:var(--admin-muted);text-align:center;padding:24px;">No children aged 0–23 months in scope.</td></tr>
 					<?php endif; ?>
 					<?php foreach ($infantRows as $i => $row): ?>
-						<?php
-						$visits = followup_fetch_visits((int)$row['id'], $rosterVisitFrom, $rosterVisitTo, 6);
-						$visitMap = [];
-						foreach ($visits as $v) { $visitMap[] = $v; }
-						?>
-						<tr style="<?php echo !empty($row['is_flagged']) ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
+						<tr>
 							<td><?php echo $i + 1; ?></td>
-							<td><?php echo nutritionist_e((string)($row['purok'] ?? '')); ?></td>
+							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
 							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 							<td>
 								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-								<div class="admin-mini">
-									<?php echo nutritionist_e((string)$row['child_code']); ?>
-									<?php if (!empty($row['is_flagged'])): ?> · <span style="color:#E03131;">⚠ flagged</span><?php endif; ?>
-								</div>
+								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
 							<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
@@ -811,12 +761,6 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? 'Not measured')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? 'Not measured')); ?></span></td>
-							<?php for ($m = 0; $m < 6; $m++): ?>
-								<?php $visit = $visitMap[$m] ?? null; ?>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
-							<?php endfor; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
@@ -827,12 +771,8 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 	<section class="nutritionist-panel" style="margin-bottom:20px;">
 		<div class="admin-section-title" style="margin-bottom:2px;">Roster 2 — Malnourished Older Children (24–59 Months)</div>
 		<div class="admin-mini" style="margin-bottom:12px;">Children with abnormal WFA/HFA/WFH — followed up EVERY month until recovery · <?php echo count($malnourishedRows); ?> children</div>
-		<?php
-		$roster2VisitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
-		$roster2VisitTo = $anchorDate->format('Y-m-d');
-		?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:1400px;">
+			<table class="nutritionist-table" style="min-width:1000px;">
 				<thead>
 					<tr>
 						<th>No.</th>
@@ -846,56 +786,31 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 						<th>WFA</th>
 						<th>HFA</th>
 						<th>WFH</th>
-						<th>Category</th>
-						<?php for ($m = 1; $m <= 6; $m++): ?>
-							<th colspan="3" style="text-align:center;background:#e8f0fe;">Month #<?php echo $m; ?></th>
-						<?php endfor; ?>
-					</tr>
-					<tr>
-						<th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th><th></th>
-						<?php for ($m = 1; $m <= 6; $m++): ?>
-							<th style="font-weight:400;font-size:10px;">Date</th>
-							<th style="font-weight:400;font-size:10px;">Intervention</th>
-							<th style="font-weight:400;font-size:10px;">Status</th>
-						<?php endfor; ?>
+					<th>Category</th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php if ($malnourishedRows === []): ?>
-						<tr><td colspan="29" style="color:var(--admin-muted);text-align:center;padding:24px;">No malnourished children aged 24–59 months — great news.</td></tr>
+						<tr><td colspan="12" style="color:var(--admin-muted);text-align:center;padding:24px;">No malnourished children aged 24–59 months — great news.</td></tr>
 					<?php endif; ?>
 					<?php foreach ($malnourishedRows as $i => $row): ?>
-						<?php
-						$categoryCodes = implode('+', followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null));
-						$visits = followup_fetch_visits((int)$row['id'], $roster2VisitFrom, $roster2VisitTo, 6);
-						$visitMap = [];
-						foreach ($visits as $v) { $visitMap[] = $v; }
-						?>
-						<tr style="<?php echo !empty($row['is_flagged']) ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
+						<?php $categoryCodes = implode('+', followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null)); ?>
+						<tr>
 							<td><?php echo $i + 1; ?></td>
-							<td><?php echo nutritionist_e((string)($row['purok'] ?? '')); ?></td>
+							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
 							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 							<td>
 								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-								<div class="admin-mini">
-									<?php echo nutritionist_e((string)$row['child_code']); ?>
-									<?php if (!empty($row['is_flagged'])): ?> · <span style="color:#E03131;">⚠ flagged</span><?php endif; ?>
-								</div>
+								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td><?php echo (int)($row['age_months'] ?? 0); ?> mo</td>
-							<td><?php echo nutritionist_e((string)$row['height_cm']); ?></td>
-							<td><?php echo nutritionist_e((string)$row['weight_kg']); ?></td>
-							<td><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
+							<td><?php echo $row['age_months'] !== null ? nutritionist_e((string)$row['age_months'] . ' mo') : '—'; ?></td>
+							<td><?php echo $row['height_cm'] !== null ? nutritionist_e((string)$row['height_cm']) : '—'; ?></td>
+							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? 'Not measured')); ?></span></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? 'Not measured')); ?></span></td>
 							<td><span class="admin-pill is-danger"><?php echo nutritionist_e(followup_category_label($categoryCodes) ?: 'At risk'); ?></span></td>
-							<?php for ($m = 0; $m < 6; $m++): ?>
-								<?php $visit = $visitMap[$m] ?? null; ?>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e(date('m-d-y', strtotime((string)$visit['scheduled_at']))) : ''; ?></td>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['intervention_notes'] ?? $visit['intervention_type'] ?? '')) : ''; ?></td>
-								<td style="font-size:11px;"><?php echo $visit ? nutritionist_e((string)($visit['nutritional_status'] ?? '')) : ''; ?></td>
-							<?php endfor; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

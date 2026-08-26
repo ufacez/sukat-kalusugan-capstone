@@ -646,7 +646,7 @@ nutritionist_layout_start(
                             app_url('/nutritionist/children.php')
                         ); ?>"
                     >
-                        Cancel
+                        <?php echo admin_action_icon('cancel'); ?> Cancel
                     </a>
 
                 <?php endif; ?>
@@ -657,8 +657,8 @@ nutritionist_layout_start(
                 >
                     <?php
                     echo $editChild !== null
-                        ? 'Save changes'
-                        : 'Create child';
+                        ? admin_action_icon('save') . ' Save changes'
+                        : admin_action_icon('save') . ' Create child';
                     ?>
                 </button>
 

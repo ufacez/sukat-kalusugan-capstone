@@ -116,7 +116,7 @@ nutritionist_layout_start('Schedule Appointment', 'Create a new follow-up visit 
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
 			<span>&nbsp;</span>
 			<div class="admin-actions">
-				<button class="admin-btn" type="submit">Save appointment</button>
+				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save appointment</button>
 			</div>
 		</div>
 	</form>

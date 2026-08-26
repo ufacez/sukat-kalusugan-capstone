@@ -37,7 +37,7 @@ foreach ($users as $user) {
     }
 }
 
-$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/user_form.php')) . '">Add user</a>';
+$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/user_form.php')) . '"><?php echo admin_action_icon(\'add\'); ?> Add user</a>';
 
 admin_layout_start('User Management', 'Create, update, and remove staff accounts.', 'users', $actions);
 ?>

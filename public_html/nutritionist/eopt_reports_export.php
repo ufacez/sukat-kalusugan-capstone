@@ -191,15 +191,7 @@ $listParam = $isSingleList ? $codeLowerMap[$listParamKey]['code'] : $listParamRa
 $activeSpecs = $isSingleList ? [$codeLowerMap[$listParamKey]] : $listsSpec;
 
 $listColumns = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
-for ($m = 1; $m <= 6; $m++) {
-	$listColumns[] = "Month #$m Date";
-	$listColumns[] = "Month #$m Intervention";
-	$listColumns[] = "Month #$m Status";
-}
-$listWidths = array_merge(
-	[6, 18, 26, 38, 9, 14, 11, 11, 9, 9, 9],
-	array_fill(0, 18, 15)
-);
+$listWidths = [6, 18, 26, 38, 9, 14, 11, 11, 9, 9, 9];
 
 $sheets = [];
 
@@ -387,12 +379,8 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	}
 	$outRows[] = $headerRow;
 
-	$visitFrom = $anchorDate->modify('-5 months')->format('Y-m-d');
-	$visitTo = $anchorDate->format('Y-m-d');
-
 	foreach ($rows as $seq => $row) {
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
-		$visits = followup_fetch_visits((int)$row['id'], $visitFrom, $visitTo, 6);
 
 		$dataRow = [
 			['v' => $seq + 1, 's' => 'cell_center'],
@@ -407,15 +395,6 @@ foreach ($activeSpecs as $listIndex => $spec) {
 			['v' => (string)($row['hfa_status'] ?? ''), 's' => 'cell_center'],
 			['v' => (string)($row['wfh_status'] ?? ''), 's' => 'cell_center'],
 		];
-
-		$visitMap = [];
-		foreach ($visits as $v) { $visitMap[] = $v; }
-		for ($m = 0; $m < 6; $m++) {
-			$v = $visitMap[$m] ?? null;
-			$dataRow[] = ['v' => $v ? date('m-d-y', strtotime((string)$v['scheduled_at'])) : '', 's' => 'cell_center'];
-			$dataRow[] = ['v' => $v ? (string)($v['intervention_notes'] ?? $v['intervention_type'] ?? '') : '', 's' => 'cell'];
-			$dataRow[] = ['v' => $v ? (string)($v['nutritional_status'] ?? '') : '', 's' => 'cell_center'];
-		}
 
 		$outRows[] = $dataRow;
 	}

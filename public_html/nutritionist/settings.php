@@ -264,7 +264,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 			</label>
 			<div class="admin-field" style="align-content:end;">
 				<span>&nbsp;</span>
-				<button class="admin-btn" type="submit">Save profile</button>
+				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save profile</button>
 			</div>
 		</form>
 	</article>
@@ -299,9 +299,9 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 			<p class="admin-section-subtitle">Add, edit, or delete meetings and Oplan Timbang entries. The dashboard calendar is read-only.</p>
 		</div>
 		<div style="display:flex;align-items:center;gap:6px;">
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&lt;</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_left'); ?></a>
 			<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;">&gt;</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_right'); ?></a>
 		</div>
 	</div>
 
@@ -383,7 +383,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 	<?php if ($editingEvent !== null): ?>
 		<div class="admin-flash" style="margin-bottom:14px;background:#fff4df;color:#9a6510;border:1px solid #f0c675;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
 			<span>✏️ Editing <strong><?php echo nutritionist_e((string)$editingEvent['title']); ?></strong> — update the fields below, then click <strong>Update event</strong>.</span>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>">Cancel edit</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>"><?php echo admin_action_icon('cancel'); ?> Cancel edit</a>
 		</div>
 	<?php endif; ?>
 
@@ -419,9 +419,9 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 			<input name="notes" value="<?php echo nutritionist_e((string)($editingEvent['notes'] ?? '')); ?>">
 		</label>
 		<div class="admin-field" style="align-content:end;grid-column:1 / -1;display:flex;gap:8px;">
-			<button class="admin-btn" type="submit"><?php echo $editingEvent !== null ? 'Update event' : 'Add to calendar'; ?></button>
+			<button class="admin-btn" type="submit"><?php echo admin_action_icon('save') . ' ' . ($editingEvent !== null ? 'Update event' : 'Add to calendar'); ?></button>
 			<?php if ($editingEvent !== null): ?>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>">Cancel edit</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>"><?php echo admin_action_icon('cancel'); ?> Cancel edit</a>
 			<?php endif; ?>
 		</div>
 	</form>

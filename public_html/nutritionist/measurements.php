@@ -87,7 +87,7 @@ foreach ($measurements as $measurement) {
 
 $atRiskCount = count(array_filter($measurements, static fn(array $measurement): bool => !in_array((string)($measurement['nutritional_status'] ?? 'Pending'), ['Normal'], true)));
 $flaggedCount = count(array_filter($measurements, static fn(array $measurement): bool => !empty($measurement['is_flagged'])));
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">View children</a>';
+$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">' . admin_action_icon('view') . ' View children</a>';
 
 nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measurements in one view.', 'measurements', $actions);
 ?>

@@ -157,8 +157,8 @@ $upcomingAppointments = count(array_filter($appointments, static function (array
 $latestMeasurementDate = $recentMeasurements[0]['measurement_date'] ?? 'n/a';
 
 $actions = implode(' ', [
-	'<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/children.php')) . '">View children</a>',
-	'<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">Book appointment</a>',
+	'<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/children.php')) . '">' . admin_action_icon('view') . ' View children</a>',
+	'<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">' . admin_action_icon('calendar') . ' Book appointment</a>',
 ]);
 
 parent_layout_start('Dashboard', 'Track your child records, follow-up visits, and recent growth updates.', 'dashboard', $actions);
@@ -207,7 +207,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 				<h2 class="admin-section-title" style="margin-bottom:2px;">Children Snapshot</h2>
 				<p class="admin-section-subtitle">Latest child status and last recorded measurement.</p>
 			</div>
-			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/children.php')); ?>">Open children</a>
+			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/children.php')); ?>"><?php echo admin_action_icon('open'); ?> Open children</a>
 		</div>
 
 		<?php if ($children === []): ?>
@@ -257,7 +257,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 				<h2 class="admin-section-title" style="margin-bottom:2px;">Upcoming Visits</h2>
 				<p class="admin-section-subtitle">Your next scheduled nutritionist appointments.</p>
 			</div>
-			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/appointments.php')); ?>">Appointments</a>
+			<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/appointments.php')); ?>"><?php echo admin_action_icon('calendar'); ?> Appointments</a>
 		</div>
 
 		<?php if ($appointments === []): ?>
@@ -287,7 +287,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 			<h2 class="admin-section-title" style="margin-bottom:2px;">Recent Measurements</h2>
 			<p class="admin-section-subtitle">Latest readings for linked children.</p>
 		</div>
-		<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/growth_history.php')); ?>">Full history</a>
+		<a class="admin-btn-secondary" href="<?php echo parent_e(app_url('/parent/growth_history.php')); ?>"><?php echo admin_action_icon('view'); ?> Full history</a>
 	</div>
 
 	<div class="parent-table-wrap">
