@@ -574,7 +574,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<td>
 							<div class="admin-actions">
 								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>">View</a>
-								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?edit=' . (int)$child['id'])); ?>">Edit</a>
+								<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id'])); ?>">Edit</a>
 								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?>?');">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">

@@ -8,46 +8,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$action = (string)($_POST['action'] ?? '');
 	$appointmentId = (int)($_POST['id'] ?? 0);
 
-	if ($action === 'create') {
-		$childId = (int)($_POST['child_id'] ?? 0);
-		$nutritionistId = (int)($_POST['nutritionist_id'] ?? 0);
-		$scheduledAt = trim((string)($_POST['scheduled_at'] ?? ''));
-		$notes = trim((string)($_POST['notes'] ?? ''));
-
-		if ($childId <= 0 || $nutritionistId <= 0 || $scheduledAt === '') {
-			admin_redirect('/parent/appointments.php', ['notice' => 'Child, nutritionist, and schedule are required.', 'type' => 'error']);
-		}
-
-		$child = admin_fetch_one('SELECT id FROM children WHERE id = ? AND parent_id = ? LIMIT 1', 'ii', [$childId, (int)$user['id']]);
-
-		if ($child === null) {
-			admin_redirect('/parent/appointments.php', ['notice' => 'The selected child is not linked to your account.', 'type' => 'error']);
-		}
-
-		$nutritionist = admin_fetch_one(
-			'SELECT u.id
-			 FROM users u
-			 INNER JOIN roles r ON r.id = u.role_id
-			 WHERE u.id = ? AND r.name = ? AND u.status = ?
-			 LIMIT 1',
-			'iss',
-			[$nutritionistId, 'nutritionist', 'active']
-		);
-
-		if ($nutritionist === null) {
-			admin_redirect('/parent/appointments.php', ['notice' => 'Please select an active nutritionist.', 'type' => 'error']);
-		}
-
-		$ok = admin_execute(
-			'INSERT INTO appointments (child_id, parent_id, nutritionist_id, scheduled_at, status, notes)
-			 VALUES (?, ?, ?, ?, ?, ?)',
-			'iiisss',
-			[$childId, (int)$user['id'], $nutritionistId, $scheduledAt, 'pending', $notes]
-		);
-
-		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment requested successfully.'] : ['notice' => 'Appointment could not be created.', 'type' => 'error']);
-	}
-
 	if ($action === 'cancel' && $appointmentId > 0) {
 		$ok = admin_execute(
 			'UPDATE appointments
@@ -60,26 +20,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Appointment could not be cancelled.', 'type' => 'error']);
 	}
 }
-
-$children = admin_fetch_all(
-	'SELECT id, first_name, last_name, child_code
-	 FROM children
-	 WHERE parent_id = ?
-	 ORDER BY last_name ASC, first_name ASC',
-	'i',
-	[(int)$user['id']]
-);
-
-$nutritionists = admin_fetch_all(
-	'SELECT u.id, u.name, b.name AS barangay
-	 FROM users u
-	 INNER JOIN roles r ON r.id = u.role_id
-	 LEFT JOIN barangays b ON b.id = u.barangay_id
-	 WHERE r.name = ? AND u.status = ?
-	 ORDER BY u.name ASC',
-	'ss',
-	['nutritionist', 'active']
-);
 
 $appointments = admin_fetch_all(
 	'SELECT
@@ -106,7 +46,9 @@ $pendingCount = count(array_filter($appointments, static fn(array $appointment):
 $confirmedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'confirmed'));
 $completedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'completed'));
 
-$actions = '<a class="admin-btn" href="#appointment-form">Request appointment</a>';
+$actions = '<a class="admin-btn" href="'
+	. parent_e(app_url('/parent/appointment_form.php'))
+	. '">Request appointment</a>';
 
 parent_layout_start('Appointments', 'Request follow-ups and manage your appointment schedule.', 'appointments', $actions);
 ?>
@@ -125,11 +67,6 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 		<div class="parent-stat-label">Completed</div>
 		<div class="admin-stat-value"><?php echo $completedCount; ?></div>
 		<div class="admin-stat-note">Finished visits</div>
-	</article>
-	<article class="parent-stat-card">
-		<div class="parent-stat-label">Children available</div>
-		<div class="admin-stat-value"><?php echo count($children); ?></div>
-		<div class="admin-stat-note">Choose a child when booking</div>
 	</article>
 </section>
 
@@ -190,48 +127,6 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 	</div>
 </section>
 
-<section class="parent-panel" id="appointment-form" style="margin-top:14px;">
-	<div class="parent-form-head" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;">Request Appointment</h2>
-			<p class="admin-section-subtitle">Submit a follow-up request for any linked child.</p>
-		</div>
-	</div>
-
-	<form method="post" class="parent-form-grid">
-		<input type="hidden" name="action" value="create">
-		<label class="admin-field">
-			<span>Child</span>
-			<select name="child_id" required>
-				<option value="">-- Select child --</option>
-				<?php foreach ($children as $child): ?>
-					<option value="<?php echo (int)$child['id']; ?>"><?php echo parent_e($child['first_name'] . ' ' . $child['last_name'] . ' · ' . $child['child_code']); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
-		<label class="admin-field">
-			<span>Nutritionist</span>
-			<select name="nutritionist_id" required>
-				<option value="">-- Select nutritionist --</option>
-				<?php foreach ($nutritionists as $nutritionist): ?>
-					<option value="<?php echo (int)$nutritionist['id']; ?>"><?php echo parent_e($nutritionist['name'] . ' · ' . (string)($nutritionist['barangay'] ?? '')); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
-		<label class="admin-field">
-			<span>Preferred schedule</span>
-			<input type="datetime-local" name="scheduled_at" required>
-		</label>
-		<label class="admin-field">
-			<span>Notes</span>
-			<input name="notes" placeholder="Optional reason for the visit">
-		</label>
-		<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
-			<span>&nbsp;</span>
-			<button class="admin-btn" type="submit">Submit request</button>
-		</div>
-	</form>
-</section>
 <?php
 parent_layout_end();
 

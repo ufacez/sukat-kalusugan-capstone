@@ -5,12 +5,11 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 start_secure_session();
 require_permission('barangays.view');
 
-$editingId = (int)($_GET['edit'] ?? 0);
-$editingBarangay = $editingId > 0 ? admin_fetch_one(
-    'SELECT id, name, city_municipality, status FROM barangays WHERE id = ? LIMIT 1',
-    'i',
-    [$editingId]
-) : null;
+$editId = (int)($_GET['edit'] ?? 0);
+
+if ($editId > 0) {
+    admin_redirect('/admin/barangay_form.php?id=' . $editId);
+}
 
 $barangays = admin_fetch_all(
     "SELECT
@@ -31,7 +30,7 @@ $activeCount = count(array_filter($barangays, static fn(array $b): bool => (stri
 $totalChildren = array_sum(array_map(static fn(array $b): int => (int)$b['children_count'], $barangays));
 $totalKiosks = array_sum(array_map(static fn(array $b): int => (int)$b['kiosks_count'], $barangays));
 
-$actions = '<a class="admin-btn" href="#barangay-form">Add barangay</a>';
+$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/barangay_form.php')) . '">Add barangay</a>';
 
 admin_layout_start('Barangays', 'The master list every child, parent, nutritionist, and kiosk is scoped to.', 'barangays', $actions);
 ?>
@@ -58,54 +57,6 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
     </article>
 </section>
 
-<section class="admin-section" id="barangay-form">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title"><?php echo $editingBarangay ? 'Edit Barangay' : 'Add Barangay'; ?></h2>
-            <p class="admin-section-subtitle"><?php echo $editingBarangay ? 'Update the barangay record used across children, parents, nutritionists, and kiosks.' : 'Create a new barangay backed by the barangays table.'; ?></p>
-        </div>
-    </div>
-
-    <form class="admin-form-grid" method="post" action="<?php echo admin_e(app_url($editingBarangay ? '/api/admin/barangays_update.php' : '/api/admin/barangays_create.php')); ?>">
-        <?php if ($editingBarangay): ?>
-            <input type="hidden" name="id" value="<?php echo (int)$editingBarangay['id']; ?>">
-        <?php endif; ?>
-        <div class="admin-field-wide">
-            <div class="admin-csfp-picker" data-csfp-barangay-picker>
-                <label class="admin-field">
-                    <span>City / Municipality</span>
-                    <select disabled><option>City of San Fernando, Pampanga</option></select>
-                </label>
-                <label class="admin-field">
-                    <span>Barangay</span>
-                    <select data-csfp="barangay" <?php echo $editingBarangay ? '' : 'required'; ?> disabled><option value="">Loading barangays...</option></select>
-                </label>
-            </div>
-            <div class="admin-address-status" data-csfp-status></div>
-            <input type="hidden" name="name" value="<?php echo admin_e($editingBarangay['name'] ?? ''); ?>">
-            <input type="hidden" name="city_municipality" value="<?php echo admin_e($editingBarangay['city_municipality'] ?? 'City of San Fernando, Pampanga'); ?>">
-            <?php if ($editingBarangay): ?>
-                <div class="admin-field-hint">Current saved barangay: <?php echo admin_e($editingBarangay['name']); ?>, <?php echo admin_e($editingBarangay['city_municipality'] ?? ''); ?>. Select a new official location to replace it.</div>
-            <?php endif; ?>
-        </div>
-        <label class="admin-field">
-            <span>Status</span>
-            <select name="status" required>
-                <option value="active" <?php echo (($editingBarangay['status'] ?? 'active') === 'active') ? 'selected' : ''; ?>>Active</option>
-                <option value="inactive" <?php echo (($editingBarangay['status'] ?? '') === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-            </select>
-        </label>
-        <div class="admin-field" style="align-content:end;">
-            <span>&nbsp;</span>
-            <div class="admin-actions">
-                <?php if ($editingBarangay): ?>
-                    <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangays.php')); ?>">Cancel</a>
-                <?php endif; ?>
-                <button class="admin-btn" type="submit"><?php echo $editingBarangay ? 'Save changes' : 'Create barangay'; ?></button>
-            </div>
-        </div>
-    </form>
-</section>
 
 <section class="admin-section">
     <div class="admin-section-head">
@@ -142,7 +93,7 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
                         <td><span class="admin-pill <?php echo (string)$barangay['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst((string)$barangay['status'])); ?></span></td>
                         <td>
                             <div class="admin-actions">
-                                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangays.php?edit=' . (int)$barangay['id']) . '#barangay-form'); ?>">Edit</a>
+                                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/barangay_form.php?id=' . (int)$barangay['id'])); ?>">Edit</a>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_delete.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($barangay['name']); ?>? Records linked to it will keep their history but lose the barangay assignment.');">
                                     <input type="hidden" name="id" value="<?php echo (int)$barangay['id']; ?>">
                                     <button class="admin-btn-danger" type="submit">Delete</button>

@@ -105,7 +105,7 @@ $latestMeasurementDate = $recentMeasurements[0]['measurement_date'] ?? 'n/a';
 
 $actions = implode(' ', [
 	'<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/children.php')) . '">View children</a>',
-	'<a class="admin-btn" href="' . parent_e(app_url('/parent/appointments.php')) . '">Book appointment</a>',
+	'<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">Book appointment</a>',
 ]);
 
 parent_layout_start('Dashboard', 'Track your child records, follow-up visits, and recent growth updates.', 'dashboard', $actions);

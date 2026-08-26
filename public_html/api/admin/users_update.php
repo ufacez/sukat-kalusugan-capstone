@@ -29,33 +29,33 @@ if (
     || !admin_is_valid_name_part($middleName, false)
     || !admin_is_valid_name_part($lastName, true)
 ) {
-    admin_redirect('/admin/users.php?edit=' . $id, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
 }
 
 $name = admin_combine_name($firstName, $middleName, $lastName);
 
 if ($id <= 0 || $name === '' || $email === '' || $username === '') {
-    admin_redirect('/admin/users.php', ['notice' => 'User id, name, email, and username are required.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'User id, name, email, and username are required.', 'type' => 'error']);
 }
 
 if (!admin_is_valid_ph_mobile($phone)) {
-    admin_redirect('/admin/users.php?edit=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 }
 
 $phone = preg_replace('/[^0-9]/', '', $phone);
 
 if ($password !== '' && !admin_is_strong_password($password)) {
-    admin_redirect('/admin/users.php?edit=' . $id, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
 }
 
 if ($password !== '' && $password !== $passwordConfirm) {
-    admin_redirect('/admin/users.php?edit=' . $id, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 }
 
 $roleId = admin_find_role_id($roleName);
 
 if ($roleId <= 0) {
-    admin_redirect('/admin/users.php', ['notice' => 'Selected role does not exist.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
 $conn = get_db_connection();
@@ -81,7 +81,7 @@ if ($password !== '') {
 
 if (!mysqli_stmt_execute($stmt)) {
     mysqli_stmt_close($stmt);
-    admin_redirect('/admin/users.php?edit=' . $id, ['notice' => 'User could not be updated. Check for duplicate email or username.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'User could not be updated. Check for duplicate email or username.', 'type' => 'error']);
 }
 
 mysqli_stmt_close($stmt);

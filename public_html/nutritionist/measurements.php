@@ -164,6 +164,7 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 					<th>HAZ</th>
 					<th>WHZ</th>
 					<th>Status</th>
+					<th>Source</th>
 					<th>WFA</th>
 					<th>HFA</th>
 					<th>WFH</th>
@@ -174,7 +175,7 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 			<tbody>
 				<?php foreach ($measurements as $measurement): ?>
 					<?php $isFlagged = !empty($measurement['is_flagged']); ?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($measurement['measurement_date'] . ' ' . $measurement['first_name'] . ' ' . $measurement['last_name'] . ' ' . $measurement['child_code'] . ' ' . ($measurement['nutritional_status'] ?? ''))); ?>" style="<?php echo $isFlagged ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
+					<tr data-filter-text="<?php echo nutritionist_e(strtolower($measurement['measurement_date'] . ' ' . $measurement['first_name'] . ' ' . $measurement['last_name'] . ' ' . $measurement['child_code'] . ' ' . ($measurement['nutritional_status'] ?? '') . ' ' . ($measurement['source_type'] ?? 'kiosk'))); ?>" style="<?php echo $isFlagged ? 'background:rgba(224,49,49,0.06);' : ''; ?>">
 						<td style="white-space:nowrap;"><?php echo nutritionist_e((string)$measurement['measurement_date']); ?></td>
 						<td>
 							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($measurement['first_name'] . ' ' . $measurement['last_name']); ?></div>
@@ -187,6 +188,13 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 						<td style="color:#4a9fd5;font-weight:600;"><?php echo ((float)$measurement['haz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['haz']); ?></td>
 						<td style="color:#0d8871;font-weight:600;"><?php echo ((float)$measurement['whz'] > 0 ? '+' : '') . nutritionist_e((string)$measurement['whz']); ?></td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></span></td>
+						<td style="white-space:nowrap;">
+							<?php if (($measurement['source_type'] ?? 'kiosk') === 'manual'): ?>
+								<span class="admin-pill is-muted" title="Recorded manually by staff">Manual</span>
+							<?php else: ?>
+								<span class="admin-pill is-success" title="Captured via kiosk device">Kiosk</span>
+							<?php endif; ?>
+						</td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['hfa_status'] ?? '—')); ?></td>
 						<td style="color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e((string)($measurement['wfh_status'] ?? '—')); ?></td>

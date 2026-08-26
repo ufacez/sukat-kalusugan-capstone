@@ -32,7 +32,7 @@ $ok = admin_execute(
 );
 
 if (!$ok) {
-    admin_redirect('/admin/barangays.php?edit=' . $id, ['notice' => 'Barangay could not be updated. The name may already be in use.', 'type' => 'error']);
+    admin_redirect('/admin/barangay_form.php?id=' . $id, ['notice' => 'Barangay could not be updated. The name may already be in use.', 'type' => 'error']);
 }
 
 $actor = current_user();
