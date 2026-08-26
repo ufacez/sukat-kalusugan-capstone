@@ -59,10 +59,6 @@ foreach ($measurements as $measurement) {
 	}
 }
 
-$recentMeasurements = array_values(array_filter(
-	$measurements,
-	static fn(array $measurement): bool => new DateTimeImmutable((string)$measurement['measurement_date']) >= (new DateTimeImmutable('today'))->modify('-7 days')
-));
 $atRiskCount = count(array_filter($measurements, static fn(array $measurement): bool => !in_array((string)($measurement['nutritional_status'] ?? 'Pending'), ['Normal', 'Overweight'], true)));
 $flaggedCount = count(array_filter($measurements, static fn(array $measurement): bool => !empty($measurement['is_flagged'])));
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">View children</a>';
@@ -74,11 +70,6 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 		<div class="nutritionist-stat-label">Measurement Entries</div>
 		<div class="admin-stat-value"><?php echo count($measurements); ?></div>
 		<div class="admin-stat-note">All logged measurements</div>
-	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Recent Week</div>
-		<div class="admin-stat-value"><?php echo count($recentMeasurements); ?></div>
-		<div class="admin-stat-note">Measurements from the last 7 days</div>
 	</article>
 	<article class="nutritionist-stat-card">
 		<div class="nutritionist-stat-label">At-Risk Results</div>
@@ -97,9 +88,8 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 	</article>
 </section>
 
-<section class="nutritionist-panel-grid is-balanced">
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Status Breakdown</div>
+<section class="nutritionist-panel">
+	<div class="admin-section-title" style="margin-bottom:12px;">Status Breakdown</div>
 		<?php foreach (['Normal', 'Underweight', 'Severely Underweight', 'Stunted', 'Severely Stunted', 'Moderately Wasted', 'Severely Wasted', 'Overweight', 'Obese'] as $status): ?>
 			<?php
 			$count = (int)($statusCounts[$status] ?? 0);
@@ -126,26 +116,6 @@ nutritionist_layout_start('Measurements', 'Latest height, weight, and WHO measur
 				</div>
 			</div>
 		<?php endforeach; ?>
-	</article>
-
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Recent Measurements</div>
-		<div class="admin-stat-note">Latest entries across children in scope.</div>
-		<div style="margin-top:14px;display:grid;gap:10px;">
-			<?php foreach (array_slice($measurements, 0, 5) as $measurement): ?>
-				<div class="admin-list-item" style="padding:10px 0;">
-					<div>
-						<div style="font-size:12px;font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($measurement['first_name'] . ' ' . $measurement['last_name']); ?></div>
-						<div class="admin-mini"><?php echo nutritionist_e((string)$measurement['measurement_date']); ?> · <?php echo nutritionist_e((string)$measurement['child_code']); ?></div>
-					</div>
-					<div style="text-align:right;">
-						<div class="admin-pill <?php echo nutritionist_status_class((string)$measurement['nutritional_status']); ?>"><?php echo nutritionist_e((string)$measurement['nutritional_status']); ?></div>
-						<div class="admin-mini">WAZ <?php echo nutritionist_e((string)$measurement['waz']); ?> · HAZ <?php echo nutritionist_e((string)$measurement['haz']); ?> · WHZ <?php echo nutritionist_e((string)$measurement['whz']); ?></div>
-					</div>
-				</div>
-			<?php endforeach; ?>
-		</div>
-	</article>
 </section>
 
 <section class="nutritionist-panel">

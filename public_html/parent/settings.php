@@ -80,7 +80,7 @@ $actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/d
 parent_layout_start('Settings', 'Update your profile, contact details, and login password.', 'settings', $actions);
 ?>
 <section class="parent-stat-grid">
-	<article class="parent-stat-card is-featured">
+	<article class="parent-stat-card">
 		<div class="parent-stat-label">Parent type</div>
 		<div class="admin-stat-value"><?php echo parent_e((string)($profile['parent_type'] ?? 'Guardian')); ?></div>
 		<div class="admin-stat-note">Household role stored in the parent record</div>

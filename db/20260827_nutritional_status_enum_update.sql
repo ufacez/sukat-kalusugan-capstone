@@ -49,6 +49,55 @@ ALTER TABLE `measurements`
 UPDATE `measurements` SET `wfh_status` = 'SW' WHERE `wfh_status` IN ('SW/SAM', 'SW(SAM)');
 UPDATE `measurements` SET `wfh_status` = 'MW' WHERE `wfh_status` IN ('MW/MAM', 'MW(MAM)');
 
+-- 6. Backfill NULL/empty wfa_status, hfa_status, wfh_status, nutritional_status
+--    from existing waz/haz/whz values using the correct classification rules.
+
+-- WFA: SUW < -3 | UW -3..-2 | Normal -2..+2 | OW > +2
+UPDATE `measurements`
+SET `wfa_status` = CASE
+    WHEN `waz` < -3 THEN 'SUW'
+    WHEN `waz` < -2 THEN 'UW'
+    WHEN `waz` > 2  THEN 'OW'
+    ELSE 'Normal'
+END
+WHERE (`wfa_status` IS NULL OR `wfa_status` = '') AND `waz` IS NOT NULL;
+
+-- HFA: SSt < -3 | St -3..-2 | Normal -2..+2 | T > +2
+UPDATE `measurements`
+SET `hfa_status` = CASE
+    WHEN `haz` < -3 THEN 'SSt'
+    WHEN `haz` < -2 THEN 'St'
+    WHEN `haz` > 2  THEN 'T'
+    ELSE 'Normal'
+END
+WHERE (`hfa_status` IS NULL OR `hfa_status` = '') AND `haz` IS NOT NULL;
+
+-- WFH: SW < -3 | MW -3..-2 | Normal -2..+2 | OW +2..+3 | Ob > +3
+UPDATE `measurements`
+SET `wfh_status` = CASE
+    WHEN `whz` < -3 THEN 'SW'
+    WHEN `whz` < -2 THEN 'MW'
+    WHEN `whz` > 3  THEN 'Ob'
+    WHEN `whz` > 2  THEN 'OW'
+    ELSE 'Normal'
+END
+WHERE (`wfh_status` IS NULL OR `wfh_status` = '') AND `whz` IS NOT NULL;
+
+-- nutritional_status: single most severe label
+UPDATE `measurements`
+SET `nutritional_status` = CASE
+    WHEN `waz` < -3 THEN 'Severely Underweight'
+    WHEN `haz` < -3 THEN 'Severely Stunted'
+    WHEN `whz` < -3 THEN 'Severely Wasted'
+    WHEN `waz` < -2 THEN 'Underweight'
+    WHEN `haz` < -2 THEN 'Stunted'
+    WHEN `whz` < -2 THEN 'Moderately Wasted'
+    WHEN `whz` > 3  THEN 'Obese'
+    WHEN `whz` > 2  THEN 'Overweight'
+    ELSE 'Normal'
+END
+WHERE (`nutritional_status` IS NULL OR `nutritional_status` = '') AND `waz` IS NOT NULL;
+
 -- Verify:
 --    SHOW COLUMNS FROM measurements LIKE 'nutritional_status';
 --    SHOW COLUMNS FROM measurements LIKE 'wfa_status';

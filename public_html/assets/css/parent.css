@@ -23,13 +23,13 @@
 
 .parent-page .parent-stat-card.is-featured,
 .parent-page .parent-hero {
-  background: linear-gradient(180deg, #103e56 0%, #16384e 100%);
+  background: linear-gradient(180deg, #0d3427 0%, #123527 100%);
   color: #fff;
 }
 
 [data-theme="dark"] .parent-page .parent-stat-card.is-featured,
 [data-theme="dark"] .parent-page .parent-hero {
-  background: linear-gradient(180deg, #0e3248 0%, #122e42 100%);
+  background: linear-gradient(180deg, #0a2a1f 0%, #0f3525 100%);
   border-color: rgba(255, 255, 255, 0.06);
 }
 

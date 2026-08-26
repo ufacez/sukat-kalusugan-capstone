@@ -51,7 +51,7 @@ $actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/c
 parent_layout_start('Growth History', 'Measurement history and WHO-linked growth results per child.', 'growth_history', $actions);
 ?>
 <section class="parent-stat-grid">
-	<article class="parent-stat-card is-featured">
+	<article class="parent-stat-card">
 		<div class="parent-stat-label">Recorded measurements</div>
 		<div class="admin-stat-value"><?php echo count($measurements); ?></div>
 		<div class="admin-stat-note">All readings linked to your account</div>

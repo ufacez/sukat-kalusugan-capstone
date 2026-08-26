@@ -62,7 +62,7 @@ $actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment
 parent_layout_start('Children', 'All children linked to your parent account and their latest growth results.', 'children', $actions);
 ?>
 <section class="parent-stat-grid">
-	<article class="parent-stat-card is-featured">
+	<article class="parent-stat-card">
 		<div class="parent-stat-label">Linked children</div>
 		<div class="admin-stat-value"><?php echo count($children); ?></div>
 		<div class="admin-stat-note">Household members in your portal</div>

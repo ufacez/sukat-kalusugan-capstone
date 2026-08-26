@@ -2,7 +2,6 @@
   const form = document.getElementById("loginForm");
   const message = document.getElementById("formMessage");
   const submitButton = form ? form.querySelector(".auth-submit") : null;
-  const passwordInput = document.getElementById("password");
 
   if (!form || !message || !submitButton) {
     return;
@@ -49,12 +48,13 @@
   });
 
   const toggle = document.querySelector("[data-toggle-password]");
+  const passwordInput = document.getElementById("password");
 
   if (toggle && passwordInput) {
     toggle.addEventListener("click", function () {
       const showing = passwordInput.type === "text";
       passwordInput.type = showing ? "password" : "text";
-      toggle.textContent = showing ? "Show" : "Hide";
+      toggle.classList.toggle("is-visible", !showing);
       toggle.setAttribute(
         "aria-label",
         showing ? "Show password" : "Hide password",

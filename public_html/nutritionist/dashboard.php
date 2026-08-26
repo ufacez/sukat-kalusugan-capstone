@@ -120,8 +120,8 @@ if ($calendarDate === false || $calendarDate === null || $calendarDate->format('
 	$calendarDate = $calendarDate->modify('first day of this month');
 }
 
-$prevMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $calendarDate->modify('-1 month')->format('Y-m')]));
-$nextMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['range' => $range, 'month' => $calendarDate->modify('+1 month')->format('Y-m')]));
+$prevMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['month' => $calendarDate->modify('-1 month')->format('Y-m')]));
+$nextMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['month' => $calendarDate->modify('+1 month')->format('Y-m')]));
 $monthStart = $calendarDate->format('Y-m-d');
 $monthEnd = $calendarDate->modify('last day of this month')->format('Y-m-d');
 

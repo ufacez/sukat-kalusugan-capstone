@@ -126,7 +126,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 </section>
 
 <section class="parent-stat-grid">
-	<article class="parent-stat-card is-featured">
+	<article class="parent-stat-card">
 		<div class="parent-stat-label">Children linked</div>
 		<div class="admin-stat-value"><?php echo $childrenCount; ?></div>
 		<div class="admin-stat-note">Household records under your account</div>

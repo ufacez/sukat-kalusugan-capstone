@@ -69,6 +69,16 @@ if ($token === '') {
         </section>
 
         <section class="auth-card" aria-labelledby="reset-password-title">
+            <button class="auth-theme-toggle" type="button" data-auth-theme-toggle aria-label="Toggle dark mode">
+                <span class="auth-theme-toggle-track">
+                    <svg class="auth-theme-icon auth-theme-icon--sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                    <svg class="auth-theme-icon auth-theme-icon--moon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+                    <span class="auth-theme-toggle-thumb">
+                        <svg class="thumb-icon--sun" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><circle cx="12" cy="12" r="4"/><path stroke-linecap="round" stroke-linejoin="round" d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32 1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+                        <svg class="thumb-icon--moon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>
+                    </span>
+                </span>
+            </button>
             <div class="auth-card-header">
                 <p class="eyebrow">Almost done</p>
                 <h2 id="reset-password-title">Set a new password</h2>
@@ -113,6 +123,21 @@ if ($token === '') {
     </main>
 
     <script src="../assets/js/auth-reset-password.js"></script>
+    <script>
+    (function(){
+        var toggle = document.querySelector('[data-auth-theme-toggle]');
+        if (!toggle) return;
+
+        var current = document.documentElement.getAttribute('data-theme') || 'light';
+        var isDark = current === 'dark';
+
+        toggle.addEventListener('click', function(){
+            isDark = !isDark;
+            document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
+            localStorage.setItem('theme', isDark ? 'dark' : 'light');
+        });
+    })();
+    </script>
 </body>
 
 </html>

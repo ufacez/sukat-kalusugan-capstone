@@ -51,9 +51,15 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
 
 $identifier = trim((string)($_POST['identifier'] ?? ''));
 $password = (string)($_POST['password'] ?? '');
+$remember = (int)($_POST['remember'] ?? 0) === 1;
 
 if ($identifier === '' || $password === '') {
     login_respond_error('Email/username and password are required.', 422);
+}
+
+if ($remember) {
+    ini_set('session.cookie_lifetime', 30 * 24 * 60 * 60);
+    ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
 }
 
 $lockoutSecondsRemaining = \login_lockout_seconds_remaining($identifier);

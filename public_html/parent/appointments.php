@@ -55,7 +55,7 @@ $actions = '<a class="admin-btn" href="'
 parent_layout_start('Appointments', 'Request follow-ups and manage your appointment schedule.', 'appointments', $actions);
 ?>
 <section class="parent-stat-grid">
-	<article class="parent-stat-card is-featured">
+	<article class="parent-stat-card">
 		<div class="parent-stat-label">Pending</div>
 		<div class="admin-stat-value"><?php echo $pendingCount; ?></div>
 		<div class="admin-stat-note">Waiting for nutritionist review</div>
