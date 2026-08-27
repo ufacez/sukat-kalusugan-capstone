@@ -358,6 +358,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<title>' . admin_e($title) . ' | Sukat Kalusugan Admin</title>';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/admin.css')) . '">';
+    echo '<link rel="icon" type="image/png" href="' . admin_e(app_url('/assets/images/logo.png')) . '">';
     echo '<script>';
     echo '(function(){';
     echo 'var t=localStorage.getItem("theme");';

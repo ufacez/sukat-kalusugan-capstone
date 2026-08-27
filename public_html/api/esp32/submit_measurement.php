@@ -95,12 +95,22 @@ if (
 |--------------------------------------------------------------------------
 */
 
+$manualWeight = filter_var($payload['manual_weight'] ?? false, FILTER_VALIDATE_BOOLEAN);
+$manualHeight = filter_var($payload['manual_height'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
 if (
-    $heightCm === null ||
-    $weightKg === null
+    ($heightCm === null && !$manualHeight) ||
+    ($weightKg === null && !$manualWeight)
 ) {
     api_error(
-        'Height and weight are required.',
+        'At least one measurement (height or weight) is required. If a sensor is offline, set manual_height or manual_weight to true.',
+        400
+    );
+}
+
+if ($heightCm === null && $weightKg === null) {
+    api_error(
+        'Both height and weight are missing. At least one sensor must provide data.',
         400
     );
 }
@@ -706,34 +716,35 @@ if ($childBirthdate !== '') {
 |--------------------------------------------------------------------------
 */
 
-$metrics =
-    calculate_who_metrics(
+$metrics = null;
+$waz = $haz = $whz = null;
+$status = $wfaStatus = $hfaStatus = $wfhStatus = null;
+
+if ($weightKg !== null && $heightCm !== null) {
+    $metrics = calculate_who_metrics(
         $weightKg,
         $heightCm,
         $ageMonths,
         $childSex
     );
-
-$waz =
-    $metrics['waz'];
-
-$haz =
-    $metrics['haz'];
-
-$whz =
-    $metrics['whz'];
-
-$status =
-    $metrics['nutritional_status'];
-
-$wfaStatus =
-    $metrics['wfa_status'];
-
-$hfaStatus =
-    $metrics['hfa_status'];
-
-$wfhStatus =
-    $metrics['wfh_status'];
+    $waz = $metrics['waz'];
+    $haz = $metrics['haz'];
+    $whz = $metrics['whz'];
+    $status = $metrics['nutritional_status'];
+    $wfaStatus = $metrics['wfa_status'];
+    $hfaStatus = $metrics['hfa_status'];
+    $wfhStatus = $metrics['wfh_status'];
+} elseif ($weightKg !== null && $heightCm === null) {
+    // Weight only — compute WAZ / WFA only; no HAZ / WHZ
+    $waz = calculate_waz($weightKg, $ageMonths, $childSex);
+    $wfaStatus = classify_wfa_status($waz);
+    $status = $wfaStatus;
+} elseif ($heightCm !== null && $weightKg === null) {
+    // Height only — compute HAZ / HFA only; no WAZ / WHZ
+    $haz = calculate_haz($heightCm, $ageMonths, $childSex);
+    $hfaStatus = classify_hfa_status($haz);
+    $status = $hfaStatus;
+}
 
 $isFlagged =
     $metrics['is_flagged'] ? 1 : 0;
@@ -1111,6 +1122,12 @@ api_success(
 
         'firebase_synced' =>
             firebase_database_url() !== '',
+
+        'manual_weight' =>
+            $manualWeight,
+
+        'manual_height' =>
+            $manualHeight,
     ],
     'Measurement saved successfully.'
 );

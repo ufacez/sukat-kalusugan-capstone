@@ -475,7 +475,13 @@ void setupHX711() {
   Serial.print("Calibration factor: ");
   Serial.println(LoadCell.getCalFactor());
 
+  unsigned long updateStart = millis();
   while (!LoadCell.update()) {
+    if (millis() - updateStart > 3000) {
+      Serial.println("HX711 TIMEOUT — update never ready (disconnected?)");
+      hx711Ready = false;
+      return;
+    }
     delay(1);
   }
 
@@ -1077,11 +1083,20 @@ bool submitFinalMeasurement(
     "device_id=" +
     DEVICE_ID +
     "&session_id=" +
-    String(sessionId) +
-    "&height_cm=" +
-    String(heightCm, 1) +
-    "&weight_kg=" +
-    String(weightKg, 2);
+    String(sessionId);
+
+  // Dual-mode: send only available sensor + manual flags
+  if (weightKg >= 0.0f && !isnan(weightKg)) {
+    payload += "&weight_kg=" + String(weightKg, 2);
+  } else {
+    payload += "&manual_weight=true";
+  }
+
+  if (heightCm >= 0.0f && !isnan(heightCm)) {
+    payload += "&height_cm=" + String(heightCm, 1);
+  } else {
+    payload += "&manual_height=true";
+  }
 
   Serial.println();
   Serial.println(
@@ -1297,6 +1312,49 @@ void runMeasurement(
   unsigned long finalSequence = 0;
 
   // ===================================================
+  // SENSOR OFFLINE DETECTION (per-session)
+  // ===================================================
+  //
+  // hx711Ready may already be false coming in (never connected at
+  // boot). heightSensorReady starts true and only flips false if the
+  // TF-Luna stops producing frames mid-session. Both timers are reset
+  // HERE, at the start of this specific measurement, instead of being
+  // `static` -- a static timestamp would carry over a stale value from
+  // the previous session (or from before setup() even finished),
+  // which was tripping the "offline" timeout instantly on a sensor
+  // that was actually fine.
+
+  bool heightSensorReady = true;
+
+  unsigned long lastHxUpdate = millis();
+  unsigned long lastHeightUpdate = millis();
+
+  // A dead HX711 board (no update() ever) is caught by
+  // SENSOR_OFFLINE_TIMEOUT_MS above. But a board that IS alive and
+  // dutifully reporting ~0.000 kg forever -- load cell wires pulled,
+  // or a genuinely stuck sensor -- never trips that timeout, because
+  // update() keeps returning true. It also never crosses
+  // EMPTY_PLATFORM_THRESHOLD_KG, so it never enters the buffer and
+  // weightStable can never become true. This second timer catches
+  // that case: if no in-range weight sample has EVER been buffered
+  // this session within a longer grace window, give up on weight too.
+  // Same idea for height, if TF-Luna keeps returning frames outside
+  // MIN/MAX_HEIGHT_CM forever (e.g. pointed at nothing).
+  //
+  // Tune these based on real-world testing: too short and someone who
+  // is just slow to step onto the platform gets bumped to manual
+  // entry; too long and a truly dead sensor makes people wait
+  // needlessly before manual entry kicks in.
+
+  const unsigned long WEIGHT_ARRIVAL_TIMEOUT_MS = 10000;
+  const unsigned long HEIGHT_ARRIVAL_TIMEOUT_MS = 10000;
+
+  unsigned long weightWaitStartedAt = millis();
+  unsigned long heightWaitStartedAt = millis();
+
+  const unsigned long SENSOR_OFFLINE_TIMEOUT_MS = 3000;
+
+  // ===================================================
   // LIVE MEASUREMENT LOOP
   // ===================================================
 
@@ -1424,10 +1482,52 @@ void runMeasurement(
     // HX711
     // ================================================
 
+    // update() proves the chip is alive: it only returns true when a
+    // fresh ADC sample was actually read. So the ONLY reliable way to
+    // detect "sensor stopped responding" is to check the clock every
+    // loop iteration regardless of what update() returns this time --
+    // not nest the check inside "update() just returned true", which
+    // can never observe an absence of updates.
+
+    bool gotWeightUpdate =
+      hx711Ready &&
+      LoadCell.update();
+
+    if (gotWeightUpdate) {
+
+      lastHxUpdate = millis();
+
+    } else if (
+      hx711Ready &&
+      millis() - lastHxUpdate > SENSOR_OFFLINE_TIMEOUT_MS
+    ) {
+
+      hx711Ready = false;
+
+      Serial.println(
+        "HX711 TIMEOUT — no updates received, treating as offline (manual mode)"
+      );
+    }
+
+    // Board is alive (gotWeightUpdate keeps happening) but never once
+    // reported a real, in-range weight -- load cell disconnected, or
+    // nobody has stepped on for way too long. Give up on weight so the
+    // session can still finish via manual entry.
+
     if (
       hx711Ready &&
-      LoadCell.update()
+      weightBufFilled == 0 &&
+      millis() - weightWaitStartedAt > WEIGHT_ARRIVAL_TIMEOUT_MS
     ) {
+
+      hx711Ready = false;
+
+      Serial.println(
+        "HX711 no in-range weight within timeout — treating as offline (manual mode)"
+      );
+    }
+
+    if (gotWeightUpdate) {
 
       measurementSequence++;
 
@@ -1495,9 +1595,44 @@ void runMeasurement(
 
     float height;
 
-    if (
-      getHeightReading(height)
+    bool gotHeightUpdate =
+      getHeightReading(height);
+
+    if (gotHeightUpdate) {
+
+      lastHeightUpdate = millis();
+
+    } else if (
+      heightSensorReady &&
+      millis() - lastHeightUpdate > SENSOR_OFFLINE_TIMEOUT_MS
     ) {
+
+      heightSensorReady = false;
+
+      Serial.println(
+        "TF-LUNA TIMEOUT — no distance frames, treating as offline (manual mode)"
+      );
+    }
+
+    // Same idea as the weight grace-timeout above: frames are arriving
+    // fine but never land inside MIN/MAX_HEIGHT_CM (sensor pointed at
+    // nothing, misaligned, or nobody has stood under it for way too
+    // long). Give up on height so the session can still finish.
+
+    if (
+      heightSensorReady &&
+      heightBufFilled == 0 &&
+      millis() - heightWaitStartedAt > HEIGHT_ARRIVAL_TIMEOUT_MS
+    ) {
+
+      heightSensorReady = false;
+
+      Serial.println(
+        "TF-LUNA no in-range height within timeout — treating as offline (manual mode)"
+      );
+    }
+
+    if (gotHeightUpdate) {
 
       measurementSequence++;
 
@@ -1556,11 +1691,34 @@ void runMeasurement(
     // FINAL STABLE SNAPSHOT
     // ================================================
 
+    // A sensor that has gone offline can never satisfy *Stable, so it
+    // is excused from the requirement instead of blocking the snapshot
+    // forever. At least one sensor must still be live and filled --
+    // if both are offline the hold timer starts immediately and the
+    // snapshot is submitted fully manual (-1/-1) once the hold time
+    // passes.
+
+    bool weightSatisfied =
+      weightStable ||
+      !hx711Ready;
+
+    bool heightSatisfied =
+      heightStable ||
+      !heightSensorReady;
+
+    bool weightContributes =
+      hx711Ready &&
+      weightBufFilled > 0;
+
+    bool heightContributes =
+      heightSensorReady &&
+      heightBufFilled > 0;
+
     if (
-      weightStable &&
-      heightStable &&
-      weightBufFilled > 0 &&
-      heightBufFilled > 0
+      weightSatisfied &&
+      heightSatisfied &&
+      (weightContributes || !hx711Ready) &&
+      (heightContributes || !heightSensorReady)
     ) {
 
       if (stableSince == 0) {
@@ -1573,33 +1731,55 @@ void runMeasurement(
         FINAL_STABLE_HOLD_MS
       ) {
 
-        float ws = 0;
+        if (weightContributes) {
 
-        for (
-          int i = 0;
-          i < weightBufFilled;
-          i++
-        ) {
+          float ws = 0;
 
-          ws += weightBuffer[i];
+          for (
+            int i = 0;
+            i < weightBufFilled;
+            i++
+          ) {
+
+            ws += weightBuffer[i];
+          }
+
+          finalWeightSnapshot =
+            ws / weightBufFilled;
+
+        } else {
+
+          finalWeightSnapshot = -1;
+
+          Serial.println(
+            "Weight sensor offline — submitting as manual_weight."
+          );
         }
 
-        float hs = 0;
+        if (heightContributes) {
 
-        for (
-          int i = 0;
-          i < heightBufFilled;
-          i++
-        ) {
+          float hs = 0;
 
-          hs += heightBuffer[i];
+          for (
+            int i = 0;
+            i < heightBufFilled;
+            i++
+          ) {
+
+            hs += heightBuffer[i];
+          }
+
+          finalHeightSnapshot =
+            hs / heightBufFilled;
+
+        } else {
+
+          finalHeightSnapshot = -1;
+
+          Serial.println(
+            "Height sensor offline — submitting as manual_height."
+          );
         }
-
-        finalWeightSnapshot =
-          ws / weightBufFilled;
-
-        finalHeightSnapshot =
-          hs / heightBufFilled;
 
         finalReady = true;
 

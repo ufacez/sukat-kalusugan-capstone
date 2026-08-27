@@ -2622,13 +2622,25 @@
       !isValidWeight(state.finalWeight) ||
       !isValidHeight(state.finalHeight)
     ) {
-      pushFeed(
-        "Processing blocked",
-        "Weight and height are not ready.",
-        "warn"
-      );
-
-      return;
+      // Dual-mode: allow processing with one sensor if other is manual
+      const hasHeightManual = state.autoHeight && !state.autoWeight && state.manualWeightInput != null;
+      const hasWeightManual = state.autoWeight && !state.autoHeight && state.manualHeightInput != null;
+      const hasOneLive = (isValidHeight(state.finalHeight) || isValidWeight(state.finalWeight));
+      
+      if (!state.autoHeight && isValidHeight(state.finalHeight) && state.manualWeightInput != null) {
+        // Height from ESP32, weight entered manually — allow
+      } else if (!state.autoWeight && isValidWeight(state.finalWeight) && state.manualHeightInput != null) {
+        // Weight from ESP32, height entered manually — allow
+      } else if (hasOneLive && (state.manualWeightInput != null || state.manualHeightInput != null)) {
+        // At least one live + at least one manual entry — allow
+      } else {
+        pushFeed(
+          "Processing blocked",
+          "Weight and height are not ready.",
+          "warn"
+        );
+        return;
+      }
     }
 
     if (!state.session) {

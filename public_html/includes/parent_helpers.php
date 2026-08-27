@@ -88,6 +88,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css')) . '">';
+    echo '<link rel="icon" type="image/png" href="' . parent_e(app_url('/assets/images/logo.png')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/chatbot.css')) . '">';
     echo '<script>';
     echo '(function(){';

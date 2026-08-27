@@ -29,6 +29,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <title>Sukat Kalusugan | Sign In</title>
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
+    <link rel="icon" type="image/png" href="../assets/images/logo.png">
     <script>
     (function(){
     var t=localStorage.getItem("theme");

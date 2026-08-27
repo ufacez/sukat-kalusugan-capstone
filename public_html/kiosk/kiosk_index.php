@@ -130,6 +130,7 @@ $appData = [
         <title>Sukat Kalusugan | Kiosk</title>
         <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/app.css?v=' . (@filemtime(__DIR__ . '/../assets/css/app.css') ?: time()))); ?>" />
         <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/kiosk.css?v=' . (@filemtime(__DIR__ . '/../assets/css/kiosk.css') ?: time()))); ?>" />
+        <link rel="icon" type="image/png" href="<?php echo kiosk_e(app_url('/assets/images/logo.png')); ?>" />
     </head>
     <body class="kiosk-page">
         <main class="kiosk-shell">
