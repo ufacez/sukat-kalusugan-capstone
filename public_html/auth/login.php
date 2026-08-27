@@ -49,14 +49,12 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </svg>
 
             <div class="mark-standalone" aria-hidden="true">
-                <img src="../assets/images/logo.jpg" alt="Sukat Kalusugan" class="mark-standalone-img">
+                <img src="../assets/images/logo.png" alt="Sukat Kalusugan" class="mark-standalone-img">
             </div>
 
-            <h1>Sukat Kalusugan</h1>
-
-            <p class="auth-tagline">
-               Tamang <span class="hl">Sukat</span>, Eksaktong<span class="hl"> Kalidad</span>.
-            </p>
+            <div class="auth-tagline" style="text-align:center;color:var(--admin-muted);font-size:0.9rem;margin-top:0.5rem;">
+               Tamang <span style="color:var(--admin-primary);font-weight:700;">Sukat</span>, Eksaktong <span style="color:var(--admin-primary);font-weight:700;">Kalidad</span>.
+            </div>
 
             <div class="auth-footer-row">
                 <div class="partner-logos">

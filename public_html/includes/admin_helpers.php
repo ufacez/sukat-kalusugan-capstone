@@ -372,7 +372,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
 
     echo '<div class="admin-brand">';
-    echo '<div class="admin-brand-mark"><img src="' . admin_e(app_url('/assets/images/logo.jpg')) . '" alt="Sukat Kalusugan" class="admin-brand-img"></div>';
+    echo '<div class="admin-brand-mark"><img src="' . admin_e(app_url('/assets/images/logo.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img"></div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
     echo '<div class="admin-brand-sub">Admin console</div>';
