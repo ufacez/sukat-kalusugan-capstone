@@ -85,10 +85,14 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<meta charset="utf-8">';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
     echo '<title>' . parent_e($title) . ' | Sukat Kalusugan Parent Portal</title>';
+    echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
+    echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css')) . '">';
-    echo '<link rel="icon" type="image/png" href="' . parent_e(app_url('/assets/images/logo.png')) . '">';
+    echo '<link rel="icon" type="image/jpeg" href="' . parent_e(app_url('/assets/img/logo/variant01.jpg')) . '">';
+
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/chatbot.css')) . '">';
     echo '<script>';
     echo '(function(){';
@@ -104,7 +108,10 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
 
     echo '<div class="admin-brand">';
-    echo '<div class="admin-brand-mark"><img src="' . parent_e(app_url('/assets/images/logo.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img"></div>';
+    echo '<div class="admin-brand-mark">';
+    echo '<img src="' . parent_e(app_url('/assets/img/logo/4k_light01.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
+    echo '<img src="' . parent_e(app_url('/assets/img/logo/4k_dark01.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
+    echo '</div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
     echo '<div class="admin-brand-sub">Parent portal</div>';

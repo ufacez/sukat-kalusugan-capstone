@@ -27,9 +27,12 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Sukat Kalusugan | Sign In</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
-    <link rel="icon" type="image/png" href="../assets/images/logo.png">
+    <link rel="icon" type="image/jpeg" href="../assets/img/logo/variant01.jpg">
     <script>
     (function(){
     var t=localStorage.getItem("theme");
@@ -50,17 +53,18 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </svg>
 
             <div class="mark-standalone" aria-hidden="true">
-                <img src="../assets/images/logo.png" alt="Sukat Kalusugan" class="mark-standalone-img">
+                <img src="../assets/img/logo/4k_light01.png" alt="Sukat Kalusugan" class="mark-standalone-img logo-light">
+                <img src="../assets/img/logo/4k_dark01.png" alt="Sukat Kalusugan" class="mark-standalone-img logo-dark">
             </div>
 
-            <div class="auth-tagline" style="text-align:center;color:var(--admin-muted);font-size:0.9rem;margin-top:0.5rem;">
-               Tamang <span style="color:var(--admin-primary);font-weight:700;">Sukat</span>, Eksaktong <span style="color:var(--admin-primary);font-weight:700;">Kalidad</span>.
+            <h1 class="system-title">Sukat Kalusugan</h1>
+
+            <div class="auth-tagline">
+               Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.
             </div>
 
             <div class="auth-footer-row">
                 <div class="partner-logos">
-                    <!-- Drop the real logo files in here once you have permission to
-                         use them -- these are empty, aligned slots until then. -->
                     <div class="logo-slot" title="City Government of San Fernando seal"></div>
                     <div class="logo-slot" title="City Health Office logo"></div>
                 </div>

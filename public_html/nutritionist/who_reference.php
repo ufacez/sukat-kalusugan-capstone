@@ -221,14 +221,20 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 	</div>
 
 	<div class="nutritionist-table-wrap">
-		<table class="nutritionist-table" id="who-reference-table">
+		<table class="nutritionist-table who-ref-table" id="who-reference-table">
 			<thead>
 				<tr>
-					<th><?php echo nutritionist_e($config['columnLabel']); ?></th>
-					<th>L</th>
-					<th>M</th>
-					<th>S</th>
-					<th style="text-align:center;">Median</th>
+					<th class="who-ref-x"><?php echo nutritionist_e($config['columnLabel']); ?></th>
+					<th class="who-ref-lms">L</th>
+					<th class="who-ref-lms">M</th>
+					<th class="who-ref-lms">S</th>
+					<th class="who-ref-sd who-ref-sd-neg3" style="text-align:right;">-3 SD</th>
+					<th class="who-ref-sd who-ref-sd-neg2" style="text-align:right;">-2 SD</th>
+					<th class="who-ref-sd who-ref-sd-neg1" style="text-align:right;">-1 SD</th>
+					<th class="who-ref-sd who-ref-sd-median" style="text-align:right;">Median</th>
+					<th class="who-ref-sd who-ref-sd-pos1" style="text-align:right;">+1 SD</th>
+					<th class="who-ref-sd who-ref-sd-pos2" style="text-align:right;">+2 SD</th>
+					<th class="who-ref-sd who-ref-sd-pos3" style="text-align:right;">+3 SD</th>
 				</tr>
 			</thead>
 			<tbody>
@@ -237,13 +243,25 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 					$M = (float)$row['M'];
 					$S = (float)$row['S'];
 					$x = $row['x'];
+					$sd3neg = who_reference_sd($L, $M, $S, -3);
+					$sd2neg = who_reference_sd($L, $M, $S, -2);
+					$sd1neg = who_reference_sd($L, $M, $S, -1);
+					$sd1pos = who_reference_sd($L, $M, $S, 1);
+					$sd2pos = who_reference_sd($L, $M, $S, 2);
+					$sd3pos = who_reference_sd($L, $M, $S, 3);
 				?>
 					<tr data-filter-text="<?php echo nutritionist_e(strtolower((string)$x)); ?>">
-						<td style="font-weight:600;"><?php echo nutritionist_e((string)$x); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($L, 4)); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($M, 4)); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($S, 5)); ?></td>
-						<td style="text-align:center;font-weight:700;color:var(--admin-primary);"><?php echo nutritionist_e(number_format($M, 2)); ?> <?php echo nutritionist_e($config['unit']); ?></td>
+						<td class="who-ref-x" style="font-weight:600;"><?php echo nutritionist_e((string)$x); ?></td>
+						<td class="who-ref-lms" style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($L, 4)); ?></td>
+						<td class="who-ref-lms" style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($M, 4)); ?></td>
+						<td class="who-ref-lms" style="color:var(--admin-muted);"><?php echo nutritionist_e(number_format($S, 5)); ?></td>
+						<td class="who-ref-sd who-ref-sd-neg3" style="text-align:right;color:var(--admin-danger);font-weight:600;"><?php echo nutritionist_e(number_format($sd3neg, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-neg2" style="text-align:right;color:#e67e22;font-weight:600;"><?php echo nutritionist_e(number_format($sd2neg, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-neg1" style="text-align:right;color:var(--admin-muted);"><?php echo nutritionist_e(number_format($sd1neg, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-median" style="text-align:right;font-weight:700;color:var(--admin-primary);"><?php echo nutritionist_e(number_format($M, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-pos1" style="text-align:right;color:var(--admin-muted);"><?php echo nutritionist_e(number_format($sd1pos, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-pos2" style="text-align:right;color:#b08900;font-weight:600;"><?php echo nutritionist_e(number_format($sd2pos, 2)); ?></td>
+						<td class="who-ref-sd who-ref-sd-pos3" style="text-align:right;color:var(--admin-danger);font-weight:600;"><?php echo nutritionist_e(number_format($sd3pos, 2)); ?></td>
 					</tr>
 				<?php endforeach; ?>
 			</tbody>

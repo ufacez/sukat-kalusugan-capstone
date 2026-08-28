@@ -329,3 +329,35 @@
   font-size: 12px;
   color: var(--admin-muted);
 }
+
+/* ---- WHO Reference Table ---- */
+.who-ref-table .who-ref-lms {
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+}
+
+.who-ref-table .who-ref-sd {
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 1100px) {
+  .nutritionist-page .who-ref-table .who-ref-lms {
+    display: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .nutritionist-page .who-ref-table {
+    min-width: 480px;
+  }
+
+  .nutritionist-page .who-ref-table .who-ref-lms {
+    display: none;
+  }
+
+  .nutritionist-page .who-ref-table .who-ref-sd-neg3,
+  .nutritionist-page .who-ref-table .who-ref-sd-pos3 {
+    display: none;
+  }
+}
