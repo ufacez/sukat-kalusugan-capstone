@@ -1940,3 +1940,197 @@
 #area-form .admin-field {
   margin-bottom: 12px;
 }
+
+/* ── Dashboard-specific styles ─────────────────────────────────────── */
+
+.admin-card-value--warn {
+  color: var(--admin-accent, #f2a93b) !important;
+}
+
+.admin-card-value--success {
+  color: var(--admin-primary, #0b6e4f) !important;
+}
+
+/* Map + Distribution row */
+.admin-dashboard-maprow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-dashboard-mapsection {
+  min-width: 0;
+}
+
+.admin-dashboard-distsection {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Donut chart wrapper */
+.admin-dashboard-donut-wrap {
+  display: flex;
+  justify-content: center;
+  padding: 12px 0 8px;
+}
+
+.admin-dashboard-donut-wrap canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+/* Distribution stats */
+.admin-dashboard-dist-stats {
+  display: grid;
+  gap: 12px;
+  margin-top: 4px;
+}
+
+.admin-dashboard-dist-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-dashboard-dist-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.admin-dashboard-dist-info {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+}
+
+.admin-dashboard-dist-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.admin-dashboard-dist-value {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--admin-text);
+}
+
+/* Distribution total */
+.admin-dashboard-dist-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.admin-dashboard-dist-total-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+}
+
+.admin-dashboard-dist-total-value {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--admin-primary);
+}
+
+/* Top barangays list */
+.admin-dashboard-toplist {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-dashboard-toplist-item {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-dashboard-toplist-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-dashboard-toplist-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--admin-muted);
+  flex-shrink: 0;
+}
+
+.admin-dashboard-toplist-name {
+  flex: 1;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-dashboard-toplist-count {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--admin-primary);
+  flex-shrink: 0;
+}
+
+.admin-dashboard-toplist-bar {
+  height: 6px;
+  border-radius: 999px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  overflow: hidden;
+}
+
+.admin-dashboard-toplist-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--admin-primary), #2ec57a);
+  transition: width 0.3s ease;
+}
+
+.admin-dashboard-toplist-meta {
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .admin-dashboard-maprow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .admin-dashboard-maprow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-dashboard-dist-total {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+}
