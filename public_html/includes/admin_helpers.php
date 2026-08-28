@@ -316,6 +316,21 @@ function admin_barangay_options(): array
     );
 }
 
+/**
+ * Active local areas for a specific barangay, sorted by type then name.
+ */
+function admin_local_area_options(int $barangayId): array
+{
+    return admin_fetch_all(
+        "SELECT id, area_code, area_name, area_type, description
+         FROM local_areas
+         WHERE barangay_id = ? AND is_active = 1
+         ORDER BY area_type ASC, area_name ASC",
+        'i',
+        [$barangayId]
+    );
+}
+
 function admin_redirect(string $path, array $query = []): void
 {
     $url = $path;

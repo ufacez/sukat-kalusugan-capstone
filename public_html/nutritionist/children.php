@@ -87,6 +87,9 @@ $children = admin_fetch_all(
         c.sex,
         c.barangay_id,
         bg.name AS barangay,
+        c.local_area_id,
+        la.area_name AS local_area,
+        la.area_type,
         c.is_ip,
         c.has_disability,
         c.parent_id,
@@ -138,6 +141,9 @@ $children = admin_fetch_all(
 
      LEFT JOIN barangays bg
         ON bg.id = c.barangay_id
+
+     LEFT JOIN local_areas la
+        ON la.id = c.local_area_id
 
      LEFT JOIN measurements lm
         ON lm.id = (
@@ -352,6 +358,7 @@ nutritionist_layout_start(
                     <th>Age</th>
                     <th>Sex</th>
                     <th>Barangay</th>
+                    <th>Local Area</th>
                     <th>Parent</th>
                     <th>Status</th>
                     <th>Next Due</th>
@@ -403,6 +410,8 @@ nutritionist_layout_start(
                                     . $child['last_name']
                                     . ' '
                                     . (string)($child['barangay'] ?? '')
+                                    . ' '
+                                    . (string)($child['local_area'] ?? '')
                                     . ' '
                                     . $child['parent_name']
                                     . ' '
@@ -482,6 +491,14 @@ nutritionist_layout_start(
                             <?php echo nutritionist_e(
                                 (string)($child['barangay'] ?? '')
                             ); ?>
+                        </td>
+
+                        <td>
+                            <?php if (!empty($child['local_area'])): ?>
+                                <span class="admin-pill is-info"><?php echo nutritionist_e(ucfirst((string)($child['area_type'] ?? '')) . ': ' . $child['local_area']); ?></span>
+                            <?php else: ?>
+                                <span style="color:var(--admin-muted);">—</span>
+                            <?php endif; ?>
                         </td>
 
                         <td style="color:var(--admin-muted);">

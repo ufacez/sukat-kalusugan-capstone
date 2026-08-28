@@ -25,6 +25,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
 	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
 	$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
+	$localAreaIdRaw = trim((string)($_POST['local_area_id'] ?? ''));
+	$localAreaId = $localAreaIdRaw !== '' ? (int)$localAreaIdRaw : null;
 	$status = trim((string)($_POST['status'] ?? 'active'));
 	$password = (string)($_POST['password'] ?? '');
 	$passwordConfirm = (string)($_POST['password_confirm'] ?? '');
@@ -88,9 +90,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if ($action === 'create') {
 		$hash = password_hash($password, PASSWORD_DEFAULT);
 		$ok = admin_execute(
-			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-			'ssssssis',
-			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $status]
+			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			'sssssssss',
+			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status]
 		);
 
 		if ($ok) {
@@ -105,15 +107,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		if ($password !== '') {
 			$hash = password_hash($password, PASSWORD_DEFAULT);
 			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, status = ? WHERE id = ?',
-				'ssssssisi',
-				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $status, $parentId]
+				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
+				'sssssssssi',
+				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $parentId]
 			);
 		} else {
 			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, status = ? WHERE id = ?',
-				'sssssisi',
-				[$name, $email, $parentType, $phone, $address, $barangayId, $status, $parentId]
+				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
+				'ssssssssi',
+				[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $parentId]
 			);
 		}
 
@@ -136,7 +138,7 @@ $editingParent = null;
 
 if ($editId > 0) {
 	$editingParent = admin_fetch_one(
-		'SELECT id, name, email, parent_type, phone, address, barangay_id, status
+		'SELECT id, name, email, parent_type, phone, address, barangay_id, local_area_id, status
 		 FROM parents
 		 WHERE id = ?
 		 LIMIT 1',
@@ -228,13 +230,22 @@ nutritionist_layout_start(
 			</div>
 		</div>
 		<label class="admin-field">
-			<span>Barangay</span>
-			<select name="barangay_id">
-				<option value="">-- Not set --</option>
+			<span>Assigned Barangay <span class="admin-required">*</span></span>
+			<select name="barangay_id" id="pf-barangay-select" required>
+				<option value="">-- Select Barangay --</option>
 				<?php foreach ($barangays as $barangay): ?>
 					<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingParent['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
 				<?php endforeach; ?>
 			</select>
+			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Children will inherit this barangay for nutritional scope and reporting.</small>
+		</label>
+
+		<label class="admin-field">
+			<span>Local Area / Purok</span>
+			<select name="local_area_id" id="pf-local-area-select" data-current-area="<?php echo (int)($editingParent['local_area_id'] ?? 0); ?>">
+				<option value="">-- Select Local Area --</option>
+			</select>
+			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking.</small>
 		</label>
 
 		<div class="admin-field-wide">
@@ -254,7 +265,7 @@ nutritionist_layout_start(
 				</label>
 			</div>
 			<label class="admin-field" style="margin-top:10px;">
-				<span>House no. / street / purok</span>
+				<span>House no. / street</span>
 				<input data-psgc="street" placeholder="143 Purok 6">
 			</label>
 			<div class="admin-address-status" data-psgc-status></div>
@@ -303,5 +314,48 @@ nutritionist_layout_start(
 		</div>
 	</form>
 </section>
+
+<script>
+(function() {
+	var barangaySelect = document.getElementById('pf-barangay-select');
+	var areaSelect = document.getElementById('pf-local-area-select');
+	var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
+	var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+
+	function loadAreas(barangayId, selectedId) {
+		areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+		if (!barangayId || barangayId <= 0) return;
+		areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
+		fetch(apiBase + '?barangay_id=' + barangayId)
+			.then(function(r) { return r.json(); })
+			.then(function(res) {
+				areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+				if (!res.success || !res.data || res.data.length === 0) {
+					areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
+					return;
+				}
+				res.data.forEach(function(area) {
+					var opt = document.createElement('option');
+					opt.value = area.id;
+					opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+					if (selectedId && parseInt(opt.value, 10) === selectedId) opt.selected = true;
+					areaSelect.appendChild(opt);
+				});
+			})
+			.catch(function() {
+				areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+			});
+	}
+
+	barangaySelect.addEventListener('change', function() {
+		currentAreaId = 0;
+		loadAreas(parseInt(barangaySelect.value || '0', 10), 0);
+	});
+
+	var initial = parseInt(barangaySelect.value || '0', 10);
+	if (initial > 0) loadAreas(initial, currentAreaId);
+})();
+</script>
+
 <?php
 nutritionist_layout_end();

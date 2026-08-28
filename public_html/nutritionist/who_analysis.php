@@ -68,26 +68,62 @@ $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nu
 
 nutritionist_layout_start('WHO Analysis', 'Latest WHO z-score snapshot and classification review.', 'who_analysis', $actions);
 ?>
-<section class="nutritionist-stat-grid">
-	<article class="nutritionist-stat-card is-featured">
-		<div class="nutritionist-stat-label">Children Analyzed</div>
-		<div class="admin-stat-value"><?php echo count($analyzed); ?></div>
-		<div class="admin-stat-note">Children with a latest measurement</div>
+<section class="admin-grid-cards">
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Children Analyzed</div>
+				<div class="admin-card-value"><?php echo count($analyzed); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-up">Children with a latest measurement</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Flagged</div>
-		<div class="admin-stat-value"><?php echo count($flagged); ?></div>
-		<div class="admin-stat-note">Outside the normal range</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Flagged</div>
+				<div class="admin-card-value"><?php echo count($flagged); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">Outside the normal range</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Normal</div>
-		<div class="admin-stat-value"><?php echo count($normal); ?></div>
-		<div class="admin-stat-note">Healthy reference cases</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon is-success">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Normal</div>
+				<div class="admin-card-value"><?php echo count($normal); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-up">Healthy reference cases</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Average WAZ</div>
-		<div class="admin-stat-value"><?php echo number_format($avgWaz, 2); ?></div>
-		<div class="admin-stat-note">HAZ <?php echo number_format($avgHaz, 2); ?> · WHZ <?php echo number_format($avgWhz, 2); ?></div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Average WAZ</div>
+				<div class="admin-card-value"><?php echo number_format($avgWaz, 2); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">HAZ <?php echo number_format($avgHaz, 2); ?> · WHZ <?php echo number_format($avgWhz, 2); ?></span>
+				</div>
+			</div>
+		</div>
 	</article>
 </section>
 

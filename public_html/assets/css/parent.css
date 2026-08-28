@@ -2,49 +2,27 @@
   align-items: center;
 }
 
+/* Legacy stat grid — delegates to admin-card system */
 .parent-page .parent-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.parent-page .parent-stat-card,
-.parent-page .parent-panel,
-.parent-page .parent-hero {
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  border-radius: 20px;
-  box-shadow: var(--admin-shadow);
+  gap: 14px;
 }
 
 .parent-page .parent-stat-card {
-  padding: 16px;
-}
-
-.parent-page .parent-stat-card.is-featured,
-.parent-page .parent-hero {
-  background: linear-gradient(180deg, #0d3427 0%, #123527 100%);
-  color: #fff;
-}
-
-[data-theme="dark"] .parent-page .parent-stat-card.is-featured,
-[data-theme="dark"] .parent-page .parent-hero {
-  background: linear-gradient(180deg, #0a2a1f 0%, #0f3525 100%);
-  border-color: rgba(255, 255, 255, 0.06);
-}
-
-.parent-page .parent-stat-card.is-featured .admin-stat-note,
-.parent-page .parent-stat-card.is-featured .parent-stat-label,
-.parent-page .parent-hero .admin-section-subtitle,
-.parent-page .parent-hero .parent-hero-copy {
-  color: rgba(255, 255, 255, 0.74);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: var(--admin-shadow);
 }
 
 .parent-page .parent-stat-label {
-  font-size: 0.76rem;
+  font-size: 0.78rem;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.06em;
   color: var(--admin-muted);
+  font-weight: 600;
 }
 
 .parent-page .parent-panel-grid {
@@ -53,12 +31,32 @@
   gap: 14px;
 }
 
+.parent-page .parent-panel,
+.parent-page .parent-hero {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 20px;
+  box-shadow: var(--admin-shadow);
+}
+
 .parent-page .parent-panel {
   padding: 18px;
 }
 
 .parent-page .parent-hero {
   padding: 20px;
+  background: linear-gradient(180deg, #0d3427 0%, #123527 100%);
+  color: #fff;
+}
+
+[data-theme="dark"] .parent-page .parent-hero {
+  background: linear-gradient(180deg, #0a2a1f 0%, #0f3525 100%);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.parent-page .parent-hero .admin-section-subtitle,
+.parent-page .parent-hero .parent-hero-copy {
+  color: rgba(255, 255, 255, 0.74);
 }
 
 .parent-page .parent-hero-top {

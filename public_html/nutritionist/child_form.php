@@ -42,6 +42,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $hasDisability = isset($_POST['has_disability']) ? 1 : 0;
 
     $parentId = (int)($_POST['parent_id'] ?? 0);
+    $localAreaId = (int)($_POST['local_area_id'] ?? 0);
 
     $errorBackUrl = '/nutritionist/child_form.php'
         . ($childId > 0 ? '?id=' . $childId : '');
@@ -110,6 +111,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Validate local area belongs to the child's barangay (if provided)
+    $validatedLocalAreaId = null;
+    if ($localAreaId > 0) {
+        $localArea = admin_fetch_one(
+            'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+            'ii',
+            [$localAreaId, $barangayId]
+        );
+        if ($localArea) {
+            $validatedLocalAreaId = (int)$localArea['id'];
+        }
+    }
+
     $registrationAgeMonths = doh_age_in_months($birthdate);
 
     if (
@@ -151,11 +165,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                  birthdate = ?,
                  sex = ?,
                  barangay_id = ?,
+                 local_area_id = ?,
                  is_ip = ?,
                  has_disability = ?,
                  parent_id = ?
              WHERE id = ?',
-            'ssssssiiiii',
+            'ssssssssiiii',
             [
                 $childCode,
                 $firstName,
@@ -164,6 +179,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $birthdate,
                 $sex,
                 $barangayId,
+                $validatedLocalAreaId ?? 0,
                 $isIp,
                 $hasDisability,
                 $parentId,
@@ -199,12 +215,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     birthdate,
                     sex,
                     barangay_id,
+                    local_area_id,
                     is_ip,
                     has_disability,
                     parent_id
                 )
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            'ssssssiiii',
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'ssssssssiii',
             [
                 $childCode,
                 $firstName,
@@ -213,6 +230,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $birthdate,
                 $sex,
                 $barangayId,
+                $validatedLocalAreaId ?? 0,
                 $isIp,
                 $hasDisability,
                 $parentId
@@ -266,11 +284,15 @@ if ($editId > 0) {
             c.is_ip,
             c.has_disability,
             c.parent_id,
+            c.local_area_id,
             p.name AS parent_name,
-            bg.name AS barangay
+            bg.name AS barangay,
+            bg.id AS barangay_id_resolved,
+            la.area_name AS local_area_name
          FROM children c
          INNER JOIN parents p ON p.id = c.parent_id
          LEFT JOIN barangays bg ON bg.id = c.barangay_id
+         LEFT JOIN local_areas la ON la.id = c.local_area_id
          WHERE c.id = ? AND {$editChildScope}
          LIMIT 1",
         str_repeat('i', count($editChildParams)),
@@ -298,6 +320,7 @@ $parents = admin_fetch_all(
         p.phone,
         p.address,
         p.barangay_id,
+        p.local_area_id,
         bg.name AS barangay
      FROM parents p
      LEFT JOIN barangays bg
@@ -534,6 +557,8 @@ nutritionist_layout_start(
 
                     <option
                         value="<?php echo (int)$parent['id']; ?>"
+                        data-barangay-id="<?php echo (int)($parent['barangay_id'] ?? 0); ?>"
+                        data-local-area-id="<?php echo (int)($parent['local_area_id'] ?? 0); ?>"
                         <?php echo (
                             (int)($editChild['parent_id'] ?? 0)
                             === (int)$parent['id']
@@ -588,6 +613,33 @@ nutritionist_layout_start(
                 style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;"
             >
                 Automatically inherited from the selected Parent/Guardian.
+            </small>
+
+        </label>
+
+
+        <label class="admin-field">
+
+            <span>
+                Local Area / Purok
+            </span>
+
+            <select
+                name="local_area_id"
+                id="local-area-select"
+                data-current-area="<?php echo (int)($editChild['local_area_id'] ?? 0); ?>"
+            >
+
+                <option value="">
+                    -- Select Local Area --
+                </option>
+
+            </select>
+
+            <small
+                style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;"
+            >
+                Optional. Purok, sitio, subdivision, or other local area within the barangay.
             </small>
 
         </label>
@@ -669,6 +721,73 @@ nutritionist_layout_start(
     </form>
 
 </section>
+
+
+<script>
+(function() {
+    var parentSelect = document.querySelector('select[name="parent_id"]');
+    var areaSelect = document.getElementById('local-area-select');
+    var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
+    var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+
+    function loadAreas(barangayId, selectedId) {
+        areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+
+        if (!barangayId || barangayId <= 0) {
+            areaSelect.innerHTML += '<option value="" disabled>No barangay selected</option>';
+            return;
+        }
+
+        areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
+
+        fetch(apiBase + '?barangay_id=' + barangayId)
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+
+                if (!res.success || !res.data || res.data.length === 0) {
+                    areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
+                    return;
+                }
+
+                res.data.forEach(function(area) {
+                    var opt = document.createElement('option');
+                    opt.value = area.id;
+                    opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+                    if (selectedId && parseInt(opt.value, 10) === selectedId) {
+                        opt.selected = true;
+                    }
+                    areaSelect.appendChild(opt);
+                });
+            })
+            .catch(function() {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+            });
+    }
+
+    function getParentBarangayId() {
+        var selected = parentSelect.options[parentSelect.selectedIndex];
+        if (!selected || !selected.value) return 0;
+        return parseInt(selected.getAttribute('data-barangay-id') || '0', 10);
+    }
+
+    function getParentLocalAreaId() {
+        var selected = parentSelect.options[parentSelect.selectedIndex];
+        if (!selected || !selected.value) return 0;
+        return parseInt(selected.getAttribute('data-local-area-id') || '0', 10);
+    }
+
+    parentSelect.addEventListener('change', function() {
+        currentAreaId = getParentLocalAreaId();
+        loadAreas(getParentBarangayId(), currentAreaId);
+    });
+
+    var initialBarangayId = getParentBarangayId();
+    if (initialBarangayId > 0) {
+        loadAreas(initialBarangayId, currentAreaId);
+    }
+})();
+</script>
 
 
 <?php

@@ -14,6 +14,8 @@ $children = admin_fetch_all(
 		c.birthdate,
 		c.sex,
 		bg.name AS barangay,
+		la.area_name AS local_area,
+		la.area_type,
 		p.name AS parent_name,
 		p.parent_type,
 		p.phone AS parent_phone,
@@ -57,6 +59,7 @@ $children = admin_fetch_all(
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
+	 LEFT JOIN local_areas la ON la.id = c.local_area_id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m.id
 		FROM measurements m
@@ -87,26 +90,62 @@ $actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment
 
 parent_layout_start('Children', 'All children linked to your parent account and their latest growth results.', 'children', $actions);
 ?>
-<section class="parent-stat-grid">
-	<article class="parent-stat-card">
-		<div class="parent-stat-label">Linked children</div>
-		<div class="admin-stat-value"><?php echo count($children); ?></div>
-		<div class="admin-stat-note">Household members in your portal</div>
+<section class="admin-grid-cards">
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Linked children</div>
+				<div class="admin-card-value"><?php echo count($children); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">Household members in your portal</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="parent-stat-card">
-		<div class="parent-stat-label">With latest reading</div>
-		<div class="admin-stat-value"><?php echo count(array_filter($children, static fn(array $child): bool => trim((string)($child['measurement_date'] ?? '')) !== '')); ?></div>
-		<div class="admin-stat-note">Children already measured</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon is-success">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">With latest reading</div>
+				<div class="admin-card-value"><?php echo count(array_filter($children, static fn(array $child): bool => trim((string)($child['measurement_date'] ?? '')) !== '')); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">Children already measured</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="parent-stat-card">
-		<div class="parent-stat-label">Needs follow-up</div>
-		<div class="admin-stat-value"><?php echo count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal'], true))); ?></div>
-		<div class="admin-stat-note">Latest flagged children</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon is-danger">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Needs follow-up</div>
+				<div class="admin-card-value"><?php echo count(array_filter($children, static fn(array $child): bool => !in_array((string)($child['nutritional_status'] ?? 'Pending'), ['Normal'], true))); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">Latest flagged children</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="parent-stat-card">
-		<div class="parent-stat-label">Account type</div>
-		<div class="admin-stat-value">Parent</div>
-		<div class="admin-stat-note">Signed in as a parent account</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon is-success">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Account type</div>
+				<div class="admin-card-value">Parent</div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend">Signed in as a parent account</span>
+				</div>
+			</div>
+		</div>
 	</article>
 </section>
 
@@ -127,6 +166,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 						<th>Child</th>
 						<th>Age</th>
 						<th>Barangay</th>
+						<th>Local Area</th>
 						<th>Parent type</th>
 						<th>Last status</th>
 						<th>Last measurement</th>
@@ -134,19 +174,26 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 				</thead>
 				<tbody>
 					<?php if ($children === []): ?>
-						<tr><td colspan="6" style="color:var(--admin-muted);">No linked children are available yet.</td></tr>
+						<tr><td colspan="7" style="color:var(--admin-muted);">No linked children are available yet.</td></tr>
 					<?php else: ?>
 						<?php foreach ($children as $child): ?>
 							<?php
 							$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
 							?>
-							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
+							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . (string)($child['local_area'] ?? '') . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
 								<td>
 									<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
 									<div class="admin-mini"><?php echo parent_e((string)$child['child_code']); ?> · <?php echo parent_e((string)$child['sex']); ?></div>
 								</td>
 								<td><?php echo (int)$ageMonths; ?> mo</td>
 								<td><?php echo parent_e((string)($child['barangay'] ?? '')); ?></td>
+								<td>
+									<?php if (!empty($child['local_area'])): ?>
+										<span class="admin-pill is-info"><?php echo parent_e(ucfirst((string)($child['area_type'] ?? '')) . ': ' . $child['local_area']); ?></span>
+									<?php else: ?>
+										<span style="color:var(--admin-muted);">—</span>
+									<?php endif; ?>
+								</td>
 								<td><?php echo parent_e((string)($child['parent_type'] ?? 'Guardian')); ?></td>
 								<td><span class="admin-pill <?php echo parent_status_class((string)($child['nutritional_status'] ?? 'Pending')); ?>"><?php echo parent_e((string)($child['nutritional_status'] ?? 'Pending')); ?></span></td>
 								<td>
@@ -184,6 +231,16 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 				</div>
 
 				<div style="display:grid;gap:10px;margin-top:14px;">
+					<div class="admin-list-item" style="padding:10px 0;">
+						<span class="admin-mini">Barangay</span>
+						<strong><?php echo parent_e((string)($selectedChild['barangay'] ?? '')); ?></strong>
+					</div>
+					<?php if (!empty($selectedChild['local_area'])): ?>
+					<div class="admin-list-item" style="padding:10px 0;">
+						<span class="admin-mini">Local Area</span>
+						<strong><?php echo parent_e(ucfirst((string)($selectedChild['area_type'] ?? '')) . ': ' . $selectedChild['local_area']); ?></strong>
+					</div>
+					<?php endif; ?>
 					<div class="admin-list-item" style="padding:10px 0;">
 						<span class="admin-mini">Birthdate</span>
 						<strong><?php echo parent_e((string)$selectedChild['birthdate']); ?></strong>

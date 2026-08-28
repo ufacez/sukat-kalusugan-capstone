@@ -2,19 +2,19 @@
   align-items: center;
 }
 
+/* Legacy stat grid — delegates to admin-card system */
 .nutritionist-page .nutritionist-stat-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 14px;
 }
 
 .nutritionist-page .nutritionist-stat-card {
-  position: relative;
-  overflow: hidden;
-  border-radius: 14px;
-  padding: 14px 16px;
-  border: 1px solid var(--admin-border);
   background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 20px 22px;
+  box-shadow: var(--admin-shadow);
 }
 
 .nutritionist-page .nutritionist-stat-card.is-featured {
@@ -29,13 +29,11 @@
 }
 
 .nutritionist-page .nutritionist-stat-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 0.76rem;
-  letter-spacing: 0.08em;
+  font-size: 0.78rem;
   text-transform: uppercase;
+  letter-spacing: 0.06em;
   color: var(--admin-muted);
+  font-weight: 600;
 }
 
 .nutritionist-page .nutritionist-stat-card.is-featured .nutritionist-stat-label,

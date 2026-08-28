@@ -49,24 +49,60 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
 ?>
 <section class="admin-grid-cards">
     <article class="admin-card">
-        <div class="admin-stat-label">Devices</div>
-        <div class="admin-stat-value"><?php echo $deviceCount; ?></div>
-        <div class="admin-stat-note">Registered hardware nodes</div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M5.25 14.25h13.5m-13.5 0a3 3 0 0 1-3-3m3 3a3 3 0 1 0 0 6h13.5a3 3 0 1 0 0-6m-16.5-3a3 3 0 0 1 3-3h13.5a3 3 0 0 1 3 3m-19.5 0a4.5 4.5 0 0 1 .9-2.7L5.737 5.1a3.375 3.375 0 0 1 2.7-1.35h7.126c1.062 0 2.062.5 2.7 1.35l2.587 3.45a4.5 4.5 0 0 1 .9 2.7m0 0a3 3 0 0 1-3 3m0 3h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Zm-3 6h.008v.008h-.008v-.008Zm0-6h.008v.008h-.008v-.008Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Devices</div>
+                <div class="admin-card-value"><?php echo $deviceCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">Registered hardware nodes</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">Active</div>
-        <div class="admin-stat-value"><?php echo $activeCount; ?></div>
-        <div class="admin-stat-note">Ready for measurements</div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon is-success">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Active</div>
+                <div class="admin-card-value"><?php echo $activeCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">Ready for measurements</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">Maintenance</div>
-        <div class="admin-stat-value"><?php echo $maintenanceCount; ?></div>
-        <div class="admin-stat-note">Calibration in progress</div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17 17.25 21A2.652 2.652 0 0 0 21 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 1 1-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 0 0 4.486-6.336l-3.276 3.277a3.004 3.004 0 0 1-2.25-2.25l3.276-3.276a4.5 4.5 0 0 0-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437 1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Maintenance</div>
+                <div class="admin-card-value"><?php echo $maintenanceCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">Calibration in progress</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">Offline</div>
-        <div class="admin-stat-value"><?php echo $offlineCount; ?></div>
-        <div class="admin-stat-note">Needs attention</div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon is-danger">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Offline</div>
+                <div class="admin-card-value"><?php echo $offlineCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-danger">Needs attention</span>
+                </div>
+            </div>
+        </div>
     </article>
 </section>
 

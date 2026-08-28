@@ -115,20 +115,60 @@ nutritionist_layout_start('Barangay Risk Map', $subtitle, 'risk_map');
 ?>
 <section class="admin-grid-cards">
     <article class="admin-card">
-        <div class="admin-stat-label">Barangays mapped</div>
-        <div class="admin-stat-value"><?php echo count($barangayStats); ?></div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Barangays mapped</div>
+                <div class="admin-card-value"><?php echo count($barangayStats); ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">All active barangays</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">Children measured</div>
-        <div class="admin-stat-value"><?php echo $totalMeasured; ?></div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Children measured</div>
+                <div class="admin-card-value"><?php echo $totalMeasured; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">All-time measurements</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">High-risk barangays</div>
-        <div class="admin-stat-value"><?php echo $highRiskCount; ?></div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon is-danger">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">High-risk barangays</div>
+                <div class="admin-card-value"><?php echo $highRiskCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-danger">Needs priority intervention</span>
+                </div>
+            </div>
+        </div>
     </article>
     <article class="admin-card">
-        <div class="admin-stat-label">Prevalence</div>
-        <div class="admin-stat-value"><?php echo $overallPrevalence !== null ? admin_e((string)$overallPrevalence) . '%' : 'n/a'; ?></div>
+        <div class="admin-card-row">
+            <div class="admin-card-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+            </div>
+            <div class="admin-card-content">
+                <div class="admin-card-label">Prevalence</div>
+                <div class="admin-card-value"><?php echo $overallPrevalence !== null ? admin_e((string)$overallPrevalence) . '%' : 'n/a'; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend is-up">Malnutrition rate across barangays</span>
+                </div>
+            </div>
+        </div>
     </article>
 </section>
 
@@ -238,6 +278,111 @@ nutritionist_layout_start('Barangay Risk Map', $subtitle, 'risk_map');
         </table>
     </div>
 </section>
+
+
+<?php
+// ── Local Area Prevalence ──────────────────────────────────────────────
+$localAreaStats = admin_fetch_all(
+    "SELECT
+        la.id,
+        la.barangay_id,
+        la.area_name,
+        la.area_type,
+        b.name AS barangay_name,
+        COUNT(c.id) AS children_count,
+        SUM(CASE WHEN lm.measurement_date IS NOT NULL THEN 1 ELSE 0 END) AS measured_count,
+        SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS at_risk_count
+     FROM local_areas la
+     INNER JOIN barangays b ON b.id = la.barangay_id
+     LEFT JOIN children c ON c.local_area_id = la.id
+     LEFT JOIN measurements lm ON lm.id = (
+        SELECT m.id
+        FROM measurements m
+        WHERE m.child_id = c.id
+        ORDER BY m.measurement_date DESC, m.id DESC
+        LIMIT 1
+     )
+     WHERE la.is_active = 1 AND b.status = 'active' AND {$scope}
+     GROUP BY la.id, la.barangay_id, la.area_name, la.area_type, b.name
+     HAVING measured_count > 0
+     ORDER BY (SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) / SUM(CASE WHEN lm.measurement_date IS NOT NULL THEN 1 ELSE 0 END)) DESC, la.area_name ASC",
+    str_repeat('i', count($params)),
+    $params
+);
+
+foreach ($localAreaStats as &$la) {
+    $la['prevalence'] = $la['measured_count'] > 0
+        ? round(($la['at_risk_count'] / $la['measured_count']) * 100, 1)
+        : null;
+}
+unset($la);
+?>
+
+<section class="admin-section" style="margin-top:16px;">
+    <div class="admin-section-head">
+        <div>
+            <h2 class="admin-section-title">Local Area Prevalence</h2>
+            <p class="admin-section-subtitle">Purok, sitio, subdivision, and other local-area breakdown. Ranked by highest prevalence.</p>
+        </div>
+    </div>
+
+    <?php if (empty($localAreaStats)): ?>
+        <div class="admin-empty">
+            <p>No local areas with measurements found. Assign children to local areas to see prevalence data here.</p>
+        </div>
+    <?php else: ?>
+        <div class="admin-table-wrap">
+            <table class="admin-table" id="local-area-prevalence-table">
+                <thead>
+                    <tr>
+                        <th>#</th>
+                        <th>Barangay</th>
+                        <th>Local Area</th>
+                        <th>Type</th>
+                        <th>Children</th>
+                        <th>Measured</th>
+                        <th>At risk</th>
+                        <th>Prevalence</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php $rank = 0; foreach ($localAreaStats as $la): ?>
+                        <?php
+                        $rank++;
+                        $prev = $la['prevalence'];
+                        if ($prev === null) {
+                            $prevColor = 'var(--admin-muted)';
+                        } elseif ($prev >= $thresholdHigh) {
+                            $prevColor = '#E03131';
+                        } elseif ($prev >= $thresholdModerate) {
+                            $prevColor = '#F08C00';
+                        } else {
+                            $prevColor = '#2F9E44';
+                        }
+                        ?>
+                        <tr>
+                            <td style="color:var(--admin-muted);"><?php echo $rank; ?></td>
+                            <td style="font-weight:700;"><?php echo admin_e($la['barangay_name']); ?></td>
+                            <td><?php echo admin_e($la['area_name']); ?></td>
+                            <td>
+                                <span class="admin-pill is-info">
+                                    <?php echo admin_e(ucfirst($la['area_type'])); ?>
+                                </span>
+                            </td>
+                            <td><?php echo (int)$la['children_count']; ?></td>
+                            <td><?php echo (int)$la['measured_count']; ?></td>
+                            <td><?php echo (int)$la['at_risk_count']; ?></td>
+                            <td style="font-weight:700;color:<?php echo $prevColor; ?>;">
+                                <?php echo $prev !== null ? admin_e((string)$prev) . '%' : 'n/a'; ?>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                </tbody>
+            </table>
+        </div>
+    <?php endif; ?>
+</section>
+
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

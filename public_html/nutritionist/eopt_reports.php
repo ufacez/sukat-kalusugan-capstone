@@ -578,45 +578,117 @@ nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring ros
 <section class="admin-grid-cards" style="margin-bottom:20px;">
 	<?php if ($view === 'monthly'): ?>
 		<article class="admin-card">
-			<div class="admin-stat-label">Children monitored this month</div>
-			<div class="admin-stat-value"><?php echo $totalMonitored; ?></div>
-			<div class="admin-stat-note">All 0–23 mo + malnourished/unmeasured 24–59 mo</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Children monitored this month</div>
+					<div class="admin-card-value"><?php echo $totalMonitored; ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-up">All 0–23 mo + malnourished/unmeasured 24–59 mo</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Infants &amp; toddlers (0–23 mo)</div>
-			<div class="admin-stat-value"><?php echo count($infantRows); ?></div>
-			<div class="admin-stat-note">Monthly weighing regardless of status</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Infants &amp; toddlers (0–23 mo)</div>
+					<div class="admin-card-value"><?php echo count($infantRows); ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-up">Monthly weighing regardless of status</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Malnourished (24–59 mo)</div>
-			<div class="admin-stat-value"><?php echo count($malnourishedRows); ?></div>
-			<div class="admin-stat-note">Monthly follow-up until rehabilitated</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-danger">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Malnourished (24–59 mo)</div>
+					<div class="admin-card-value"><?php echo count($malnourishedRows); ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-danger">Monthly follow-up until rehabilitated</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Flagged measurements</div>
-			<div class="admin-stat-value" style="<?php echo $flaggedCount > 0 ? 'color:#E03131;' : ''; ?>"><?php echo $flaggedCount; ?></div>
-			<div class="admin-stat-note">Implausible values — re-measure before reporting</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-danger">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Flagged measurements</div>
+					<div class="admin-card-value" style="<?php echo $flaggedCount > 0 ? 'color:#E03131;' : ''; ?>"><?php echo $flaggedCount; ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-danger">Implausible values — re-measure before reporting</span>
+					</div>
+				</div>
+			</div>
 		</article>
 	<?php else: ?>
 		<article class="admin-card">
-			<div class="admin-stat-label">Q1-normal cohort (24–59 mo)</div>
-			<div class="admin-stat-value"><?php echo count($quarterlyRows); ?></div>
-			<div class="admin-stat-note">Baseline Jan–Mar <?php echo $year; ?> · due in the <?php echo nutritionist_e(explode(' ', $roundsList[$checkupMonth])[0]); ?> round</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Q1-normal cohort (24–59 mo)</div>
+					<div class="admin-card-value"><?php echo count($quarterlyRows); ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-up">Baseline Jan–Mar <?php echo $year; ?> · due in the <?php echo nutritionist_e(explode(' ', $roundsList[$checkupMonth])[0]); ?> round</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Re-checked this round</div>
-			<div class="admin-stat-value"><?php echo $recheckedCount; ?></div>
-			<div class="admin-stat-note">New measurement recorded after Mar 31</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-success">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Re-checked this round</div>
+					<div class="admin-card-value"><?php echo $recheckedCount; ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-up">New measurement recorded after Mar 31</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Still normal</div>
-			<div class="admin-stat-value"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) === [] && !empty($row['latest_measured']))); ?></div>
-			<div class="admin-stat-note">Latest measurement shows no deterioration</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-success">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Still normal</div>
+					<div class="admin-card-value"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) === [] && !empty($row['latest_measured']))); ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-up">Latest measurement shows no deterioration</span>
+					</div>
+				</div>
+			</div>
 		</article>
 		<article class="admin-card">
-			<div class="admin-stat-label">Moved to monthly track</div>
-			<div class="admin-stat-value" style="color:#B08900;"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) !== [])); ?></div>
-			<div class="admin-stat-note">Deteriorated after Q1 — now monitored monthly</div>
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-danger">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+				</div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Moved to monthly track</div>
+					<div class="admin-card-value" style="color:#B08900;"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) !== [])); ?></div>
+					<div class="admin-card-meta">
+						<span class="admin-card-trend is-danger">Deteriorated after Q1 — now monitored monthly</span>
+					</div>
+				</div>
+			</div>
 		</article>
 	<?php endif; ?>
 </section>

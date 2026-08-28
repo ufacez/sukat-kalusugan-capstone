@@ -296,28 +296,150 @@ $actions = implode(' ', [
 
 nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth analysis, and appointment oversight.', 'dashboard', $actions);
 ?>
-<section class="nutritionist-stat-grid">
-	<article class="nutritionist-stat-card is-featured">
-		<div class="nutritionist-stat-label">Children Monitored</div>
-		<div class="admin-stat-value"><?php echo count($children); ?></div>
-		<div class="admin-stat-note">Registered children in scope</div>
+<section class="admin-grid-cards">
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Children Monitored</div>
+				<div class="admin-card-value"><?php echo count($children); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-up">Registered in scope</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">At-Risk Cases</div>
-		<div class="admin-stat-value"><?php echo count($atRiskChildren); ?></div>
-		<div class="admin-stat-note">Children needing follow-up</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon is-danger">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">At-Risk Cases</div>
+				<div class="admin-card-value"><?php echo count($atRiskChildren); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-danger">Need follow-up</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Parents Linked</div>
-		<div class="admin-stat-value"><?php echo count($parents); ?></div>
-		<div class="admin-stat-note">Active guardians and caregivers</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Parents Linked</div>
+				<div class="admin-card-value"><?php echo count($parents); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-up">Active guardians</span>
+				</div>
+			</div>
+		</div>
 	</article>
-	<article class="nutritionist-stat-card">
-		<div class="nutritionist-stat-label">Appointments</div>
-		<div class="admin-stat-value"><?php echo count($upcomingAppointments); ?></div>
-		<div class="admin-stat-note">Upcoming scheduled visits</div>
+	<article class="admin-card">
+		<div class="admin-card-row">
+			<div class="admin-card-icon">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
+			</div>
+			<div class="admin-card-content">
+				<div class="admin-card-label">Appointments</div>
+				<div class="admin-card-value"><?php echo count($upcomingAppointments); ?></div>
+				<div class="admin-card-meta">
+					<span class="admin-card-trend is-up">Upcoming visits</span>
+				</div>
+			</div>
+		</div>
 	</article>
 </section>
+
+<?php
+// ── Top High-Prevalence Local Areas ────────────────────────────────────
+$dashLocalAreas = admin_fetch_all(
+    "SELECT
+        la.id,
+        la.area_name,
+        la.area_type,
+        b.name AS barangay_name,
+        COUNT(c.id) AS children_count,
+        SUM(CASE WHEN lm.measurement_date IS NOT NULL THEN 1 ELSE 0 END) AS measured_count,
+        SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS at_risk_count
+     FROM local_areas la
+     INNER JOIN barangays b ON b.id = la.barangay_id
+     LEFT JOIN children c ON c.local_area_id = la.id
+     LEFT JOIN measurements lm ON lm.id = (
+        SELECT m.id FROM measurements m WHERE m.child_id = c.id
+        ORDER BY m.measurement_date DESC, m.id DESC LIMIT 1
+     )
+     WHERE la.is_active = 1 AND b.status = 'active' AND {$childrenScope}
+     GROUP BY la.id, la.area_name, la.area_type, b.name
+     HAVING measured_count > 0
+     ORDER BY (at_risk_count / measured_count) DESC
+     LIMIT 10",
+    str_repeat('i', count($childrenParams)),
+    $childrenParams
+);
+
+foreach ($dashLocalAreas as &$dla) {
+    $dla['prevalence'] = $dla['measured_count'] > 0
+        ? round(($dla['at_risk_count'] / $dla['measured_count']) * 100, 1)
+        : null;
+}
+unset($dla);
+?>
+
+<?php if (!empty($dashLocalAreas)): ?>
+<section class="admin-section" style="margin-top:16px;">
+    <div class="admin-section-head">
+        <div>
+            <h2 class="admin-section-title">High Prevalence Local Areas</h2>
+            <p class="admin-section-subtitle">Top 10 local areas ranked by nutritional concern prevalence.</p>
+        </div>
+        <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/risk_map.php')); ?>">
+            <?php echo admin_action_icon('open'); ?> Full risk map
+        </a>
+    </div>
+
+    <div class="admin-table-wrap">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Barangay</th>
+                    <th>Local Area</th>
+                    <th>Type</th>
+                    <th>Measured</th>
+                    <th>At risk</th>
+                    <th>Prevalence</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php $dashRank = 0; foreach ($dashLocalAreas as $dla): ?>
+                    <?php
+                    $dashRank++;
+                    $dp = $dla['prevalence'];
+                    if ($dp === null) { $dpColor = 'var(--admin-muted)'; }
+                    elseif ($dp >= 25) { $dpColor = '#E03131'; }
+                    elseif ($dp >= 10) { $dpColor = '#F08C00'; }
+                    else { $dpColor = '#2F9E44'; }
+                    ?>
+                    <tr>
+                        <td style="color:var(--admin-muted);"><?php echo $dashRank; ?></td>
+                        <td style="font-weight:700;"><?php echo nutritionist_e($dla['barangay_name']); ?></td>
+                        <td><?php echo nutritionist_e($dla['area_name']); ?></td>
+                        <td><span class="admin-pill is-info"><?php echo nutritionist_e(ucfirst($dla['area_type'])); ?></span></td>
+                        <td><?php echo (int)$dla['measured_count']; ?></td>
+                        <td><?php echo (int)$dla['at_risk_count']; ?></td>
+                        <td style="font-weight:700;color:<?php echo $dpColor; ?>;"><?php echo $dp !== null ? nutritionist_e((string)$dp) . '%' : 'n/a'; ?></td>
+                    </tr>
+                <?php endforeach; ?>
+            </tbody>
+        </table>
+    </div>
+</section>
+<?php endif; ?>
 
 <section class="nutritionist-panel-grid">
 	<article class="nutritionist-panel">
