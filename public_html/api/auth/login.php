@@ -164,7 +164,7 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
         'status' => (string)$parent['status'],
     ];
 
-    log_action(null, 'LOGIN', 'info', 'Parent login for ' . (string)$parent['email']);
+    log_action((int)$parent['id'], 'LOGIN', 'info', 'Parent login for ' . (string)$parent['email']);
     \login_record_attempt($identifier, true);
     login_respond_success($_SESSION['auth']);
 }

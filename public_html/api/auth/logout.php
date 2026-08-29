@@ -13,7 +13,7 @@ start_secure_session();
 $auth = current_user();
 
 if ($auth !== null) {
-    $userId = isset($auth['type']) && $auth['type'] === 'staff' ? (int)($auth['id'] ?? 0) : null;
+    $userId = (int)($auth['id'] ?? 0);
     $description = ($auth['type'] ?? 'guest') === 'parent'
         ? 'Parent logout for ' . ($auth['email'] ?? 'unknown')
         : 'Staff logout for ' . ($auth['email'] ?? 'unknown');

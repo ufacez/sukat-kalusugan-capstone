@@ -137,11 +137,8 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['sex']); ?></td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['parent_name']); ?></td>
-                        <td>
-                            <div><?php echo admin_e((string)($child['measurement_date'] ?? 'n/a')); ?></div>
-                            <?php if ($child['height_cm'] !== null): ?>
-                                <div class="admin-mini"><?php echo admin_e((string)$child['height_cm']); ?> cm · <?php echo admin_e((string)$child['weight_kg']); ?> kg</div>
-                            <?php endif; ?>
+                        <td style="font-size:12px;color:var(--admin-muted);">
+                            <?php echo admin_e((string)($child['measurement_date'] ?? 'n/a')); ?>
                         </td>
                         <td>
                             <div class="admin-actions">
