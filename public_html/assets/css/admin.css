@@ -77,6 +77,7 @@
 }
 
 .admin-page {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   background:
     radial-gradient(circle at top left, rgba(11, 110, 79, 0.12), transparent 24%),
     radial-gradient(circle at right top, rgba(242, 169, 59, 0.14), transparent 20%),
@@ -173,17 +174,21 @@
 }
 
 .admin-brand-name {
-  font-family: "Nunito", "Trebuchet MS", sans-serif;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.1rem;
   font-weight: 900;
   color: var(--admin-text);
   line-height: 1.2;
+  letter-spacing: -0.02em;
 }
 
 .admin-brand-sub {
   color: var(--admin-muted);
-  font-size: 0.72rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.68rem;
   font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   margin-top: 1px;
 }
 
@@ -609,23 +614,29 @@
 }
 
 .admin-card-label {
-  font-size: 0.78rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--admin-muted);
   font-weight: 600;
 }
 
 .admin-card-value {
   margin-top: 4px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.75rem;
   font-weight: 800;
   color: var(--admin-text);
   line-height: 1.1;
+  letter-spacing: -0.03em;
 }
 
 .admin-card-value--text {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .admin-card-meta {
@@ -633,9 +644,11 @@
   display: flex;
   align-items: center;
   gap: 5px;
-  font-size: 0.78rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.73rem;
   color: var(--admin-muted);
   flex-wrap: wrap;
+  font-weight: 500;
 }
 
 .admin-card-trend {
@@ -643,6 +656,7 @@
   align-items: center;
   gap: 3px;
   font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .admin-card-trend.is-up {
@@ -697,13 +711,19 @@
 .admin-section-title {
   margin: 0;
   color: var(--admin-text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .admin-section-subtitle {
   margin: 0.25rem 0 0;
   color: var(--admin-muted);
-  font-size: 0.94rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 400;
+  letter-spacing: -0.01em;
 }
 
 .admin-panel-grid {
@@ -732,8 +752,11 @@
 }
 
 .admin-mini {
-  font-size: 0.78rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.73rem;
+  font-weight: 400;
   color: var(--admin-muted);
+  letter-spacing: -0.01em;
 }
 
 .admin-status-dot {
@@ -763,7 +786,8 @@
 
 .admin-pagination-status {
   color: var(--admin-muted);
-  font-size: 0.82rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
   font-weight: 500;
 }
 
@@ -790,7 +814,8 @@
   border: 1px solid transparent;
   background: transparent;
   color: var(--admin-text);
-  font-size: 0.82rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s;
@@ -812,7 +837,8 @@
   min-width: 28px;
   height: 32px;
   color: var(--admin-muted);
-  font-size: 0.82rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
 }
 
 .admin-pagination .admin-icon-btn {
@@ -823,6 +849,25 @@
 .admin-pagination button:disabled {
   cursor: not-allowed;
   opacity: 0.4;
+}
+
+.admin-pagination--mini {
+  padding: 6px 12px;
+  margin-top: 8px;
+  border-radius: 8px;
+  background: var(--admin-surface-alt);
+}
+
+.admin-pagination--mini .admin-pagination-status {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.7rem;
+  font-weight: 500;
+}
+
+.admin-pagination--mini .admin-icon-btn {
+  width: 26px;
+  height: 26px;
+  font-size: 0.9rem;
 }
 
 .admin-table {
@@ -850,14 +895,17 @@
   border-bottom: 1px solid var(--admin-border);
   text-align: left;
   vertical-align: top;
-  font-size: 0.92rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.85rem;
 }
 
 .admin-table th {
   color: var(--admin-muted);
-  font-size: 0.76rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
 .admin-pill {
@@ -866,8 +914,10 @@
   gap: 6px;
   padding: 0.35rem 0.7rem;
   border-radius: 999px;
-  font-size: 0.75rem;
-  font-weight: 700;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 .admin-pill.is-success {
@@ -924,7 +974,10 @@
   border: 1px solid transparent;
   text-decoration: none;
   cursor: pointer;
-  font-weight: 700;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 .admin-btn svg,
 .admin-btn-secondary svg,
@@ -1228,6 +1281,8 @@
   border-radius: 12px;
   padding: 0.82rem 0.95rem;
   background: var(--admin-search-bg);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.85rem;
 }
 
 .admin-grid-3 {
@@ -1655,9 +1710,11 @@
 
 .admin-riskmap-card-title {
   margin: 0 0 10px;
-  font-size: 0.82rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.7rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
+  font-weight: 600;
   color: var(--admin-muted);
 }
 
@@ -1679,16 +1736,24 @@
 
 .admin-riskmap-legend-text {
   flex: 1;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
 }
 
 .admin-riskmap-legend-text em {
   display: block;
   font-style: normal;
-  font-size: 0.72rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 400;
   color: var(--admin-muted);
+  letter-spacing: 0.01em;
 }
 
 .admin-riskmap-legend-count {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-weight: 700;
   color: var(--admin-text);
   background: var(--admin-surface-alt);
@@ -1697,7 +1762,7 @@
   min-width: 24px;
   text-align: center;
   padding: 1px 8px;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
 }
 
 .admin-riskmap-chartwrap {
@@ -1956,11 +2021,17 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr) 340px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-dashboard-mapsection {
   min-width: 0;
+}
+
+.admin-dashboard-rightcol {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
 }
 
 .admin-dashboard-distsection {
@@ -1968,16 +2039,60 @@
   flex-direction: column;
 }
 
+.admin-dashboard-kiosksection {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+/* Pure CSS Donut Chart */
+.admin-css-donut {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  border-radius: 50%;
+  margin: 8px auto;
+}
+
+.admin-css-donut-hole {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: var(--admin-surface, #fff);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-css-donut-total {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1;
+  letter-spacing: -0.03em;
+}
+
+.admin-css-donut-label {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.6rem;
+  font-weight: 500;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 2px;
+}
+
 /* Donut chart wrapper */
 .admin-dashboard-donut-wrap {
   display: flex;
   justify-content: center;
   padding: 12px 0 8px;
-}
-
-.admin-dashboard-donut-wrap canvas {
-  max-width: 100%;
-  height: auto !important;
 }
 
 /* Distribution stats */
@@ -2010,15 +2125,19 @@
 }
 
 .admin-dashboard-dist-label {
-  font-size: 0.88rem;
-  font-weight: 600;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--admin-text);
+  letter-spacing: -0.01em;
 }
 
 .admin-dashboard-dist-value {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.05rem;
   font-weight: 800;
   color: var(--admin-text);
+  letter-spacing: -0.02em;
 }
 
 /* Distribution total */
@@ -2033,17 +2152,20 @@
 }
 
 .admin-dashboard-dist-total-label {
-  font-size: 0.82rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.72rem;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.08em;
   color: var(--admin-muted);
 }
 
 .admin-dashboard-dist-total-value {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 1.5rem;
-  font-weight: 900;
+  font-weight: 800;
   color: var(--admin-primary);
+  letter-spacing: -0.03em;
 }
 
 /* Top barangays list */
@@ -2072,7 +2194,8 @@
   border-radius: 6px;
   background: var(--admin-surface-alt);
   border: 1px solid var(--admin-border);
-  font-size: 0.7rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--admin-muted);
   flex-shrink: 0;
@@ -2080,9 +2203,11 @@
 
 .admin-dashboard-toplist-name {
   flex: 1;
-  font-size: 0.86rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
   font-weight: 600;
   color: var(--admin-text);
+  letter-spacing: -0.01em;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2090,7 +2215,8 @@
 }
 
 .admin-dashboard-toplist-count {
-  font-size: 0.88rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
   font-weight: 800;
   color: var(--admin-primary);
   flex-shrink: 0;
@@ -2112,8 +2238,59 @@
 }
 
 .admin-dashboard-toplist-meta {
-  font-size: 0.72rem;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.68rem;
+  font-weight: 400;
   color: var(--admin-muted);
+  letter-spacing: 0.01em;
+}
+
+/* ─── Compact Kiosk Widget ──────────────────────────────────── */
+.admin-dashboard-kiosk-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.admin-dashboard-kiosk-tile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--admin-table-bg);
+  border: 1px solid rgba(128, 128, 128, 0.1);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
+}
+
+.admin-dashboard-kiosk-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.admin-dashboard-kiosk-code {
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--admin-text);
+  white-space: nowrap;
+}
+
+.admin-dashboard-kiosk-location {
+  flex: 1;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .admin-dashboard-kiosk-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* Responsive adjustments */

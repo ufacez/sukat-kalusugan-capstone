@@ -14,8 +14,8 @@
   --radius-lg: 22px;
   --radius-md: 14px;
   --radius-sm: 10px;
-  --font-display: "Trebuchet MS", "Segoe UI", sans-serif;
-  --font-body: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --font-display: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   --field-bg: #ffffff;
   --flash-error-bg: #fff4f4;
   --flash-error-border: rgba(201, 59, 59, 0.24);

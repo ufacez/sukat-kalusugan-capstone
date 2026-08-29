@@ -99,7 +99,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<title>' . nutritionist_e($title) . ' | Sukat Kalusugan Nutritionist</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css')) . '">';

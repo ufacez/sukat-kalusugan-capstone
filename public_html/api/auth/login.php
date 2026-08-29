@@ -9,8 +9,6 @@ require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
 require_once __DIR__ . '/../../includes/login_throttle.php';
 
-start_secure_session();
-
 function login_respond_error(string $message, int $statusCode = 401): void
 {
     if (wants_json_response()) {
@@ -57,10 +55,11 @@ if ($identifier === '' || $password === '') {
     login_respond_error('Email/username and password are required.', 422);
 }
 
-if ($remember) {
-    ini_set('session.cookie_lifetime', 30 * 24 * 60 * 60);
-    ini_set('session.gc_maxlifetime', 30 * 24 * 60 * 60);
-}
+// Start session AFTER parsing POST. Pass 30-day lifetime for remember-me,
+// otherwise the default 12 hours. This must happen before session_start()
+// so the cookie lifetime and gc_maxlifetime take effect.
+$sessionLifetime = $remember ? (30 * 24 * 60 * 60) : null;
+start_secure_session($sessionLifetime);
 
 $lockoutSecondsRemaining = \login_lockout_seconds_remaining($identifier);
 

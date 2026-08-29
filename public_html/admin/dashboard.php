@@ -116,8 +116,6 @@ foreach ($barangayUserStats as &$bs) {
 }
 unset($bs);
 
-$totalSystemUsers = $totalParents + $totalChildren;
-
 // Normalize barangay names for GeoJSON matching
 function dashboard_normalize_name(string $name): string
 {
@@ -135,20 +133,6 @@ foreach ($barangayUserStats as $row) {
         'total' => (int)$row['total_users'],
     ];
 }
-
-/*
-|--------------------------------------------------------------------------
-| Recent Audit Logs (for live alerts sidebar)
-|--------------------------------------------------------------------------
-*/
-
-$recentLogs = admin_fetch_all(
-    'SELECT a.id, a.action, a.level, a.description, a.created_at, COALESCE(u.email, "System") AS actor
-     FROM audit_logs a
-     LEFT JOIN users u ON u.id = a.user_id
-     ORDER BY a.created_at DESC, a.id DESC
-     LIMIT 8'
-);
 
 /*
 |--------------------------------------------------------------------------
@@ -274,8 +258,8 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
     <article class="admin-section admin-dashboard-mapsection">
         <div class="admin-section-head">
             <div>
-                <h2 class="admin-section-title">Users Across the Entire City</h2>
-                <p class="admin-section-subtitle">Distribution of registered parents and children across barangays, City of San Fernando, Pampanga.</p>
+                <h2 class="admin-section-title">Families Across the Entire City</h2>
+                <p class="admin-section-subtitle">Geographic distribution of registered families across all barangays in the City of San Fernando, Pampanga.</p>
             </div>
         </div>
 
@@ -286,26 +270,26 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
 
             <aside class="admin-riskmap-sidebar">
                 <div class="admin-riskmap-card">
-                    <h3 class="admin-riskmap-card-title">User Density</h3>
+                    <h3 class="admin-riskmap-card-title">Family Density</h3>
                     <ul id="user-map-legend" class="admin-riskmap-legend-v2">
                         <li data-level="high">
                             <span class="admin-riskmap-swatch" style="background:#0b6e4f"></span>
-                            <span class="admin-riskmap-legend-text">High density<em>&ge;20 users</em></span>
+                            <span class="admin-riskmap-legend-text">High density</span>
                             <span class="admin-riskmap-legend-count" id="legend-high">0</span>
                         </li>
                         <li data-level="medium">
                             <span class="admin-riskmap-swatch" style="background:#2ec57a"></span>
-                            <span class="admin-riskmap-legend-text">Medium density<em>10&ndash;19 users</em></span>
+                            <span class="admin-riskmap-legend-text">Medium density</span>
                             <span class="admin-riskmap-legend-count" id="legend-medium">0</span>
                         </li>
                         <li data-level="low">
                             <span class="admin-riskmap-swatch" style="background:#a8e6c3"></span>
-                            <span class="admin-riskmap-legend-text">Low density<em>1&ndash;9 users</em></span>
+                            <span class="admin-riskmap-legend-text">Low density</span>
                             <span class="admin-riskmap-legend-count" id="legend-low">0</span>
                         </li>
                         <li data-level="none">
                             <span class="admin-riskmap-swatch" style="background:#c7ccd1"></span>
-                            <span class="admin-riskmap-legend-text">No users yet</span>
+                            <span class="admin-riskmap-legend-text">No families yet</span>
                             <span class="admin-riskmap-legend-count" id="legend-none">0</span>
                         </li>
                     </ul>
@@ -321,197 +305,58 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         <div id="user-map-status" class="admin-mini" style="margin-top:8px;"></div>
     </article>
 
-    <article class="admin-section admin-dashboard-distsection">
-        <div class="admin-section-head">
-            <div>
-                <h2 class="admin-section-title">User Distribution</h2>
-                <p class="admin-section-subtitle">Registered parents, children, and staff across the system.</p>
-            </div>
-        </div>
-
-        <div class="admin-dashboard-donut-wrap">
-            <canvas id="user-dist-donut" width="240" height="240"></canvas>
-        </div>
-
-        <div class="admin-dashboard-dist-stats">
-            <div class="admin-dashboard-dist-stat">
-                <div class="admin-dashboard-dist-dot" style="background:#0b6e4f"></div>
-                <div class="admin-dashboard-dist-info">
-                    <span class="admin-dashboard-dist-label">Parents/Guardians</span>
-                    <span class="admin-dashboard-dist-value"><?php echo (int)$totalParents; ?></span>
+    <div class="admin-dashboard-rightcol">
+        <article class="admin-section admin-dashboard-distsection">
+            <div class="admin-section-head">
+                <div>
+                    <h2 class="admin-section-title">User Distribution</h2>
+                    <p class="admin-section-subtitle">System staff accounts — Admin and Nutritionist roles only.</p>
                 </div>
             </div>
-            <div class="admin-dashboard-dist-stat">
-                <div class="admin-dashboard-dist-dot" style="background:#2ec57a"></div>
-                <div class="admin-dashboard-dist-info">
-                    <span class="admin-dashboard-dist-label">Children</span>
-                    <span class="admin-dashboard-dist-value"><?php echo (int)$totalChildren; ?></span>
-                </div>
-            </div>
-            <div class="admin-dashboard-dist-stat">
-                <div class="admin-dashboard-dist-dot" style="background:#f2a93b"></div>
-                <div class="admin-dashboard-dist-info">
-                    <span class="admin-dashboard-dist-label">Staff (Admin + Nutritionist)</span>
-                    <span class="admin-dashboard-dist-value"><?php echo (int)$totalUsers; ?></span>
-                </div>
-            </div>
-        </div>
 
-        <div class="admin-dashboard-dist-total">
-            <span class="admin-dashboard-dist-total-label">Total System Users</span>
-            <span class="admin-dashboard-dist-total-value"><?php echo (int)($totalSystemUsers + $totalUsers); ?></span>
-        </div>
-    </article>
-</section>
-
-<?php
-/* ─── LIVE KIOSK & SENSOR MONITORING ────────────────────────────────── */
-?>
-<section class="admin-section">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title">Live Kiosk &amp; Sensor Monitoring</h2>
-            <p class="admin-section-subtitle">Current status of deployed SukatKalusugan kiosk devices and their sensors.</p>
-        </div>
-        <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/sensors.php')); ?>"><?php echo admin_action_icon('open'); ?> View all devices</a>
-    </div>
-
-    <div class="admin-table-wrap">
-        <table class="admin-table" id="kiosk-monitor-table">
-            <thead>
-                <tr>
-                    <th>Device</th>
-                    <th>Barangay</th>
-                    <th>Status</th>
-                    <th>Connection</th>
-                    <th>HX711 Weight</th>
-                    <th>TF-Luna Height</th>
-                    <th>Last Activity</th>
-                    <th>Last Calibration</th>
-                    <th>Maintenance</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($devices as $device): ?>
-                    <?php
-                    $isOnline = api_device_is_online($device);
-                    $deviceStatus = (string)($device['status'] ?? 'offline');
-
-                    // Connection pill
-                    $connectionText = $isOnline ? 'online' : 'offline';
-                    $connectionClass = $isOnline ? 'is-success' : 'is-danger';
-
-                    // Device status pill
-                    if ($deviceStatus === 'active') {
-                        $statusPillClass = 'is-success';
-                        $statusLabel = 'Active';
-                    } elseif ($deviceStatus === 'maintenance') {
-                        $statusPillClass = 'is-warn';
-                        $statusLabel = 'Maintenance';
-                    } else {
-                        $statusPillClass = 'is-danger';
-                        $statusLabel = 'Offline';
-                    }
-
-                    // Sensor health: derive from device status and connectivity
-                    if ($deviceStatus === 'maintenance') {
-                        $hx711Text = 'Needs repair';
-                        $hx711Class = 'is-warn';
-                        $tflunaText = 'Needs repair';
-                        $tflunaClass = 'is-warn';
-                    } elseif (!$isOnline) {
-                        $hx711Text = 'Offline';
-                        $hx711Class = 'is-muted';
-                        $tflunaText = 'Offline';
-                        $tflunaClass = 'is-muted';
-                    } else {
-                        $hx711Text = 'Healthy';
-                        $hx711Class = 'is-success';
-                        $tflunaText = 'Healthy';
-                        $tflunaClass = 'is-success';
-                    }
-
-                    // Last seen formatting
-                    $lastSeen = (string)($device['last_seen_at'] ?? 'never');
-                    $secondsAgo = (int)($device['seconds_since_last_seen'] ?? 9999);
-                    if ($secondsAgo < 60) {
-                        $lastSeenDisplay = $secondsAgo . 's ago';
-                    } elseif ($secondsAgo < 3600) {
-                        $lastSeenDisplay = floor($secondsAgo / 60) . 'm ago';
-                    } elseif ($secondsAgo < 86400) {
-                        $lastSeenDisplay = floor($secondsAgo / 3600) . 'h ago';
-                    } else {
-                        $lastSeenDisplay = floor($secondsAgo / 86400) . 'd ago';
-                    }
-                    ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($device['device_code'] . ' ' . (string)($device['barangay'] ?? '') . ' ' . $deviceStatus . ' ' . $connectionText)); ?>">
-                        <td style="font-weight:700;font-family:monospace;"><?php echo admin_e((string)$device['device_code']); ?></td>
-                        <td><?php echo admin_e((string)($device['barangay'] ?? 'Unassigned')); ?></td>
-                        <td><span class="admin-pill <?php echo $statusPillClass; ?>"><?php echo $statusLabel; ?></span></td>
-                        <td>
-                            <span class="admin-status-dot" style="background:<?php echo $isOnline ? '#0b6e4f' : '#c93b3b'; ?>"></span>
-                            <?php echo $connectionText; ?>
-                            <span class="admin-mini">&nbsp;(<?php echo admin_e($lastSeenDisplay); ?>)</span>
-                        </td>
-                        <td><span class="admin-pill <?php echo $hx711Class; ?>"><?php echo $hx711Text; ?></span></td>
-                        <td><span class="admin-pill <?php echo $tflunaClass; ?>"><?php echo $tflunaText; ?></span></td>
-                        <td class="admin-mini"><?php echo admin_e($lastSeen); ?></td>
-                        <td class="admin-mini"><?php echo admin_e((string)($device['last_calibration_at'] ?? 'n/a')); ?></td>
-                        <td>
-                            <?php if ($deviceStatus === 'maintenance'): ?>
-                                <span class="admin-pill is-warn">Repair required</span>
-                            <?php elseif (!$isOnline): ?>
-                                <span class="admin-pill is-muted">Check device</span>
-                            <?php else: ?>
-                                <span class="admin-pill is-success">Healthy</span>
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</section>
-
-<?php
-/* ─── RECENT SECURITY ALERTS ────────────────────────────────────────── */
-?>
-<section class="admin-section">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title">Recent Security Alerts</h2>
-            <p class="admin-section-subtitle">Latest critical and warning events from the audit log.</p>
-        </div>
-        <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/audit_logs.php')); ?>"><?php echo admin_action_icon('view'); ?> View all logs</a>
-    </div>
-
-    <?php if (empty($recentLogs)): ?>
-        <div class="admin-empty">
-            <p>No recent security events recorded.</p>
-        </div>
-    <?php else: ?>
-        <div class="admin-list">
-            <?php foreach ($recentLogs as $log): ?>
+            <div class="admin-dashboard-donut-wrap">
                 <?php
-                $levelClass = match ($log['level']) {
-                    'danger' => 'is-danger',
-                    'warning' => 'is-warn',
-                    default => 'is-success',
-                };
+                $totalStaff = max(1, (int)$adminCount + (int)$nutritionistCount);
+                $adminPct = round(((int)$adminCount / $totalStaff) * 360, 2);
+                $nutriPct = round(360 - $adminPct, 2);
                 ?>
-                <div class="admin-list-item">
-                    <div>
-                        <div><span class="admin-pill <?php echo $levelClass; ?>"><?php echo admin_e($log['level']); ?></span> <?php echo admin_e($log['action']); ?></div>
-                        <div class="admin-mini"><?php echo admin_e($log['description'] ?? ''); ?></div>
-                    </div>
-                    <div class="admin-mini" style="text-align:right;">
-                        <div><?php echo admin_e($log['actor']); ?></div>
-                        <div><?php echo admin_e((string)$log['created_at']); ?></div>
+                <div class="admin-css-donut" style="background: conic-gradient(#f2a93b 0deg <?php echo $adminPct; ?>deg, #0b6e4f <?php echo $adminPct; ?>deg 360deg);">
+                    <div class="admin-css-donut-hole">
+                        <span class="admin-css-donut-total"><?php echo (int)($adminCount + $nutritionistCount); ?></span>
+                        <span class="admin-css-donut-label">Total Staff</span>
                     </div>
                 </div>
-            <?php endforeach; ?>
-        </div>
-    <?php endif; ?>
+            </div>
+
+            <div class="admin-dashboard-dist-stats">
+                <div class="admin-dashboard-dist-stat">
+                    <div class="admin-dashboard-dist-dot" style="background:#f2a93b"></div>
+                    <div class="admin-dashboard-dist-info">
+                        <span class="admin-dashboard-dist-label">Admins</span>
+                        <span class="admin-dashboard-dist-value"><?php echo (int)$adminCount; ?></span>
+                    </div>
+                </div>
+                <div class="admin-dashboard-dist-stat">
+                    <div class="admin-dashboard-dist-dot" style="background:#0b6e4f"></div>
+                    <div class="admin-dashboard-dist-info">
+                        <span class="admin-dashboard-dist-label">Nutritionists</span>
+                        <span class="admin-dashboard-dist-value"><?php echo (int)$nutritionistCount; ?></span>
+                    </div>
+                </div>
+            </div>
+        </article>
+
+        <article class="admin-section admin-dashboard-kiosksection">
+            <div class="admin-section-head">
+                <div>
+                    <h2 class="admin-section-title">Live Kiosk &amp; Sensor Status</h2>
+                    <p class="admin-section-subtitle">Quick overview of deployed devices.</p>
+                </div>
+            </div>
+            <div id="kiosk-tiles-wrap" class="admin-dashboard-kiosk-grid"></div>
+            <div id="kiosk-pagination" class="admin-pagination admin-pagination--mini"></div>
+        </article>
+    </div>
 </section>
 
 <?php
@@ -580,7 +425,6 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
 <script>
 (function () {
     "use strict";
@@ -588,6 +432,19 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
     var STATS_BY_NAME = <?php echo json_encode($byNormalizedName, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
     var GEOJSON_URL = <?php echo json_encode(app_url('/assets/data/sanfernando_barangays.geojson')); ?>;
     var MAX_USERS = <?php echo (int)$barangayMaxUsers; ?>;
+    var KIOSK_DEVICES = <?php echo json_encode(array_map(function ($d) {
+        $online = api_device_is_online($d);
+        $status = (string)($d['status'] ?? 'offline');
+        return [
+            'code' => $d['device_code'],
+            'barangay' => $d['barangay'] ?? 'Unassigned',
+            'online' => $online,
+            'status' => $status,
+            'color' => $online ? '#0b6e4f' : ($status === 'maintenance' ? '#d97706' : '#c93b3b'),
+            'label' => $online ? 'Online' : ($status === 'maintenance' ? 'Maintenance' : 'Offline'),
+            'pill' => $online ? 'is-success' : ($status === 'maintenance' ? 'is-warn' : 'is-danger'),
+        ];
+    }, $devices), JSON_UNESCAPED_SLASHES); ?>;
 
     var DIST_COLORS = {
         high: '#0b6e4f',
@@ -611,44 +468,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             .toLowerCase();
     }
 
-    /* ─── User Distribution Donut ──────────────────────────────────── */
-    function renderDonut() {
-        var canvas = document.getElementById('user-dist-donut');
-        if (!canvas || typeof Chart === 'undefined') return;
-
-        var parents = <?php echo (int)$totalParents; ?>;
-        var children = <?php echo (int)$totalChildren; ?>;
-        var staff = <?php echo (int)$totalUsers; ?>;
-
-        new Chart(canvas.getContext('2d'), {
-            type: 'doughnut',
-            data: {
-                labels: ['Parents/Guardians', 'Children', 'Staff'],
-                datasets: [{
-                    data: [parents, children, staff],
-                    backgroundColor: ['#0b6e4f', '#2ec57a', '#f2a93b'],
-                    borderColor: '#ffffff',
-                    borderWidth: 3
-                }]
-            },
-            options: {
-                responsive: false,
-                cutout: '65%',
-                plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                        callbacks: {
-                            label: function (ctx) {
-                                var total = ctx.dataset.data.reduce(function (a, b) { return a + b; }, 0);
-                                var pct = total > 0 ? Math.round((ctx.parsed / total) * 100) : 0;
-                                return ctx.label + ': ' + ctx.parsed + ' (' + pct + '%)';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
+    /* ─── User Distribution Donut (pure CSS — no Chart.js needed) ─── */
 
     /* ─── Top Barangays List ───────────────────────────────────────── */
     function renderTopBarangays() {
@@ -661,7 +481,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             .slice(0, 6);
 
         if (sorted.length === 0) {
-            container.innerHTML = '<div class="admin-empty"><p>No registered users yet.</p></div>';
+            container.innerHTML = '<div class="admin-empty"><p>No families registered yet.</p></div>';
             return;
         }
 
@@ -839,8 +659,8 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                         var label = stat ? stat.name : feature.properties.name;
                         var body = stat && stat.total > 0
                             ? '<strong>' + label + '</strong><br>' +
-                              stat.total + ' users (' + stat.parents + ' parents, ' + stat.children + ' children)'
-                            : '<strong>' + label + '</strong><br>No registered users yet.';
+                              stat.parents + ' parents &middot; ' + stat.children + ' children'
+                            : '<strong>' + label + '</strong><br>No families registered yet.';
 
                         featureLayer.bindPopup(body);
                         featureLayer.on('mouseover', function () { featureLayer.setStyle({ weight: 2.5, color: '#2f3d3a' }); });
@@ -869,10 +689,66 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             });
     }
 
+    /* ─── Live Kiosk Tiles Pagination ──────────────────────────────── */
+    var KIOSK_PER_PAGE = 6;
+    var kioskPage = 1;
+
+    function renderKioskTiles() {
+        var wrap = document.getElementById('kiosk-tiles-wrap');
+        var pag = document.getElementById('kiosk-pagination');
+        if (!wrap) return;
+
+        if (KIOSK_DEVICES.length === 0) {
+            wrap.innerHTML = '<div class="admin-empty" style="padding:16px;"><p>No devices registered yet.</p></div>';
+            if (pag) pag.innerHTML = '';
+            return;
+        }
+
+        var totalPages = Math.ceil(KIOSK_DEVICES.length / KIOSK_PER_PAGE);
+        if (kioskPage > totalPages) kioskPage = totalPages;
+        var start = (kioskPage - 1) * KIOSK_PER_PAGE;
+        var slice = KIOSK_DEVICES.slice(start, start + KIOSK_PER_PAGE);
+
+        var html = '';
+        slice.forEach(function (d) {
+            html += '<div class="admin-dashboard-kiosk-tile">';
+            html += '<span class="admin-dashboard-kiosk-dot" style="background:' + d.color + ';"></span>';
+            html += '<span class="admin-dashboard-kiosk-code">' + escHtml(d.code) + '</span>';
+            html += '<span class="admin-dashboard-kiosk-location">' + escHtml(d.barangay) + '</span>';
+            html += '<span class="admin-pill ' + d.pill + '" style="font-size:0.65rem;padding:2px 8px;">' + d.label + '</span>';
+            html += '</div>';
+        });
+        wrap.innerHTML = html;
+
+        if (!pag || totalPages <= 1) { if (pag) pag.innerHTML = ''; return; }
+
+        var phtml = '<span class="admin-pagination-status">Page ' + kioskPage + ' of ' + totalPages + '</span>';
+        phtml += '<div class="admin-pagination-actions">';
+        phtml += '<button class="admin-icon-btn" data-kiosk-page="prev"' + (kioskPage <= 1 ? ' disabled' : '') + '>&#8249;</button>';
+        phtml += '<button class="admin-icon-btn" data-kiosk-page="next"' + (kioskPage >= totalPages ? ' disabled' : '') + '>&#8250;</button>';
+        phtml += '</div>';
+        pag.innerHTML = phtml;
+    }
+
+    function escHtml(s) {
+        var d = document.createElement('div');
+        d.appendChild(document.createTextNode(s));
+        return d.innerHTML;
+    }
+
+    document.addEventListener('click', function (e) {
+        var btn = e.target.closest('[data-kiosk-page]');
+        if (!btn) return;
+        var action = btn.getAttribute('data-kiosk-page');
+        var totalPages = Math.ceil(KIOSK_DEVICES.length / KIOSK_PER_PAGE);
+        if (action === 'prev' && kioskPage > 1) { kioskPage--; renderKioskTiles(); }
+        if (action === 'next' && kioskPage < totalPages) { kioskPage++; renderKioskTiles(); }
+    });
+
     /* ─── Initialize ───────────────────────────────────────────────── */
     document.addEventListener('DOMContentLoaded', function () {
-        renderDonut();
         renderTopBarangays();
+        renderKioskTiles();
         initMap();
     });
 })();

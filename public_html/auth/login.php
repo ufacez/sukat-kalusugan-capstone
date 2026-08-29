@@ -29,7 +29,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <title>Sukat Kalusugan | Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
     <link rel="icon" type="image/jpeg" href="../assets/img/logo/variant01.jpg">
