@@ -18,6 +18,10 @@ if ($userId <= 0) {
     api_error('Invalid user ID.', 422);
 }
 
+if ((int)$userId === 1) {
+    api_error('The system administrator access level cannot be changed.', 403);
+}
+
 $validLevels = ['full', 'standard', 'readonly'];
 if (!in_array($accessLevel, $validLevels)) {
     api_error('Invalid access level. Must be: ' . implode(', ', $validLevels), 422);

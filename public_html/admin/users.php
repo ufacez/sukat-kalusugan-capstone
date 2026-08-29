@@ -35,7 +35,7 @@ foreach ($users as $user) {
 $archivedCountRow = admin_fetch_one("SELECT COUNT(*) AS cnt FROM users WHERE status = 'inactive'");
 $archivedCount = (int)($archivedCountRow['cnt'] ?? 0);
 
-$actions = has_permission('users.create') ? '<a class="admin-btn" href="' . admin_e(app_url('/admin/user_form.php')) . '">' . admin_action_icon('add') . ' Add user</a>' : '';
+$actions = has_permission('users.create') ? '<a class="admin-btn" href="' . admin_e(app_url('/admin/invitations.php')) . '">' . admin_action_icon('add') . ' Invite staff</a>' : '';
 
 admin_layout_start('User Management', 'Create, update, and manage staff accounts.', 'users', $actions);
 ?>

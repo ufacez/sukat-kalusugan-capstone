@@ -22,6 +22,10 @@ if ($target === null) {
     admin_redirect('/admin/users.php', ['notice' => 'User not found.', 'type' => 'error']);
 }
 
+if ((int)$target['id'] === 1) {
+    admin_redirect('/admin/users.php', ['notice' => 'The system administrator account cannot be archived.', 'type' => 'error']);
+}
+
 if ($target['status'] !== 'active') {
     admin_redirect('/admin/users.php', ['notice' => 'User is already archived.', 'type' => 'error']);
 }

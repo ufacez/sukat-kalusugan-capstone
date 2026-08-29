@@ -128,6 +128,10 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                     <span class="button-spinner" aria-hidden="true"></span>
                 </button>
             </form>
+
+            <p style="text-align:center;margin-top:1.2rem;font-size:0.85rem;">
+                New staff? <a class="link" href="activate.php">Activate your account</a>
+            </p>
         </section>
     </main>
 

@@ -6,18 +6,16 @@ start_secure_session();
 
 $editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
 
-if ($editId > 0) {
-    require_permission('users.update');
-} else {
-    require_permission('users.create');
+if ($editId <= 0) {
+    admin_redirect('/admin/users.php', ['notice' => 'Select a user to edit.', 'type' => 'error']);
 }
+
+require_permission('users.update');
 
 $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
 $barangays = admin_barangay_options();
 
-$editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
-
-$editingUser = $editId > 0 ? admin_fetch_one(
+$editingUser = admin_fetch_one(
     'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
@@ -26,9 +24,9 @@ $editingUser = $editId > 0 ? admin_fetch_one(
      LIMIT 1',
     'i',
     [$editId]
-) : null;
+);
 
-if ($editId > 0 && $editingUser === null) {
+if ($editingUser === null) {
     admin_redirect(
         '/admin/users.php',
         [
@@ -45,8 +43,8 @@ $actions = '<a class="admin-btn-secondary" href="'
     . '">' . admin_action_icon('back') . ' Users</a>';
 
 admin_layout_start(
-    $editingUser ? 'Edit User' : 'Add User',
-    $editingUser ? 'Update account details and role assignment.' : 'Create a new staff account backed by the users table.',
+    'Edit User',
+    'Update account details and role assignment.',
     'users',
     $actions
 );
@@ -54,15 +52,13 @@ admin_layout_start(
 <section class="admin-section">
     <div class="admin-section-head">
         <div>
-            <h2 class="admin-section-title"><?php echo $editingUser ? 'Edit User' : 'Add User'; ?></h2>
-            <p class="admin-section-subtitle"><?php echo $editingUser ? admin_e((string)$editingUser['name']) . ' · ' . admin_e(ucfirst((string)$editingUser['role_name'])) : 'Create a new staff account backed by the users table.'; ?></p>
+            <h2 class="admin-section-title">Edit User</h2>
+            <p class="admin-section-subtitle"><?php echo admin_e((string)$editingUser['name']); ?> · <?php echo admin_e(ucfirst((string)$editingUser['role_name'])); ?></p>
         </div>
     </div>
 
-    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url($editingUser ? '/api/admin/users_update.php' : '/api/admin/users_create.php')); ?>">
-        <?php if ($editingUser): ?>
-            <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
-        <?php endif; ?>
+    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>">
+        <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
 
         <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
 
@@ -131,8 +127,8 @@ admin_layout_start(
         </label>
 
         <label class="admin-field admin-field-wide">
-            <span><?php echo $editingUser ? 'New password (optional)' : 'Password'; ?><?php echo $editingUser ? '' : '<span class="admin-required">*</span>'; ?></span>
-            <input id="user_password" type="password" name="password" <?php echo $editingUser ? '' : 'required'; ?> data-validate="password" autocomplete="new-password" placeholder="<?php echo $editingUser ? 'Leave blank to keep current password' : 'Create a strong password'; ?>">
+            <span>New password (optional)</span>
+            <input id="user_password" type="password" name="password" data-validate="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
             <span class="admin-field-message"></span>
             <ul class="admin-pw-checklist" data-pw-checklist-for="user_password">
                 <li data-pw-rule="length">At least 8 characters</li>
@@ -147,13 +143,13 @@ admin_layout_start(
             </div>
         </label>
         <label class="admin-field admin-field-wide">
-            <span><?php echo $editingUser ? 'Confirm new password' : 'Confirm password'; ?><?php echo $editingUser ? '' : '<span class="admin-required">*</span>'; ?></span>
-            <input id="user_password_confirm" type="password" name="password_confirm" <?php echo $editingUser ? '' : 'required'; ?> data-validate="confirm-password" data-match="user_password" autocomplete="new-password" placeholder="Re-type the password">
+            <span>Confirm new password</span>
+            <input id="user_password_confirm" type="password" name="password_confirm" data-validate="confirm-password" data-match="user_password" autocomplete="new-password" placeholder="Re-type the password">
             <span class="admin-field-message"></span>
         </label>
 
         <div class="admin-field admin-field-wide" style="align-content:end;">
-            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> <?php echo $editingUser ? 'Save changes' : 'Create user'; ?></button>
+            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save changes</button>
         </div>
     </form>
 </section>

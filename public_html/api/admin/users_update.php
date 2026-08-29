@@ -38,6 +38,18 @@ if ($id <= 0 || $name === '' || $email === '' || $username === '') {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'User id, name, email, and username are required.', 'type' => 'error']);
 }
 
+$isSeededAdmin = ((int)$id === 1);
+
+if ($isSeededAdmin) {
+    $existingRole = admin_fetch_one('SELECT r.name AS role_name FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE u.id = 1 LIMIT 1');
+    if ($existingRole !== null && $existingRole['role_name'] !== $roleName) {
+        admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'The system administrator role cannot be changed.', 'type' => 'error']);
+    }
+    if ($status !== 'active') {
+        admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'The system administrator account cannot be deactivated.', 'type' => 'error']);
+    }
+}
+
 if (!admin_is_valid_ph_mobile($phone)) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 }

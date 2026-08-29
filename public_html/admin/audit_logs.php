@@ -127,12 +127,15 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-user-role{font-size:9px;color:var(--admin-muted);letter-spacing:.2px}
 
 .audit-action-pill{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:5px;font-size:10px;font-weight:600;white-space:nowrap}
-.audit-action-pill.is-create{background:rgba(34,197,94,0.10);color:#16a34a}
-.audit-action-pill.is-read{background:rgba(99,102,241,0.10);color:#6366f1}
-.audit-action-pill.is-update{background:rgba(59,130,246,0.10);color:#2563eb}
-.audit-action-pill.is-delete{background:rgba(239,68,68,0.10);color:#dc2626}
-.audit-action-pill.is-login{background:rgba(34,197,94,0.10);color:#16a34a}
-.audit-action-pill.is-logout{background:rgba(148,163,184,0.12);color:#64748b}
+ .audit-action-pill.is-create{background:rgba(34,197,94,0.10);color:#16a34a}
+ .audit-action-pill.is-read{background:rgba(99,102,241,0.10);color:#6366f1}
+ .audit-action-pill.is-update{background:rgba(59,130,246,0.10);color:#2563eb}
+ .audit-action-pill.is-delete{background:rgba(239,68,68,0.10);color:#dc2626}
+ .audit-action-pill.is-success{background:rgba(34,197,94,0.10);color:#16a34a}
+ .audit-action-pill.is-danger{background:rgba(239,68,68,0.10);color:#dc2626}
+ .audit-action-pill.is-indigo{background:rgba(99,102,241,0.10);color:#6366f1}
+ .audit-action-pill.is-login{background:rgba(34,197,94,0.10);color:#16a34a}
+ .audit-action-pill.is-logout{background:rgba(148,163,184,0.12);color:#64748b}
 
 .audit-time-cell{line-height:1.2}
 .audit-time-date{font-size:11px;font-weight:600;color:var(--admin-text)}
@@ -337,9 +340,9 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     $pillClass = match(true) {
                         $rawAction === 'LOGIN' || $rawAction === 'LOGOUT' => 'is-muted',
                         str_starts_with($rawAction, 'CREATE') || str_starts_with($rawAction, 'MEASUREMENT') => 'is-success',
+                        str_starts_with($rawAction, 'DELETE') => 'is-danger',
                         str_starts_with($rawAction, 'EOPT') || str_starts_with($rawAction, 'FOLLOWUP') || str_starts_with($rawAction, 'PASSWORD_RESET') => 'is-indigo',
                         str_starts_with($rawAction, 'UPDATE') => 'is-info',
-                        str_starts_with($rawAction, 'DELETE') => 'is-danger',
                         default => 'is-muted',
                     };
                     $ts = $log['created_at'];
@@ -348,7 +351,8 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     $timeLine = $dateObj->format('H:i');
 
                     $actionLabel = $log['action'];
-                    if (str_starts_with($actionLabel, 'CREATE_')) $actionLabel = 'Create ' . strtolower(substr($actionLabel, 7));
+                    if ($actionLabel === 'DELETE_INVITATION') $actionLabel = 'Cancel invite';
+                    elseif (str_starts_with($actionLabel, 'CREATE_')) $actionLabel = 'Create ' . strtolower(substr($actionLabel, 7));
                     elseif (str_starts_with($actionLabel, 'UPDATE_')) $actionLabel = 'Update ' . strtolower(substr($actionLabel, 7));
                     elseif (str_starts_with($actionLabel, 'DELETE_')) $actionLabel = 'Delete ' . strtolower(substr($actionLabel, 7));
                     elseif ($actionLabel === 'LOGIN') $actionLabel = 'Login';
