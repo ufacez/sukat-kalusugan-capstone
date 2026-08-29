@@ -7,9 +7,20 @@ $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 
 $editId = (int)($_GET['id'] ?? 0);
 
+if ($editId <= 0 && !nutritionist_can_write('parents.create')) {
+	admin_redirect('/nutritionist/parents.php', ['notice' => 'You do not have permission to create parents.', 'type' => 'error']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	$action = (string)($_POST['action'] ?? '');
+
+	if ($action === 'create') {
+		nutritionist_require_write('parents.create');
+	} elseif ($action === 'update') {
+		nutritionist_require_write('parents.update');
+	}
+
 	$parentId = (int)($_POST['id'] ?? 0);
 
 	if ($action !== 'create' && $action !== 'update') {

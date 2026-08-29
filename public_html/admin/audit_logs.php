@@ -251,10 +251,6 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 
 <section class="admin-section">
     <div class="audit-filter-wrap">
-        <div class="audit-search-wrap">
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
-            <input class="audit-search-input" type="search" placeholder="Search logs..." id="audit-search">
-        </div>
         <?php
         $filterLabels = ['login'=>'Login','logout'=>'Logout','create'=>'Create','read'=>'Read','update'=>'Update','delete'=>'Delete'];
         $currentLabel = $actionFilter !== '' && isset($filterLabels[$actionFilter]) ? $filterLabels[$actionFilter] : 'All Actions';
@@ -313,7 +309,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
     </div>
 
     <div class="admin-table-wrap">
-        <table class="admin-table" id="audit-table">
+        <table class="admin-table" id="audit-table" data-no-paginate>
             <thead>
                 <tr>
                     <th>Name</th>
@@ -393,7 +389,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         <?php if ($totalPages > 1): ?>
         <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--admin-border);">
             <span class="admin-pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
-            <div class="admin-pagination-numbers">
+            <div class="admin-pagination-numbers" style="gap:6px;">
                 <?php
                 $pParams = $_GET;
                 unset($pParams['page']);

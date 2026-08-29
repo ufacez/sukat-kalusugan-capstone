@@ -1285,6 +1285,30 @@
   font-size: 0.85rem;
 }
 
+.admin-select {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  background: var(--admin-surface);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--admin-text);
+  cursor: pointer;
+  outline: none;
+  transition: border-color .15s;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke-width='1.5' stroke='%2364748b'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='m19.5 8.25-7.5 7.5-7.5-7.5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 14px;
+  padding-right: 28px;
+}
+.admin-select:hover { border-color: var(--admin-primary); }
+.admin-select:focus { border-color: var(--admin-primary); box-shadow: 0 0 0 2px var(--admin-primary-soft); }
+
 .admin-grid-3 {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

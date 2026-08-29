@@ -47,6 +47,13 @@ nutritionist_layout_start(
 
 ?>
 
+<?php if (!nutritionist_can_write()): ?>
+<section class="nutritionist-panel">
+    <div class="admin-flash">
+        You do not have permission to record measurements. Contact your administrator if you believe this is an error.
+    </div>
+</section>
+<?php else: ?>
 <section class="nutritionist-panel">
 
     <div
@@ -230,7 +237,8 @@ nutritionist_layout_start(
         style="display:none;margin-top:18px;"
     ></div>
 
-</section>
+    </section>
+<?php endif; ?>
 
 
 <script>

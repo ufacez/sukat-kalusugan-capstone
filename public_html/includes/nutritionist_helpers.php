@@ -83,6 +83,52 @@ function nutritionist_require_access(): array
     return $user;
 }
 
+function nutritionist_require_write(string $permissionCode = ''): array
+{
+    $user = nutritionist_require_access();
+
+    if (($user['role'] ?? '') === 'admin') {
+        return $user;
+    }
+
+    $accessLevel = $user['access_level'] ?? 'full';
+
+    if ($accessLevel === 'readonly') {
+        deny_access('You do not have permission to modify data. Your access level is Read Only.', 403);
+    }
+
+    if ($accessLevel === 'standard' && $permissionCode !== '' && has_permission($permissionCode) === false) {
+        deny_access('You do not have permission to perform this action.', 403);
+    }
+
+    return $user;
+}
+
+function nutritionist_can_write(string $permissionCode = ''): bool
+{
+    $user = current_user();
+
+    if ($user === null) {
+        return false;
+    }
+
+    if (($user['role'] ?? '') === 'admin') {
+        return true;
+    }
+
+    $accessLevel = $user['access_level'] ?? 'full';
+
+    if ($accessLevel === 'readonly') {
+        return false;
+    }
+
+    if ($accessLevel === 'standard' && $permissionCode !== '' && has_permission($permissionCode) === false) {
+        return false;
+    }
+
+    return true;
+}
+
 function nutritionist_layout_start(string $title, string $subtitle, string $activeSection, string $actionsHtml = ''): void
 {
     $currentUser = nutritionist_require_access();

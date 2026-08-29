@@ -17,6 +17,9 @@ $indicators = [
 // same page (POST -> Redirect -> GET) once it's done, same pattern used by
 // every other nutritionist/admin form in this app.
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'import') {
+
+	nutritionist_require_write();
+
 	$importIndicator = strtolower((string)($_POST['indicator'] ?? 'waz'));
 	$importSex = ($_POST['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
 
@@ -190,6 +193,7 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 	<?php endif; ?>
 </section>
 
+<?php if (nutritionist_can_write()): ?>
 <section class="nutritionist-panel" style="margin-bottom:20px;padding:16px;">
 	<div class="who-import-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
 		<div class="who-import-label" style="display:flex;align-items:center;gap:8px;color:var(--admin-muted);font-size:0.85rem;">
@@ -212,6 +216,7 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 		</form>
 	</div>
 </section>
+<?php endif; ?>
 
 <?php if ($rowCount > 0): ?>
 <section class="nutritionist-panel">

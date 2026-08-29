@@ -30,6 +30,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      */
     if ($action === 'delete' && $childId > 0) {
 
+        nutritionist_require_write('children.delete');
+
         $target = admin_fetch_one('SELECT id, child_code, barangay_id FROM children WHERE id = ? LIMIT 1', 'i', [$childId]);
 
         if ($target === null) {
@@ -289,9 +291,11 @@ $actions = '<div class="admin-actions">'
     . '<a class="admin-btn-secondary" href="'
     . nutritionist_e(app_url('/nutritionist/measurement_record.php'))
     . '">' . admin_action_icon('measure') . ' Record measurement</a>'
-    . '<a class="admin-btn" href="'
-    . nutritionist_e(app_url('/nutritionist/child_form.php'))
-    . '">' . admin_action_icon('add') . ' Add child</a>'
+    . (nutritionist_can_write('children.create')
+        ? '<a class="admin-btn" href="'
+            . nutritionist_e(app_url('/nutritionist/child_form.php'))
+            . '">' . admin_action_icon('add') . ' Add child</a>'
+        : '')
     . '</div>';
 
 nutritionist_layout_start(
@@ -549,12 +553,16 @@ nutritionist_layout_start(
                             <div class="admin-actions">
                                 <a class="admin-icon-btn admin-icon-btn-primary" title="Measure" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('measure'); ?></a>
                                 <a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('view'); ?></a>
+                                <?php if (nutritionist_can_write('children.update')): ?>
                                 <a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <?php endif; ?>
+                                <?php if (nutritionist_can_write('children.delete')): ?>
                                 <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?>?');" style="display:inline;">
                                     <input type="hidden" name="action" value="delete">
                                     <input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
                                     <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
                                 </form>
+                                <?php endif; ?>
                             </div>
                         </td>
 

@@ -27,9 +27,20 @@ $user = nutritionist_require_access();
 
 $editId = (int)($_GET['id'] ?? 0);
 
+if ($editId <= 0 && !nutritionist_can_write('children.create')) {
+	admin_redirect('/nutritionist/children.php', ['notice' => 'You do not have permission to create children.', 'type' => 'error']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $action = (string)($_POST['action'] ?? '');
+
+    if ($action === 'create') {
+        nutritionist_require_write('children.create');
+    } elseif ($action === 'update') {
+        nutritionist_require_write('children.update');
+    }
+
     $childId = (int)($_POST['id'] ?? 0);
 
     $firstName = trim((string)($_POST['first_name'] ?? ''));

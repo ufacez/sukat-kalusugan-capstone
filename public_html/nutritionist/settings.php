@@ -21,6 +21,10 @@ function nutritionist_calendar_redirect_params(): array
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$formAction = (string)($_POST['action'] ?? 'update_profile');
 
+	if (in_array($formAction, ['create_event', 'update_event', 'delete_event'], true)) {
+		nutritionist_require_write('settings.update');
+	}
+
 	if ($formAction === 'update_profile') {
 		$name = trim((string)($_POST['name'] ?? ''));
 		$email = trim((string)($_POST['email'] ?? ''));
@@ -403,6 +407,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 						</div>
 					</div>
 					<div class="admin-actions">
+						<?php if (nutritionist_can_write('settings.update')): ?>
 						<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>"><?php echo admin_action_icon('edit'); ?></a>
 						<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/settings.php')); ?>" onsubmit="return confirm('Remove this event?');" style="display:inline;">
 							<input type="hidden" name="action" value="delete_event">
@@ -410,12 +415,14 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 							<input type="hidden" name="cal_month" value="<?php echo nutritionist_e($calMonthParam); ?>">
 							<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 						</form>
+						<?php endif; ?>
 					</div>
 				</div>
 			<?php endforeach; ?>
 		</div>
 	<?php endif; ?>
 
+	<?php if (nutritionist_can_write('settings.update')): ?>
 	<?php if ($editingEvent !== null): ?>
 		<div class="admin-flash" style="margin-bottom:14px;background:#fff4df;color:#9a6510;border:1px solid #f0c675;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
 			<span>✏️ Editing <strong><?php echo nutritionist_e((string)$editingEvent['title']); ?></strong> — update the fields below, then click <strong>Update event</strong>.</span>
@@ -461,6 +468,7 @@ nutritionist_layout_start('Settings', 'Manage your profile and account details.'
 			<?php endif; ?>
 		</div>
 	</form>
+	<?php endif; ?>
 </section>
 <?php
 nutritionist_layout_end();

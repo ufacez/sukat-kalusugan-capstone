@@ -119,14 +119,14 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
             <h2 class="admin-section-title">Children Directory</h2>
             <p class="admin-section-subtitle">All active children<?php echo $filterBarangay > 0 ? ' in filtered barangay' : ' across all barangays'; ?>.</p>
         </div>
-        <div class="admin-toolbar" style="margin:0;">
-            <select class="admin-search" id="barangay-filter" onchange="window.location.href='<?php echo admin_e(app_url('/admin/children.php')); ?>?barangay_id='+this.value" style="max-width:200px;cursor:pointer;">
+        <div class="admin-toolbar" style="margin:0;gap:8px;">
+            <select class="admin-select" id="barangay-filter" onchange="window.location.href='<?php echo admin_e(app_url('/admin/children.php')); ?>?barangay_id='+this.value">
                 <option value="0">All Barangays</option>
                 <?php foreach ($barangays as $b): ?>
                     <option value="<?php echo (int)$b['id']; ?>" <?php echo $filterBarangay === (int)$b['id'] ? 'selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
                 <?php endforeach; ?>
             </select>
-            <input class="admin-search" type="search" placeholder="Search children" data-admin-filter="#children-table">
+            <input class="admin-search" type="search" placeholder="Search children" data-admin-filter="#children-table" style="flex:1;min-width:0;">
         </div>
     </div>
 

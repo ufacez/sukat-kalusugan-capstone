@@ -4,6 +4,10 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
 $user = nutritionist_require_access();
 
+if (!nutritionist_can_write()) {
+	admin_redirect('/nutritionist/appointments.php', ['notice' => 'You do not have permission to create appointments.', 'type' => 'error']);
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	$action = (string)($_POST['action'] ?? '');
@@ -11,6 +15,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	if ($action !== 'create') {
 		admin_redirect('/nutritionist/appointments.php', ['notice' => 'No action was performed.', 'type' => 'error']);
 	}
+
+	nutritionist_require_write();
 
 	$childId = (int)($_POST['child_id'] ?? 0);
 	$scheduledAt = trim((string)($_POST['scheduled_at'] ?? ''));

@@ -88,7 +88,31 @@ function current_user(): ?array
         return null;
     }
 
-    return $_SESSION['auth'];
+    $user = &$_SESSION['auth'];
+
+    if (($user['type'] ?? null) === 'staff' && isset($user['id'])) {
+        $conn = get_db_connection();
+        $stmt = mysqli_prepare($conn, 'SELECT access_level, status FROM users WHERE id = ? LIMIT 1');
+        if ($stmt) {
+            mysqli_stmt_bind_param($stmt, 'i', $user['id']);
+            if (mysqli_stmt_execute($stmt)) {
+                $result = mysqli_stmt_get_result($stmt);
+                if ($row = mysqli_fetch_assoc($result)) {
+                    $newLevel = $row['access_level'] ?? 'full';
+                    $newStatus = $row['status'] ?? 'active';
+                    if (($user['access_level'] ?? '') !== $newLevel) {
+                        $user['access_level'] = $newLevel;
+                    }
+                    if (($user['status'] ?? '') !== $newStatus) {
+                        $user['status'] = $newStatus;
+                    }
+                }
+            }
+            mysqli_stmt_close($stmt);
+        }
+    }
+
+    return $user;
 }
 
 function is_parent_session(): bool

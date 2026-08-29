@@ -12,6 +12,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	 * DELETE
 	 */
 	if ($action === 'delete' && $parentId > 0) {
+
+		nutritionist_require_write('parents.delete');
+
 		$target = admin_fetch_one('SELECT id, email, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
 
 		if ($target === null) {
@@ -86,9 +89,11 @@ $totalChildren = array_sum(array_map(static fn(array $parent): int => (int)$pare
 $totalAppointments = array_sum(array_map(static fn(array $parent): int => (int)$parent['appointment_count'], $parents));
 $atRiskCount = count(array_filter($parents, static fn(array $parent): bool => (int)$parent['follow_up_count'] > 0));
 
-$actions = '<a class="admin-btn" href="'
-	. nutritionist_e(app_url('/nutritionist/parent_form.php'))
-	. '">' . admin_action_icon('add') . ' Add parent</a>';
+$actions = nutritionist_can_write('parents.create')
+	? '<a class="admin-btn" href="'
+		. nutritionist_e(app_url('/nutritionist/parent_form.php'))
+		. '">' . admin_action_icon('add') . ' Add parent</a>'
+	: '';
 
 nutritionist_layout_start('Parents', 'Linked guardians and household contact information.', 'parents', $actions);
 ?>
@@ -195,12 +200,16 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 						<td><span class="admin-pill <?php echo $parent['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo nutritionist_e(ucfirst($parent['status'])); ?></span></td>
 						<td>
 							<div class="admin-actions">
+								<?php if (nutritionist_can_write('parents.update')): ?>
 								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+								<?php endif; ?>
+								<?php if (nutritionist_can_write('parents.delete')): ?>
 								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($parent['name']); ?>?');" style="display:inline;">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
 									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 								</form>
+								<?php endif; ?>
 							</div>
 						</td>
 					</tr>

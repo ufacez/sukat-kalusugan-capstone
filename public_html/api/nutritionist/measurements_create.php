@@ -11,6 +11,13 @@ api_require_method(['POST']);
 
 $user = api_require_staff_session(['admin', 'nutritionist']);
 
+if (($user['role'] ?? '') !== 'admin') {
+    $accessLevel = $user['access_level'] ?? 'full';
+    if ($accessLevel === 'readonly') {
+        api_error('You do not have permission to create measurements. Your access level is Read Only.', 403);
+    }
+}
+
 $payload = api_payload();
 
 $childId = api_int($payload['child_id'] ?? 0, 0);

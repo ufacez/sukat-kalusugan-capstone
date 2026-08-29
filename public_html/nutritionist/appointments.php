@@ -10,6 +10,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$appointmentId = (int)($_POST['id'] ?? 0);
 
 	if ($action === 'sync_followups') {
+		nutritionist_require_write();
 		$result = followup_sync_for_scope($user);
 		admin_redirect('/nutritionist/appointments.php', ['notice' => sprintf(
 			'EOPT follow-ups synced — %d generated, %d auto-completed.',
@@ -25,6 +26,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	 | be cancelled or deleted.
 	 */
 	if ($action === 'complete_followup' && $appointmentId > 0) {
+
+		nutritionist_require_write();
+
 		$appointment = admin_fetch_one(
 			"SELECT
 				a.id,
@@ -94,6 +98,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	 | Regular (manually booked) appointments keep their old behaviour.
 	 */
 	if ($action === 'update_status' && $appointmentId > 0) {
+
+		nutritionist_require_write();
+
 		$type = (string)(admin_fetch_one(
 			'SELECT appointment_type FROM appointments WHERE id = ? LIMIT 1',
 			'i',
@@ -118,6 +125,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	}
 
 	if ($action === 'delete' && $appointmentId > 0) {
+
+		nutritionist_require_write();
+
 		$type = (string)(admin_fetch_one(
 			'SELECT appointment_type FROM appointments WHERE id = ? LIMIT 1',
 			'i',
@@ -212,13 +222,15 @@ $followUpOverdue = count(array_filter($followUpAppointments, static fn(array $a)
 $followUpCompleted = count(array_filter($followUpAppointments, static fn(array $a): bool => (string)$a['status'] === 'completed'));
 
 $actions = '<div class="admin-actions">'
-	. '<form method="post" action="' . nutritionist_e(app_url('/nutritionist/appointments.php')) . '" style="display:inline;">'
-	. '<input type="hidden" name="action" value="sync_followups">'
-	. '<button class="admin-btn-secondary" type="submit">' . admin_action_icon('sync') . ' Sync EOPT follow-ups</button>'
-	. '</form>'
-	. '<a class="admin-btn" href="'
-	. nutritionist_e(app_url('/nutritionist/appointment_form.php'))
-	. '">' . admin_action_icon('add') . ' New appointment</a>'
+	. (nutritionist_can_write()
+		? '<form method="post" action="' . nutritionist_e(app_url('/nutritionist/appointments.php')) . '" style="display:inline;">'
+		. '<input type="hidden" name="action" value="sync_followups">'
+		. '<button class="admin-btn-secondary" type="submit">' . admin_action_icon('sync') . ' Sync EOPT follow-ups</button>'
+		. '</form>'
+		. '<a class="admin-btn" href="'
+		. nutritionist_e(app_url('/nutritionist/appointment_form.php'))
+		. '">' . admin_action_icon('add') . ' New appointment</a>'
+		: '')
 	. '</div>';
 
 nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT follow-ups, and enforce mandatory re-measurements.', 'appointments', $actions);
@@ -328,6 +340,7 @@ nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT 
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($appointment['notes'] ?? '')); ?></td>
 						<td>
 							<div class="admin-actions">
+								<?php if (nutritionist_can_write()): ?>
 								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">
 									<input type="hidden" name="action" value="update_status">
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
@@ -342,6 +355,7 @@ nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT 
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
 									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
 								</form>
+								<?php endif; ?>
 							</div>
 						</td>
 					</tr>
@@ -420,12 +434,14 @@ nutritionist_layout_start('Appointments', 'Manage visits, review automatic EOPT 
 						</td>
 						<td>
 							<?php if ($isOpen): ?>
+								<?php if (nutritionist_can_write()): ?>
 								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" style="display:inline;"
 									onsubmit="return confirm('Verify that a NEW measurement was recorded for this child? The follow-up only completes when a re-measurement exists.');">
 									<input type="hidden" name="action" value="complete_followup">
 									<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
 									<button class="admin-icon-btn admin-icon-btn-primary" type="submit" title="Verify re-measurement"><?php echo admin_action_icon('verify'); ?></button>
 								</form>
+								<?php endif; ?>
 							<?php else: ?>
 								<span class="admin-mini"><?php echo nutritionist_e(ucfirst((string)$appointment['status'])); ?></span>
 							<?php endif; ?>
