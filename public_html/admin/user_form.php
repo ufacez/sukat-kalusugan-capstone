@@ -3,7 +3,14 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('users.view');
+
+$editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
+
+if ($editId > 0) {
+    require_permission('users.update');
+} else {
+    require_permission('users.create');
+}
 
 $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
 $barangays = admin_barangay_options();

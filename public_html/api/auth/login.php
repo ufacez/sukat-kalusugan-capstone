@@ -76,7 +76,7 @@ $conn = get_db_connection();
 // Attempt staff authentication by username or email.
 $staffStmt = mysqli_prepare(
     $conn,
-    'SELECT u.id, u.name, u.email, u.username, u.password_hash, u.status, u.role_id, u.barangay_id, r.name AS role
+    'SELECT u.id, u.name, u.email, u.username, u.password_hash, u.status, u.role_id, u.barangay_id, u.access_level, r.name AS role
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
      WHERE LOWER(u.email) = LOWER(?) OR LOWER(u.username) = LOWER(?)
@@ -111,6 +111,7 @@ if (is_array($staff) && password_verify($password, (string)($staff['password_has
         'role_id' => (int)$staff['role_id'],
         'barangay_id' => $barangayId === null ? null : (int)$barangayId,
         'status' => (string)$staff['status'],
+        'access_level' => (string)($staff['access_level'] ?? 'full'),
     ];
 
     $lastLoginStmt = mysqli_prepare($conn, 'UPDATE users SET last_login = NOW() WHERE id = ? LIMIT 1');

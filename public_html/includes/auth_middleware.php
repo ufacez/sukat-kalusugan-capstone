@@ -8,7 +8,7 @@
  *   start_secure_session(): void
  *   current_user(): array|null
  *   require_login(): void                 -- redirects/exits if not logged in
- *   require_permission(string $code): void -- checks role_permissions table
+ *   require_permission(string $code): void -- checks per-user access_level
  *   is_parent_session(): bool             -- distinguishes staff vs parent session
  */
 
@@ -157,40 +157,28 @@ function require_permission(string $code): void
         deny_access('You do not have permission to access this page.', 403);
     }
 
-    if (($user['role'] ?? null) === 'admin') {
-        return;
-    }
+    $accessLevel = $user['access_level'] ?? 'full';
 
-    $roleId = (int)($user['role_id'] ?? 0);
-
-    if ($roleId <= 0) {
+    if (!user_has_access_for_code($accessLevel, $code)) {
         deny_access('You do not have permission to access this page.', 403);
     }
+}
 
-    $conn = get_db_connection();
-    $sql = '
-		SELECT 1
-		FROM role_permissions rp
-		INNER JOIN permissions p ON p.id = rp.permission_id
-		WHERE rp.role_id = ? AND p.code = ?
-		LIMIT 1
-	';
-    $stmt = mysqli_prepare($conn, $sql);
-
-    if ($stmt === false) {
-        deny_access('Unable to verify permissions right now.', 500);
+function user_has_access_for_code(string $accessLevel, string $code): bool
+{
+    switch ($accessLevel) {
+        case 'full':
+            return true;
+        case 'standard':
+            if (in_array($code, ['settings.update', 'sensors.update', 'users.delete', 'parents.delete', 'children.delete'])) {
+                return false;
+            }
+            return true;
+        case 'readonly':
+            return str_ends_with($code, '.view');
+        default:
+            return false;
     }
-
-    mysqli_stmt_bind_param($stmt, 'is', $roleId, $code);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_store_result($stmt);
-
-    if (mysqli_stmt_num_rows($stmt) < 1) {
-        mysqli_stmt_close($stmt);
-        deny_access('You do not have permission to access this page.', 403);
-    }
-
-    mysqli_stmt_close($stmt);
 }
 
 function has_permission(string $code): bool
@@ -205,28 +193,7 @@ function has_permission(string $code): bool
         return false;
     }
 
-    if (($user['role'] ?? null) === 'admin') {
-        return true;
-    }
+    $accessLevel = $user['access_level'] ?? 'full';
 
-    $roleId = (int)($user['role_id'] ?? 0);
-
-    if ($roleId <= 0) {
-        return false;
-    }
-
-    $conn = get_db_connection();
-    $stmt = mysqli_prepare($conn, 'SELECT 1 FROM role_permissions rp INNER JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ? AND p.code = ? LIMIT 1');
-
-    if ($stmt === false) {
-        return false;
-    }
-
-    mysqli_stmt_bind_param($stmt, 'is', $roleId, $code);
-    mysqli_stmt_execute($stmt);
-    mysqli_stmt_store_result($stmt);
-    $allowed = mysqli_stmt_num_rows($stmt) >= 1;
-    mysqli_stmt_close($stmt);
-
-    return $allowed;
+    return user_has_access_for_code($accessLevel, $code);
 }

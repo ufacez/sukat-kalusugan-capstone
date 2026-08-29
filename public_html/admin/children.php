@@ -12,6 +12,18 @@ if ($editId > 0) {
     admin_redirect('/admin/child_form.php?id=' . $editId);
 }
 
+$filterBarangay = (int)($_GET['barangay_id'] ?? 0);
+
+$where = "WHERE c.status = 'active'";
+$params = [];
+$types = '';
+
+if ($filterBarangay > 0) {
+    $where .= " AND c.barangay_id = ?";
+    $params[] = $filterBarangay;
+    $types = 'i';
+}
+
 $children = admin_fetch_all(
     "SELECT
         c.id,
@@ -36,14 +48,18 @@ $children = admin_fetch_all(
         SELECT m.id FROM measurements m WHERE m.child_id = c.id
         ORDER BY m.measurement_date DESC, m.id DESC LIMIT 1
      )
-     WHERE c.status = 'active'
-     ORDER BY c.last_name ASC, c.first_name ASC"
+     $where
+     ORDER BY c.last_name ASC, c.first_name ASC",
+    $types,
+    $params
 );
 
 $archivedCountRow = admin_fetch_one("SELECT COUNT(*) AS cnt FROM children WHERE status = 'inactive'");
 $archivedCount = (int)($archivedCountRow['cnt'] ?? 0);
 
 $totalAtRisk = count(array_filter($children, static fn(array $c): bool => in_array(strtolower((string)($c['nutritional_status'] ?? '')), ['severely underweight', 'severely stunted', 'severely wasted', 'moderately underweight', 'moderately stunted', 'moderately wasted'], true)));
+
+$barangays = admin_fetch_all("SELECT id, name FROM barangays WHERE status = 'active' ORDER BY name ASC");
 
 $actions = '';
 if (has_permission('children.create')) {
@@ -101,9 +117,15 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">Children Directory</h2>
-            <p class="admin-section-subtitle">All active children across all barangays.</p>
+            <p class="admin-section-subtitle">All active children<?php echo $filterBarangay > 0 ? ' in filtered barangay' : ' across all barangays'; ?>.</p>
         </div>
         <div class="admin-toolbar" style="margin:0;">
+            <select class="admin-search" id="barangay-filter" onchange="window.location.href='<?php echo admin_e(app_url('/admin/children.php')); ?>?barangay_id='+this.value" style="max-width:200px;cursor:pointer;">
+                <option value="0">All Barangays</option>
+                <?php foreach ($barangays as $b): ?>
+                    <option value="<?php echo (int)$b['id']; ?>" <?php echo $filterBarangay === (int)$b['id'] ? 'selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
+                <?php endforeach; ?>
+            </select>
             <input class="admin-search" type="search" placeholder="Search children" data-admin-filter="#children-table">
         </div>
     </div>
@@ -114,33 +136,38 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                 <tr>
                     <th>Code</th>
                     <th>Name</th>
-                    <th>Age</th>
-                    <th>Sex</th>
-                    <th>Barangay</th>
                     <th>Parent</th>
-                    <th>Last measurement</th>
+                    <th>Barangay</th>
+                    <th>Last Measurement</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($children as $child): ?>
-                    <?php
-                    $ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
-                    ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . $child['parent_name'])); ?>">
+                    <tr data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . $child['parent_name'] . ' ' . (string)($child['barangay'] ?? ''))); ?>">
                         <td style="font-family:monospace;color:var(--admin-muted);"><?php echo admin_e($child['child_code']); ?></td>
                         <td>
-                            <div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
-                            <div class="admin-mini"><?php echo admin_e((string)$child['birthdate']); ?></div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($child['first_name'] . ' ' . $child['last_name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
+                                <div>
+                                    <div style="font-weight:700;"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
+                                    <div class="admin-mini"><?php echo admin_e((string)$child['sex']); ?> &middot; <?php echo (int)(doh_age_in_months((string)$child['birthdate']) ?? 0); ?> mo</div>
+                                </div>
+                            </div>
                         </td>
-                        <td style="color:var(--admin-muted);"><?php echo (int)$ageMonths; ?> mo</td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['sex']); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['parent_name']); ?></td>
-                        <td style="font-size:12px;color:var(--admin-muted);">
-                            <?php echo admin_e((string)($child['measurement_date'] ?? 'n/a')); ?>
+                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
+                        <td>
+                            <?php if (!empty($child['measurement_date'])): ?>
+                                <?php $md = (string)$child['measurement_date']; ?>
+                                <div style="font-weight:600;font-size:0.82rem;"><?php echo admin_e(date('M j Y', strtotime($md))); ?></div>
+                                <div class="admin-mini"><?php echo admin_e(date('H:i', strtotime($md))); ?></div>
+                            <?php else: ?>
+                                <span style="color:var(--admin-muted);">n/a</span>
+                            <?php endif; ?>
                         </td>
                         <td>
+                            <?php if (has_permission('children.update') || has_permission('children.delete')): ?>
                             <div class="admin-actions">
                                 <?php if (has_permission('children.update')): ?>
                                     <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/child_form.php?id=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
@@ -154,6 +181,7 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                                     </form>
                                 <?php endif; ?>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

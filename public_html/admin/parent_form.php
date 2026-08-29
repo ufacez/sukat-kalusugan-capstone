@@ -3,7 +3,14 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('parents.view');
+
+$editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
+
+if ($editId > 0) {
+    require_permission('parents.update');
+} else {
+    require_permission('parents.create');
+}
 
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 $barangays = admin_barangay_options();

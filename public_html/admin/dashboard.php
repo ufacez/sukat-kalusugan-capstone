@@ -370,7 +370,9 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         </div>
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <input class="admin-search" type="search" placeholder="Search users..." data-admin-filter="#staff-users-table" style="flex:1; min-width:180px;">
+            <?php if (has_permission('users.create')): ?>
             <a class="admin-btn" href="<?php echo admin_e(app_url('/admin/user_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add user</a>
+            <?php endif; ?>
         </div>
     </div>
 
@@ -382,9 +384,8 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                     <th>Role</th>
                     <th>Barangay</th>
                     <th>Status</th>
-                    <th>Date Registered</th>
+                    <th>Registered</th>
                     <th>Last Login</th>
-                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -405,17 +406,19 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                         <td><span class="admin-pill <?php echo $su['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($su['role_name'])); ?></span></td>
                         <td><?php echo admin_e((string)($su['barangay'] ?? 'All barangays')); ?></td>
                         <td><span class="admin-pill <?php echo $statusClass; ?>"><?php echo admin_e(ucfirst($su['status'])); ?></span></td>
-                        <td class="admin-mini"><?php echo admin_e((string)($su['created_at'] ?? 'n/a')); ?></td>
-                        <td class="admin-mini"><?php echo admin_e((string)($su['last_login'] ?? 'never')); ?></td>
-                        <td>
-                            <div class="admin-actions">
-                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/user_form.php?id=' . (int)$su['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
-                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/users_delete.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($su['name']); ?>?');" style="display:inline;">
-                                    <input type="hidden" name="id" value="<?php echo (int)$su['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-                                </form>
-                            </div>
-                        </td>
+                        <td><?php
+                            $d = (string)($su['created_at'] ?? '');
+                            echo $d !== '' ? admin_e(date('M j Y', strtotime($d))) : 'n/a';
+                        ?></td>
+                        <td><?php
+                            $d = (string)($su['last_login'] ?? '');
+                            if ($d !== '' && $d !== 'never') {
+                                echo admin_e(date('M j Y', strtotime($d)));
+                                echo '<br><span class="admin-mini">' . admin_e(date('H:i', strtotime($d))) . '</span>';
+                            } else {
+                                echo 'never';
+                            }
+                        ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

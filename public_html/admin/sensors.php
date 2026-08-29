@@ -118,13 +118,12 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
         <table class="admin-table" id="devices-table">
             <thead>
                 <tr>
-                    <th>Device code</th>
-                    <th>Location</th>
+                    <th>Device</th>
                     <th>Barangay</th>
                     <th>Status</th>
                     <th>Connection</th>
-                    <th>Last seen</th>
-                    <th>Last calibration</th>
+                    <th>Last Seen</th>
+                    <th>Last Calibration</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -136,17 +135,42 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                         $deviceStatus = (string)($device['status'] ?? 'offline');
                     ?>
                     <tr data-filter-text="<?php echo admin_e(strtolower((string)$device['device_code'] . ' ' . (string)($device['location'] ?? '') . ' ' . (string)($device['barangay'] ?? '') . ' ' . $deviceStatus)); ?>">
-                        <td style="font-weight:700;color:var(--admin-text);font-family:monospace;"><?php echo admin_e((string)($device['device_code'] ?? '')); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($device['location'] ?? '')); ?></td>
+                        <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="admin-avatar" style="background:#64748b;width:32px;height:32px;font-size:0.65rem;font-family:monospace;"><?php echo admin_e(substr((string)($device['device_code'] ?? '??'), 0, 2)); ?></span>
+                                <div>
+                                    <div style="font-weight:700;font-family:monospace;"><?php echo admin_e((string)($device['device_code'] ?? '')); ?></div>
+                                    <div class="admin-mini"><?php echo admin_e((string)($device['location'] ?? '')); ?></div>
+                                </div>
+                            </div>
+                        </td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)($device['barangay'] ?? 'All barangays')); ?></td>
                         <td><span class="admin-pill <?php echo $deviceStatus === 'active' ? 'is-success' : ($deviceStatus === 'maintenance' ? 'is-warn' : 'is-danger'); ?>"><?php echo admin_e($deviceStatus); ?></span></td>
                         <td><span class="admin-pill <?php echo $connectionClass; ?>"><?php echo admin_e($connectionText); ?></span></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($device['last_seen_at'] ?? 'never')); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($device['last_calibration_at'] ?? 'n/a')); ?></td>
+                        <td><?php
+                            $d = (string)($device['last_seen_at'] ?? '');
+                            if ($d !== '' && $d !== 'never') {
+                                echo admin_e(date('M j Y', strtotime($d)));
+                                echo '<br><span class="admin-mini">' . admin_e(date('H:i', strtotime($d))) . '</span>';
+                            } else {
+                                echo 'never';
+                            }
+                        ?></td>
+                        <td><?php
+                            $d = (string)($device['last_calibration_at'] ?? '');
+                            if ($d !== '' && $d !== 'n/a') {
+                                echo admin_e(date('M j Y', strtotime($d)));
+                                echo '<br><span class="admin-mini">' . admin_e(date('H:i', strtotime($d))) . '</span>';
+                            } else {
+                                echo 'n/a';
+                            }
+                        ?></td>
                         <td>
+                            <?php if (has_permission('sensors.update')): ?>
                             <div class="admin-actions">
                                 <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/device_form.php?id=' . (int)$device['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

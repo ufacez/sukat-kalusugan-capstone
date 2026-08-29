@@ -35,7 +35,7 @@ foreach ($users as $user) {
 $archivedCountRow = admin_fetch_one("SELECT COUNT(*) AS cnt FROM users WHERE status = 'inactive'");
 $archivedCount = (int)($archivedCountRow['cnt'] ?? 0);
 
-$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/user_form.php')) . '">' . admin_action_icon('add') . ' Add user</a>';
+$actions = has_permission('users.create') ? '<a class="admin-btn" href="' . admin_e(app_url('/admin/user_form.php')) . '">' . admin_action_icon('add') . ' Add user</a>' : '';
 
 admin_layout_start('User Management', 'Create, update, and manage staff accounts.', 'users', $actions);
 ?>
@@ -85,34 +85,59 @@ admin_layout_start('User Management', 'Create, update, and manage staff accounts
         <table class="admin-table" id="users-table">
             <thead>
                 <tr>
-                    <th>Role</th>
                     <th>Name</th>
-                    <th>Username</th>
-                    <th>Email</th>
+                    <th>Role</th>
                     <th>Barangay</th>
-                    <th>Last login</th>
+                    <th>Status</th>
+                    <th>Registered</th>
+                    <th>Last Login</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($users as $user): ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $user['username'] . ' ' . $user['role_name'])); ?>">
-                        <td><span class="admin-pill <?php echo $user['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($user['role_name'])); ?></span></td>
-                        <td><?php echo admin_e($user['name']); ?></td>
-                        <td><?php echo admin_e($user['username'] ?? ''); ?></td>
-                        <td><?php echo admin_e($user['email']); ?></td>
-                        <td><?php echo admin_e($user['barangay'] ?? 'All barangays'); ?></td>
-                        <td><?php echo admin_e((string)($user['last_login'] ?? 'n/a')); ?></td>
+                    <tr data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $user['role_name'])); ?>">
                         <td>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($user['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($user['name']); ?></span>
+                                <div>
+                                    <div style="font-weight:700;"><?php echo admin_e($user['name']); ?></div>
+                                    <div class="admin-mini"><?php echo admin_e($user['email']); ?></div>
+                                </div>
+                            </div>
+                        </td>
+                        <td><span class="admin-pill <?php echo $user['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($user['role_name'])); ?></span></td>
+                        <td><?php echo admin_e((string)($user['barangay'] ?? 'All barangays')); ?></td>
+                        <td><span class="admin-pill <?php echo $user['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst($user['status'])); ?></span></td>
+                        <td><?php
+                            $d = (string)($user['created_at'] ?? '');
+                            echo $d !== '' ? admin_e(date('M j Y', strtotime($d))) : 'n/a';
+                        ?></td>
+                        <td><?php
+                            $d = (string)($user['last_login'] ?? '');
+                            if ($d !== '' && $d !== 'never') {
+                                echo admin_e(date('M j Y', strtotime($d)));
+                                echo '<br><span class="admin-mini">' . admin_e(date('H:i', strtotime($d))) . '</span>';
+                            } else {
+                                echo 'never';
+                            }
+                        ?></td>
+                        <td>
+                            <?php if (has_permission('users.update') || has_permission('users.delete')): ?>
                             <div class="admin-actions">
+                                <?php if (has_permission('users.update')): ?>
                                 <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/user_form.php?id=' . (int)$user['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <?php endif; ?>
+                                <?php if (has_permission('users.delete')): ?>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/users_archive.php')); ?>" onsubmit="return confirm('Archive <?php echo admin_e($user['name']); ?>?');" style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$user['id']; ?>">
                                     <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
                                     </button>
                                 </form>
+                                <?php endif; ?>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

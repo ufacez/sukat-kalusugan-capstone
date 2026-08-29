@@ -15,6 +15,33 @@ $todayCount = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE DATE(created_a
 $weekCount = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
 $uniqueUsers = admin_scalar("SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE user_id IS NOT NULL");
 
+$actionFilter = $_GET['action'] ?? '';
+$filterWhere = '';
+$filterTypes = '';
+$filterParams = [];
+if ($actionFilter === 'login') {
+    $filterWhere = "AND a.action = 'LOGIN'";
+} elseif ($actionFilter === 'logout') {
+    $filterWhere = "AND a.action = 'LOGOUT'";
+} elseif ($actionFilter === 'create') {
+    $filterWhere = "AND (a.action LIKE 'CREATE_%' OR a.action = 'measurement.create')";
+} elseif ($actionFilter === 'read') {
+    $filterWhere = "AND a.action IN ('EOPT_EXPORT','EOPT_LIST_EXPORT','FOLLOWUP_SYNC','PASSWORD_RESET_REQUEST','PASSWORD_RESET_COMPLETE')";
+} elseif ($actionFilter === 'update') {
+    $filterWhere = "AND a.action LIKE 'UPDATE_%'";
+} elseif ($actionFilter === 'delete') {
+    $filterWhere = "AND a.action LIKE 'DELETE_%'";
+}
+
+$perPage = 10;
+$page = max(1, (int)($_GET['page'] ?? 1));
+$filteredCount = (int)admin_scalar(
+    "SELECT COUNT(*) FROM audit_logs a WHERE 1=1 " . $filterWhere
+);
+$totalPages = max(1, (int)ceil($filteredCount / $perPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $perPage;
+
 $logs = admin_fetch_all(
     'SELECT a.id, a.action, a.level, a.description, a.ip_address, a.created_at, a.user_type,
             COALESCE(u.email, "System") AS actor,
@@ -23,8 +50,11 @@ $logs = admin_fetch_all(
      FROM audit_logs a
      LEFT JOIN users u ON u.id = a.user_id
      LEFT JOIN roles r ON r.id = u.role_id
+     WHERE 1=1 ' . $filterWhere . '
      ORDER BY a.created_at DESC, a.id DESC
-     LIMIT 200'
+     LIMIT ? OFFSET ?',
+    'ii',
+    [$perPage, $offset]
 );
 
 $searchHtml = '';
@@ -46,7 +76,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-legend-item{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:500;color:var(--admin-muted)}
 .audit-legend-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .audit-chart-body{position:relative}
-.audit-chart-canvas{width:100%;height:180px;cursor:crosshair}
+.audit-chart-canvas{width:100%;height:260px;cursor:crosshair}
 .audit-chart-y-axis{position:absolute;left:2px;top:0;bottom:0;width:28px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
 .audit-chart-y-label{font-size:8px;color:var(--admin-muted);font-family:Inter,monospace;text-align:right}
 .audit-chart-x-axis{display:flex;justify-content:space-between;padding:2px 30px 0 30px}
@@ -114,6 +144,8 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-level-dot.is-warning{background:#f59e0b}
 .audit-level-dot.is-danger{background:#dc2626}
 
+.admin-pill.is-indigo{background:rgba(99,102,241,0.10);color:#6366f1}
+
 .admin-table th,.admin-table td{padding:8px 12px;vertical-align:middle}
 
 .audit-filter-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -134,7 +166,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-dropdown.is-open .audit-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
 .audit-dropdown-group-label{font-size:9px;font-weight:600;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px 2px;user-select:none}
 .audit-dropdown-divider{height:1px;background:var(--admin-border);margin:3px 8px}
-.audit-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--admin-text);font-family:Inter,sans-serif;text-align:left;transition:background .1s}
+.audit-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--admin-text);font-family:Inter,sans-serif;text-align:left;transition:background .1s;text-decoration:none}
 .audit-dropdown-item:hover{background:var(--admin-surface-alt)}
 .audit-dropdown-item.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);font-weight:600}
 .audit-dropdown-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
@@ -151,7 +183,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         </div>
     </article>
     <article class="audit-stat">
-        <div class="audit-stat-icon is-yellow">
+        <div class="audit-stat-icon is-green">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
         </div>
         <div>
@@ -160,7 +192,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         </div>
     </article>
     <article class="audit-stat">
-        <div class="audit-stat-icon is-orange">
+        <div class="audit-stat-icon is-green">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
         </div>
         <div>
@@ -169,11 +201,11 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         </div>
     </article>
     <article class="audit-stat">
-        <div class="audit-stat-icon is-red">
+        <div class="audit-stat-icon is-green">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
         </div>
         <div>
-            <div class="audit-stat-value"><?php echo number_format(count($logs)); ?></div>
+            <div class="audit-stat-value"><?php echo number_format($filteredCount); ?></div>
             <div class="audit-stat-label">Total Events</div>
         </div>
     </article>
@@ -218,63 +250,63 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 </section>
 
 <section class="admin-section">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title">Event Log</h2>
-            <p class="admin-section-subtitle">Showing most recent 200 entries.</p>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <input class="admin-search" type="search" placeholder="Search logs" data-admin-filter="#audit-table" style="margin:0;">
-        </div>
-    </div>
-
     <div class="audit-filter-wrap">
         <div class="audit-search-wrap">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
-            <input class="audit-search-input" type="search" placeholder="Search logs..." id="audit-search" data-admin-filter="#audit-table">
+            <input class="audit-search-input" type="search" placeholder="Search logs..." id="audit-search">
         </div>
+        <?php
+        $filterLabels = ['login'=>'Login','logout'=>'Logout','create'=>'Create','read'=>'Read','update'=>'Update','delete'=>'Delete'];
+        $currentLabel = $actionFilter !== '' && isset($filterLabels[$actionFilter]) ? $filterLabels[$actionFilter] : 'All Actions';
+        $filterUrl = function($action) {
+            $params = $_GET;
+            unset($params['page']);
+            if ($action !== '') $params['action'] = $action; else unset($params['action']);
+            return admin_e(app_url('/admin/audit_logs.php') . '?' . http_build_query($params));
+        };
+        ?>
         <div class="audit-dropdown" id="audit-dropdown">
             <button class="audit-dropdown-trigger" id="audit-dropdown-trigger" type="button">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 0 1-.659 1.591l-5.432 5.432a2.25 2.25 0 0 0-.659 1.591v2.927a2.25 2.25 0 0 1-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 0 0-.659-1.591L3.659 7.409A2.25 2.25 0 0 1 3 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0 1 12 3Z"/></svg>
-                <span id="audit-dropdown-label">All Actions</span>
+                <span id="audit-dropdown-label"><?php echo admin_e($currentLabel); ?></span>
                 <svg class="audit-dropdown-chevron" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5"/></svg>
             </button>
             <div class="audit-dropdown-menu" id="audit-dropdown-menu">
-                <button class="audit-dropdown-item is-active" data-filter="all">
+                <a class="audit-dropdown-item<?php echo $actionFilter === '' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl(''); ?>">
                     <span class="audit-dropdown-dot" style="background:var(--admin-muted)"></span>
                     All Actions
-                </button>
+                </a>
                 <div class="audit-dropdown-divider"></div>
                 <div class="audit-dropdown-group">
                     <div class="audit-dropdown-group-label">Authentication</div>
-                    <button class="audit-dropdown-item" data-filter="login">
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'login' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('login'); ?>">
                         <span class="audit-dropdown-dot" style="background:#16a34a"></span>
                         Login
-                    </button>
-                    <button class="audit-dropdown-item" data-filter="logout">
+                    </a>
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'logout' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('logout'); ?>">
                         <span class="audit-dropdown-dot" style="background:#64748b"></span>
                         Logout
-                    </button>
+                    </a>
                 </div>
                 <div class="audit-dropdown-divider"></div>
                 <div class="audit-dropdown-group">
                     <div class="audit-dropdown-group-label">Data Operations</div>
-                    <button class="audit-dropdown-item" data-filter="create">
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'create' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('create'); ?>">
                         <span class="audit-dropdown-dot" style="background:#16a34a"></span>
                         Create
-                    </button>
-                    <button class="audit-dropdown-item" data-filter="read">
+                    </a>
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'read' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('read'); ?>">
                         <span class="audit-dropdown-dot" style="background:#6366f1"></span>
                         Read
-                    </button>
-                    <button class="audit-dropdown-item" data-filter="update">
+                    </a>
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'update' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('update'); ?>">
                         <span class="audit-dropdown-dot" style="background:#2563eb"></span>
                         Update
-                    </button>
-                    <button class="audit-dropdown-item" data-filter="delete">
+                    </a>
+                    <a class="audit-dropdown-item<?php echo $actionFilter === 'delete' ? ' is-active' : ''; ?>" href="<?php echo $filterUrl('delete'); ?>">
                         <span class="audit-dropdown-dot" style="background:#dc2626"></span>
                         Delete
-                    </button>
+                    </a>
                 </div>
             </div>
         </div>
@@ -284,9 +316,10 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         <table class="admin-table" id="audit-table">
             <thead>
                 <tr>
-                    <th style="width:22%">User</th>
-                    <th style="width:16%">Action</th>
-                    <th style="width:16%">Date &amp; Time</th>
+                    <th>Name</th>
+                    <th>Role</th>
+                    <th>Action</th>
+                    <th>Date &amp; Time</th>
                     <th>Description</th>
                 </tr>
             </thead>
@@ -294,12 +327,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 <?php foreach ($logs as $log): ?>
                     <?php
                     $resolvedType = strtolower($log['resolved_type'] ?? 'admin');
-                    $avatarClass = match($resolvedType) {
-                        'nutritionist' => 'is-nutritionist',
-                        'parent' => 'is-parent',
-                        'system' => 'is-system',
-                        default => 'is-admin',
-                    };
+                    $avatarColor = admin_avatar_color($log['actor_name'] ?? 'System');
                     $roleLabel = match($resolvedType) {
                         'admin' => 'Admin',
                         'nutritionist' => 'Nutritionist',
@@ -310,21 +338,17 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                         ? admin_initials($log['actor_name'])
                         : 'SY';
                     $rawAction = strtoupper($log['action']);
-                    $actionClass = match(true) {
-                        str_starts_with($rawAction, 'CREATE') => 'is-create',
-                        str_starts_with($rawAction, 'UPDATE') => 'is-update',
-                        str_starts_with($rawAction, 'DELETE') => 'is-delete',
-                        $rawAction === 'LOGIN' => 'is-login',
-                        $rawAction === 'LOGOUT' => 'is-logout',
-                        str_starts_with($rawAction, 'PASSWORD_RESET') => 'is-update',
-                        str_starts_with($rawAction, 'MEASUREMENT') => 'is-create',
-                        str_starts_with($rawAction, 'EOPT') => 'is-read',
-                        str_starts_with($rawAction, 'FOLLOWUP') => 'is-read',
-                        default => 'is-read',
+                    $pillClass = match(true) {
+                        $rawAction === 'LOGIN' || $rawAction === 'LOGOUT' => 'is-muted',
+                        str_starts_with($rawAction, 'CREATE') || str_starts_with($rawAction, 'MEASUREMENT') => 'is-success',
+                        str_starts_with($rawAction, 'EOPT') || str_starts_with($rawAction, 'FOLLOWUP') || str_starts_with($rawAction, 'PASSWORD_RESET') => 'is-indigo',
+                        str_starts_with($rawAction, 'UPDATE') => 'is-info',
+                        str_starts_with($rawAction, 'DELETE') => 'is-danger',
+                        default => 'is-muted',
                     };
                     $ts = $log['created_at'];
                     $dateObj = new DateTime($ts);
-                    $dateLine = $dateObj->format('j M Y');
+                    $dateLine = $dateObj->format('M j Y');
                     $timeLine = $dateObj->format('H:i');
 
                     $actionLabel = $log['action'];
@@ -341,28 +365,64 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     ?>
                     <tr data-filter-text="<?php echo admin_e(strtolower($log['actor'] . ' ' . $log['actor_name'] . ' ' . $actionLabel . ' ' . ($log['description'] ?? '') . ' ' . $roleLabel)); ?>">
                         <td>
-                            <div class="audit-user-cell">
-                                <div class="audit-user-avatar <?php echo $avatarClass; ?>"><?php echo admin_e($initials); ?></div>
-                                <div class="audit-user-info">
-                                    <div class="audit-user-name"><?php echo admin_e($log['actor_name']); ?></div>
-                                    <div class="audit-user-role"><?php echo admin_e($roleLabel); ?></div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="admin-avatar" style="background:<?php echo admin_e($avatarColor); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_e($initials); ?></span>
+                                <div>
+                                    <div style="font-weight:700;"><?php echo admin_e($log['actor_name']); ?></div>
+                                    <div class="admin-mini"><?php echo admin_e($log['actor'] ?? ''); ?></div>
                                 </div>
                             </div>
                         </td>
-                        <td><span class="audit-action-pill <?php echo $actionClass; ?>"><?php echo admin_e($actionLabel); ?></span></td>
+                        <td><span class="admin-pill <?php echo admin_e(match($resolvedType) {
+                            'admin' => 'is-warn',
+                            'nutritionist' => 'is-success',
+                            'parent' => 'is-info',
+                            default => 'is-muted',
+                        }); ?>"><?php echo admin_e($roleLabel); ?></span></td>
+                        <td><span class="admin-pill <?php echo admin_e($pillClass); ?>"><?php echo admin_e($actionLabel); ?></span></td>
                         <td>
-                            <div class="audit-time-cell">
-                                <div class="audit-time-date"><?php echo admin_e($dateLine); ?></div>
-                                <div class="audit-time-clock"><?php echo admin_e($timeLine); ?></div>
-                            </div>
+                            <div><?php echo admin_e($dateLine); ?></div>
+                            <div class="admin-mini"><?php echo admin_e($timeLine); ?></div>
                         </td>
-                        <td class="audit-desc-cell">
-                            <span class="audit-level-dot is-<?php echo admin_e($log['level']); ?>"></span><?php echo admin_e($log['description'] ?? ''); ?>
-                        </td>
+                        <td style="color:var(--admin-muted);font-size:0.82rem;"><?php echo admin_e($log['description'] ?? ''); ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>
         </table>
+
+        <?php if ($totalPages > 1): ?>
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--admin-border);">
+            <span class="admin-pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
+            <div class="admin-pagination-numbers">
+                <?php
+                $pParams = $_GET;
+                unset($pParams['page']);
+                $qs = http_build_query($pParams);
+                $prefix = $qs ? $qs . '&' : '';
+                $range = 1;
+                $start = max(1, $page - $range);
+                $end = min($totalPages, $page + $range);
+                ?>
+                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . 'page=' . ($page - 1)); ?>" <?php echo $page <= 1 ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                </a>
+                <?php if ($start > 1): ?>
+                    <a class="admin-page-num" href="?<?php echo admin_e($prefix . 'page=1'); ?>">1</a>
+                    <?php if ($start > 2): ?><span style="color:var(--admin-muted);padding:0 4px;">...</span><?php endif; ?>
+                <?php endif;
+                for ($i = $start; $i <= $end; $i++): ?>
+                    <a class="admin-page-num<?php echo $i === $page ? ' is-active' : ''; ?>" href="?<?php echo admin_e($prefix . 'page=' . $i); ?>"><?php echo $i; ?></a>
+                <?php endfor;
+                if ($end < $totalPages): ?>
+                    <?php if ($end < $totalPages - 1): ?><span style="color:var(--admin-muted);padding:0 4px;">...</span><?php endif; ?>
+                    <a class="admin-page-num" href="?<?php echo admin_e($prefix . 'page=' . $totalPages); ?>"><?php echo $totalPages; ?></a>
+                <?php endif; ?>
+                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . 'page=' . ($page + 1)); ?>" <?php echo $page >= $totalPages ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                </a>
+            </div>
+        </div>
+        <?php endif; ?>
     </div>
 </section>
 
@@ -430,7 +490,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         ctx = canvas.getContext('2d');
         dpr = window.devicePixelRatio || 1;
         var rect = canvas.parentElement.getBoundingClientRect();
-        W = rect.width; H = 180;
+        W = rect.width; H = 260;
         canvas.width = W*dpr; canvas.height = H*dpr;
         canvas.style.width = W+'px'; canvas.style.height = H+'px';
         ctx.scale(dpr,dpr);
@@ -522,7 +582,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 }
             }
 
-            if(closest>=0 && closestDist<30){
+            if(closest>=0 && closestDist<45){
                 hoverIndex = closest;
                 var d = catData[closest];
                 var lines = [formatFull(d.date)+':' ];
@@ -593,42 +653,11 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
     loadInsights();
     setInterval(loadInsights,60000);
 
-    // Dropdown
     var dropdown=document.getElementById('audit-dropdown');
     var trigger=document.getElementById('audit-dropdown-trigger');
-    var menu=document.getElementById('audit-dropdown-menu');
-    var lbl=document.getElementById('audit-dropdown-label');
-    if(trigger&&menu){
+    if(trigger&&dropdown){
         trigger.addEventListener('click',function(e){e.stopPropagation();dropdown.classList.toggle('is-open');});
         document.addEventListener('click',function(e){if(!dropdown.contains(e.target))dropdown.classList.remove('is-open');});
-        var catMap={all:null,login:['LOGIN'],logout:['LOGOUT'],create:['CREATE_USER','CREATE_PARENT','CREATE_LOCAL_AREA','measurement.create'],read:['EOPT_EXPORT','EOPT_LIST_EXPORT','FOLLOWUP_SYNC','PASSWORD_RESET_REQUEST','PASSWORD_RESET_COMPLETE'],update:['UPDATE_CHILD','UPDATE_BARANGAY','UPDATE_DEVICE'],delete:[]};
-        var items=menu.querySelectorAll('.audit-dropdown-item');
-        var table=document.getElementById('audit-table');
-        var rows=table?table.querySelectorAll('tbody tr'):[];
-        items.forEach(function(item){
-            item.addEventListener('click',function(){
-                var filter=item.getAttribute('data-filter');
-                items.forEach(function(i){i.classList.remove('is-active');});
-                item.classList.add('is-active');
-                lbl.textContent=item.textContent.trim();
-                dropdown.classList.remove('is-open');
-                rows.forEach(function(row){
-                    if(filter==='all'){row.style.display='';}
-                    else{
-                        var pill=row.querySelector('.audit-action-pill');
-                        var t=pill?pill.textContent.trim().toLowerCase():'';
-                        var m=false;
-                        if(filter==='login')m=t==='login';
-                        else if(filter==='logout')m=t==='logout';
-                        else if(filter==='create')m=t.indexOf('create')!==-1;
-                        else if(filter==='read')m=t.indexOf('export')!==-1||t.indexOf('sync')!==-1||t.indexOf('password')!==-1||t.indexOf('request')!==-1||t.indexOf('complete')!==-1;
-                        else if(filter==='update')m=t.indexOf('update')!==-1;
-                        else if(filter==='delete')m=t.indexOf('delete')!==-1;
-                        row.style.display=m?'':'none';
-                    }
-                });
-            });
-        });
     }
 })();
 </script>

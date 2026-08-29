@@ -107,40 +107,43 @@ admin_layout_start('Parents', 'Manage parent and guardian accounts across all ba
             <thead>
                 <tr>
                     <th>Name</th>
-                    <th>Type</th>
-                    <th>Email</th>
+                    <th>Address</th>
                     <th>Phone</th>
-                    <th>Barangay</th>
-                    <th>Children</th>
+                    <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php foreach ($parents as $parent): ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'])); ?>">
+                    <tr data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' ' . (string)($parent['address'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
                         <td>
-                            <div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e($parent['name']); ?></div>
-                            <div class="admin-mini"><?php echo admin_e((string)($parent['address'] ?? '')); ?></div>
+                            <div style="display:flex;align-items:center;gap:10px;">
+                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($parent['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>
+                                <div>
+                                    <div style="font-weight:700;"><?php echo admin_e($parent['name']); ?></div>
+                                    <div class="admin-mini"><?php echo admin_e($parent['email']); ?></div>
+                                </div>
+                            </div>
                         </td>
-                        <td><span class="admin-pill is-muted"><?php echo admin_e($parent['parent_type']); ?></span></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e($parent['email']); ?></td>
+                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['address'] ?? '')); ?></td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['phone'] ?? '')); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['barangay'] ?? '')); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
+                        <td><span class="admin-pill is-success"><?php echo admin_e(ucfirst($parent['status'])); ?></span></td>
                         <td>
+                            <?php if (has_permission('parents.update') || has_permission('parents.delete')): ?>
                             <div class="admin-actions">
                                 <?php if (has_permission('parents.update')): ?>
-                                    <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
                                 <?php endif; ?>
                                 <?php if (has_permission('parents.delete')): ?>
-                                    <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_archive.php')); ?>" onsubmit="return confirm('Archive <?php echo admin_e($parent['name']); ?>?');" style="display:inline;">
-                                        <input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
-                                        <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-                                        </button>
-                                    </form>
+                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_archive.php')); ?>" onsubmit="return confirm('Archive <?php echo admin_e($parent['name']); ?>?');" style="display:inline;">
+                                    <input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                    </button>
+                                </form>
                                 <?php endif; ?>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>

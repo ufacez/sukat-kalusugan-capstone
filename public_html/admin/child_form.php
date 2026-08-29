@@ -4,7 +4,14 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 
 start_secure_session();
-require_permission('children.view');
+
+$editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
+
+if ($editId > 0) {
+    require_permission('children.update');
+} else {
+    require_permission('children.create');
+}
 
 function admin_next_child_code(): string
 {

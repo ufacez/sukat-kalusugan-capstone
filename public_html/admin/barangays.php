@@ -30,7 +30,7 @@ $activeCount = count(array_filter($barangays, static fn(array $b): bool => (stri
 $totalChildren = array_sum(array_map(static fn(array $b): int => (int)$b['children_count'], $barangays));
 $totalKiosks = array_sum(array_map(static fn(array $b): int => (int)$b['kiosks_count'], $barangays));
 
-$actions = '<a class="admin-btn" href="' . admin_e(app_url('/admin/barangay_form.php')) . '">' . admin_action_icon('add') . ' Add barangay</a>';
+$actions = has_permission('barangays.manage') ? '<a class="admin-btn" href="' . admin_e(app_url('/admin/barangay_form.php')) . '">' . admin_action_icon('add') . ' Add barangay</a>' : '';
 
 admin_layout_start('Barangays', 'The master list every child, parent, nutritionist, and kiosk is scoped to.', 'barangays', $actions);
 ?>
@@ -128,16 +128,20 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
                         <td><?php echo (int)$barangay['kiosks_count']; ?></td>
                         <td><span class="admin-pill <?php echo (string)$barangay['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst((string)$barangay['status'])); ?></span></td>
                         <td>
+                            <?php if (has_permission('barangays.view')): ?>
                             <div class="admin-actions">
                                 <a class="admin-icon-btn" title="Local Areas" href="<?php echo admin_e(app_url('/admin/local_areas.php?barangay_id=' . (int)$barangay['id'])); ?>">
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 2.499 4.012-3.749a1.125 1.125 0 0 1 1.538-.028l3.499 3.25a1.125 1.125 0 0 1-.05 1.664l-3.499 2a1.125 1.125 0 0 1-1.588-.5V6.75a1.125 1.125 0 0 1 .503-.999Z"/></svg>
                                 </a>
+                                <?php if (has_permission('barangays.manage')): ?>
                                 <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/barangay_form.php?id=' . (int)$barangay['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_delete.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($barangay['name']); ?>? Records linked to it will keep their history but lose the barangay assignment.');" style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$barangay['id']; ?>">
                                     <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
                                 </form>
+                                <?php endif; ?>
                             </div>
+                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
