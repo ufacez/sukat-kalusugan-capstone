@@ -147,8 +147,6 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-level-dot.is-warning{background:#f59e0b}
 .audit-level-dot.is-danger{background:#dc2626}
 
-.admin-pill.is-indigo{background:rgba(99,102,241,0.10);color:#6366f1}
-
 .admin-table th,.admin-table td{padding:8px 12px;vertical-align:middle}
 
 .audit-filter-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -337,12 +335,30 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                         ? admin_initials($log['actor_name'])
                         : 'SY';
                     $rawAction = strtoupper($log['action']);
+                    // CRUD action-pill mapping for the audit log.
+                    // Maps each audit action to the same CRUD-themed color
+                    // classes used across the admin system so the meaning
+                    // is consistent (create=green, read=blue, update=orange,
+                    // delete=red, auth/session=muted).
+                    //
+                    // We accept BOTH naming styles because the database may
+                    // already contain rows logged with the older
+                    // "INVITATION_CANCEL" / "INVITATION_CREATE" form, while
+                    // new code logs them as "DELETE_INVITATION" /
+                    // "CREATE_INVITATION". Both forms map to the same pill.
                     $pillClass = match(true) {
                         $rawAction === 'LOGIN' || $rawAction === 'LOGOUT' => 'is-muted',
-                        str_starts_with($rawAction, 'CREATE') || str_starts_with($rawAction, 'MEASUREMENT') => 'is-success',
-                        str_starts_with($rawAction, 'DELETE') => 'is-danger',
-                        str_starts_with($rawAction, 'EOPT') || str_starts_with($rawAction, 'FOLLOWUP') || str_starts_with($rawAction, 'PASSWORD_RESET') => 'is-indigo',
-                        str_starts_with($rawAction, 'UPDATE') => 'is-info',
+                        $rawAction === 'ACCOUNT_ACTIVATED' => 'is-create',
+                        $rawAction === 'INVITATION_CREATE' => 'is-create',
+                        $rawAction === 'INVITATION_CANCEL' => 'is-delete',
+                        str_starts_with($rawAction, 'CREATE') || str_starts_with($rawAction, 'MEASUREMENT') => 'is-create',
+                        str_starts_with($rawAction, 'DELETE') => 'is-delete',
+                        str_starts_with($rawAction, 'UPDATE') => 'is-update',
+                        // Exports, syncs, and password reset flows are "read /
+                        // export / sync" actions — they pull data without
+                        // mutating the underlying records, so we render them
+                        // with the read-themed blue pill.
+                        str_starts_with($rawAction, 'EOPT') || str_starts_with($rawAction, 'FOLLOWUP') || str_starts_with($rawAction, 'PASSWORD_RESET') => 'is-read',
                         default => 'is-muted',
                     };
                     $ts = $log['created_at'];
@@ -350,8 +366,12 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     $dateLine = $dateObj->format('M j Y');
                     $timeLine = $dateObj->format('H:i');
 
+                    // Human-readable label. The older "INVITATION_*" form is
+                    // also recognized so historic rows render nicely until
+                    // the audit log is rotated/archived.
                     $actionLabel = $log['action'];
-                    if ($actionLabel === 'DELETE_INVITATION') $actionLabel = 'Cancel invite';
+                    if ($actionLabel === 'DELETE_INVITATION' || $actionLabel === 'INVITATION_CANCEL') $actionLabel = 'Cancel invite';
+                    elseif ($actionLabel === 'CREATE_INVITATION' || $actionLabel === 'INVITATION_CREATE') $actionLabel = 'Create invite';
                     elseif (str_starts_with($actionLabel, 'CREATE_')) $actionLabel = 'Create ' . strtolower(substr($actionLabel, 7));
                     elseif (str_starts_with($actionLabel, 'UPDATE_')) $actionLabel = 'Update ' . strtolower(substr($actionLabel, 7));
                     elseif (str_starts_with($actionLabel, 'DELETE_')) $actionLabel = 'Delete ' . strtolower(substr($actionLabel, 7));

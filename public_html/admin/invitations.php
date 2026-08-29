@@ -136,19 +136,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);
 }
 
-$perPage = 10;
-$page = max(1, (int)($_GET['page'] ?? 1));
-$offset = ($page - 1) * $perPage;
-
-$totalCount = (int)admin_scalar(
-    "SELECT COUNT(*) FROM invitations i
-     INNER JOIN users u ON u.id = i.inviter_user_id
-     LEFT JOIN barangays b ON b.id = i.barangay_id
-     WHERE 1=1",
-    '', [], 0
-);
-$totalPages = max(1, (int)ceil($totalCount / $perPage));
-
+// Pagination of the Invitation History is now performed client-side by the
+// shared admin.js paginator (which reads `data-page-size="5"` from the table).
+// Loading the full list is fine because the table is admin-only and bounded by
+// the 3-pending cap already enforced on creation, so even heavy usage stays
+// well under a few hundred rows. This keeps the visual pagination controls
+// consistent with every other admin-table in the system.
 $invitations = admin_fetch_all(
     "SELECT i.id, i.invitee_name, i.invitee_email, i.barangay_id, i.role, i.code, i.method, i.status, i.expires_at, i.used_at, i.created_at,
             u.name AS inviter_name,
@@ -156,9 +149,8 @@ $invitations = admin_fetch_all(
      FROM invitations i
      INNER JOIN users u ON u.id = i.inviter_user_id
      LEFT JOIN barangays b ON b.id = i.barangay_id
-     ORDER BY i.created_at DESC
-     LIMIT ? OFFSET ?",
-    'ii', [$perPage, $offset]
+     ORDER BY i.created_at DESC",
+    '', []
 );
 
 $barangays = admin_barangay_options();
@@ -311,7 +303,7 @@ admin_layout_start('Staff Invitations', 'Invite new staff members via activation
         </div>
 
         <div class="admin-field admin-field-wide" style="align-content:end;">
-            <button class="admin-btn" type="submit"><?php echo admin_action_icon('add'); ?> Generate Invitation</button>
+            <button class="admin-btn is-create" type="submit"><?php echo admin_action_icon('add'); ?> Generate Invitation</button>
         </div>
     </form>
 </section>
@@ -326,7 +318,7 @@ admin_layout_start('Staff Invitations', 'Invite new staff members via activation
     </div>
 
     <div class="admin-table-wrap">
-        <table class="admin-table" id="invitations-table" data-no-paginate>
+        <table class="admin-table" id="invitations-table" data-page-size="5">
             <thead>
                 <tr>
                     <th>Name</th>
@@ -356,18 +348,23 @@ admin_layout_start('Staff Invitations', 'Invite new staff members via activation
                             </div>
                         </td>
                         <td><span class="admin-mini"><?php echo admin_e($inv['invitee_email'] ?? '—'); ?></span></td>
-                        <td><span class="admin-pill <?php echo $inv['role'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($inv['role'])); ?></span></td>
+                        <td><span class="admin-pill <?php echo $inv['role'] === 'admin' ? 'is-update' : 'is-create'; ?>"><?php echo admin_e(ucfirst($inv['role'])); ?></span></td>
                         <td><?php echo admin_e((string)($inv['barangay_name'] ?? 'All barangays')); ?></td>
-                        <td><span class="admin-pill <?php echo $inv['method'] === 'email' ? 'is-info' : ''; ?>"><?php echo admin_e(ucfirst($inv['method'])); ?></span></td>
+                        <td><span class="admin-pill is-read"><?php echo admin_e(ucfirst($inv['method'])); ?></span></td>
                         <td><code style="font-weight:700;letter-spacing:0.1em;font-size:0.85rem;"><?php echo admin_e($inv['code']); ?></code></td>
                         <td>
                             <?php
+                            // CRUD action-pill mapping for invitation status:
+                            //   pending   → is-update  (orange, awaiting activation)
+                            //   used      → is-create  (green,  successfully activated)
+                            //   expired   → is-muted   (gray,   no longer valid)
+                            //   cancelled → is-delete  (red,    operator cancelled it)
                             $statusClass = match ($inv['status']) {
-                                'pending' => 'is-warn',
-                                'used' => 'is-success',
-                                'expired' => 'is-muted',
-                                'cancelled' => 'is-danger',
-                                default => 'is-muted',
+                                'pending'   => 'is-update',
+                                'used'      => 'is-create',
+                                'expired'   => 'is-muted',
+                                'cancelled' => 'is-delete',
+                                default     => 'is-muted',
                             };
                             ?>
                             <span class="admin-pill <?php echo $statusClass; ?>"><?php echo admin_e(ucfirst($inv['status'])); ?></span>
@@ -398,7 +395,7 @@ admin_layout_start('Staff Invitations', 'Invite new staff members via activation
                                 <form method="post" action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>" onsubmit="return confirm('Cancel invitation for <?php echo admin_e($inv['invitee_name']); ?>?');" style="display:inline;">
                                     <input type="hidden" name="action" value="cancel">
                                     <input type="hidden" name="id" value="<?php echo (int)$inv['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Cancel" type="submit">
+                                    <button class="admin-icon-btn is-delete" title="Cancel" type="submit" aria-label="Cancel invitation">
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                                     </button>
                                 </form>
@@ -410,31 +407,12 @@ admin_layout_start('Staff Invitations', 'Invite new staff members via activation
             </tbody>
         </table>
     </div>
-    <?php if ($totalPages > 1): ?>
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-top:1px solid var(--admin-border);">
-        <span class="admin-pagination-status">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
-        <div class="admin-pagination-numbers" style="gap:6px;">
-            <?php
-            $pParams = $_GET;
-            unset($pParams['page']);
-            $qs = http_build_query($pParams);
-            $prefix = $qs ? $qs . '&' : '';
-            if ($page > 1): ?>
-                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . 'page=' . ($page - 1)); ?>">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
-                </a>
-            <?php endif;
-            for ($i = 1; $i <= $totalPages; $i++): ?>
-                <a class="admin-page-num<?php echo $i === $page ? ' is-active' : ''; ?>" href="?<?php echo admin_e($prefix . 'page=' . $i); ?>"><?php echo $i; ?></a>
-            <?php endfor;
-            if ($page < $totalPages): ?>
-                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . 'page=' . ($page + 1)); ?>">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
-                </a>
-            <?php endif; ?>
-        </div>
-    </div>
-    <?php endif; ?>
+    <!--
+        Pagination for the Invitation History is handled by the shared
+        admin.js paginator (see public_html/assets/js/admin.js) which
+        reads data-page-size="5" from this table. This keeps the visual
+        pagination consistent with every other admin-table in the system.
+    -->
 </section>
 <?php endif; ?>
 

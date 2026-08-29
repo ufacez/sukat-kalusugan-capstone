@@ -144,6 +144,11 @@
   paginatedTables.forEach((table) => {
     const rows = Array.from(table.querySelectorAll("tbody tr"));
     const filterInput = document.querySelector(`[data-admin-filter="#${table.id}"]`);
+    // Per-table page-size override: any <table data-page-size="N"> uses N rows
+    // per page, otherwise we fall back to the global default of 10.
+    // The invitation history uses this to render 5 per page.
+    const tablePageSize = parseInt(table.getAttribute("data-page-size"), 10);
+    const effectivePageSize = Number.isFinite(tablePageSize) && tablePageSize > 0 ? tablePageSize : pageSize;
     let currentPage = 1;
     let filteredRows = rows;
     const pagination = document.createElement("div");
@@ -158,10 +163,10 @@
     const nextButton = pagination.querySelector(".admin-pagination-next");
 
     function render() {
-      const pageCount = Math.max(1, Math.ceil(filteredRows.length / pageSize));
+      const pageCount = Math.max(1, Math.ceil(filteredRows.length / effectivePageSize));
       currentPage = Math.min(currentPage, pageCount);
-      const start = (currentPage - 1) * pageSize;
-      const end = Math.min(start + pageSize, filteredRows.length);
+      const start = (currentPage - 1) * effectivePageSize;
+      const end = Math.min(start + effectivePageSize, filteredRows.length);
       const visibleRows = new Set(filteredRows.slice(start, end));
 
       rows.forEach((row) => {

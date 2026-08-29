@@ -955,6 +955,43 @@
   color: var(--admin-muted);
 }
 
+/* ---------------------------------------------------------------------------
+ * CRUD action-pill variants
+ * Used to visually group the action pills for invitation management
+ * (and any other CRUD-style list) so that each verb inherits the same
+ * theme color across the system:
+ *   - is-create → primary / success (green)  → "create / generate"
+ *   - is-read   → info (blue)                → "view / read"
+ *   - is-update → warning / orange (amber)   → "update / re-send / activated"
+ *   - is-delete → danger (red)               → "cancel / delete"
+ * They reuse the same CSS variables as the status pills, so any future
+ * theme tweak in one place propagates everywhere.
+ * ------------------------------------------------------------------------- */
+.admin-pill.is-create {
+  background: var(--admin-pill-success-bg);
+  color: var(--admin-primary);
+}
+
+.admin-pill.is-read {
+  background: #e8f4fd;
+  color: #1971c2;
+}
+
+[data-theme="dark"] .admin-pill.is-read {
+  background: rgba(25, 113, 194, 0.15);
+  color: #74c0fc;
+}
+
+.admin-pill.is-update {
+  background: var(--admin-pill-orange-bg);
+  color: var(--admin-pill-orange-text);
+}
+
+.admin-pill.is-delete {
+  background: var(--admin-pill-danger-bg);
+  color: var(--admin-danger);
+}
+
 .admin-actions {
   display: flex;
   gap: 8px;
@@ -1035,6 +1072,19 @@
   background: var(--admin-btn-danger-bg);
 }
 .admin-icon-btn.admin-icon-btn-danger:hover {
+  background: var(--admin-danger);
+  color: #fff;
+  border-color: var(--admin-danger);
+}
+/* CRUD action modifier for icon buttons. Mirrors the danger variant so
+ * the Cancel-Invitation control reads as a "delete" action without
+ * needing the legacy admin-icon-btn-danger class. */
+.admin-icon-btn.is-delete {
+  color: var(--admin-danger);
+  border-color: var(--admin-btn-danger-border);
+  background: var(--admin-btn-danger-bg);
+}
+.admin-icon-btn.is-delete:hover {
   background: var(--admin-danger);
   color: #fff;
   border-color: var(--admin-danger);
@@ -2034,6 +2084,111 @@
 
 .admin-card-value--warn {
   color: var(--admin-accent, #f2a93b) !important;
+}
+
+/* ─────────────────────────────────────────────────────────────────────
+ * Settings page layout
+ *
+ * Mirrors the reference 2-column profile layout:
+ *   ┌───────────────────────────┬───────────────────┐
+ *   │  General Information      │  Change password  │
+ *   │  (avatar + Basic Info)    │  (3 inputs)       │
+ *   └───────────────────────────┴───────────────────┘
+ * The form is a single <form> so the single "Save All Changes" button
+ * at the bottom submits everything together, but the visual surface is
+ * split into the two cards above. The grid collapses to a single column
+ * on narrow screens.
+ * ─────────────────────────────────────────────────────────────────── */
+.admin-settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.admin-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+/* Each card: a little extra vertical breathing room than a default
+ * .admin-section so the avatar + subhead feel like distinct blocks. */
+.admin-settings-card {
+  padding: 22px 22px 24px;
+}
+
+.admin-settings-card--narrow {
+  /* The right-hand password card naturally has fewer fields, so it just
+   * keeps the same padding and lets the grid align everything to the top. */
+}
+
+.admin-settings-card .admin-section-head {
+  margin-bottom: 14px;
+}
+
+.admin-settings-subhead {
+  margin: 18px 0 12px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--admin-muted);
+}
+
+.admin-settings-avatar {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: 4px;
+}
+
+/* Larger avatar variant for the settings/profile page. Keeps the circle
+ * shape from the global .admin-avatar rule but bumps the size and font so
+ * the initials are readable at profile-page scale. */
+.admin-avatar.admin-avatar--lg {
+  width: 72px;
+  height: 72px;
+  font-size: 1.5rem;
+  border: 3px solid var(--admin-surface);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+/* Single-column variant of the form grid for the right-hand password
+ * card, so each field takes the full card width. */
+.admin-form-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+/* Footer with the single Save All Changes button. Right-aligned on
+ * desktop, full-width on narrow screens for thumb-friendly tapping. */
+.admin-settings-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.admin-settings-footer .admin-btn {
+  min-width: 180px;
+}
+
+/* Responsive: collapse to a single column on narrower screens so the
+ * password card doesn't squeeze the name fields. */
+@media (max-width: 880px) {
+  .admin-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-settings-footer {
+    justify-content: stretch;
+  }
+
+  .admin-settings-footer .admin-btn {
+    width: 100%;
+  }
 }
 
 .admin-card-value--success {
