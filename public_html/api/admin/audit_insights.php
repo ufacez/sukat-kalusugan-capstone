@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/admin_helpers.php';
+require_once __DIR__ . '/../../includes/ai_insights_helper.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -103,7 +104,18 @@ foreach ($recentActivity as $ra) {
 
 $summaryText = implode("\n", $summaryLines);
 
-$aiInsights = generate_ai_insights($summaryText, $totalLogs, $last7, $last30, $actionBreakdown, $userTypeBreakdown);
+$aiInsights = ai_insights_generate([
+    'summary_text' => $summaryText,
+    'system_message' => 'You are a data analyst for a child nutrition monitoring system called Sukat Kalusugan. '
+        . 'Analyze the following audit log summary and return exactly 4-6 short insight bullets in JSON format: '
+        . '{"insights": ["insight 1", "insight 2", ...]}. '
+        . 'Each insight should be 1-2 sentences max. Focus on: activity trends, security observations, '
+        . 'user behavior patterns, and any anomalies. Be concise and actionable. '
+        . 'Do NOT use markdown. Return ONLY valid JSON.',
+    'fallback' => function () use ($totalLogs, $last7, $last30, $actionBreakdown, $userTypeBreakdown) {
+        return generate_audit_rule_based_insights($totalLogs, $last7, $last30, $actionBreakdown, $userTypeBreakdown);
+    },
+]);
 
 echo json_encode([
     'success' => true,
@@ -118,102 +130,7 @@ echo json_encode([
 ], JSON_UNESCAPED_UNICODE);
 
 
-function generate_ai_insights(
-    string $summaryText,
-    int $total,
-    int $last7,
-    int $last30,
-    array $actions,
-    array $userTypes
-): array {
-    $apiKey = defined('CHATBOT_API_KEY') ? trim((string)CHATBOT_API_KEY) : '';
-    $provider = defined('CHATBOT_PROVIDER') ? strtolower(trim((string)CHATBOT_PROVIDER)) : '';
-    $model = defined('CHATBOT_MODEL') ? trim((string)CHATBOT_MODEL) : '';
-
-    if ($apiKey !== '' && in_array($provider, ['gemini', 'openai'], true)) {
-        try {
-            return call_ai_provider($provider, $apiKey, $model, $summaryText);
-        } catch (\Throwable $e) {
-            error_log('[AuditLogs] AI provider error: ' . $e->getMessage());
-        }
-    }
-
-    return generate_rule_based_insights($total, $last7, $last30, $actions, $userTypes);
-}
-
-
-function call_ai_provider(string $provider, string $apiKey, string $model, string $prompt): array
-{
-    $systemMessage = 'You are a data analyst for a child nutrition monitoring system called Sukat Kalusugan. '
-        . 'Analyze the following audit log summary and return exactly 4-6 short insight bullets in JSON format: '
-        . '{"insights": ["insight 1", "insight 2", ...]}. '
-        . 'Each insight should be 1-2 sentences max. Focus on: activity trends, security observations, '
-        . 'user behavior patterns, and any anomalies. Be concise and actionable. '
-        . 'Do NOT use markdown. Return ONLY valid JSON.';
-
-    if ($provider === 'gemini') {
-        $url = 'https://generativelanguage.googleapis.com/v1beta/models/'
-            . ($model ?: 'gemini-2.0-flash') . ':generateContent?key=' . $apiKey;
-        $body = json_encode([
-            'contents' => [['parts' => [['text' => $systemMessage . "\n\n" . $prompt]]]],
-            'generationConfig' => ['temperature' => 0.3, 'maxOutputTokens' => 500],
-        ]);
-    } else {
-        $url = 'https://api.openai.com/v1/chat/completions';
-        $body = json_encode([
-            'model' => $model ?: 'gpt-4o-mini',
-            'messages' => [
-                ['role' => 'system', 'content' => $systemMessage],
-                ['role' => 'user', 'content' => $prompt],
-            ],
-            'temperature' => 0.3,
-            'max_tokens' => 500,
-        ]);
-    }
-
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
-        CURLOPT_POSTFIELDS => $body,
-        CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 8,
-        CURLOPT_SSL_VERIFYPEER => false,
-    ]);
-    $response = curl_exec($ch);
-    $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
-
-    if ($response === false || $httpCode >= 400) {
-        throw new \RuntimeException("AI request failed: HTTP {$httpCode}");
-    }
-
-    $data = json_decode($response, true);
-    if ($data === null) {
-        throw new \RuntimeException('AI response decode failed');
-    }
-
-    $text = '';
-    if ($provider === 'gemini') {
-        $text = $data['candidates'][0]['content']['parts'][0]['text'] ?? '';
-    } else {
-        $text = $data['choices'][0]['message']['content'] ?? '';
-    }
-
-    $text = trim($text);
-    $text = preg_replace('/^```(?:json)?\s*/i', '', $text);
-    $text = preg_replace('/\s*```$/i', '', $text);
-
-    $parsed = json_decode($text, true);
-    if (is_array($parsed) && isset($parsed['insights']) && is_array($parsed['insights'])) {
-        return ['source' => 'ai', 'insights' => array_slice($parsed['insights'], 0, 6)];
-    }
-
-    throw new \RuntimeException('AI response format invalid');
-}
-
-
-function generate_rule_based_insights(
+function generate_audit_rule_based_insights(
     int $total,
     int $last7,
     int $last30,

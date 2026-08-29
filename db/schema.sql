@@ -145,8 +145,6 @@ CREATE TABLE `children` (
   `birthdate` date NOT NULL,
   `sex` enum('Male','Female') NOT NULL,
   `barangay_id` int(10) UNSIGNED DEFAULT NULL,
-  `address` varchar(255) DEFAULT NULL,
-  `purok` varchar(150) DEFAULT NULL,
   `is_ip` tinyint(1) NOT NULL DEFAULT 0,
   `has_disability` tinyint(1) NOT NULL DEFAULT 0,
   `parent_id` int(10) UNSIGNED NOT NULL,

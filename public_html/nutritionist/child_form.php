@@ -31,7 +31,7 @@ if ($editId <= 0 && !nutritionist_can_write('children.create')) {
 	admin_redirect('/nutritionist/children.php', ['notice' => 'You do not have permission to create children.', 'type' => 'error']);
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     $action = (string)($_POST['action'] ?? '');
 
@@ -322,6 +322,14 @@ if ($editId > 0) {
 }
 
 
+/*
+ * Parents list is scoped to the nutritionist's barangay. A
+ * non-admin nutritionist can only see / pick parents already in their
+ * barangay, which is what determines the child's `barangay_id` on
+ * save.
+ */
+$parentParams = [];
+$parentScope = nutritionist_scope_fragment($user, 'p.barangay_id', $parentParams);
 $parents = admin_fetch_all(
     "SELECT
         p.id,
@@ -336,9 +344,10 @@ $parents = admin_fetch_all(
      FROM parents p
      LEFT JOIN barangays bg
         ON bg.id = p.barangay_id
+     WHERE {$parentScope}
      ORDER BY p.name ASC",
-    '',
-    []
+    str_repeat('i', count($parentParams)),
+    $parentParams
 );
 
 $actions = '<a class="admin-btn-secondary" href="'

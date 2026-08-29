@@ -2,89 +2,39 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
-
-function nutritionist_child_status_class(?string $status): string
-{
-    $normalized = strtolower(trim((string)$status));
-
-    return match ($normalized) {
-        'normal', 'tall', 't' => 'is-success',
-        'moderately underweight', 'moderately stunted', 'moderately wasted', 'muw', 'mst', 'mw' => 'is-warn',
-        'overweight', 'obese', 'ow', 'ob' => 'is-orange',
-        'pending' => 'is-muted',
-        'suw', 'sst', 'sw', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
-        default => 'is-muted',
-    };
-}
 
 $user = nutritionist_require_access();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-
-    $action = (string)($_POST['action'] ?? '');
-    $childId = (int)($_POST['id'] ?? 0);
-
-    /*
-     * DELETE
-     */
-    if ($action === 'delete' && $childId > 0) {
-
-        nutritionist_require_write('children.delete');
-
-        $target = admin_fetch_one('SELECT id, child_code, barangay_id FROM children WHERE id = ? LIMIT 1', 'i', [$childId]);
-
-        if ($target === null) {
-            admin_redirect('/nutritionist/children.php', ['notice' => 'Child not found.', 'type' => 'error']);
-        }
-
-        // Scope check: nutritionists can only archive children in their assigned barangay
-        $userBarangayId = $user['barangay_id'] ?? null;
-        if (($user['role'] ?? '') !== 'admin' && $userBarangayId !== null && $userBarangayId !== '' && (int)$target['barangay_id'] !== (int)$userBarangayId) {
-            admin_redirect('/nutritionist/children.php', ['notice' => 'You can only manage children within your assigned barangay.', 'type' => 'error']);
-        }
-
-        // Archive instead of hard delete
-        $newStatus = 'inactive';
-        $ok = admin_execute('UPDATE children SET status = ? WHERE id = ?', 'si', [$newStatus, $childId]);
-
-        if ($ok) {
-            $actor = current_user();
-            log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'warning', 'Archived child ' . $target['child_code'] . ' (' . $childId . ')');
-        }
-
-        admin_redirect(
-            '/nutritionist/children.php',
-            $ok ? ['notice' => 'Child archived successfully.'] : ['notice' => 'Child could not be archived.', 'type' => 'error']
-        );
-    }
-}
-
 /*
- * FILTERS / VIEW
+ * Filter / view params
  */
-$statusFilter = (string)($_GET['status'] ?? 'All');
-$viewId = (int)($_GET['view'] ?? 0);
-$deleteId = (int)($_GET['delete'] ?? 0);
+$localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
+$page = max(1, (int)($_GET['page'] ?? 1));
+$perPage = 10;
 
-if ($deleteId > 0) {
-    admin_redirect(
-        '/nutritionist/child_form.php?id=' . $deleteId
-    );
-}
-
-
-/*
- * CHILDREN
- */
 $childrenParams = [];
+$childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 
-$childrenScope = nutritionist_scope_fragment(
-    $user,
-    'c.barangay_id',
-    $childrenParams
-);
+$where = [$childrenScope];
+$types = str_repeat('i', count($childrenParams));
+$filterParams = $childrenParams;
 
+if ($localAreaFilter > 0) {
+    $where[] = 'c.local_area_id = ?';
+    $types .= 'i';
+    $filterParams[] = $localAreaFilter;
+}
+$whereSql = implode(' AND ', $where);
+
+/*
+ * Full fetch — the per-nutritionist dataset is bounded so we filter
+ * status in PHP only when needed. The children page doesn't filter by
+ * status, so we slice directly.
+ *
+ * NOTE: the live `children` table does not have `address` or `purok`
+ * columns (they only exist in the schema.sql file). Address info is
+ * pulled from the parent's `address` field instead.
+ */
 $children = admin_fetch_all(
     "SELECT
         c.id,
@@ -95,1047 +45,446 @@ $children = admin_fetch_all(
         c.birthdate,
         c.sex,
         c.barangay_id,
-        bg.name AS barangay,
         c.local_area_id,
-        la.area_name AS local_area,
-        la.area_type,
         c.is_ip,
         c.has_disability,
         c.parent_id,
-
+        bg.name AS barangay,
+        la.area_name AS local_area,
+        la.area_type,
         p.name AS parent_name,
-        p.status AS parent_status,
-
-        lm.measurement_date,
-        lm.height_cm,
-        lm.weight_kg,
-        lm.waz,
-        lm.haz,
-        lm.whz,
-        COALESCE(lm.nutritional_status, CASE
-            WHEN lm.waz < -3 THEN 'Severely Underweight'
-            WHEN lm.haz < -3 THEN 'Severely Stunted'
-            WHEN lm.whz < -3 THEN 'Severely Wasted'
-            WHEN lm.waz < -2 THEN 'Moderately Underweight'
-            WHEN lm.haz < -2 THEN 'Moderately Stunted'
-            WHEN lm.whz < -2 THEN 'Moderately Wasted'
-            WHEN lm.whz > 3 THEN 'Obese'
-            WHEN lm.whz > 2 THEN 'Overweight'
-            ELSE 'Normal'
-        END) AS nutritional_status,
-        COALESCE(lm.wfa_status, CASE
-            WHEN lm.waz < -3 THEN 'SUW'
-            WHEN lm.waz < -2 THEN 'MUW'
-            WHEN lm.waz > 2 THEN 'OW'
-            ELSE 'Normal'
-        END) AS wfa_status,
-        COALESCE(lm.hfa_status, CASE
-            WHEN lm.haz < -3 THEN 'SSt'
-            WHEN lm.haz < -2 THEN 'MSt'
-            WHEN lm.haz > 2 THEN 'Tall'
-            ELSE 'Normal'
-        END) AS hfa_status,
-        COALESCE(lm.wfh_status, CASE
-            WHEN lm.whz < -3 THEN 'SW'
-            WHEN lm.whz < -2 THEN 'MW'
-            WHEN lm.whz > 3 THEN 'Ob'
-            WHEN lm.whz > 2 THEN 'OW'
-            ELSE 'Normal'
-        END) AS wfh_status
-
+        p.parent_type AS parent_kind,
+        p.phone AS parent_phone,
+        p.email AS parent_email,
+        p.address AS parent_address
      FROM children c
-
-     INNER JOIN parents p
-        ON p.id = c.parent_id
-
-     LEFT JOIN barangays bg
-        ON bg.id = c.barangay_id
-
-     LEFT JOIN local_areas la
-        ON la.id = c.local_area_id
-
-     LEFT JOIN measurements lm
-        ON lm.id = (
-            SELECT m.id
-            FROM measurements m
-            WHERE m.child_id = c.id
-            ORDER BY m.measurement_date DESC, m.id DESC
-            LIMIT 1
-        )
-
-     WHERE {$childrenScope}
-
-     ORDER BY
-        c.last_name ASC,
-        c.first_name ASC",
-    str_repeat('i', count($childrenParams)),
-    $childrenParams
+     INNER JOIN parents p ON p.id = c.parent_id
+     LEFT JOIN barangays bg ON bg.id = c.barangay_id
+     LEFT JOIN local_areas la ON la.id = c.local_area_id
+     WHERE {$whereSql}
+     ORDER BY c.last_name ASC, c.first_name ASC",
+    $types,
+    $filterParams
 );
 
-$viewChild = null;
+$totalAll = count($children);
+$totalPages = max(1, (int)ceil($totalAll / $perPage));
+$page = min($page, $totalPages);
+$offset = ($page - 1) * $perPage;
+$pageChildren = array_slice($children, $offset, $perPage);
 
-foreach ($children as $child) {
+/*
+ * Local area list for the filter dropdown. The list is restricted to
+ * the user's barangay scope so a Dela Paz Norte nutritionist can only
+ * filter to local areas inside Dela Paz Norte.
+ */
+$localAreaParams = [];
+$localAreaScope = nutritionist_scope_fragment($user, 'la.barangay_id', $localAreaParams);
+$localAreaList = admin_fetch_all(
+    "SELECT la.id, la.area_name, la.area_type, la.barangay_id, bg.name AS barangay
+     FROM local_areas la
+     INNER JOIN barangays bg ON bg.id = la.barangay_id
+     WHERE la.is_active = 1 AND {$localAreaScope}
+     ORDER BY bg.name ASC, la.area_name ASC",
+    str_repeat('i', count($localAreaParams)),
+    $localAreaParams
+);
 
-    if ((int)$child['id'] === $viewId) {
-        $viewChild = $child;
+function nutritionist_children_url(array $params): string
+{
+    $base = app_url('/nutritionist/children.php');
+    $merged = array_filter($params, static fn($v) => $v !== '' && $v !== null);
+    return $merged === [] ? $base : $base . '?' . http_build_query($merged);
+}
+
+function nchild_full_address(?string $barangay, ?string $localArea, ?string $address, ?string $purok): string
+{
+    $parts = [];
+    if ($purok !== null && trim($purok) !== '') {
+        $parts[] = trim($purok);
     }
+    if ($localArea !== null && trim($localArea) !== '') {
+        $parts[] = trim($localArea);
+    }
+    if ($address !== null && trim($address) !== '') {
+        $parts[] = trim($address);
+    }
+    if ($barangay !== null && trim($barangay) !== '') {
+        $parts[] = trim($barangay);
+    }
+    return $parts === [] ? '—' : implode(', ', $parts);
 }
 
-
-/*
- * PARENTS
- *
- * barangay_id is included because the selected parent's
- * Barangay is used automatically for the child.
- */
-$parents = admin_fetch_all(
-    "SELECT
-        p.id,
-        p.name,
-        p.parent_type,
-        p.status,
-        p.phone,
-        p.address,
-        p.barangay_id,
-        bg.name AS barangay
-     FROM parents p
-     LEFT JOIN barangays bg
-        ON bg.id = p.barangay_id
-     ORDER BY p.name ASC",
-    '',
-    []
-);
-
-
-/*
- * STATUS FILTER
- */
-$statuses = [
-    'All',
-    'Normal',
-    'Moderately Underweight',
-    'Severely Underweight',
-    'Moderately Stunted',
-    'Severely Stunted',
-    'Moderately Wasted',
-    'Severely Wasted',
-    'Overweight',
-    'Obese',
-    'Tall',
-    'Pending',
-];
-
-$filteredChildren = array_values(
-    array_filter(
-        $children,
-        static function (array $child) use ($statusFilter): bool {
-
-            if ($statusFilter === 'All') {
-                return true;
-            }
-
-            return (string)(
-                $child['nutritional_status'] ?? 'Pending'
-            ) === $statusFilter;
-        }
-    )
-);
-
-
-/*
- * SELECTED CHILD
- */
-$selectedChild = $viewChild;
-
-$selectedMeasurements = [];
-
-if ($selectedChild !== null) {
-
-    $measurementParams = [
-        (int)$selectedChild['id']
-    ];
-
-    $selectedMeasurements = admin_fetch_all(
-        'SELECT
-            id,
-            measurement_date,
-            height_cm,
-            weight_kg,
-            waz,
-            haz,
-            whz,
-            nutritional_status,
-            source_type
-         FROM measurements
-         WHERE child_id = ?
-         ORDER BY measurement_date DESC, id DESC',
-        'i',
-        $measurementParams
-    );
-
-    $openFollowup = admin_fetch_one(
-        "SELECT id, scheduled_at, status, followup_track, followup_category
-         FROM appointments
-         WHERE child_id = ?
-           AND appointment_type = 'followup'
-           AND status IN ('pending', 'confirmed')
-         ORDER BY scheduled_at ASC
-         LIMIT 1",
-        'i',
-        [(int)$selectedChild['id']]
-    );
+function nchild_short_address(?string $localArea, ?string $barangay): string
+{
+    $local = trim((string)($localArea ?? ''));
+    $brgy = trim((string)($barangay ?? ''));
+    if ($local !== '' && $brgy !== '') {
+        return $local . ' · ' . $brgy;
+    }
+    return $local !== '' ? $local : ($brgy !== '' ? $brgy : '—');
 }
-
 
 $actions = '<div class="admin-actions">'
-    . '<a class="admin-btn-secondary" href="'
-    . nutritionist_e(app_url('/nutritionist/measurement_record.php'))
-    . '">' . admin_action_icon('measure') . ' Record measurement</a>'
+    . '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('clipboard') . ' Measurements</a>'
     . (nutritionist_can_write('children.create')
-        ? '<a class="admin-btn" href="'
-            . nutritionist_e(app_url('/nutritionist/child_form.php'))
-            . '">' . admin_action_icon('add') . ' Add child</a>'
+        ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/child_form.php')) . '">' . admin_action_icon('add') . ' Add child</a>'
         : '')
     . '</div>';
 
 nutritionist_layout_start(
-    'Children & Growth',
-    'Registered children, latest growth status, and follow-up history.',
+    'Children',
+    'Registered child profiles. Click any row to view the child information card.',
     'children',
     $actions
 );
-
 ?>
+<style>
+.children-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.children-toolbar .admin-search{flex:1;min-width:220px}
+.children-toolbar .admin-select{min-width:200px;max-width:260px}
+
+.children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
+.children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:#94a3b8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.children-table .child-name-cell .text{min-width:0}
+.children-table .child-name-cell .text .name{font-weight:600;color:var(--admin-text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.children-table .child-name-cell .text .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
+
+.children-table .address-cell{max-width:240px}
+.children-table .address-cell .primary{font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.children-table .address-cell .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
+
+.children-table .row-link{cursor:pointer;transition:background-color .12s}
+.children-table .row-link:hover td{background:var(--admin-surface-alt)}
+
+.children-empty{padding:32px 18px;color:var(--admin-muted);font-size:13px;background:var(--admin-surface-alt);border-radius:10px;border:1px dashed var(--admin-border);text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
+.children-empty .empty-title{font-weight:700;color:var(--admin-text);font-size:14px}
+.children-empty .empty-sub{color:var(--admin-muted);max-width:420px;line-height:1.45}
+
+.children-pagination{display:flex;align-items:center;justify-content:space-between;padding:12px 4px 0;flex-wrap:wrap;gap:8px}
+.children-pagination .status{font-size:11px;color:var(--admin-muted)}
+.children-pagination .pages{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.children-pagination .page-btn{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 8px;border:1px solid var(--admin-border);border-radius:7px;background:var(--admin-surface);color:var(--admin-text);font-size:11px;font-weight:600;text-decoration:none}
+.children-pagination .page-btn.is-active{background:var(--admin-primary);border-color:var(--admin-primary);color:#fff}
+.children-pagination .page-btn.is-disabled{opacity:.4;pointer-events:none}
+
+/* Child detail modal (just child information, no measurements) */
+.cc-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.cc-overlay.is-open{display:flex}
+.cc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.cc-head{display:flex;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
+.cc-head .avatar{width:56px;height:56px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cc-head .meta{min-width:0;flex:1}
+.cc-head .name{font-size:16px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-head .sub{font-size:11px;color:var(--admin-muted);margin-top:2px}
+.cc-head .close{background:none;border:none;color:var(--admin-muted);font-size:20px;line-height:1;cursor:pointer;padding:6px 10px;border-radius:6px}
+.cc-head .close:hover{background:var(--admin-surface-alt);color:var(--admin-text)}
+
+.cc-body{padding:18px 20px}
+.cc-section{font-weight:700;font-size:11px;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px}
+.cc-section:first-child{margin-top:0}
+.cc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--admin-border);font-size:12px}
+.cc-row:last-child{border-bottom:none}
+.cc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0;width:120px}
+.cc-row .value{font-weight:600;color:var(--admin-text);text-align:right;flex:1;min-width:0;word-break:break-word}
+.cc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+</style>
 
 <section class="nutritionist-panel">
-
-    <div class="nutritionist-form-head" style="margin-bottom:12px;">
-
+    <div class="nutritionist-form-head" style="margin-bottom:14px;">
         <div>
-            <h2 class="admin-section-title" style="margin-bottom:2px;">
-                Children Monitoring
-            </h2>
-
+            <h2 class="admin-section-title" style="margin-bottom:2px;">Children directory</h2>
             <p class="admin-section-subtitle">
-                <?php echo count($children); ?> registered children
+                Registered children in your scope. Click a row to view the child information card, or use the action buttons.
             </p>
         </div>
-
-        <div class="nutritionist-chip-row">
-
-            <?php foreach ($statuses as $status): ?>
-
-                <a
-                    class="nutritionist-chip<?php echo $statusFilter === $status ? ' is-active' : ''; ?>"
-                    href="<?php echo nutritionist_e(
-                        app_url(
-                            '/nutritionist/children.php?status='
-                            . urlencode($status)
-                        )
-                    ); ?>"
-                >
-                    <?php echo nutritionist_e($status); ?>
-                </a>
-
-            <?php endforeach; ?>
-
-        </div>
-
     </div>
 
-
-    <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-
+    <div class="children-toolbar">
         <input
             class="admin-search"
             data-admin-filter="#children-table"
             type="search"
-            placeholder="Search children..."
-            style="flex:1;min-width:200px;"
+            placeholder="Search by name, code, guardian, or address..."
         >
-
+        <select
+            class="admin-select"
+            id="local-area-filter"
+            onchange="window.location.href=this.value"
+        >
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['page' => 1])); ?>">All local areas</option>
+            <?php foreach ($localAreaList as $la): ?>
+                <option
+                    value="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => (int)$la['id'], 'page' => 1])); ?>"
+                    <?php echo $localAreaFilter === (int)$la['id'] ? 'selected' : ''; ?>
+                ><?php
+                    $label = ucfirst((string)$la['area_type']) . ': ' . $la['area_name'];
+                    if (($user['role'] ?? '') === 'admin' && !empty($la['barangay'])) {
+                        $label .= ' · ' . $la['barangay'];
+                    }
+                    echo nutritionist_e($label);
+                ?></option>
+            <?php endforeach; ?>
+        </select>
     </div>
-
 
     <div class="nutritionist-table-wrap">
-
-        <table class="nutritionist-table" id="children-table">
-
+        <table class="nutritionist-table children-table" id="children-table">
             <thead>
-
                 <tr>
                     <th>Code</th>
-                    <th>Name</th>
-                    <th>Age</th>
+                    <th>Address (Local area · Barangay)</th>
+                    <th>Name of Guardian</th>
+                    <th>Full name of child</th>
                     <th>Sex</th>
-                    <th>Barangay</th>
-                    <th>Local Area</th>
-                    <th>Parent</th>
-                    <th>Status</th>
-                    <th>Next Due</th>
+                    <th>Age (months)</th>
                     <th>Actions</th>
                 </tr>
-
             </thead>
-
             <tbody>
-
-                <?php foreach ($filteredChildren as $child): ?>
-
-                    <?php
-
-                    $ageMonths =
-                        doh_age_in_months(
-                            (string)$child['birthdate']
-                        ) ?? 0;
-
-                    $status =
-                        (string)(
-                            $child['nutritional_status']
-                            ?? 'Pending'
-                        );
-
-                    $pillClass =
-                        nutritionist_child_status_class($status);
-
-                    $schedule = followup_card_state(
-                        (string)$child['birthdate'],
-                        ($child['measurement_date'] ?? null) !== null ? (string)$child['measurement_date'] : null,
-                        ($child['wfa_status'] ?? null) !== null ? (string)$child['wfa_status'] : null,
-                        ($child['hfa_status'] ?? null) !== null ? (string)$child['hfa_status'] : null,
-                        ($child['wfh_status'] ?? null) !== null ? (string)$child['wfh_status'] : null
-                    );
-
-                    ?>
-
-                    <tr
-                        data-filter-text="<?php
-                            echo nutritionist_e(
-                                strtolower(
-                                    $child['child_code']
-                                    . ' '
-                                    . $child['first_name']
-                                    . ' '
-                                    . ($child['middle_name'] ?? '')
-                                    . ' '
-                                    . $child['last_name']
-                                    . ' '
-                                    . (string)($child['barangay'] ?? '')
-                                    . ' '
-                                    . (string)($child['local_area'] ?? '')
-                                    . ' '
-                                    . $child['parent_name']
-                                    . ' '
-                                    . $status
-                                    . ' '
-                                    . $schedule['label']
-                                )
-                            );
-                        ?>"
-                    >
-
-                        <td style="font-family:monospace;color:var(--admin-muted);">
-                            <?php echo nutritionist_e($child['child_code']); ?>
-                        </td>
-
-                        <td>
-
-                            <div style="display:flex;align-items:center;gap:8px;">
-
-                                <div
-                                    class="admin-pill <?php echo $pillClass; ?>"
-                                    style="min-width:30px;justify-content:center;border-radius:50%;padding:0.35rem 0.5rem;"
-                                >
-                                    <?php
-                                    echo nutritionist_e(
-                                        substr($child['first_name'], 0, 1)
-                                        . substr($child['last_name'], 0, 1)
-                                    );
-                                    ?>
-                                </div>
-
-                                <div>
-
-                                    <div
-                                        style="font-size:13px;font-weight:600;color:var(--admin-text);"
-                                    >
-                                        <?php
-                                        echo nutritionist_e(
-                                            trim(
-                                                $child['first_name']
-                                                . ' '
-                                                . ($child['middle_name'] ?? '')
-                                                . ' '
-                                                . $child['last_name']
-                                            )
-                                        );
-                                        ?>
-                                    </div>
-
-                                    <div
-                                        style="font-size:10px;color:var(--admin-muted);margin-top:1px;"
-                                    >
-                                        <?php
-                                        echo nutritionist_e(
-                                            (string)$child['birthdate']
-                                        );
-                                        ?>
-                                    </div>
-
-                                </div>
-
-                            </div>
-
-                        </td>
-
-                        <td style="color:var(--admin-muted);">
-                            <?php echo (int)$ageMonths; ?> mo
-                        </td>
-
-                        <td style="color:var(--admin-muted);">
-                            <?php echo nutritionist_e(
-                                (string)$child['sex']
-                            ); ?>
-                        </td>
-
-                        <td style="color:var(--admin-muted);">
-                            <?php echo nutritionist_e(
-                                (string)($child['barangay'] ?? '')
-                            ); ?>
-                        </td>
-
-                        <td>
-                            <?php if (!empty($child['local_area'])): ?>
-                                <span class="admin-pill is-info"><?php echo nutritionist_e(ucfirst((string)($child['area_type'] ?? '')) . ': ' . $child['local_area']); ?></span>
+                <?php if ($pageChildren === []): ?>
+                    <tr><td colspan="7">
+                        <div class="children-empty">
+                            <?php if ($totalAll === 0): ?>
+                                <div class="empty-title">No children registered yet</div>
+                                <div class="empty-sub">Your scope doesn't have any registered children. Once children are added, they will appear in this list.</div>
+                                <?php if (nutritionist_can_write('children.create')): ?>
+                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
+                                <?php endif; ?>
                             <?php else: ?>
-                                <span style="color:var(--admin-muted);">—</span>
+                                <div class="empty-title">No children in this view</div>
+                                <div class="empty-sub">Your current local area filter doesn't include any of the <?php echo (int)$totalAll; ?> children in your scope. Clear the filter to see all of them.</div>
+                                <a class="admin-btn-secondary" href="<?php echo nutritionist_e(nutritionist_children_url([])); ?>">Clear filter</a>
+                            <?php endif; ?>
+                        </div>
+                    </td></tr>
+                <?php endif; ?>
+                <?php foreach ($pageChildren as $child): ?>
+                    <?php
+                    $ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
+                    $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
+                    $profileUrl = nutritionist_e(app_url('/nutritionist/child_view.php?id=' . (int)$child['id']));
+                    $editUrl = nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id']));
+                    $parentAddress = (string)($child['parent_address'] ?? '');
+                    ?>
+                    <tr
+                        class="row-link"
+                        data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $fullName . ' ' . ($child['parent_name'] ?? '') . ' ' . ($child['barangay'] ?? '') . ' ' . ($child['local_area'] ?? '') . ' ' . $parentAddress)); ?>"
+                        data-child-id="<?php echo (int)$child['id']; ?>"
+                        data-child-name="<?php echo nutritionist_e($fullName); ?>"
+                        data-child-code="<?php echo nutritionist_e((string)$child['child_code']); ?>"
+                        data-child-sex="<?php echo nutritionist_e((string)$child['sex']); ?>"
+                        data-child-birthdate="<?php echo nutritionist_e((string)$child['birthdate']); ?>"
+                        data-child-age="<?php echo (int)$ageMonths; ?>"
+                        data-child-localarea="<?php echo nutritionist_e((string)($child['local_area'] ?? '')); ?>"
+                        data-child-areatype="<?php echo nutritionist_e((string)($child['area_type'] ?? '')); ?>"
+                        data-child-address="<?php echo nutritionist_e($parentAddress); ?>"
+                        data-child-barangay="<?php echo nutritionist_e((string)($child['barangay'] ?? '')); ?>"
+                        data-child-ip="<?php echo !empty($child['is_ip']) ? '1' : '0'; ?>"
+                        data-child-disability="<?php echo !empty($child['has_disability']) ? '1' : '0'; ?>"
+                        data-parent-name="<?php echo nutritionist_e((string)($child['parent_name'] ?? '')); ?>"
+                        data-parent-kind="<?php echo nutritionist_e((string)($child['parent_kind'] ?? '')); ?>"
+                        data-parent-phone="<?php echo nutritionist_e((string)($child['parent_phone'] ?? '')); ?>"
+                        data-parent-email="<?php echo nutritionist_e((string)($child['parent_email'] ?? '')); ?>"
+                    >
+                        <td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($child['child_code']); ?></td>
+                        <td class="address-cell">
+                            <div class="primary"><?php echo nutritionist_e(nchild_short_address($child['local_area'] ?? null, $child['barangay'] ?? null)); ?></div>
+                            <?php if ($parentAddress !== ''): ?>
+                                <div class="sub" title="<?php echo nutritionist_e($parentAddress); ?>"><?php echo nutritionist_e(mb_strimwidth($parentAddress, 0, 48, '…')); ?></div>
                             <?php endif; ?>
                         </td>
-
-                        <td style="color:var(--admin-muted);">
-                            <?php echo nutritionist_e(
-                                (string)$child['parent_name']
-                            ); ?>
+                        <td style="min-width:0;">
+                            <div style="font-weight:600;color:var(--admin-text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;"><?php echo nutritionist_e((string)($child['parent_name'] ?? '—')); ?></div>
+                            <?php if (!empty($child['parent_kind'])): ?>
+                                <div class="admin-mini"><?php echo nutritionist_e((string)$child['parent_kind']); ?></div>
+                            <?php endif; ?>
                         </td>
-
                         <td>
-                            <span class="admin-pill <?php echo $pillClass; ?>">
-                                <?php echo nutritionist_e($status); ?>
-                            </span>
-                        </td>
-
-                        <td>
-
-                            <div
-                                style="display:flex;flex-direction:column;gap:3px;align-items:flex-start;"
-                            >
-
-                                <span
-                                    class="admin-pill <?php echo $schedule['class']; ?>"
-                                    title="EOPT schedule compliance flag"
-                                >
-                                    <?php echo nutritionist_e($schedule['label']); ?>
-                                </span>
-
-                                <span style="font-size:10px;color:var(--admin-muted);">
-                                    <?php
-                                    echo $schedule['due'] !== null
-                                        ? nutritionist_e('Next: ' . $schedule['due'])
-                                        : '—';
-                                    ?>
-                                </span>
-
+                            <div class="child-name-cell">
+                                <span class="avatar" style="background:<?php echo nutritionist_e(admin_avatar_color($fullName)); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+                                <div class="text">
+                                    <div class="name"><?php echo nutritionist_e($fullName); ?></div>
+                                </div>
                             </div>
-
                         </td>
-
+                        <td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)$child['sex']); ?></td>
+                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;"><?php echo (int)$ageMonths; ?></td>
                         <td>
-                            <div class="admin-actions">
-                                <a class="admin-icon-btn admin-icon-btn-primary" title="Measure" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('measure'); ?></a>
-                                <a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php?view=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('view'); ?></a>
+                            <div class="admin-actions" onclick="event.stopPropagation();">
+                                <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
                                 <?php if (nutritionist_can_write('children.update')): ?>
-                                <a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
-                                <?php endif; ?>
-                                <?php if (nutritionist_can_write('children.delete')): ?>
-                                <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?>?');" style="display:inline;">
-                                    <input type="hidden" name="action" value="delete">
-                                    <input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-                                </form>
+                                <a class="admin-icon-btn" title="Edit profile" href="<?php echo $editUrl; ?>"><?php echo admin_action_icon('edit'); ?></a>
                                 <?php endif; ?>
                             </div>
                         </td>
-
                     </tr>
-
                 <?php endforeach; ?>
-
             </tbody>
-
         </table>
-
     </div>
 
-</section>
-
-
-<?php if ($selectedChild !== null): ?>
-
-<section
-    class="nutritionist-panel-grid"
-    style="margin-top:18px;"
->
-
-    <article class="nutritionist-panel">
-
-        <div style="text-align:center;margin-bottom:20px;">
-
-            <div
-                style="display:flex;justify-content:center;margin-bottom:12px;"
-            >
-
-                <div
-                    class="admin-pill <?php
-                        echo nutritionist_child_status_class(
-                            (string)(
-                                $selectedChild['nutritional_status']
-                                ?? 'Pending'
-                            )
-                        );
-                    ?>"
-                    style="width:64px;height:64px;border-radius:50%;font-size:1rem;justify-content:center;"
-                >
-                    <?php
-                    echo nutritionist_e(
-                        substr(
-                            (string)$selectedChild['first_name'],
-                            0,
-                            1
-                        )
-                        . substr(
-                            (string)$selectedChild['last_name'],
-                            0,
-                            1
-                        )
-                    );
-                    ?>
-                </div>
-
-            </div>
-
-            <h2
-                style="margin:0;font-size:16px;font-weight:700;color:var(--admin-text);"
-            >
-                <?php
-                echo nutritionist_e(
-                    trim(
-                        $selectedChild['first_name']
-                        . ' '
-                        . ($selectedChild['middle_name'] ?? '')
-                        . ' '
-                        . $selectedChild['last_name']
-                    )
-                );
-                ?>
-            </h2>
-
-            <div
-                style="color:var(--admin-muted);font-size:12px;margin:4px 0 10px;"
-            >
-                <?php
-                echo nutritionist_e(
-                    (string)$selectedChild['child_code']
-                );
-                ?>
-            </div>
-
-            <span
-                class="admin-pill <?php
-                    echo nutritionist_child_status_class(
-                        (string)(
-                            $selectedChild['nutritional_status']
-                            ?? 'Pending'
-                        )
-                    );
-                ?>"
-            >
-                <?php
-                echo nutritionist_e(
-                    (string)(
-                        $selectedChild['nutritional_status']
-                        ?? 'Pending'
-                    )
-                );
-                ?>
-            </span>
-
-        </div>
-
-
-        <div
-            style="border-top:1px solid var(--admin-border);padding-top:16px;"
-        >
-
-            <?php foreach ([
-
-                [
-                    'Birthdate',
-                    $selectedChild['birthdate']
-                ],
-
-                [
-                    'Age',
-                    (
-                        doh_age_in_months(
-                            (string)$selectedChild['birthdate']
-                        ) ?? 0
-                    ) . ' months'
-                ],
-
-                [
-                    'Sex',
-                    $selectedChild['sex']
-                ],
-
-                [
-                    'Barangay',
-                    $selectedChild['barangay']
-                ],
-
-                [
-                    'Parent',
-                    $selectedChild['parent_name']
-                ],
-
-                [
-                    'IP Group',
-                    !empty($selectedChild['is_ip'])
-                        ? 'Yes'
-                        : 'No'
-                ],
-
-                [
-                    'Disability',
-                    !empty($selectedChild['has_disability'])
-                        ? 'Yes'
-                        : 'No'
-                ],
-
-            ] as [$label, $value]): ?>
-
-                <div
-                    style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--admin-border);"
-                >
-
-                    <span
-                        style="font-size:12px;color:var(--admin-muted);"
-                    >
-                        <?php echo nutritionist_e($label); ?>
-                    </span>
-
-                    <span
-                        style="font-size:12px;font-weight:600;color:var(--admin-text);text-align:right;max-width:55%;"
-                    >
-                        <?php echo nutritionist_e((string)$value); ?>
-                    </span>
-
-                </div>
-
-            <?php endforeach; ?>
-
-        </div>
-
-
-        <?php if (
-            ($selectedChild['wfa_status'] ?? null) !== null
-            || ($selectedChild['hfa_status'] ?? null) !== null
-            || ($selectedChild['wfh_status'] ?? null) !== null
-        ): ?>
-
-            <div
-                style="margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border);"
-            >
-
-                <div
-                    style="font-weight:700;font-size:12px;color:var(--admin-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;"
-                >
-                    DOH Nutritional Status (per OPT Plus)
-                </div>
-
-                <div
-                    style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;"
-                >
-
-                    <?php foreach ([
-
-                        [
-                            'WFA',
-                            $selectedChild['wfa_status'] ?? '—'
-                        ],
-
-                        [
-                            'HFA',
-                            $selectedChild['hfa_status'] ?? '—'
-                        ],
-
-                        [
-                            'WFH',
-                            $selectedChild['wfh_status'] ?? '—'
-                        ],
-
-                    ] as [$axis, $val]): ?>
-
-                        <div
-                            style="text-align:center;background:var(--admin-surface-alt,#f7f7f5);border-radius:8px;padding:8px 4px;"
-                        >
-
-                            <div
-                                style="font-size:10px;color:var(--admin-muted);"
-                            >
-                                <?php echo nutritionist_e($axis); ?>
-                            </div>
-
-                            <div
-                                style="font-size:12px;font-weight:700;color:var(--admin-text);"
-                            >
-                                <?php echo nutritionist_e((string)$val); ?>
-                            </div>
-
-                        </div>
-
-                    <?php endforeach; ?>
-
-                </div>
-
-            </div>
-
-        <?php endif; ?>
-
+    <?php if ($totalPages > 1): ?>
         <?php
-
-        $selectedSchedule = followup_card_state(
-            (string)$selectedChild['birthdate'],
-            ($selectedChild['measurement_date'] ?? null) !== null ? (string)$selectedChild['measurement_date'] : null,
-            ($selectedChild['wfa_status'] ?? null) !== null ? (string)$selectedChild['wfa_status'] : null,
-            ($selectedChild['hfa_status'] ?? null) !== null ? (string)$selectedChild['hfa_status'] : null,
-            ($selectedChild['wfh_status'] ?? null) !== null ? (string)$selectedChild['wfh_status'] : null
-        );
-
+        $prevPage = max(1, $page - 1);
+        $nextPage = min($totalPages, $page + 1);
+        $firstItem = $offset + 1;
+        $lastItem = min($totalAll, $offset + $perPage);
         ?>
-
-        <div
-            style="margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border);"
-        >
-
-            <div
-                style="font-weight:700;font-size:12px;color:var(--admin-muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:0.04em;"
-            >
-                EOPT Follow-up Schedule
+        <div class="children-pagination">
+            <span class="status">Showing <?php echo (int)$firstItem; ?>–<?php echo (int)$lastItem; ?> of <?php echo (int)$totalAll; ?> children</span>
+            <div class="pages">
+                <a class="page-btn<?php echo $page <= 1 ? ' is-disabled' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $prevPage])); ?>">‹ Prev</a>
+                <?php
+                $start = max(1, $page - 2);
+                $end = min($totalPages, $page + 2);
+                if ($start > 1) {
+                    echo '<a class="page-btn" href="' . nutritionist_e(nutritionist_children_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => 1])) . '">1</a>';
+                    if ($start > 2) {
+                        echo '<span class="status" style="padding:0 4px;">…</span>';
+                    }
+                }
+                for ($i = $start; $i <= $end; $i++) {
+                    echo '<a class="page-btn' . ($i === $page ? ' is-active' : '') . '" href="' . nutritionist_e(nutritionist_children_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $i])) . '">' . $i . '</a>';
+                }
+                if ($end < $totalPages) {
+                    if ($end < $totalPages - 1) {
+                        echo '<span class="status" style="padding:0 4px;">…</span>';
+                    }
+                    echo '<a class="page-btn" href="' . nutritionist_e(nutritionist_children_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $totalPages])) . '">' . $totalPages . '</a>';
+                }
+                ?>
+                <a class="page-btn<?php echo $page >= $totalPages ? ' is-disabled' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $nextPage])); ?>">Next ›</a>
             </div>
-
-            <div
-                style="display:flex;justify-content:space-between;align-items:center;gap:8px;background:var(--admin-surface-alt,#f7f7f5);border-radius:8px;padding:10px 12px;margin-bottom:8px;"
-            >
-
-                <span style="font-size:12px;color:var(--admin-muted);">
-                    Next measurement due
-                </span>
-
-                <span style="font-size:12px;font-weight:700;color:var(--admin-text);">
-                    <?php echo $selectedSchedule['due'] !== null ? nutritionist_e($selectedSchedule['due']) : '—'; ?>
-                </span>
-
-            </div>
-
-            <div
-                style="display:flex;justify-content:space-between;align-items:center;gap:8px;"
-            >
-
-                <span class="admin-pill <?php echo $selectedSchedule['class']; ?>">
-                    <?php echo nutritionist_e($selectedSchedule['label']); ?>
-                </span>
-
-                <?php if ($openFollowup !== null): ?>
-                    <span class="admin-mini">
-                        Follow-up booked:
-                        <?php echo nutritionist_e(date('M j, Y', strtotime((string)$openFollowup['scheduled_at']))); ?>
-                        · <?php echo nutritionist_e($openFollowup['followup_track'] === 'quarterly' ? 'Quarterly' : 'Monthly'); ?>
-                    </span>
-                <?php endif; ?>
-
-            </div>
-
         </div>
-
-    </article>
-
-
-    <article class="nutritionist-panel">
-
-        <?php if (!empty($selectedMeasurements)): ?>
-
-            <div
-                style="font-weight:700;font-size:14px;color:var(--admin-text);margin-bottom:14px;"
-            >
-                Latest WHO Z-Scores
-            </div>
-
-            <div
-                style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;"
-            >
-
-                <?php foreach ([
-
-                    [
-                        'WAZ',
-                        $selectedMeasurements[0]['waz'],
-                        'Weight-for-Age'
-                    ],
-
-                    [
-                        'HAZ',
-                        $selectedMeasurements[0]['haz'],
-                        'Height-for-Age'
-                    ],
-
-                    [
-                        'WHZ',
-                        $selectedMeasurements[0]['whz'],
-                        'Weight-for-Height'
-                    ],
-
-                ] as [$label, $value, $description]): ?>
-
-                    <div
-                        style="background:var(--admin-surface-alt);border-radius:12px;padding:16px;text-align:center;"
-                    >
-
-                        <div
-                            style="font-size:10px;color:var(--admin-muted);letter-spacing:0.5px;"
-                        >
-                            <?php echo nutritionist_e($description); ?>
-                        </div>
-
-                        <div
-                            style="font-size:28px;font-weight:800;color:<?php
-                                echo abs((float)$value) > 2
-                                    ? 'var(--admin-danger)'
-                                    : 'var(--admin-primary)';
-                            ?>;margin:8px 0 4px;"
-                        >
-                            <?php
-                            echo ((float)$value > 0 ? '+' : '')
-                                . nutritionist_e((string)$value);
-                            ?>
-                        </div>
-
-                        <div
-                            style="font-size:10px;color:var(--admin-muted);"
-                        >
-                            <?php echo nutritionist_e($label); ?> Z-Score
-                        </div>
-
-                    </div>
-
-                <?php endforeach; ?>
-
-            </div>
-
-
-            <div
-                style="margin-top:12px;background:<?php
-                    echo nutritionist_child_status_class(
-                        (string)($selectedChild['nutritional_status'] ?? 'Pending')
-                    ) === 'is-success'
-                        ? 'var(--admin-primary-soft)'
-                        : 'var(--admin-surface-alt)';
-                ?>;border:1px solid var(--admin-border);border-radius:10px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"
-            >
-
-                <span
-                    style="font-size:12px;font-weight:700;color:var(--admin-text);"
-                >
-                    Nutritional Status:
-                    <?php
-                    echo nutritionist_e(
-                        (string)(
-                            $selectedChild['nutritional_status']
-                            ?? 'Pending'
-                        )
-                    );
-                    ?>
-                </span>
-
-                <span
-                    style="font-size:11px;color:var(--admin-muted);"
-                >
-                    H:
-                    <?php
-                    echo nutritionist_e(
-                        (string)($selectedChild['height_cm'] ?? 'n/a')
-                    );
-                    ?>cm · W:
-                    <?php
-                    echo nutritionist_e(
-                        (string)($selectedChild['weight_kg'] ?? 'n/a')
-                    );
-                    ?>kg
-                </span>
-
-            </div>
-
-        <?php endif; ?>
-
-
-        <div
-            style="font-weight:700;font-size:14px;color:var(--admin-text);margin:18px 0 14px;"
-        >
-            Measurement History
-        </div>
-
-
-        <?php if ($selectedMeasurements === []): ?>
-
-            <div
-                style="text-align:center;color:var(--admin-muted);font-size:13px;padding:20px;"
-            >
-                No measurements recorded
-            </div>
-
-        <?php else: ?>
-
-            <table
-                class="nutritionist-table"
-                id="measurement-history-table"
-                data-child-id="<?php echo (int)$selectedChild['id']; ?>"
-            >
-
-                <thead>
-
-                    <tr>
-                        <th>Date</th>
-                        <th>Height</th>
-                        <th>Weight</th>
-                        <th>WAZ</th>
-                        <th>HAZ</th>
-                        <th>WHZ</th>
-                        <th>Status</th>
-                    </tr>
-
-                </thead>
-
-                <tbody>
-
-                    <?php foreach ($selectedMeasurements as $measurement): ?>
-
-                        <tr>
-
-                            <td>
-                                <?php
-                                echo nutritionist_e(
-                                    (string)$measurement['measurement_date']
-                                );
-
-                                if (
-                                    ($measurement['source_type'] ?? 'kiosk')
-                                    === 'manual'
-                                ):
-                                ?>
-
-                                    <span
-                                        class="admin-pill is-muted"
-                                        style="margin-left:6px;font-size:9px;padding:1px 6px;vertical-align:middle;"
-                                        title="Recorded manually by staff"
-                                    >
-                                        Manual
-                                    </span>
-
-                                <?php endif; ?>
-                            </td>
-
-                            <td style="color:var(--admin-muted);">
-                                <?php
-                                echo nutritionist_e(
-                                    (string)$measurement['height_cm']
-                                );
-                                ?>
-                            </td>
-
-                            <td style="color:var(--admin-muted);">
-                                <?php
-                                echo nutritionist_e(
-                                    (string)$measurement['weight_kg']
-                                );
-                                ?>
-                            </td>
-
-                            <td
-                                style="color:var(--admin-primary);font-weight:600;"
-                            >
-                                <?php
-                                echo ((float)$measurement['waz'] > 0 ? '+' : '')
-                                    . nutritionist_e(
-                                        (string)$measurement['waz']
-                                    );
-                                ?>
-                            </td>
-
-                            <td
-                                style="color:var(--admin-info,#4a9fd5);font-weight:600;"
-                            >
-                                <?php
-                                echo ((float)$measurement['haz'] > 0 ? '+' : '')
-                                    . nutritionist_e(
-                                        (string)$measurement['haz']
-                                    );
-                                ?>
-                            </td>
-
-                            <td
-                                style="color:#0d8871;font-weight:600;"
-                            >
-                                <?php
-                                echo ((float)$measurement['whz'] > 0 ? '+' : '')
-                                    . nutritionist_e(
-                                        (string)$measurement['whz']
-                                    );
-                                ?>
-                            </td>
-
-                            <td>
-
-                                <span
-                                    class="admin-pill <?php
-                                        echo nutritionist_child_status_class(
-                                            (string)$measurement['nutritional_status']
-                                        );
-                                    ?>"
-                                >
-                                    <?php
-                                    echo nutritionist_e(
-                                        (string)$measurement['nutritional_status']
-                                    );
-                                    ?>
-                                </span>
-
-                            </td>
-
-                        </tr>
-
-                    <?php endforeach; ?>
-
-                </tbody>
-
-            </table>
-
-        <?php endif; ?>
-
-    </article>
-
+    <?php endif; ?>
 </section>
 
-<?php endif; ?>
+<!--
+    Child information card modal. Opened from the row's "view" button or
+    clicking anywhere on the row. Shows ONLY child information (no
+    measurements, no growth history) per the spec.
+-->
+<div class="cc-overlay" id="cc-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="cc-modal">
+        <div class="cc-head">
+            <div class="avatar" id="cc-avatar">--</div>
+            <div class="meta">
+                <div class="name" id="cc-name">Child name</div>
+                <div class="sub" id="cc-sub">—</div>
+            </div>
+            <button type="button" class="close" id="cc-close" aria-label="Close">×</button>
+        </div>
+        <div class="cc-body">
+            <div class="cc-section">Child information</div>
+            <div class="cc-row"><span class="label">Child code</span><span class="value" id="cc-code">—</span></div>
+            <div class="cc-row"><span class="label">Sex</span><span class="value" id="cc-sex">—</span></div>
+            <div class="cc-row"><span class="label">Birthdate</span><span class="value" id="cc-birthdate">—</span></div>
+            <div class="cc-row"><span class="label">Age</span><span class="value" id="cc-age">—</span></div>
+            <div class="cc-row"><span class="label">IP group</span><span class="value" id="cc-ip">—</span></div>
+            <div class="cc-row"><span class="label">With disability</span><span class="value" id="cc-disability">—</span></div>
+
+            <div class="cc-section">Address</div>
+            <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
+            <div class="cc-row"><span class="label">Street address</span><span class="value" id="cc-address">—</span></div>
+            <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
+
+            <div class="cc-section">Parent / guardian</div>
+            <div class="cc-row"><span class="label">Name</span><span class="value" id="cc-parent-name">—</span></div>
+            <div class="cc-row"><span class="label">Type</span><span class="value" id="cc-parent-kind">—</span></div>
+            <div class="cc-row"><span class="label">Phone</span><span class="value" id="cc-parent-phone">—</span></div>
+            <div class="cc-row"><span class="label">Email</span><span class="value" id="cc-parent-email">—</span></div>
+        </div>
+        <div class="cc-foot">
+            <a class="admin-btn-secondary" id="cc-edit" href="#">Edit profile</a>
+            <button type="button" class="admin-btn" id="cc-close-2">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    var overlay = document.getElementById('cc-overlay');
+    if (!overlay) return;
+
+    function val(id) { return document.getElementById(id); }
+    function text(id, v) { var el = val(id); if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v; }
+
+    function openCard(row) {
+        if (!row) return;
+        var get = function (k) { return row.getAttribute('data-child-' + k) || ''; };
+        var getP = function (k) { return row.getAttribute('data-parent-' + k) || ''; };
+
+        var name = get('name');
+        var code = get('code');
+        var initials = (name.split(' ').filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0).toUpperCase(); }).join('')) || '--';
+
+        val('cc-avatar').textContent = initials;
+        val('cc-avatar').style.background = (function () {
+            // Match the in-row avatar color the page assigns.
+            var rowAvatar = row.querySelector('.child-name-cell .avatar');
+            return rowAvatar ? rowAvatar.style.background : '#94a3b8';
+        })();
+
+        text('cc-name', name);
+        text('cc-sub', code + ' · ' + (get('sex') || '—'));
+
+        text('cc-code', code);
+        text('cc-sex', get('sex'));
+        text('cc-birthdate', get('birthdate'));
+        text('cc-age', get('age') + ' months');
+        text('cc-ip', get('ip') === '1' ? 'Yes' : 'No');
+        text('cc-disability', get('disability') === '1' ? 'Yes' : 'No');
+
+        var localArea = get('localarea');
+        var areaType = get('areatype');
+        text('cc-localarea', (areaType && localArea) ? (areaType.charAt(0).toUpperCase() + areaType.slice(1) + ': ' + localArea) : (localArea || '—'));
+        text('cc-address', get('address'));
+        text('cc-barangay', get('barangay'));
+
+        text('cc-parent-name', getP('name'));
+        text('cc-parent-kind', getP('kind'));
+        text('cc-parent-phone', getP('phone'));
+        text('cc-parent-email', getP('email'));
+
+        var editLink = val('cc-edit');
+        if (editLink) {
+            editLink.setAttribute('href', '<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>?id=' + (row.getAttribute('data-child-id') || ''));
+        }
+
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCard() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-view-card]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            var row = btn.closest('tr.row-link');
+            openCard(row);
+        });
+    });
+
+    document.querySelectorAll('#children-table tr.row-link').forEach(function (row) {
+        row.addEventListener('click', function () { openCard(row); });
+    });
+
+    val('cc-close').addEventListener('click', closeCard);
+    val('cc-close-2').addEventListener('click', closeCard);
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeCard();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeCard();
+    });
+})();
+</script>
 
 <?php
-
 nutritionist_layout_end();

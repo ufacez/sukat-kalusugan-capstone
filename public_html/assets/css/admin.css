@@ -608,6 +608,21 @@
   color: var(--admin-primary);
 }
 
+.admin-card-icon.is-warn {
+  background: rgba(245, 185, 66, 0.12);
+  color: #b6791f;
+}
+
+.admin-card-icon.is-orange {
+  background: rgba(249, 159, 56, 0.12);
+  color: #b96a1a;
+}
+
+.admin-card-icon.is-muted {
+  background: rgba(143, 168, 154, 0.15);
+  color: #6c7a72;
+}
+
 .admin-card-content {
   min-width: 0;
   flex: 1;

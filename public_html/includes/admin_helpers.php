@@ -314,8 +314,29 @@ function admin_is_strong_password(string $password): bool
  * admin, nutritionist, and settings pages. Active barangays only, sorted
  * by name so the <select> stays predictable.
  */
-function admin_barangay_options(): array
+function admin_barangay_options(?array $scopeUser = null): array
 {
+    /*
+     * When a non-admin scope user is passed (i.e. a nutritionist with a
+     * fixed barangay), return ONLY that one barangay. Admins see every
+     * active barangay. This prevents the form dropdowns from offering
+     * barangays the user isn't allowed to assign records to.
+     */
+    if ($scopeUser !== null && ($scopeUser['role'] ?? '') !== 'admin') {
+        $barangayId = $scopeUser['barangay_id'] ?? null;
+        if ($barangayId === null || $barangayId === '') {
+            return [];
+        }
+        return admin_fetch_all(
+            "SELECT id, name, city_municipality, status
+             FROM barangays
+             WHERE id = ? AND status = 'active'
+             ORDER BY name ASC",
+            'i',
+            [(int)$barangayId]
+        );
+    }
+
     return admin_fetch_all(
         "SELECT id, name, city_municipality, status
          FROM barangays

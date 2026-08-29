@@ -11,7 +11,7 @@ if ($editId <= 0 && !nutritionist_can_write('parents.create')) {
 	admin_redirect('/nutritionist/parents.php', ['notice' => 'You do not have permission to create parents.', 'type' => 'error']);
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 	$action = (string)($_POST['action'] ?? '');
 
@@ -34,8 +34,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$phone = trim((string)($_POST['phone'] ?? ''));
 	$address = trim((string)($_POST['address'] ?? ''));
 	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
-	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
-	$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
+
+	/*
+	 * For non-admin nutritionists, the barangay is ALWAYS their
+	 * assigned barangay — they cannot pick a different one even if the
+	 * client tampers with the POST body. We force it server-side.
+	 */
+	$isAdmin = ($user['role'] ?? '') === 'admin';
+	$userBarangayId = $user['barangay_id'] ?? null;
+
+	if (!$isAdmin) {
+		if ($userBarangayId === null || $userBarangayId === '') {
+			admin_redirect($redirectBack, [
+				'notice' => 'Your account is not assigned to a barangay. Contact your administrator to set one before adding parents.',
+				'type' => 'error',
+			]);
+		}
+		$barangayId = (int)$userBarangayId;
+	} else {
+		$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+		$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
+	}
+
 	$localAreaIdRaw = trim((string)($_POST['local_area_id'] ?? ''));
 	$localAreaId = $localAreaIdRaw !== '' ? (int)$localAreaIdRaw : null;
 	$status = trim((string)($_POST['status'] ?? 'active'));
@@ -83,16 +103,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		admin_redirect($redirectBack, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 	}
 
-	if (($user['role'] ?? '') !== 'admin' && $barangayId !== null) {
-		$userBarangayId = $user['barangay_id'] ?? null;
-
-		if (
-			$userBarangayId !== null
-			&& $userBarangayId !== ''
-			&& (int)$userBarangayId !== $barangayId
-		) {
+	/*
+	 * Local-area validation: if a local area is selected, it must
+	 * belong to the parent's barangay so a Dela Paz Norte parent can't
+	 * be assigned a Malpitic purok by accident.
+	 */
+	if ($localAreaId !== null && $barangayId !== null) {
+		$localAreaCheck = admin_fetch_one(
+			'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+			'ii',
+			[$localAreaId, $barangayId]
+		);
+		if (!$localAreaCheck) {
 			admin_redirect($redirectBack, [
-				'notice' => 'You can only assign parents under your assigned barangay.',
+				'notice' => 'Selected local area does not belong to the assigned barangay.',
 				'type' => 'error',
 			]);
 		}
@@ -169,7 +193,40 @@ if ($editId > 0) {
 }
 
 $editingNameParts = admin_split_full_name($editingParent['name'] ?? '');
-$barangays = admin_barangay_options();
+
+/*
+ * Barangay list is scoped to the current user: a non-admin nutritionist
+ * only ever sees their own barangay in the dropdown, and the assigned
+ * barangay is enforced server-side in the POST handler above.
+ */
+$isScopedUser = ($user['role'] ?? '') !== 'admin';
+$scopedBarangayId = $isScopedUser ? (int)($user['barangay_id'] ?? 0) : 0;
+$barangays = admin_barangay_options($isScopedUser ? $user : null);
+
+/*
+ * On edit, if the editing parent's barangay falls outside the user's
+ * scope (e.g. an admin is editing another barangay's record), force
+ * the dropdown to show that barangay so the value is preserved.
+ */
+if ($editingParent !== null) {
+    $editingBarangayId = (int)($editingParent['barangay_id'] ?? 0);
+    if ($editingBarangayId > 0) {
+        $found = false;
+        foreach ($barangays as $b) {
+            if ((int)$b['id'] === $editingBarangayId) { $found = true; break; }
+        }
+        if (!$found) {
+            $extra = admin_fetch_one(
+                "SELECT id, name, city_municipality, status FROM barangays WHERE id = ? LIMIT 1",
+                'i',
+                [$editingBarangayId]
+            );
+            if ($extra !== null) {
+                $barangays[] = $extra;
+            }
+        }
+    }
+}
 
 $actions = '<a class="admin-btn-secondary" href="'
 	. nutritionist_e(app_url('/nutritionist/parents.php'))
@@ -242,21 +299,39 @@ nutritionist_layout_start(
 		</div>
 		<label class="admin-field">
 			<span>Assigned Barangay <span class="admin-required">*</span></span>
-			<select name="barangay_id" id="pf-barangay-select" required>
-				<option value="">-- Select Barangay --</option>
-				<?php foreach ($barangays as $barangay): ?>
-					<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingParent['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
-				<?php endforeach; ?>
-			</select>
-			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Children will inherit this barangay for nutritional scope and reporting.</small>
+			<?php if ($isScopedUser): ?>
+				<?php
+				$lockedBarangayName = '';
+				$lockedBarangayId = $scopedBarangayId;
+				foreach ($barangays as $barangay) {
+					if ((int)$barangay['id'] === $scopedBarangayId) {
+						$lockedBarangayName = (string)$barangay['name'];
+						break;
+					}
+				}
+				?>
+				<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface-alt);">
+					<span class="admin-pill is-info" style="font-weight:700;"><?php echo nutritionist_e($lockedBarangayName !== '' ? $lockedBarangayName : 'Your assigned barangay'); ?></span>
+					<span class="admin-mini">Locked to your account scope.</span>
+				</div>
+				<input type="hidden" name="barangay_id" value="<?php echo (int)$lockedBarangayId; ?>">
+			<?php else: ?>
+				<select name="barangay_id" id="pf-barangay-select" required>
+					<option value="">-- Select Barangay --</option>
+					<?php foreach ($barangays as $barangay): ?>
+						<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingParent['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Children will inherit this barangay for nutritional scope and reporting.</small>
+			<?php endif; ?>
 		</label>
 
 		<label class="admin-field">
 			<span>Local Area / Purok</span>
-			<select name="local_area_id" id="pf-local-area-select" data-current-area="<?php echo (int)($editingParent['local_area_id'] ?? 0); ?>">
+			<select name="local_area_id" id="pf-local-area-select" data-current-area="<?php echo (int)($editingParent['local_area_id'] ?? 0); ?>" data-scoped-barangay="<?php echo (int)$lockedBarangayId; ?>">
 				<option value="">-- Select Local Area --</option>
 			</select>
-			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking.</small>
+			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking. Scoped to the assigned barangay.</small>
 		</label>
 
 		<div class="admin-field-wide">
@@ -331,6 +406,7 @@ nutritionist_layout_start(
 	var barangaySelect = document.getElementById('pf-barangay-select');
 	var areaSelect = document.getElementById('pf-local-area-select');
 	var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
+	var scopedBarangayId = parseInt(areaSelect.getAttribute('data-scoped-barangay') || '0', 10);
 	var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
 
 	function loadAreas(barangayId, selectedId) {
@@ -358,13 +434,17 @@ nutritionist_layout_start(
 			});
 	}
 
-	barangaySelect.addEventListener('change', function() {
-		currentAreaId = 0;
-		loadAreas(parseInt(barangaySelect.value || '0', 10), 0);
-	});
-
-	var initial = parseInt(barangaySelect.value || '0', 10);
-	if (initial > 0) loadAreas(initial, currentAreaId);
+	if (barangaySelect) {
+		barangaySelect.addEventListener('change', function() {
+			currentAreaId = 0;
+			loadAreas(parseInt(barangaySelect.value || '0', 10), 0);
+		});
+		var initial = parseInt(barangaySelect.value || '0', 10);
+		if (initial > 0) loadAreas(initial, currentAreaId);
+	} else if (scopedBarangayId > 0) {
+		// Scoped nutritionist: barangay is locked, so load areas once.
+		loadAreas(scopedBarangayId, currentAreaId);
+	}
 })();
 </script>
 

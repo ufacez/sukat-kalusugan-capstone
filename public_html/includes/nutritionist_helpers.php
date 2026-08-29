@@ -305,3 +305,163 @@ function nutritionist_calendar_label(string $entryType): string
         default => ucfirst($entryType),
     };
 }
+
+// ----------------------------------------------------------------------
+// Wave-chart helpers (used by the dashboard's stacked-area charts)
+//
+// The chart renders a smooth stacked-area visualization in pure SVG. The
+// data is collapsed to a small number of meaningful bands (Normal / Needs
+// Monitoring / Urgent / Overweight-Obese) so the chart reads cleanly
+// instead of overlapping 9 thin lines. The path strings are produced by
+// nutritionist_smooth_path(), which converts a sequence of (x,y) points
+// into a Catmull-Rom-spline cubic-Bezier path that curves smoothly
+// between them (matching the rounded look in the reference mockups).
+// ----------------------------------------------------------------------
+
+/**
+ * Map a single fine-grained WHO/eOPT status into one of the 4 collapsed
+ * bands used by the dashboard's "Nutritional Status Trend" chart.
+ * Unknown values fall through to "needs_monitoring" so they're still
+ * surfaced.
+ */
+function nutritionist_collapse_status_band(?string $status): string
+{
+    $normalized = strtolower(trim((string)$status));
+
+    return match (true) {
+        $normalized === '', $normalized === 'normal' => 'normal',
+        $normalized === 'severely underweight',
+        $normalized === 'severely stunted',
+        $normalized === 'severely wasted',
+        $normalized === 'suw', $normalized === 'sst', $normalized === 'sw' => 'urgent',
+        $normalized === 'overweight', $normalized === 'obese',
+        $normalized === 'ow', $normalized === 'ob' => 'overweight',
+        default => 'needs_monitoring', // MW, MUW, MSt, etc.
+    };
+}
+
+/**
+ * Map a single fine-grained HFA (height-for-age) code into one of the 4
+ * collapsed bands used by the dashboard's "Growth Trend — Height-for-Age"
+ * chart. Same four-band shape as the status chart for visual consistency.
+ */
+function nutritionist_collapse_hfa_band(?string $hfa): string
+{
+    $normalized = strtolower(trim((string)$hfa));
+
+    return match (true) {
+        $normalized === '', $normalized === 'normal', $normalized === 'n' => 'normal',
+        $normalized === 'sst', $normalized === 'severely stunted' => 'urgent',
+        $normalized === 't', $normalized === 'tall' => 'tall',
+        default => 'stunted', // St, MSt, etc.
+    };
+}
+
+/**
+ * Canonical band definitions used by both charts. Centralized here so the
+ * label, color, and rendering order stay in sync across the dashboard.
+ *
+ * The order is intentional: Normal at the bottom, severity layers stacked
+ * on top — this gives the natural "the chart fills up as more children
+ * are flagged" reading.
+ */
+function nutritionist_chart_bands(string $chart = 'status'): array
+{
+    if ($chart === 'hfa') {
+        return [
+            'normal'  => ['label' => 'Normal',            'color' => '#16a34a'],
+            'stunted' => ['label' => 'Moderate Stunting', 'color' => '#eab308'],
+            'urgent'  => ['label' => 'Severe Stunting',   'color' => '#dc2626'],
+            'tall'    => ['label' => 'Tall',              'color' => '#2563eb'],
+        ];
+    }
+
+    return [
+        'normal'            => ['label' => 'Normal',             'color' => '#16a34a'],
+        'needs_monitoring'  => ['label' => 'Moderate Case',      'color' => '#eab308'],
+        'urgent'            => ['label' => 'Severe Case',        'color' => '#dc2626'],
+        'overweight'        => ['label' => 'Overweight / Obese', 'color' => '#f97316'],
+    ];
+}
+
+/**
+ * Convert an array of (x, y) points into a smooth cubic-Bezier SVG path
+ * using the Catmull-Rom → Bezier conversion. The first and last points
+ * are mirrored so the curve has natural end-slopes (instead of kinking
+ * to a stop at the chart edges).
+ *
+ * Returns just the path's "M ... C ..." segment (no leading L) so callers
+ * can use it for both the upper and lower edge of a stacked area.
+ */
+function nutritionist_smooth_path(array $points, float $tension = 0.2): string
+{
+    $count = count($points);
+    if ($count === 0) {
+        return '';
+    }
+    if ($count === 1) {
+        $p = $points[0];
+        return sprintf('M%.2f,%.2f', $p[0], $p[1]);
+    }
+
+    $cmds = [sprintf('M%.2f,%.2f', $points[0][0], $points[0][1])];
+
+    for ($i = 0; $i < $count - 1; $i++) {
+        $p0 = $points[max($i - 1, 0)];
+        $p1 = $points[$i];
+        $p2 = $points[$i + 1];
+        $p3 = $points[min($i + 2, $count - 1)];
+
+        $c1x = $p1[0] + ($p2[0] - $p0[0]) * $tension;
+        $c1y = $p1[1] + ($p2[1] - $p0[1]) * $tension;
+        $c2x = $p2[0] - ($p3[0] - $p1[0]) * $tension;
+        $c2y = $p2[1] - ($p3[1] - $p1[1]) * $tension;
+
+        $cmds[] = sprintf(
+            'C%.2f,%.2f %.2f,%.2f %.2f,%.2f',
+            $c1x, $c1y, $c2x, $c2y, $p2[0], $p2[1]
+        );
+    }
+
+    return implode(' ', $cmds);
+}
+
+/**
+ * Build a closed SVG area path between two smooth lines: the upper line
+ * (top of the band) and the lower line (bottom of the band, walked in
+ * reverse). The result is a single "M ... C ... L ... C ... Z" path that
+ * fills correctly as a stacked-area band.
+ */
+function nutritionist_area_path(array $upperPoints, array $lowerPoints): string
+{
+    $upper = nutritionist_smooth_path($upperPoints);
+    if ($upper === '' || count($lowerPoints) === 0) {
+        return '';
+    }
+
+    $lowerRev = array_reverse($lowerPoints);
+    $cmds = [$upper, sprintf('L%.2f,%.2f', $lowerRev[0][0], $lowerRev[0][1])];
+    for ($i = 1; $i < count($lowerRev); $i++) {
+        $cmds[] = sprintf('L%.2f,%.2f', $lowerRev[$i][0], $lowerRev[$i][1]);
+    }
+    $cmds[] = 'Z';
+
+    return implode(' ', $cmds);
+}
+
+/**
+ * Convert a hex color (#rrggbb) into an rgba() string at the requested
+ * alpha. Used by the dashboard's wave chart so each band gets a soft
+ * fill that matches its line color (matching the audit_logs chart style).
+ */
+function nutritionist_chart_fill_rgba(string $hex, float $alpha): string
+{
+    $hex = ltrim(trim($hex), '#');
+    if (strlen($hex) !== 6 || !ctype_xdigit($hex)) {
+        return 'rgba(99,102,241,' . $alpha . ')';
+    }
+    $r = hexdec(substr($hex, 0, 2));
+    $g = hexdec(substr($hex, 2, 2));
+    $b = hexdec(substr($hex, 4, 2));
+    return 'rgba(' . $r . ',' . $g . ',' . $b . ',' . $alpha . ')';
+}

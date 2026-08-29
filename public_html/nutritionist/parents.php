@@ -50,8 +50,10 @@ if ($editId > 0) {
     );
 }
 
-$params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
+$childScopeParams = [];
+$childScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childScopeParams);
+$parentScopeParams = [];
+$parentScope = nutritionist_scope_fragment($user, 'p.barangay_id', $parentScopeParams);  // restrict parents to user's barangay
 $parents = admin_fetch_all(
 	"SELECT
 		p.id,
@@ -69,8 +71,8 @@ $parents = admin_fetch_all(
 		MAX(lm.measurement_date) AS latest_measurement
 	 FROM parents p
 	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
-	 LEFT JOIN children c ON c.parent_id = p.id AND {$scope}
-	 LEFT JOIN appointments a ON a.parent_id = p.id
+     LEFT JOIN children c ON c.parent_id = p.id AND {$childScope}
+     LEFT JOIN appointments a ON a.parent_id = p.id
 	 LEFT JOIN measurements lm ON lm.id = (
 		SELECT m2.id
 		FROM measurements m2
@@ -78,10 +80,11 @@ $parents = admin_fetch_all(
 		ORDER BY m2.measurement_date DESC, m2.id DESC
 		LIMIT 1
 	 )
+	 WHERE {$parentScope}
 	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status
 	 ORDER BY p.name ASC",
-	str_repeat('i', count($params)),
-	$params
+	str_repeat('i', count($childScopeParams) + count($parentScopeParams)),
+	array_merge($childScopeParams, $parentScopeParams)
 );
 
 $activeCount = count(array_filter($parents, static fn(array $parent): bool => (string)$parent['status'] === 'active'));

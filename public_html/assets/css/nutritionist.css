@@ -359,3 +359,357 @@
     display: none;
   }
 }
+
+/* ----------------------------------------------------------------------
+ * Dashboard wave chart + Children Requiring Attention + AI Insights
+ *
+ * Visual additions for the redesigned dashboard:
+ *   - the wave chart now stacks translucent bands (Catmull-Rom-spline
+ *     cubic-Bezier paths) rather than overlapping polylines
+ *   - the attention list shows named children with severity pills and
+ *     a "Nd overdue" hint when a recheck is overdue
+ *   - the AI insights panel renders bullets from the AI endpoint with
+ *     a subtle accent bar, and a small "AI-generated" microcopy line
+ * -------------------------------------------------------------------- */
+
+.nutritionist-dashboard-chart svg[data-wave-chart] {
+  width: 100%;
+  display: block;
+  overflow: visible;
+}
+
+.nutritionist-dashboard-chart svg[data-wave-chart] path {
+  transition: fill-opacity 0.15s ease;
+}
+
+.nutritionist-dashboard-chart svg[data-wave-chart]:hover path {
+  fill-opacity: 0.65;
+}
+
+.nutritionist-attention-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.nutritionist-attention-row {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.nutritionist-attention-row:hover {
+  border-color: rgba(11, 110, 79, 0.25);
+  background: var(--admin-surface-alt);
+}
+
+.nutritionist-attention-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  font-weight: 700;
+  font-size: 0.72rem;
+  flex-shrink: 0;
+}
+
+.nutritionist-attention-meta {
+  min-width: 0;
+}
+
+.nutritionist-attention-name {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nutritionist-attention-sub {
+  font-size: 0.7rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nutritionist-attention-due {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  font-size: 0.7rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+}
+
+.nutritionist-attention-due-text {
+  font-weight: 600;
+}
+
+.nutritionist-attention-due-text.is-overdue {
+  color: var(--admin-danger);
+}
+
+.nutritionist-attention-link {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+  text-decoration: none;
+}
+
+.nutritionist-attention-link:hover {
+  text-decoration: underline;
+}
+
+.nutritionist-empty {
+  padding: 18px;
+  text-align: center;
+  color: var(--admin-muted);
+  font-size: 0.8rem;
+  border: 1px dashed var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+}
+
+/* ---- AI Insights panel ---- */
+.nutritionist-ai-insights {
+  padding: 2px 0 0;
+  min-height: 68px;
+}
+
+.nutritionist-ai-skeleton,
+.nutritionist-ai-empty {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  text-align: center;
+}
+
+.nutritionist-ai-bullets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.nutritionist-ai-bullet {
+  position: relative;
+  padding: 6px 10px 6px 12px;
+  font-size: 0.75rem;
+  line-height: 1.3;
+  color: var(--admin-text);
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+
+.nutritionist-ai-bullet::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--admin-primary);
+  opacity: 0.65;
+}
+
+.nutritionist-ai-bullet:hover {
+  border-color: rgba(11, 110, 79, 0.25);
+}
+
+.nutritionist-ai-meta {
+  font-size: 0.7rem;
+  color: var(--admin-muted);
+}
+
+/* Stacked-panel layout: when a single .nutritionist-panel-grid is used
+ * below the calendar, give the two children a side-by-side layout
+ * (chart on the left, attention list on the right) and collapse on
+ * narrow screens. The same rules are reused by the top wave-chart +
+ * calendar row. */
+@media (max-width: 880px) {
+  .nutritionist-attention-row {
+    grid-template-columns: 32px minmax(0, 1fr) auto;
+  }
+  .nutritionist-attention-due {
+    grid-column: 2 / -1;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+/* ----------------------------------------------------------------------
+ * Wave chart (Canvas2D) — modeled on the audit_logs chart style.
+ * Single "Activity Over Time" panel that overlays one smooth wave per
+ * band (Normal / Moderate / Severe / Overweight). Mirrors the audit
+ * chart exactly: title + "Live" badge header, inline legend, 260px
+ * canvas, 28px y-axis gutter, 2/30px x-axis gutter, hover dimming,
+ * and rounded dot markers on the focused series.
+ * -------------------------------------------------------------------- */
+.nutritionist-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nutritionist-chart-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+.nutritionist-chart-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.nutritionist-chart-badge::before {
+  content: "";
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  animation: nutritionist-pulse-dot 2s infinite;
+}
+
+@keyframes nutritionist-pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.nutritionist-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+}
+
+.nutritionist-chart-body {
+  position: relative;
+}
+
+.nutritionist-chart-canvas {
+  width: 100%;
+  height: 260px;
+  display: block;
+  cursor: crosshair;
+}
+
+.nutritionist-chart-y-axis {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 28px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  padding: 4px 0;
+}
+
+.nutritionist-chart-y-label {
+  font-size: 8px;
+  color: var(--admin-muted);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  text-align: right;
+  line-height: 1;
+}
+
+.nutritionist-chart-x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 30px 0 30px;
+  height: 18px;
+}
+
+.nutritionist-chart-x-label {
+  font-size: 8px;
+  color: var(--admin-muted);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1;
+  text-align: center;
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.nutritionist-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--admin-text);
+  color: var(--admin-surface);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 10;
+  line-height: 1.5;
+  max-width: 320px;
+}
+
+.nutritionist-chart-tooltip::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 3px solid transparent;
+  border-top-color: var(--admin-text);
+}
+
+.nutritionist-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.nutritionist-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+
+.nutritionist-legend-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
