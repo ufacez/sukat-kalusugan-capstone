@@ -30,23 +30,30 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
      */
     if ($action === 'delete' && $childId > 0) {
 
-        if (admin_execute(
-            'DELETE FROM children WHERE id = ?',
-            'i',
-            [$childId]
-        )) {
-            admin_redirect(
-                '/nutritionist/children.php',
-                ['notice' => 'Child removed successfully.']
-            );
+        $target = admin_fetch_one('SELECT id, child_code, barangay_id FROM children WHERE id = ? LIMIT 1', 'i', [$childId]);
+
+        if ($target === null) {
+            admin_redirect('/nutritionist/children.php', ['notice' => 'Child not found.', 'type' => 'error']);
+        }
+
+        // Scope check: nutritionists can only archive children in their assigned barangay
+        $userBarangayId = $user['barangay_id'] ?? null;
+        if (($user['role'] ?? '') !== 'admin' && $userBarangayId !== null && $userBarangayId !== '' && (int)$target['barangay_id'] !== (int)$userBarangayId) {
+            admin_redirect('/nutritionist/children.php', ['notice' => 'You can only manage children within your assigned barangay.', 'type' => 'error']);
+        }
+
+        // Archive instead of hard delete
+        $newStatus = 'inactive';
+        $ok = admin_execute('UPDATE children SET status = ? WHERE id = ?', 'si', [$newStatus, $childId]);
+
+        if ($ok) {
+            $actor = current_user();
+            log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'warning', 'Archived child ' . $target['child_code'] . ' (' . $childId . ')');
         }
 
         admin_redirect(
             '/nutritionist/children.php',
-            [
-                'notice' => 'Child could not be removed because of linked records.',
-                'type' => 'error'
-            ]
+            $ok ? ['notice' => 'Child archived successfully.'] : ['notice' => 'Child could not be archived.', 'type' => 'error']
         );
     }
 }

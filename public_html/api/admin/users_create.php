@@ -57,6 +57,17 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php', ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
+// Duplicate checks
+$existingEmail = admin_fetch_one('SELECT id FROM users WHERE email = ? LIMIT 1', 's', [$email]);
+if ($existingEmail !== null) {
+    admin_redirect('/admin/user_form.php', ['notice' => 'A user with this email already exists.', 'type' => 'error']);
+}
+
+$existingUsername = admin_fetch_one('SELECT id FROM users WHERE username = ? LIMIT 1', 's', [$username]);
+if ($existingUsername !== null) {
+    admin_redirect('/admin/user_form.php', ['notice' => 'A user with this username already exists.', 'type' => 'error']);
+}
+
 $hash = password_hash($password, PASSWORD_DEFAULT);
 $conn = get_db_connection();
 $stmt = mysqli_prepare($conn, 'INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');

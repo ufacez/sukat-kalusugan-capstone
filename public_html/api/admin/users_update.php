@@ -58,6 +58,17 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
+// Duplicate checks (exclude current user)
+$existingEmail = admin_fetch_one('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1', 'si', [$email, $id]);
+if ($existingEmail !== null) {
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this email already exists.', 'type' => 'error']);
+}
+
+$existingUsername = admin_fetch_one('SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1', 'si', [$username, $id]);
+if ($existingUsername !== null) {
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this username already exists.', 'type' => 'error']);
+}
+
 $conn = get_db_connection();
 
 if ($password !== '') {

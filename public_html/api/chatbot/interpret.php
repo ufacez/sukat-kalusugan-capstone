@@ -79,13 +79,25 @@ if ($userType === 'parent') {
         [$childId, (int)$user['id']]
     );
 } else {
+    // Staff: scope nutritionists to their assigned barangay
+    $scopeCondition = '';
+    $scopeParams = [$childId];
+    $role = $user['role'] ?? '';
+    $userBarangayId = $user['barangay_id'] ?? null;
+
+    if ($role === 'nutritionist' && $userBarangayId !== null && $userBarangayId !== '') {
+        $scopeCondition = ' AND c.barangay_id = ?';
+        $scopeParams[] = (int)$userBarangayId;
+    }
+
     $child = admin_fetch_one(
-        'SELECT id, first_name, last_name, sex, birthdate, parent_id
-         FROM children
-         WHERE id = ?
+        'SELECT c.id, c.first_name, c.last_name, c.sex, c.birthdate, c.parent_id
+         FROM children c
+         WHERE c.id = ?
+            ' . $scopeCondition . '
          LIMIT 1',
-        'i',
-        [$childId]
+        str_repeat('i', count($scopeParams)),
+        $scopeParams
     );
 }
 

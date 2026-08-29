@@ -61,46 +61,53 @@ if ($userType === 'parent') {
 
     $query = trim((string)($_GET['q'] ?? ''));
 
+    // Scope nutritionists to their assigned barangay
+    $scopeCondition = '';
+    $scopeParams = [];
+    $role = $user['role'] ?? '';
+    $userBarangayId = $user['barangay_id'] ?? null;
+
+    if ($role === 'nutritionist' && $userBarangayId !== null && $userBarangayId !== '') {
+        $scopeCondition = ' AND c.barangay_id = ?';
+        $scopeParams[] = (int)$userBarangayId;
+    }
+
     if ($query !== '') {
 
-        /*
-         * Search by:
-         *   - first name
-         *   - last name
-         *   - child code
-         */
         $search = '%' . $query . '%';
 
         $children = admin_fetch_all(
             'SELECT
-                id,
-                child_code,
-                first_name,
-                last_name
-             FROM children
-             WHERE first_name LIKE ?
-                OR last_name LIKE ?
-                OR child_code LIKE ?
-             ORDER BY first_name ASC, last_name ASC
+                c.id,
+                c.child_code,
+                c.first_name,
+                c.last_name
+             FROM children c
+             WHERE (c.first_name LIKE ?
+                 OR c.last_name LIKE ?
+                 OR c.child_code LIKE ?)
+                ' . $scopeCondition . '
+             ORDER BY c.first_name ASC, c.last_name ASC
              LIMIT 50',
-            'sss',
-            [$search, $search, $search]
+            'sss' . str_repeat('i', count($scopeParams)),
+            [$search, $search, $search, ...$scopeParams]
         );
 
     } else {
 
-        /*
-         * Don't load an unlimited number of children.
-         */
         $children = admin_fetch_all(
             'SELECT
-                id,
-                child_code,
-                first_name,
-                last_name
-             FROM children
-             ORDER BY first_name ASC, last_name ASC
-             LIMIT 50'
+                c.id,
+                c.child_code,
+                c.first_name,
+                c.last_name
+             FROM children c
+             WHERE 1=1
+                ' . $scopeCondition . '
+             ORDER BY c.first_name ASC, c.last_name ASC
+             LIMIT 50',
+            str_repeat('i', count($scopeParams)),
+            $scopeParams
         );
     }
 

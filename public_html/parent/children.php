@@ -170,6 +170,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 						<th>Parent type</th>
 						<th>Last status</th>
 						<th>Last measurement</th>
+						<th>Actions</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -199,6 +200,11 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 								<td>
 									<div><?php echo parent_e((string)($child['measurement_date'] ?? 'n/a')); ?></div>
 									<div class="admin-mini"><?php echo parent_e((string)($child['height_cm'] ?? '')); ?> cm · <?php echo parent_e((string)($child['weight_kg'] ?? '')); ?> kg</div>
+								</td>
+								<td>
+									<div class="admin-actions">
+										<a class="admin-icon-btn" title="Edit" href="<?php echo parent_e(app_url('/parent/child_edit.php?id=' . (int)$child['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+									</div>
 								</td>
 							</tr>
 						<?php endforeach; ?>

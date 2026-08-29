@@ -12,32 +12,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	 * DELETE
 	 */
 	if ($action === 'delete' && $parentId > 0) {
-		$target = admin_fetch_one('SELECT id, email FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+		$target = admin_fetch_one('SELECT id, email, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
 
 		if ($target === null) {
 			admin_redirect('/nutritionist/parents.php', ['notice' => 'Parent not found.', 'type' => 'error']);
 		}
 
-		// children.parent_id and appointments.parent_id are RESTRICT (not
-		// CASCADE), so check for linked children first and give a clear,
-		// actionable message instead of a raw FK constraint error.
-		$linkedChildren = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ?', 'i', [$parentId]);
-
-		if ($linkedChildren > 0) {
-			admin_redirect('/nutritionist/parents.php', [
-				'notice' => 'Cannot delete this parent — ' . $linkedChildren . ' child record(s) are still linked to it. Reassign or remove those children first.',
-				'type' => 'error',
-			]);
+		// Scope check: nutritionists can only archive parents in their assigned barangay
+		$userBarangayId = $user['barangay_id'] ?? null;
+		if (($user['role'] ?? '') !== 'admin' && $userBarangayId !== null && $userBarangayId !== '' && (int)$target['barangay_id'] !== (int)$userBarangayId) {
+			admin_redirect('/nutritionist/parents.php', ['notice' => 'You can only manage parents within your assigned barangay.', 'type' => 'error']);
 		}
 
-		$ok = admin_execute('DELETE FROM parents WHERE id = ?', 'i', [$parentId]);
+		// Archive instead of hard delete
+		$newStatus = ($target['status'] ?? 'active') === 'active' ? 'inactive' : 'active';
+		$ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', [$newStatus, $parentId]);
 
 		if ($ok) {
 			$actor = current_user();
-			log_action($actor['id'] ?? null, 'DELETE_PARENT', 'warning', 'Deleted parent account ' . $target['email'] . ' (' . $parentId . ')');
+			$actionLabel = $newStatus === 'inactive' ? 'Archived' : 'Restored';
+			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', $actionLabel . ' parent ' . $target['email'] . ' (' . $parentId . ')');
 		}
 
-		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent deleted successfully.'] : ['notice' => 'Parent could not be deleted.', 'type' => 'error']);
+		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent ' . ($newStatus === 'inactive' ? 'archived' : 'restored') . ' successfully.'] : ['notice' => 'Parent could not be updated.', 'type' => 'error']);
 	}
 
 }

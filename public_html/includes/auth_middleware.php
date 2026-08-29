@@ -192,3 +192,41 @@ function require_permission(string $code): void
 
     mysqli_stmt_close($stmt);
 }
+
+function has_permission(string $code): bool
+{
+    $user = current_user();
+
+    if ($user === null) {
+        return false;
+    }
+
+    if (($user['type'] ?? null) === 'parent') {
+        return false;
+    }
+
+    if (($user['role'] ?? null) === 'admin') {
+        return true;
+    }
+
+    $roleId = (int)($user['role_id'] ?? 0);
+
+    if ($roleId <= 0) {
+        return false;
+    }
+
+    $conn = get_db_connection();
+    $stmt = mysqli_prepare($conn, 'SELECT 1 FROM role_permissions rp INNER JOIN permissions p ON p.id = rp.permission_id WHERE rp.role_id = ? AND p.code = ? LIMIT 1');
+
+    if ($stmt === false) {
+        return false;
+    }
+
+    mysqli_stmt_bind_param($stmt, 'is', $roleId, $code);
+    mysqli_stmt_execute($stmt);
+    mysqli_stmt_store_result($stmt);
+    $allowed = mysqli_stmt_num_rows($stmt) >= 1;
+    mysqli_stmt_close($stmt);
+
+    return $allowed;
+}
