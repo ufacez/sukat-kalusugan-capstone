@@ -69,9 +69,26 @@ function admin_action_icon(string $key): string
         'logout' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9"/></svg>',
         'chevron_left'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>',
         'chevron_right' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>',
+        'theme' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>',
+        'theme_sun' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z"/></svg>',
     ];
 
     return $icons[$key] ?? '';
+}
+
+/**
+ * Renders the topbar theme toggle button (light/dark mode). Used by
+ * the admin, parent, and nutritionist layouts to put a quick theme
+ * switcher next to the settings icon in the topbar.
+ */
+function admin_topbar_theme_toggle(): string
+{
+    $moon = admin_action_icon('theme');
+    $sun  = admin_action_icon('theme_sun');
+    return '<button type="button" class="admin-topbar-theme-toggle" data-theme-toggle-topbar title="Toggle light / dark mode" aria-label="Toggle theme">'
+        . '<span class="admin-topbar-theme-icon is-dark">' . $moon . '</span>'
+        . '<span class="admin-topbar-theme-icon is-light">' . $sun . '</span>'
+        . '</button>';
 }
 
 function admin_initials(string $name): string
@@ -453,12 +470,6 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</nav>';
 
     echo '<div class="admin-sidebar-footer">';
-    echo '<div class="admin-nav-group sidebar-theme-toggle">';
-    echo '<button type="button" data-theme-toggle>';
-    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z"/></svg>';
-    echo '<span class="theme-toggle-label">Dark Mode</span>';
-    echo '</button>';
-    echo '</div>';
     echo '<div class="admin-session-card">';
     echo '<div class="admin-session-role">' . admin_e(ucfirst($userRole)) . '</div>';
     echo '<div class="admin-session-name">' . admin_e($userName) . '</div>';
@@ -482,6 +493,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo '<div class="admin-topbar-actions">' . $actionsHtml . '</div>';
+    echo admin_topbar_theme_toggle();
     echo '<a href="' . admin_e(app_url('/admin/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';

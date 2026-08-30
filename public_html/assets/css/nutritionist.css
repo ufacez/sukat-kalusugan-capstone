@@ -396,10 +396,10 @@
 
 .nutritionist-attention-row {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto auto;
+  grid-template-columns: 36px minmax(0, 1.1fr) minmax(0, 1.05fr) minmax(0, 0.95fr) auto;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
+  gap: 14px;
+  padding: 12px 14px;
   border: 1px solid var(--admin-border);
   border-radius: 12px;
   background: var(--admin-surface);
@@ -445,14 +445,49 @@
   text-overflow: ellipsis;
 }
 
-.nutritionist-attention-due {
+.nutritionist-attention-status {
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 2px;
-  font-size: 0.7rem;
+  gap: 4px;
+}
+.nutritionist-attention-status-label,
+.nutritionist-attention-due-label {
+  font-size: 0.62rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--admin-muted);
+  font-weight: 700;
+}
+
+.nutritionist-attention-due {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.72rem;
   color: var(--admin-muted);
   white-space: nowrap;
+}
+.nutritionist-attention-due-value {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  letter-spacing: -0.01em;
+}
+.nutritionist-attention-due-value.is-overdue {
+  color: var(--admin-danger);
+}
+.nutritionist-attention-due-value.is-due-today {
+  color: var(--admin-accent);
+}
+.nutritionist-attention-due-value.is-upcoming {
+  color: var(--admin-valid);
+}
+.nutritionist-attention-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
 }
 
 .nutritionist-attention-due-text {
@@ -468,10 +503,6 @@
   font-weight: 600;
   color: var(--admin-primary);
   text-decoration: none;
-}
-
-.nutritionist-attention-link:hover {
-  text-decoration: underline;
 }
 
 .nutritionist-empty {
@@ -545,16 +576,19 @@
  * (chart on the left, attention list on the right) and collapse on
  * narrow screens. The same rules are reused by the top wave-chart +
  * calendar row. */
-@media (max-width: 880px) {
+@media (max-width: 980px) {
   .nutritionist-attention-row {
-    grid-template-columns: 32px minmax(0, 1fr) auto;
+    grid-template-columns: 36px minmax(0, 1fr) auto;
+    row-gap: 8px;
   }
+  .nutritionist-attention-status,
   .nutritionist-attention-due {
     grid-column: 2 / -1;
     flex-direction: row;
     align-items: center;
     gap: 8px;
   }
+  .nutritionist-attention-due { justify-content: space-between; }
 }
 
 /* ----------------------------------------------------------------------
@@ -712,4 +746,832 @@
   height: 6px;
   border-radius: 50%;
   flex-shrink: 0;
+}
+
+/* ---- Replicated Dashboard Layout (reference: dashbaordui.png) ---- */
+.nutritionist-dashboard-header {
+  margin-bottom: 18px;
+}
+.nutritionist-dashboard-title {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+  font-weight: 800;
+  color: var(--admin-text);
+  letter-spacing: -0.03em;
+  line-height: 1.15;
+  margin: 0 0 4px;
+}
+[data-theme="dark"] .nutritionist-dashboard-title {
+  color: #f0f6f3;
+}
+.nutritionist-dashboard-subtitle {
+  color: var(--admin-muted);
+  font-size: 0.9rem;
+  margin: 0;
+}
+
+/* Light surface stat cards matching the admin-card system */
+.dashboard-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.dashboard-stat-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+.dashboard-stat-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(11, 110, 79, 0.2);
+  box-shadow: 0 4px 16px rgba(11, 110, 79, 0.06);
+}
+.dashboard-stat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+.dashboard-stat-icon-wrap {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.dashboard-stat-icon-wrap.is-primary {
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+}
+.dashboard-stat-icon-wrap.is-accent {
+  background: var(--admin-pill-warn-bg);
+  color: var(--admin-pill-warn-text);
+}
+.dashboard-stat-icon-wrap.is-danger {
+  background: var(--admin-pill-danger-bg);
+  color: var(--admin-danger);
+}
+.dashboard-stat-icon-wrap.is-valid {
+  background: var(--admin-pill-success-bg);
+  color: var(--admin-valid);
+}
+.dashboard-stat-icon-wrap svg { width: 22px; height: 22px; stroke-width: 1.5; }
+.dashboard-stat-label {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--admin-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.dashboard-stat-value {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+.dashboard-stat-meta {
+  margin-top: 6px;
+  font-size: 0.73rem;
+  color: var(--admin-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dashboard-stat-meta a {
+  color: var(--admin-primary);
+  text-decoration: none;
+  font-weight: 600;
+}
+.dashboard-stat-meta .highlight { color: var(--admin-text); font-weight: 600; }
+.dashboard-stat-meta.is-danger .highlight { color: var(--admin-danger); }
+
+/* Main two-column layout for chart + calendar */
+.dashboard-main-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+/* WHO Indicators panel redesign — light surface, matches admin-card */
+.dashboard-chart-panel {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+}
+.dashboard-chart-panel .panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.dashboard-chart-panel h2 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0;
+  color: var(--admin-text);
+}
+.dashboard-chart-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dashboard-chart-tab {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.dashboard-chart-tab:hover {
+  border-color: rgba(11, 110, 79, 0.35);
+  color: var(--admin-primary);
+}
+.dashboard-chart-tab.is-active {
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  border-color: rgba(11, 110, 79, 0.35);
+}
+
+/* Chart sidebar stats — light surface, system tokens */
+.dashboard-chart-sidebar {
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 14px;
+}
+.dashboard-chart-sidebar .stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.dashboard-chart-sidebar .stat-row:last-child { border-bottom: 0; }
+.dashboard-chart-sidebar .stat-row[hidden] { display: none; }
+.dashboard-chart-sidebar .stat-label {
+  font-size: 0.78rem;
+  color: var(--admin-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+}
+.dashboard-chart-sidebar .stat-label strong { color: var(--admin-text); font-weight: 700; }
+.dashboard-chart-sidebar .stat-code {
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  border: 1px solid var(--admin-border);
+  margin-left: 4px;
+}
+.dashboard-chart-sidebar .stat-count {
+  font-size: 1.45rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
+}
+.dashboard-chart-sidebar .stat-pct {
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+  font-weight: 600;
+}
+.dashboard-chart-sidebar .stat-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.dashboard-chart-sidebar .stat-dot.is-primary { background: var(--admin-primary); }
+.dashboard-chart-sidebar .stat-dot.is-accent { background: var(--admin-accent); }
+.dashboard-chart-sidebar .stat-dot.is-danger { background: var(--admin-danger); }
+.dashboard-chart-sidebar .stat-foot {
+  margin-top: 10px;
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+  line-height: 1.4;
+}
+
+/* Larger sidebar variant — used inside the WHO Growth Indicators panel. */
+.dashboard-chart-sidebar-large {
+  min-width: 280px;
+}
+.dashboard-chart-sidebar-large .stat-row {
+  padding: 10px 0;
+}
+.dashboard-chart-sidebar-large .stat-label {
+  font-size: 0.84rem;
+  gap: 10px;
+}
+.dashboard-chart-sidebar-large .stat-count {
+  font-size: 1.6rem;
+}
+.dashboard-chart-sidebar-large .stat-pct {
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+/* Calendar widget redesign — light surface, system tokens */
+.dashboard-calendar-widget {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+}
+.dashboard-calendar-widget .cal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.dashboard-calendar-widget .cal-header h3 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.85rem;
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+
+/* Bottom 3-section layout — light surface, system tokens */
+.dashboard-bottom-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.dashboard-bottom-panel {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+}
+.dashboard-bottom-panel h3 {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+  margin: 0 0 12px 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: var(--admin-text);
+}
+.dashboard-bottom-panel h3 a {
+  color: var(--admin-primary);
+  font-size: 0.72rem;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+/* Recent measurements table inside panel — light surface, system tokens */
+.dashboard-table-mini {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+.dashboard-table-mini th {
+  text-align: left;
+  padding: 6px 6px;
+  color: var(--admin-muted);
+  font-weight: 600;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border-bottom: 1px solid var(--admin-border);
+}
+.dashboard-table-mini td {
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--admin-border);
+  color: var(--admin-text);
+  vertical-align: middle;
+}
+.dashboard-table-mini tr:last-child td { border-bottom: 0; }
+
+/* AI Insights bullets — light surface, system tokens */
+.dashboard-ai-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.dashboard-ai-item {
+  display: flex;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+}
+.dashboard-ai-item svg { flex-shrink: 0; width: 18px; height: 18px; }
+.dashboard-ai-item .ai-text {
+  font-size: 0.78rem;
+  line-height: 1.35;
+  color: var(--admin-text);
+}
+.dashboard-ai-item .ai-text strong {
+  color: var(--admin-text);
+  font-weight: 700;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .dashboard-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-bottom-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 900px) {
+  .dashboard-main-grid { grid-template-columns: 1fr; }
+  .dashboard-bottom-grid { grid-template-columns: 1fr; }
+  .dashboard-stat-grid { grid-template-columns: 1fr; }
+}
+
+/* ----------------------------------------------------------------------
+ * Wave chart styles for the WHO Growth Indicators panel. Mirrors the
+ * audit_logs chart so both dashboards look like siblings.
+ * -------------------------------------------------------------------- */
+.audit-chart-wrap {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+.audit-chart-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+.audit-chart-title {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-text);
+}
+.audit-chart-badge {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 7px;
+  border-radius: 20px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.audit-chart-badge::before {
+  content: '';
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.audit-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.audit-chart-legend .audit-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+.audit-chart-legend .audit-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.audit-chart-legend .audit-legend-dot.is-primary { background: var(--admin-primary); }
+.audit-chart-legend .audit-legend-dot.is-accent { background: var(--admin-accent); }
+.audit-chart-legend .audit-legend-dot.is-danger { background: var(--admin-danger); }
+
+.audit-chart-body {
+  position: relative;
+}
+.audit-chart-canvas {
+  width: 100%;
+  height: 320px;
+  display: block;
+  cursor: crosshair;
+}
+.audit-chart-y-axis {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  bottom: 0;
+  width: 34px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  padding: 14px 0 26px 0;
+}
+.audit-chart-y-label {
+  font-size: 11px;
+  color: var(--admin-muted);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  text-align: right;
+  line-height: 1;
+  font-weight: 600;
+}
+.audit-chart-x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 30px 0 30px;
+  height: 22px;
+}
+.audit-chart-x-label {
+  font-size: 11px;
+  color: var(--admin-text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  line-height: 1;
+  text-align: center;
+  flex: 1 1 0;
+  min-width: 0;
+  font-weight: 600;
+}
+.audit-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--admin-text);
+  color: var(--admin-surface);
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 10;
+  line-height: 1.5;
+  max-width: 320px;
+}
+.audit-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 3px solid transparent;
+  border-top-color: var(--admin-text);
+}
+.audit-chart-tooltip.is-visible {
+  opacity: 1;
+}
+
+@media (max-width: 700px) {
+  .audit-chart-y-axis { width: 28px; padding: 16px 0 26px 0; }
+  .audit-chart-x-axis { padding: 8px 22px 0 22px; }
+  .audit-chart-canvas { height: 280px; }
+  .audit-chart-y-label { font-size: 10px; }
+  .audit-chart-x-label { font-size: 10px; }
+}
+
+/* ----------------------------------------------------------------------
+ * Calendar widget (system-standard palette):
+ *   .dashboard-calendar-grid   — outer container with weekday header + day cells
+ *   .dashboard-calendar-day    — individual day cell (button)
+ *   .dashboard-calendar-events — the panel below the calendar with title,
+ *                                count, event cards, legend, and CTA
+ * Light surface — uses the same tokens as the rest of the dashboard.
+ * -------------------------------------------------------------------- */
+.dashboard-calendar-grid {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 14px 14px 10px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+}
+.dashboard-calendar-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+  margin-bottom: 6px;
+}
+.dashboard-calendar-weekday {
+  text-align: center;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 0;
+}
+.dashboard-calendar-days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.dashboard-calendar-day {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 6px 2px 4px;
+  min-height: 44px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--admin-text);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  cursor: default;
+  transition: background 0.15s, color 0.15s;
+}
+.dashboard-calendar-day.is-empty {
+  background: transparent;
+  min-height: 44px;
+  pointer-events: none;
+}
+.dashboard-calendar-day.has-events {
+  cursor: pointer;
+}
+.dashboard-calendar-day.has-events:hover {
+  background: var(--admin-surface-alt);
+}
+.dashboard-calendar-day.is-today.has-events:hover {
+  background: var(--admin-primary-soft);
+}
+.dashboard-calendar-day-num {
+  font-weight: 500;
+  line-height: 1;
+}
+.dashboard-calendar-day.is-today .dashboard-calendar-day-num {
+  background: var(--admin-primary);
+  color: #fff;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  font-weight: 700;
+}
+.dashboard-calendar-day-dots {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+}
+.dashboard-calendar-day-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.dashboard-calendar-events {
+  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dashboard-calendar-events-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.dashboard-calendar-events-title {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--admin-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.dashboard-calendar-events-today {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.dashboard-calendar-events-sub {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--admin-muted);
+  margin-top: 2px;
+}
+.dashboard-calendar-events-empty {
+  font-size: 12px;
+  color: var(--admin-muted);
+  padding: 8px 0;
+}
+.dashboard-calendar-event {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+}
+.dashboard-calendar-event-meta {
+  min-width: 0;
+  flex: 1;
+}
+.dashboard-calendar-event-time {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--admin-text);
+  margin-bottom: 2px;
+}
+.dashboard-calendar-event-title {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--admin-text);
+  line-height: 1.25;
+}
+.dashboard-calendar-event-sub {
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--admin-muted);
+  flex-wrap: wrap;
+}
+.dashboard-calendar-event-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+.dashboard-calendar-event-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dashboard-calendar-event-sep { color: var(--admin-border); }
+.dashboard-calendar-event-loc { color: var(--admin-muted); }
+
+.dashboard-calendar-events-legend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding-top: 10px;
+  border-top: 1px solid var(--admin-border);
+  margin-top: 4px;
+}
+.dashboard-calendar-events-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+.dashboard-calendar-events-legend-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.dashboard-calendar-view-all {
+  align-self: flex-end;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+@media (max-width: 600px) {
+  .dashboard-calendar-day { min-height: 38px; font-size: 11px; }
+}
+
+/* ----------------------------------------------------------------------
+ * Unified bottom section — Children Requiring Attention + Recent
+ * Measurements + AI Insights combined in one panel with a 2-col grid.
+ * -------------------------------------------------------------------- */
+.nutritionist-dashboard-bottom {
+  margin-top: 18px;
+}
+.nutritionist-bottom-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  gap: 22px;
+}
+.nutritionist-bottom-col {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.nutritionist-attention-pills {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  max-width: 110px;
+  justify-content: flex-end;
+}
+@media (max-width: 980px) {
+  .nutritionist-bottom-grid { grid-template-columns: 1fr; }
+  .nutritionist-attention-pills { max-width: none; }
+}
+
+/* ----------------------------------------------------------------------
+ * Link cleanup: no underlines on dashboard links. Hover only changes
+ * color/weight — never reintroduces the underline.
+ * -------------------------------------------------------------------- */
+.nutritionist-dashboard a,
+.nutritionist-dashboard a:hover,
+.nutritionist-dashboard a:focus,
+.nutritionist-dashboard a:active {
+  text-decoration: none;
+}
+
+/* ----------------------------------------------------------------------
+ * Calendar: blinking dot animation for days with events. The dot pulses
+ * in opacity to draw attention to scheduled days.
+ * -------------------------------------------------------------------- */
+@keyframes nutritionist-day-blink {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.35; transform: scale(0.6); }
+}
+.dashboard-calendar-day.has-events .dashboard-calendar-day-dot {
+  animation: nutritionist-day-blink 1.2s ease-in-out infinite;
+}
+.dashboard-calendar-day.has-events .dashboard-calendar-day-dots {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+}
+.dashboard-calendar-day.has-events {
+  position: relative;
+}
+.dashboard-calendar-day.has-events::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--admin-primary);
+  opacity: 0.35;
+  pointer-events: none;
+  animation: nutritionist-day-blink 1.6s ease-in-out infinite;
 }

@@ -1,33 +1,40 @@
 (function () {
-  // Theme toggle
-  const themeToggle = document.querySelector("[data-theme-toggle]");
-  if (themeToggle) {
-    const getPreferredTheme = () => {
-      const stored = localStorage.getItem("theme");
-      if (stored) return stored;
-      return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-    };
+  // Theme toggle (used by both the sidebar [data-theme-toggle] and the topbar
+  // [data-theme-toggle-topbar] buttons). Both should stay in sync — any click
+  // updates the localStorage value, the data-theme attribute, and the
+  // visible label of the sidebar toggle.
+  const getPreferredTheme = () => {
+    const stored = localStorage.getItem("theme");
+    if (stored) return stored;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  };
 
-    const applyTheme = (theme) => {
-      document.documentElement.setAttribute("data-theme", theme);
-      localStorage.setItem("theme", theme);
-      const label = themeToggle.querySelector(".theme-toggle-label");
-      if (label) label.textContent = theme === "dark" ? "Light Mode" : "Dark Mode";
-    };
+  const applyTheme = (theme, flashButton) => {
+    document.documentElement.setAttribute("data-theme", theme);
+    localStorage.setItem("theme", theme);
+    if (flashButton) {
+      // Brief pulse so the user gets a visual confirmation of the switch.
+      flashButton.classList.remove("is-flashing");
+      // Force reflow so the animation can replay on rapid clicks.
+      void flashButton.offsetWidth;
+      flashButton.classList.add("is-flashing");
+    }
+  };
 
-    applyTheme(getPreferredTheme());
+  applyTheme(getPreferredTheme());
 
-    themeToggle.addEventListener("click", () => {
+  document.querySelectorAll("[data-theme-toggle], [data-theme-toggle-topbar]").forEach(function (btn) {
+    btn.addEventListener("click", function () {
       const current = document.documentElement.getAttribute("data-theme");
-      applyTheme(current === "dark" ? "light" : "dark");
+      applyTheme(current === "dark" ? "light" : "dark", btn);
     });
+  });
 
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => {
-      if (!localStorage.getItem("theme")) {
-        applyTheme(e.matches ? "dark" : "light");
-      }
-    });
-  }
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function (e) {
+    if (!localStorage.getItem("theme")) {
+      applyTheme(e.matches ? "dark" : "light");
+    }
+  });
 
   const sidebar = document.querySelector("[data-admin-sidebar]");
   const toggle = document.querySelector("[data-admin-sidebar-toggle]");
@@ -43,6 +50,8 @@
 
     toggle.setAttribute("aria-expanded", "false");
     sidebar.setAttribute("aria-hidden", "true");
+
+    const isMobile = () => window.innerWidth <= 920;
 
     const openSidebar = () => {
       sidebar.classList.add("is-open");
@@ -80,9 +89,62 @@
       }
     });
 
+    // Swipe-to-close on touch devices. The user drags the sidebar left
+    // past a 30% threshold and the drawer closes. The gesture only
+    // activates when the drawer is already open on a mobile breakpoint.
+    let touchStartX = 0;
+    let touchStartY = 0;
+    let touching = false;
+    sidebar.addEventListener("touchstart", (event) => {
+      if (!isMobile() || !sidebar.classList.contains("is-open")) return;
+      const touch = event.touches[0];
+      touchStartX = touch.clientX;
+      touchStartY = touch.clientY;
+      touching = true;
+    }, { passive: true });
+
+    sidebar.addEventListener("touchmove", (event) => {
+      if (!touching || !isMobile()) return;
+      const touch = event.touches[0];
+      const dx = touch.clientX - touchStartX;
+      const dy = touch.clientY - touchStartY;
+      // If the gesture is more horizontal than vertical, drag the
+      // drawer left in real time. We translate the sidebar up to -80%
+      // before letting it snap closed.
+      if (Math.abs(dx) > Math.abs(dy) && dx < 0) {
+        const sidebarWidth = sidebar.offsetWidth || 280;
+        const translate = Math.max(dx, -sidebarWidth * 0.8);
+        sidebar.style.transform = "translateX(" + translate + "px)";
+        sidebar.style.transition = "none";
+      }
+    }, { passive: true });
+
+    const endTouch = (event) => {
+      if (!touching) return;
+      touching = false;
+      sidebar.style.transition = "";
+      const touch = (event.changedTouches && event.changedTouches[0]) || null;
+      if (!touch) {
+        sidebar.style.transform = "";
+        return;
+      }
+      const dx = touch.clientX - touchStartX;
+      const sidebarWidth = sidebar.offsetWidth || 280;
+      if (dx < -sidebarWidth * 0.3) {
+        closeSidebar();
+      }
+      sidebar.style.transform = "";
+    };
+    sidebar.addEventListener("touchend", endTouch, { passive: true });
+    sidebar.addEventListener("touchcancel", endTouch, { passive: true });
+
     window.addEventListener("resize", () => {
       if (window.innerWidth > 920 && sidebar.classList.contains("is-open")) {
         closeSidebar();
+      }
+      // Clear any inline transform when crossing breakpoints.
+      if (!isMobile()) {
+        sidebar.style.transform = "";
       }
     });
   }

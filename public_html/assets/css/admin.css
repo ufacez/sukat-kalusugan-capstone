@@ -234,7 +234,6 @@
 .admin-shell.is-collapsed .admin-nav-label,
 .admin-shell.is-collapsed .admin-nav-link span,
 .admin-shell.is-collapsed .admin-nav-section,
-.admin-shell.is-collapsed .sidebar-theme-toggle .theme-toggle-label,
 .admin-shell.is-collapsed .admin-session-card,
 .admin-shell.is-collapsed .admin-logout span {
   display: none;
@@ -514,6 +513,106 @@
   width: 20px;
   height: 20px;
   fill: none;
+}
+
+/* Light/dark mode toggle in the topbar (beside the settings icon). */
+.admin-topbar-theme-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid transparent;
+  background: var(--admin-surface);
+  border-radius: 12px;
+  color: var(--admin-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 0.2s ease, background 0.2s ease,
+              border-color 0.2s ease, transform 0.25s ease,
+              box-shadow 0.25s ease;
+  overflow: hidden;
+}
+.admin-topbar-theme-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg,
+    rgba(250, 204, 21, 0.18) 0%,
+    rgba(99, 102, 241, 0.18) 100%);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+  pointer-events: none;
+}
+.admin-topbar-theme-toggle:hover {
+  color: var(--admin-text);
+  background: var(--admin-surface-alt);
+  border-color: var(--admin-border);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
+}
+[data-theme="dark"] .admin-topbar-theme-toggle:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+}
+.admin-topbar-theme-toggle:hover::before {
+  opacity: 1;
+}
+.admin-topbar-theme-toggle:active {
+  transform: scale(0.94);
+}
+.admin-topbar-theme-toggle:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+.admin-topbar-theme-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  position: relative;
+  z-index: 1;
+  transition: transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.admin-topbar-theme-toggle:hover svg {
+  transform: rotate(20deg) scale(1.08);
+}
+
+/* Smooth icon swap when the user toggles the theme. The active icon
+ * fades + scales in, the outgoing icon fades + scales out. */
+.admin-topbar-theme-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  inset: 0;
+  transition: opacity 0.3s ease, transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.admin-topbar-theme-icon.is-light {
+  opacity: 0;
+  transform: rotate(-90deg) scale(0.5);
+  pointer-events: none;
+}
+[data-theme="dark"] .admin-topbar-theme-icon.is-dark {
+  opacity: 0;
+  transform: rotate(90deg) scale(0.5);
+  pointer-events: none;
+}
+[data-theme="dark"] .admin-topbar-theme-icon.is-light {
+  opacity: 1;
+  transform: rotate(0deg) scale(1);
+  pointer-events: auto;
+}
+
+/* Brief pulse on the whole button when the theme changes (driven by the
+ * .is-flashing class that the JS toggles for ~600ms). */
+.admin-topbar-theme-toggle.is-flashing {
+  animation: topbar-theme-flash 0.6s ease;
+}
+@keyframes topbar-theme-flash {
+  0%   { box-shadow: 0 0 0 0 var(--admin-primary); }
+  40%  { box-shadow: 0 0 0 8px rgba(99, 102, 241, 0.18); }
+  100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
 }
 
 .admin-sidebar-toggle {
@@ -1443,25 +1542,31 @@
   .admin-sidebar {
     position: fixed;
     inset: 0 auto 0 0;
-    width: min(86vw, 280px);
-    max-width: 280px;
+    width: min(86vw, 300px);
+    max-width: 300px;
     height: 100dvh;
-    transform: translateX(-102%);
-    visibility: hidden;
-    transition: transform 220ms ease, visibility 220ms ease;
-    z-index: 30;
+    transform: translateX(-105%);
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
+    z-index: 40;
     overflow-y: auto;
+    overflow-x: hidden;
     -webkit-overflow-scrolling: touch;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.12);
+    box-shadow: 6px 0 28px rgba(0, 0, 0, 0.18);
+    /* When closed, hide from a11y and avoid focus traps. */
+    visibility: hidden;
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1),
+                visibility 0s linear 280ms;
   }
 
   .admin-sidebar.is-open {
     transform: translateX(0);
     visibility: visible;
+    transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1),
+                visibility 0s linear 0s;
   }
 
   .admin-main {
-    padding: 16px 16px 28px;
+    padding: 14px 14px 28px;
     min-width: 0;
     position: relative;
     z-index: 0;
@@ -1481,19 +1586,39 @@
     top: 0;
     z-index: 5;
     padding: 10px 0 14px;
-    margin: 0 -16px 20px;
-    padding-left: 16px;
-    padding-right: 16px;
+    margin: 0 -14px 20px;
+    padding-left: 14px;
+    padding-right: 14px;
     flex-wrap: wrap;
     background: var(--admin-bg);
+    gap: 10px;
+  }
+
+  .admin-topbar-left {
+    min-width: 0;
+    flex: 1 1 auto;
   }
 
   .admin-topbar-right {
-    gap: 10px;
+    gap: 8px;
   }
 
   .admin-topbar-actions {
     width: 100%;
+    order: 3;
+  }
+
+  .admin-topbar-actions:empty {
+    display: none;
+  }
+
+  .admin-pagehead h1 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+
+  .admin-pagehead p {
+    font-size: 0.82rem;
   }
 
   .admin-panel-grid {
@@ -1504,11 +1629,13 @@
     display: block;
     position: fixed;
     inset: 0;
-    background: rgba(0, 0, 0, 0.3);
+    background: rgba(0, 0, 0, 0.4);
     opacity: 0;
     pointer-events: none;
-    transition: opacity 220ms ease;
-    z-index: 25;
+    transition: opacity 280ms ease;
+    z-index: 35;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
   }
 
   .admin-sidebar-overlay.is-open {
@@ -1727,6 +1854,115 @@
   .who-import-actions .admin-btn {
     width: 100%;
     justify-content: center;
+  }
+}
+
+/* ----- Extra small mobile (≤ 480px): phones in portrait ----- */
+@media (max-width: 480px) {
+  .admin-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-sidebar {
+    width: min(94vw, 300px);
+  }
+
+  .admin-main {
+    padding: 10px 10px 24px;
+  }
+
+  .admin-topbar {
+    margin: 0 -10px 16px;
+    padding: 8px 10px 12px;
+    gap: 8px;
+  }
+
+  .admin-pagehead h1 {
+    font-size: 1.05rem;
+    line-height: 1.2;
+  }
+
+  .admin-pagehead p {
+    font-size: 0.75rem;
+  }
+
+  .admin-kicker {
+    font-size: 0.6rem;
+  }
+
+  .admin-topbar-theme-toggle,
+  .admin-topbar-settings {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+  }
+
+  .admin-topbar-theme-toggle svg,
+  .admin-topbar-settings svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .admin-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.74rem;
+  }
+
+  .admin-card {
+    padding: 12px;
+  }
+
+  .admin-section {
+    padding: 12px;
+  }
+
+  .admin-section-title {
+    font-size: 1rem;
+  }
+
+  /* Hide lengthy sub-titles on tiny screens to reduce clutter. */
+  .admin-section-subtitle {
+    font-size: 0.75rem;
+  }
+
+  .admin-table th,
+  .admin-table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  .admin-stat {
+    padding: 12px;
+  }
+
+  .admin-stat-value {
+    font-size: 1.1rem;
+  }
+
+  .admin-flash {
+    margin: 0 0 12px;
+    padding: 10px 12px;
+    font-size: 0.82rem;
+  }
+
+  .admin-page-num {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.74rem;
+  }
+}
+
+/* ----- Touch device tweaks for the mobile drawer ----- */
+@media (max-width: 920px) and (hover: none) {
+  .admin-sidebar a,
+  .admin-sidebar button {
+    min-height: 44px;
+  }
+
+  /* Make the close affordance easier to reach on touch screens. */
+  .admin-sidebar-collapse {
+    display: none;
   }
 }
 .admin-riskmap-canvas {
@@ -1974,40 +2210,6 @@
   .admin-riskmap-search-input {
     width: 140px;
   }
-}
-
-/* ---- Theme toggle ---- */
-.sidebar-theme-toggle {
-  padding: 0;
-}
-
-[data-theme-toggle] {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 0 12px;
-  min-height: 38px;
-  border: none;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--admin-text);
-  font-size: 0.88rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background 150ms ease;
-  font-family: inherit;
-}
-
-[data-theme-toggle]:hover {
-  background: var(--admin-surface-alt);
-}
-
-[data-theme-toggle] svg {
-  width: 18px;
-  height: 18px;
-  flex-shrink: 0;
-  opacity: 0.55;
 }
 
 /* ---- Dark theme fixes ---- */
