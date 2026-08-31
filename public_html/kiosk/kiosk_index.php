@@ -120,7 +120,7 @@ $appData = [
         // in the firmware) so an offline flip in MySQL shows up on screen
         // within a couple of seconds, not five.
         'syncSeconds' => 3,
-        'pollSeconds' => 0.5,
+        'pollSeconds' => 0.2,
         'sessionTimeoutSeconds' => 180,
     ],
 ];

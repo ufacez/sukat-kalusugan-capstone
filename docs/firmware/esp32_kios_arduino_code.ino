@@ -5,6 +5,8 @@
 #include <math.h>
 #include <WiFiManager.h>
 #include <Preferences.h>
+#include "soc/soc.h"
+#include "soc/rtc_cntl_reg.h"
 
 // =====================================================
 // WIFI
@@ -121,8 +123,8 @@ const String FIREBASE_AUTH = "";
 // HX711
 // =====================================================
 
-const int HX711_DOUT = 16;
-const int HX711_SCK = 17;
+const int HX711_DOUT = 26;
+const int HX711_SCK = 25;
 
 HX711_ADC LoadCell(
   HX711_DOUT,
@@ -162,18 +164,18 @@ const float HEIGHT_OFFSET_CM = 0.0f;
 const float MIN_HEIGHT_CM = 0.0f;
 const float MAX_HEIGHT_CM = 250.0f;
 
-const float MIN_WEIGHT_KG = 0.1f;
+const float MIN_WEIGHT_KG = 0.0f;
 const float MAX_WEIGHT_KG = 300.0f;
 
-const float EMPTY_PLATFORM_THRESHOLD_KG = 1.0f;
+const float EMPTY_PLATFORM_THRESHOLD_KG = 0.0f;
 
 // =====================================================
 // TIMING
 // =====================================================
 
 const unsigned long COMMAND_POLL_INTERVAL = 2000;
-const unsigned long FIREBASE_UPDATE_INTERVAL = 250;
-const unsigned long SESSION_VALIDATE_INTERVAL = 1500;
+const unsigned long FIREBASE_UPDATE_INTERVAL = 100;
+const unsigned long SESSION_VALIDATE_INTERVAL = 1000;
 
 const unsigned long MEASUREMENT_TIMEOUT = 120000;
 
@@ -190,7 +192,7 @@ const int HEIGHT_SAMPLE_WINDOW = 8;
 
 const int STABLE_SAMPLES_REQUIRED = 8;
 
-const unsigned long FINAL_STABLE_HOLD_MS = 2500;
+const unsigned long FINAL_STABLE_HOLD_MS = 1500;
 
 const float WEIGHT_STABLE_EPSILON_KG = 0.15f;
 const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
@@ -201,6 +203,10 @@ const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
 
 bool hx711Ready = false;
 bool measuring = false;
+
+bool calMode = false;
+bool calWaitingForWeight = false;
+float calKnownWeight = 0.0f;
 
 long currentSessionId = 0;
 long lastSessionId = 0;
@@ -338,7 +344,7 @@ String httpGet(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(2000);
+  http.setTimeout(1500);
   http.addHeader("X-Device-Key", DEVICE_KEY);
 
   httpCode = http.GET();
@@ -413,7 +419,7 @@ String httpPutJson(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(3000);
+  http.setTimeout(300);
 
   http.addHeader(
     "Content-Type",
@@ -422,15 +428,9 @@ String httpPutJson(
 
   httpCode = http.PUT(jsonBody);
 
-  String response = "";
-
-  if (httpCode > 0) {
-    response = http.getString();
-  }
-
   http.end();
 
-  return response;
+  return "";
 }
 
 // =====================================================
@@ -590,14 +590,6 @@ bool getHeightReading(
     mountingHeightCm -
     distanceCm +
     HEIGHT_OFFSET_CM;
-
-  Serial.print("TF-Luna distance: ");
-  Serial.print(distanceCm, 1);
-
-  Serial.print(" cm | Height: ");
-  Serial.print(heightCm, 1);
-
-  Serial.println(" cm");
 
   return true;
 }
@@ -1005,9 +997,6 @@ bool updateFirebase(
       httpCode
     );
 
-  Serial.print("Firebase HTTP: ");
-  Serial.println(httpCode);
-
   return (
     httpCode >= 200 &&
     httpCode < 300
@@ -1083,20 +1072,9 @@ bool submitFinalMeasurement(
     "device_id=" +
     DEVICE_ID +
     "&session_id=" +
-    String(sessionId);
-
-  // Dual-mode: send only available sensor + manual flags
-  if (weightKg >= 0.0f && !isnan(weightKg)) {
-    payload += "&weight_kg=" + String(weightKg, 2);
-  } else {
-    payload += "&manual_weight=true";
-  }
-
-  if (heightCm >= 0.0f && !isnan(heightCm)) {
-    payload += "&height_cm=" + String(heightCm, 1);
-  } else {
-    payload += "&manual_height=true";
-  }
+    String(sessionId) +
+    "&weight_kg=" + String(weightKg, 2) +
+    "&height_cm=" + String(heightCm, 1);
 
   Serial.println();
   Serial.println(
@@ -1235,7 +1213,7 @@ void runMeasurement(
   );
 
   for (
-    int i = 3;
+    int i = 1;
     i >= 1;
     i--
   ) {
@@ -1312,47 +1290,15 @@ void runMeasurement(
   unsigned long finalSequence = 0;
 
   // ===================================================
-  // SENSOR OFFLINE DETECTION (per-session)
+  // SENSOR WAITING (per-session)
   // ===================================================
   //
-  // hx711Ready may already be false coming in (never connected at
-  // boot). heightSensorReady starts true and only flips false if the
-  // TF-Luna stops producing frames mid-session. Both timers are reset
-  // HERE, at the start of this specific measurement, instead of being
-  // `static` -- a static timestamp would carry over a stale value from
-  // the previous session (or from before setup() even finished),
-  // which was tripping the "offline" timeout instantly on a sensor
-  // that was actually fine.
-
-  bool heightSensorReady = true;
+  // Both sensors MUST produce stable readings before a final
+  // snapshot is taken. No manual mode fallback — if a sensor
+  // never comes online, the measurement times out.
 
   unsigned long lastHxUpdate = millis();
   unsigned long lastHeightUpdate = millis();
-
-  // A dead HX711 board (no update() ever) is caught by
-  // SENSOR_OFFLINE_TIMEOUT_MS above. But a board that IS alive and
-  // dutifully reporting ~0.000 kg forever -- load cell wires pulled,
-  // or a genuinely stuck sensor -- never trips that timeout, because
-  // update() keeps returning true. It also never crosses
-  // EMPTY_PLATFORM_THRESHOLD_KG, so it never enters the buffer and
-  // weightStable can never become true. This second timer catches
-  // that case: if no in-range weight sample has EVER been buffered
-  // this session within a longer grace window, give up on weight too.
-  // Same idea for height, if TF-Luna keeps returning frames outside
-  // MIN/MAX_HEIGHT_CM forever (e.g. pointed at nothing).
-  //
-  // Tune these based on real-world testing: too short and someone who
-  // is just slow to step onto the platform gets bumped to manual
-  // entry; too long and a truly dead sensor makes people wait
-  // needlessly before manual entry kicks in.
-
-  const unsigned long WEIGHT_ARRIVAL_TIMEOUT_MS = 10000;
-  const unsigned long HEIGHT_ARRIVAL_TIMEOUT_MS = 10000;
-
-  unsigned long weightWaitStartedAt = millis();
-  unsigned long heightWaitStartedAt = millis();
-
-  const unsigned long SENSOR_OFFLINE_TIMEOUT_MS = 3000;
 
   // ===================================================
   // LIVE MEASUREMENT LOOP
@@ -1482,49 +1428,12 @@ void runMeasurement(
     // HX711
     // ================================================
 
-    // update() proves the chip is alive: it only returns true when a
-    // fresh ADC sample was actually read. So the ONLY reliable way to
-    // detect "sensor stopped responding" is to check the clock every
-    // loop iteration regardless of what update() returns this time --
-    // not nest the check inside "update() just returned true", which
-    // can never observe an absence of updates.
-
     bool gotWeightUpdate =
       hx711Ready &&
       LoadCell.update();
 
     if (gotWeightUpdate) {
-
       lastHxUpdate = millis();
-
-    } else if (
-      hx711Ready &&
-      millis() - lastHxUpdate > SENSOR_OFFLINE_TIMEOUT_MS
-    ) {
-
-      hx711Ready = false;
-
-      Serial.println(
-        "HX711 TIMEOUT — no updates received, treating as offline (manual mode)"
-      );
-    }
-
-    // Board is alive (gotWeightUpdate keeps happening) but never once
-    // reported a real, in-range weight -- load cell disconnected, or
-    // nobody has stepped on for way too long. Give up on weight so the
-    // session can still finish via manual entry.
-
-    if (
-      hx711Ready &&
-      weightBufFilled == 0 &&
-      millis() - weightWaitStartedAt > WEIGHT_ARRIVAL_TIMEOUT_MS
-    ) {
-
-      hx711Ready = false;
-
-      Serial.println(
-        "HX711 no in-range weight within timeout — treating as offline (manual mode)"
-      );
     }
 
     if (gotWeightUpdate) {
@@ -1533,10 +1442,6 @@ void runMeasurement(
 
       float weight =
         LoadCell.getData();
-
-      Serial.print("HX711 weight: ");
-      Serial.print(weight, 3);
-      Serial.println(" kg");
 
       if (
         weight >= EMPTY_PLATFORM_THRESHOLD_KG &&
@@ -1599,37 +1504,7 @@ void runMeasurement(
       getHeightReading(height);
 
     if (gotHeightUpdate) {
-
       lastHeightUpdate = millis();
-
-    } else if (
-      heightSensorReady &&
-      millis() - lastHeightUpdate > SENSOR_OFFLINE_TIMEOUT_MS
-    ) {
-
-      heightSensorReady = false;
-
-      Serial.println(
-        "TF-LUNA TIMEOUT — no distance frames, treating as offline (manual mode)"
-      );
-    }
-
-    // Same idea as the weight grace-timeout above: frames are arriving
-    // fine but never land inside MIN/MAX_HEIGHT_CM (sensor pointed at
-    // nothing, misaligned, or nobody has stood under it for way too
-    // long). Give up on height so the session can still finish.
-
-    if (
-      heightSensorReady &&
-      heightBufFilled == 0 &&
-      millis() - heightWaitStartedAt > HEIGHT_ARRIVAL_TIMEOUT_MS
-    ) {
-
-      heightSensorReady = false;
-
-      Serial.println(
-        "TF-LUNA no in-range height within timeout — treating as offline (manual mode)"
-      );
     }
 
     if (gotHeightUpdate) {
@@ -1691,34 +1566,17 @@ void runMeasurement(
     // FINAL STABLE SNAPSHOT
     // ================================================
 
-    // A sensor that has gone offline can never satisfy *Stable, so it
-    // is excused from the requirement instead of blocking the snapshot
-    // forever. At least one sensor must still be live and filled --
-    // if both are offline the hold timer starts immediately and the
-    // snapshot is submitted fully manual (-1/-1) once the hold time
-    // passes.
+    // Both weight AND height must be stable with data in their
+    // buffers before a final snapshot is taken. No manual fallback.
 
-    bool weightSatisfied =
-      weightStable ||
-      !hx711Ready;
-
-    bool heightSatisfied =
-      heightStable ||
-      !heightSensorReady;
-
-    bool weightContributes =
-      hx711Ready &&
-      weightBufFilled > 0;
-
-    bool heightContributes =
-      heightSensorReady &&
-      heightBufFilled > 0;
+    bool weightSatisfied = weightStable;
+    bool heightSatisfied = heightStable;
 
     if (
       weightSatisfied &&
       heightSatisfied &&
-      (weightContributes || !hx711Ready) &&
-      (heightContributes || !heightSensorReady)
+      weightBufFilled > 0 &&
+      heightBufFilled > 0
     ) {
 
       if (stableSince == 0) {
@@ -1731,55 +1589,33 @@ void runMeasurement(
         FINAL_STABLE_HOLD_MS
       ) {
 
-        if (weightContributes) {
+        float ws = 0;
 
-          float ws = 0;
+        for (
+          int i = 0;
+          i < weightBufFilled;
+          i++
+        ) {
 
-          for (
-            int i = 0;
-            i < weightBufFilled;
-            i++
-          ) {
-
-            ws += weightBuffer[i];
-          }
-
-          finalWeightSnapshot =
-            ws / weightBufFilled;
-
-        } else {
-
-          finalWeightSnapshot = -1;
-
-          Serial.println(
-            "Weight sensor offline — submitting as manual_weight."
-          );
+          ws += weightBuffer[i];
         }
 
-        if (heightContributes) {
+        finalWeightSnapshot =
+          ws / weightBufFilled;
 
-          float hs = 0;
+        float hs = 0;
 
-          for (
-            int i = 0;
-            i < heightBufFilled;
-            i++
-          ) {
+        for (
+          int i = 0;
+          i < heightBufFilled;
+          i++
+        ) {
 
-            hs += heightBuffer[i];
-          }
-
-          finalHeightSnapshot =
-            hs / heightBufFilled;
-
-        } else {
-
-          finalHeightSnapshot = -1;
-
-          Serial.println(
-            "Height sensor offline — submitting as manual_height."
-          );
+          hs += heightBuffer[i];
         }
+
+        finalHeightSnapshot =
+          hs / heightBufFilled;
 
         finalReady = true;
 
@@ -1844,46 +1680,8 @@ void runMeasurement(
       lastFirebaseUpdate =
         millis();
 
-      float liveWeight = -1;
-      float liveHeight = -1;
-
-      if (
-        weightBufFilled > 0
-      ) {
-
-        float sum = 0;
-
-        for (
-          int i = 0;
-          i < weightBufFilled;
-          i++
-        ) {
-
-          sum += weightBuffer[i];
-        }
-
-        liveWeight =
-          sum / weightBufFilled;
-      }
-
-      if (
-        heightBufFilled > 0
-      ) {
-
-        float sum = 0;
-
-        for (
-          int i = 0;
-          i < heightBufFilled;
-          i++
-        ) {
-
-          sum += heightBuffer[i];
-        }
-
-        liveHeight =
-          sum / heightBufFilled;
-      }
+      float liveWeight = lastRawWeight;
+      float liveHeight = lastRawHeight;
 
       safeFirebaseUpdate(
         sessionId,
@@ -1900,7 +1698,6 @@ void runMeasurement(
       );
     }
 
-    delay(20);
   }
 
   // ===================================================
@@ -2079,6 +1876,8 @@ void runMeasurement(
 
 void setup() {
 
+  WRITE_PERI_REG(RTC_CNTL_BROWN_OUT_REG, 0);
+
   Serial.begin(115200);
 
   delay(1000);
@@ -2116,7 +1915,7 @@ void setup() {
 
   Serial.print("Server URL: ");
   Serial.println(serverBaseUrl);
-9
+
   customServerUrlParam = new WiFiManagerParameter(
     "server_url",
     "Server Base URL (e.g. http://192.168.100.164/sukat-kalusugan-capstone/public_html/)",
@@ -2264,8 +2063,13 @@ void setup() {
     "Waiting for kiosk START..."
   );
 
-  Serial.println(
-    "========================================"
+  Serial.println();
+  Serial.println("SERIAL CALIBRATION COMMANDS (idle only):");
+  Serial.println("  t = Tare (zero the scale)");
+  Serial.println("  c = Calibrate with known weight");
+  Serial.println("  r = Read current weight");
+  Serial.println("  p = Print current calibration factor");
+  Serial.println("========================================"
   );
 }
 
@@ -2281,6 +2085,121 @@ void loop() {
 
   if (hx711Ready) {
     LoadCell.update();
+  }
+
+  // ===================================================
+  // SERIAL CALIBRATION (idle only)
+  // ===================================================
+
+  if (!measuring && Serial.available()) {
+
+    String input = Serial.readStringUntil('\n');
+    input.trim();
+    input.toLowerCase();
+
+    if (input == "t") {
+
+      if (!hx711Ready) {
+        Serial.println("HX711 not ready — cannot tare.");
+      } else {
+        Serial.println("Taring... remove all weight from platform.");
+        LoadCell.tareNoDelay();
+        delay(2000);
+        Serial.print("Tare done. Offset: ");
+        Serial.println(LoadCell.getTareOffset());
+      }
+
+    } else if (input == "r") {
+
+      if (!hx711Ready) {
+        Serial.println("HX711 not ready.");
+      } else {
+        LoadCell.update();
+        float w = LoadCell.getData();
+        Serial.print("Current weight: ");
+        Serial.print(w, 3);
+        Serial.println(" kg");
+      }
+
+    } else if (input == "p") {
+
+      Serial.print("Calibration factor: ");
+      Serial.println(hx711CalFactor, 4);
+
+    } else if (input == "c") {
+
+      if (!hx711Ready) {
+        Serial.println("HX711 not ready — cannot calibrate.");
+      } else {
+        Serial.println("=== CALIBRATION MODE ===");
+        Serial.println("Make sure platform is EMPTY and stable.");
+        Serial.println("Then type the known weight in kg (e.g. 1.0 or 5.0):");
+        calMode = true;
+        calWaitingForWeight = true;
+      }
+
+    } else if (calWaitingForWeight) {
+
+      float knownWeight = input.toFloat();
+
+      if (knownWeight <= 0.0f) {
+        Serial.println("Invalid weight. Type a number > 0 (e.g. 1.0):");
+        return;
+      }
+
+      calKnownWeight = knownWeight;
+
+      Serial.print("Taring with empty platform...");
+      LoadCell.tareNoDelay();
+      delay(2000);
+
+      Serial.println("Now place your known weight on the platform.");
+      Serial.println("Waiting 5 seconds for reading to stabilize...");
+
+      float sum = 0;
+      int samples = 0;
+
+      for (int i = 0; i < 50; i++) {
+        if (LoadCell.update()) {
+          sum += LoadCell.getData();
+          samples++;
+        }
+        delay(100);
+      }
+
+      if (samples < 10) {
+        Serial.println("Not enough stable readings. Calibration FAILED.");
+        Serial.println("Check HX711 wiring and try again.");
+        calMode = false;
+        calWaitingForWeight = false;
+        return;
+      }
+
+      float avgRaw = sum / samples;
+
+      float newFactor = avgRaw / calKnownWeight;
+
+      Serial.println();
+      Serial.println("=== CALIBRATION RESULT ===");
+      Serial.print("Average raw value: ");
+      Serial.println(avgRaw, 2);
+      Serial.print("Known weight: ");
+      Serial.print(calKnownWeight, 2);
+      Serial.println(" kg");
+      Serial.print("NEW calibration factor: ");
+      Serial.println(newFactor, 4);
+
+      hx711CalFactor = newFactor;
+      LoadCell.setCalFactor(hx711CalFactor);
+
+      Serial.println();
+      Serial.println("Calibration factor UPDATED in memory.");
+      Serial.println("To save permanently, update 'HX711 Calibration Factor'");
+      Serial.println("in Admin > Sensors > Edit Device.");
+
+      calMode = false;
+      calWaitingForWeight = false;
+    }
   }
 
   // ===================================================

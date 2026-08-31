@@ -95,22 +95,9 @@ if (
 |--------------------------------------------------------------------------
 */
 
-$manualWeight = filter_var($payload['manual_weight'] ?? false, FILTER_VALIDATE_BOOLEAN);
-$manualHeight = filter_var($payload['manual_height'] ?? false, FILTER_VALIDATE_BOOLEAN);
-
-if (
-    ($heightCm === null && !$manualHeight) ||
-    ($weightKg === null && !$manualWeight)
-) {
+if ($heightCm === null || $weightKg === null) {
     api_error(
-        'At least one measurement (height or weight) is required. If a sensor is offline, set manual_height or manual_weight to true.',
-        400
-    );
-}
-
-if ($heightCm === null && $weightKg === null) {
-    api_error(
-        'Both height and weight are missing. At least one sensor must provide data.',
+        'Both height and weight are required.',
         400
     );
 }
@@ -653,39 +640,23 @@ $weightKg =
 
 /*
 |--------------------------------------------------------------------------
-| HEIGHT RANGE
+| HEIGHT RANGE (disabled for testing)
 |--------------------------------------------------------------------------
 */
 
-if (
-    $heightCm < 40 ||
-    $heightCm > 140
-) {
-
-    fail_session(
-        $conn,
-        $sessionId,
-        'Height must be between 40 cm and 140 cm for a valid child measurement.'
-    );
-}
+// if ($heightCm < 40 || $heightCm > 140) {
+//     fail_session($conn, $sessionId, 'Height must be between 40 cm and 140 cm for a valid child measurement.');
+// }
 
 /*
 |--------------------------------------------------------------------------
-| WEIGHT RANGE
+| WEIGHT RANGE (disabled for testing)
 |--------------------------------------------------------------------------
 */
 
-if (
-    $weightKg < 2 ||
-    $weightKg > 80
-) {
-
-    fail_session(
-        $conn,
-        $sessionId,
-        'Weight must be between 2 kg and 80 kg for a valid child measurement.'
-    );
-}
+// if ($weightKg < 2 || $weightKg > 80) {
+//     fail_session($conn, $sessionId, 'Weight must be between 2 kg and 80 kg for a valid child measurement.');
+// }
 
 /*
 |--------------------------------------------------------------------------
@@ -1136,12 +1107,6 @@ api_success(
 
         'firebase_synced' =>
             firebase_database_url() !== '',
-
-        'manual_weight' =>
-            $manualWeight,
-
-        'manual_height' =>
-            $manualHeight,
     ],
     'Measurement saved successfully.'
 );

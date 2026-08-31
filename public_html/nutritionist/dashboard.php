@@ -955,7 +955,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 										echo '<span class="admin-pill is-success" style="font-size:0.65rem;padding:2px 6px;">N</span>';
 									} else {
 										foreach ($pills as $pill) {
-											$lvl = $pill['level'] === 'severe' ? 'is-danger' : 'is-warn';
+											$lvl = match($pill['level']) { 'severe' => 'is-danger', 'refer' => 'is-info', default => 'is-warn' };
 											echo '<span class="admin-pill ' . $lvl . '" style="font-size:0.65rem;padding:2px 6px;">' . nutritionist_e($pill['label']) . '</span>';
 										}
 									}
@@ -1004,7 +1004,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 								} else {
 									echo '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
 									foreach ($rowPills as $pill) {
-										$lvl = $pill['level'] === 'severe' ? 'is-danger' : 'is-warn';
+										$lvl = match($pill['level']) { 'severe' => 'is-danger', 'refer' => 'is-info', default => 'is-warn' };
 										echo '<span class="admin-pill ' . $lvl . '" style="font-size:0.72rem;padding:2px 6px;">' . nutritionist_e($pill['label']) . '</span>';
 									}
 									echo '</div>';

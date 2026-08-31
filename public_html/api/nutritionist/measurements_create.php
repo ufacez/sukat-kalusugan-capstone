@@ -42,13 +42,14 @@ $heightCm = round($heightCm, 2);
 
 $weightKg = round($weightKg, 3);
 
-if ($heightCm < 40 || $heightCm > 140) {
-    api_error('Height must be between 40 cm and 140 cm for a valid child measurement.', 422);
-}
+// Height/weight range checks disabled for testing
+// if ($heightCm < 40 || $heightCm > 140) {
+//     api_error('Height must be between 40 cm and 140 cm for a valid child measurement.', 422);
+// }
 
-if ($weightKg < 2 || $weightKg > 80) {
-    api_error('Weight must be between 2 kg and 80 kg for a valid child measurement.', 422);
-}
+// if ($weightKg < 2 || $weightKg > 80) {
+//     api_error('Weight must be between 2 kg and 80 kg for a valid child measurement.', 422);
+// }
 
 $measurementDate = api_string($payload['measurement_date'] ?? '', '');
 

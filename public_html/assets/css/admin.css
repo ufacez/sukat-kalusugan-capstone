@@ -1069,6 +1069,11 @@
   color: var(--admin-muted);
 }
 
+.admin-pill.is-info {
+  background: rgba(59, 130, 246, 0.10);
+  color: #2563eb;
+}
+
 /* ---------------------------------------------------------------------------
  * CRUD action-pill variants
  * Used to visually group the action pills for invitation management

@@ -1581,3 +1581,451 @@
   pointer-events: none;
   animation: nutritionist-day-blink 1.6s ease-in-out infinite;
 }
+
+/* ======================================================================
+ * WHO Analysis Page — Redesigned Layout
+ * ====================================================================== */
+
+/* ---- Filter bar ---- */
+.who-filters-bar {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: var(--admin-shadow);
+  margin-bottom: 18px;
+}
+.who-filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.who-filter-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--admin-muted);
+}
+.who-filter-group .admin-select,
+.who-filter-group .admin-field-input {
+  min-width: 160px;
+  height: 40px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  padding: 0 12px;
+  background: var(--admin-field-bg);
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.82rem;
+  color: var(--admin-text);
+}
+.who-date-range {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.who-date-sep {
+  color: var(--admin-muted);
+  font-size: 0.85rem;
+}
+.who-filter-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+.who-filter-actions .admin-btn,
+.who-filter-actions .admin-btn-secondary {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  font-size: 0.82rem;
+}
+
+/* ---- Stat cards ---- */
+.who-stat-cards {
+  margin-bottom: 18px;
+}
+.who-stat-card .admin-card-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.who-card-pct {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+}
+
+/* ---- Two-column layout ---- */
+.who-two-col {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.who-panel {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--admin-shadow);
+  min-width: 0;
+}
+.who-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.who-panel-head .admin-section-title {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+/* ---- Tabs ---- */
+.who-tab-row {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+.who-tab {
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-muted);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.who-tab:hover {
+  border-color: rgba(11, 110, 79, 0.35);
+  color: var(--admin-primary);
+}
+.who-tab.is-active {
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  border-color: rgba(11, 110, 79, 0.35);
+}
+.who-tab-panel {
+  display: none;
+}
+.who-tab-panel.is-active {
+  display: block;
+}
+
+/* ---- Distribution layout ---- */
+.who-dist-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-bottom: 12px;
+}
+.who-pie-wrap {
+  flex: 0 0 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+.who-pie-wrap canvas {
+  display: block;
+}
+
+/* ---- Classification table ---- */
+.who-classification-table {
+  flex: 1;
+  min-width: 0;
+}
+.who-ct-head,
+.who-ct-row,
+.who-ct-total {
+  display: grid;
+  grid-template-columns: 20px 1fr 60px 70px;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 0;
+  font-size: 0.78rem;
+}
+.who-ct-head {
+  font-weight: 700;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.68rem;
+  border-bottom: 1px solid var(--admin-border);
+}
+.who-ct-row {
+  border-bottom: 1px solid var(--admin-border);
+  color: var(--admin-text);
+}
+.who-ct-total {
+  font-weight: 700;
+  color: var(--admin-text);
+  border-top: 2px solid var(--admin-border);
+  margin-top: 2px;
+}
+.who-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.who-dot.is-green { background: #22c55e; }
+.who-dot.is-yellow { background: #f59e0b; }
+.who-dot.is-red { background: #ef4444; }
+.who-dot.is-blue { background: #3b82f6; }
+.who-dot.is-orange { background: #f97316; }
+.who-dot.is-orange-dark { background: #ea580c; }
+.who-dot.is-pink { background: #ec4899; }
+
+.who-info-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+}
+.who-info-bar svg {
+  flex-shrink: 0;
+  color: var(--admin-primary);
+}
+
+/* ---- Legend ---- */
+.who-trend-legend {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.who-legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+  font-weight: 500;
+}
+.who-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+/* ---- Right column: age bar + sex donut ---- */
+.who-right-col {
+  display: flex;
+  flex-direction: column;
+}
+.who-bar-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 240px;
+  margin-bottom: 10px;
+}
+.who-bar-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---- Sex block (combined with age chart) ---- */
+.who-sex-block {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding-top: 14px;
+  border-top: 1px solid var(--admin-border);
+  margin-top: 8px;
+}
+.who-sex-donut-wrap {
+  position: relative;
+  flex: 0 0 140px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.who-sex-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.who-sex-total {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1;
+}
+.who-sex-label {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.who-sex-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.who-sex-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  color: var(--admin-text);
+  font-weight: 500;
+}
+
+/* ---- Prevalence single panel ---- */
+.who-prevalence-panel {
+  margin-bottom: 18px;
+}
+.who-prevalence-panel .who-panel-head {
+  flex-wrap: wrap;
+}
+.who-prevalence-panel .admin-select {
+  min-width: 220px;
+}
+.who-prev-chart-wrap {
+  position: relative;
+  width: 100%;
+  height: 280px;
+}
+.who-prev-chart-wrap canvas {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* ---- Chart hover tooltip (shared) ---- */
+.who-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #f8fafc;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(-50%, -100%);
+  opacity: 0;
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  z-index: 20;
+  line-height: 1.55;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.who-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(15, 23, 42, 0.92);
+}
+.who-chart-tooltip.is-visible {
+  opacity: 1;
+  transform: translate(-50%, calc(-100% - 6px));
+}
+.who-chart-tooltip strong {
+  font-weight: 700;
+}
+
+/* ---- Modern panel glassmorphism ---- */
+.who-panel {
+  transition: box-shadow 0.25s ease, transform 0.25s ease;
+}
+.who-panel:hover {
+  box-shadow: 0 12px 40px rgba(0,0,0,0.10), 0 2px 8px rgba(0,0,0,0.06);
+  transform: translateY(-1px);
+}
+
+/* ---- Modern tab pill transitions ---- */
+.who-tab {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.who-tab:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(11, 110, 79, 0.12);
+}
+.who-tab.is-active {
+  box-shadow: 0 2px 10px rgba(11, 110, 79, 0.18);
+}
+
+/* ---- Stat card hover lift ---- */
+.who-stat-card {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.who-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.10);
+}
+
+/* ---- Pie canvas smooth ---- */
+.who-pie-wrap canvas {
+  display: block;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08));
+}
+
+/* ---- Sex donut smooth ---- */
+.who-sex-donut-wrap canvas {
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.08));
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 1100px) {
+  .who-two-col {
+    grid-template-columns: 1fr;
+  }
+  .who-dist-layout {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+@media (max-width: 760px) {
+  .who-filters-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .who-filter-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+  .who-filter-actions .admin-btn,
+  .who-filter-actions .admin-btn-secondary {
+    flex: 1;
+  }
+  .who-tab-row {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+  .who-sex-block {
+    flex-direction: column;
+    align-items: center;
+  }
+}

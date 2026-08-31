@@ -23,8 +23,8 @@
     firebaseBaseUrl !== "";
 
   const pollSeconds = Math.max(
-    0.25,
-    Number(data?.defaults?.pollSeconds || 0.5)
+    0.2,
+    Number(data?.defaults?.pollSeconds || 0.2)
   );
 
   const pollIntervalMs = pollSeconds * 1000;
@@ -3957,28 +3957,6 @@ function finishResults(
 
   function resetKioskToIdle() {
     if (
-      isMeasurementActive()
-    ) {
-      pushFeed(
-        "Reset blocked",
-        "Wait for the active measurement to finish.",
-        "warn"
-      );
-
-      return;
-    }
-
-    /*
-     * A settled failure (phase === "error") is NOT "still
-     * processing" — processingStarted stays true after a failure
-     * so the Process button/step-jump guards don't reopen, but
-     * that used to also block Reset itself, leaving the operator
-     * stuck on the failed screen with no way out except waiting
-     * for the whole session to time out. Only block Reset while
-     * genuinely mid-flight (no error/complete outcome yet).
-     */
-
-    if (
       state.processingStarted &&
       state.step === "processing" &&
       state.phase !== "error"
@@ -3990,6 +3968,38 @@ function finishResults(
       );
 
       return;
+    }
+
+    if (
+      state.session &&
+      state.session.session_id
+    ) {
+      if (
+        !confirm(
+          "A measurement is active. Going back will cancel the current session. Continue?"
+        )
+      ) {
+        return;
+      }
+
+      const cancelBody =
+        JSON.stringify({
+          device_id: deviceId,
+          session_id:
+            state.session.session_id,
+        });
+
+      fetch(
+        "api/kiosk/cancel_session.php",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type":
+              "application/json",
+          },
+          body: cancelBody,
+        }
+      ).catch(function () {});
     }
 
     clearSelectionAndSession(
@@ -4400,18 +4410,6 @@ function finishResults(
             event.preventDefault();
 
             if (
-              isMeasurementActive()
-            ) {
-              pushFeed(
-                "Back blocked",
-                "Wait for the current measurement to finish.",
-                "warn"
-              );
-
-              return;
-            }
-
-            if (
               state.processingStarted
             ) {
               pushFeed(
@@ -4419,6 +4417,60 @@ function finishResults(
                 "The current measurement is being processed.",
                 "warn"
               );
+
+              return;
+            }
+
+            if (
+              state.session &&
+              state.session.session_id
+            ) {
+              if (
+                !confirm(
+                  "A measurement is active. Going back will cancel the current session. Continue?"
+                )
+              ) {
+                return;
+              }
+
+              pushFeed(
+                "Cancelling",
+                "Ending active measurement session...",
+                "info"
+              );
+
+              const cancelBody =
+                JSON.stringify({
+                  device_id: deviceId,
+                  session_id:
+                    state.session.session_id,
+                });
+
+              fetch(
+                "api/kiosk/cancel_session.php",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body: cancelBody,
+                }
+              )
+                .then(function () {
+                  clearSelectionAndSession(
+                    "select",
+                    "Back to selection",
+                    "Session cancelled. Choose a child to continue."
+                  );
+                })
+                .catch(function () {
+                  clearSelectionAndSession(
+                    "select",
+                    "Back to selection",
+                    "Child deselected. Choose a child to continue."
+                  );
+                });
 
               return;
             }

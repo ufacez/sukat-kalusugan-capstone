@@ -400,6 +400,7 @@ nutritionist_layout_start(
                     <th>Full name of child</th>
                     <th>Sex</th>
                     <th>Age (months)</th>
+                    <th>Age (days)</th>
                     <th>WFA</th>
                     <th>HFA</th>
                     <th>WFH</th>
@@ -408,7 +409,7 @@ nutritionist_layout_start(
             </thead>
             <tbody>
                 <?php if ($pageChildren === []): ?>
-                    <tr><td colspan="10">
+                    <tr><td colspan="11">
                         <div class="children-empty">
                             <?php if ($totalAll === 0): ?>
                                 <div class="empty-title">No children registered yet</div>
@@ -427,6 +428,7 @@ nutritionist_layout_start(
                 <?php foreach ($pageChildren as $child): ?>
                     <?php
                     $ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
+                    $ageDays = doh_age_in_days((string)$child['birthdate']) ?? 0;
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
                     $hasMeasurement = !empty($child['measurement_id']);
                     $wfa = (string)($child['wfa_status'] ?? '');
@@ -498,6 +500,7 @@ nutritionist_layout_start(
                         </td>
                         <td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)$child['sex']); ?></td>
                         <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;"><?php echo (int)$ageMonths; ?></td>
+                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;"><?php echo (int)$ageDays; ?></td>
                         <td style="text-align:center;white-space:nowrap;">
                             <?php if ($hasMeasurement): ?>
                                 <span class="admin-pill <?php echo nutritionist_e($wfaPill); ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($wfaDisplay); ?></span>
@@ -687,7 +690,7 @@ nutritionist_layout_start(
         if (x.indexOf('moderately') !== -1 || x === 'muw' || x === 'mst' || x === 'mw') return 'is-warn';
         if (x === 'suw' || x === 'sst' || x === 'sw' || x.indexOf('severely') !== -1) return 'is-danger';
         // WFA overflow: WAZ > +2 is a redirect, not a real WFA label.
-        if (x.indexOf('refer') !== -1 || x === 'ref') return 'is-muted';
+        if (x.indexOf('refer') !== -1 || x === 'ref') return 'is-info';
         if (!x) return 'is-muted';
         return 'is-danger';
     }

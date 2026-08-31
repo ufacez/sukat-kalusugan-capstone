@@ -238,12 +238,13 @@ nutritionist_layout_start(
                     <th>Full name of child</th>
                     <th>Sex</th>
                     <th>Age (months)</th>
+                    <th>Age (days)</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
                 <?php if ($pageChildren === []): ?>
-                    <tr><td colspan="7">
+                    <tr><td colspan="8">
                         <div class="children-empty">
                             <?php if ($totalAll === 0): ?>
                                 <div class="empty-title">No children registered yet</div>
@@ -309,9 +310,11 @@ nutritionist_layout_start(
                             </div>
                         </td>
                         <td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)$child['sex']); ?></td>
-                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;" title="<?php echo (int)$age['days']; ?> days">
+                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
                             <?php echo (int)$age['months']; ?> mo
-                            <span style="color:var(--admin-muted);font-weight:normal;font-size:0.75rem;">(<?php echo (int)$age['days']; ?> d)</span>
+                        </td>
+                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
+                            <?php echo (int)$age['days']; ?> d
                         </td>
                         <td>
                             <div class="admin-actions" onclick="event.stopPropagation();">

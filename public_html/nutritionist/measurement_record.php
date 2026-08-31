@@ -189,6 +189,7 @@ nutritionist_layout_start(
                 <div class="row"><span class="label">Sex</span><span class="value" id="cs-sex"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['sex']) : ''; ?></span></div>
                 <div class="row"><span class="label">Birthdate</span><span class="value" id="cs-birthdate"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['birthdate']) : ''; ?></span></div>
                 <div class="row"><span class="label">Age at measurement</span><span class="value" id="cs-age">—</span></div>
+                <div class="row"><span class="label">Age in days</span><span class="value" id="cs-age-days">—</span></div>
                 <div class="row"><span class="label">Barangay</span><span class="value" id="cs-barangay"><?php echo $preselectedChild !== null ? nutritionist_e((string)($preselectedChild['barangay'] ?? '—')) : ''; ?></span></div>
                 <div class="pills" id="cs-pills"></div>
 
@@ -423,6 +424,9 @@ nutritionist_layout_start(
         var ageMonths = computeAgeMonths(match.birthdate, dateInput.value);
         $('cs-age').textContent = ageMonths !== null ? (ageMonths + ' months') : '—';
 
+        var ageDays = computeAgeDays(match.birthdate, dateInput.value);
+        $('cs-age-days').textContent = ageDays !== null ? (ageDays + ' days') : '—';
+
         var pills = [];
         if (match.sex) pills.push('<span class="admin-pill is-muted">' + escapeHtml(match.sex) + '</span>');
         if (match.barangay) pills.push('<span class="admin-pill is-info">' + escapeHtml(match.barangay) + '</span>');
@@ -475,6 +479,15 @@ nutritionist_layout_start(
         return months < 0 ? 0 : months;
     }
 
+    function computeAgeDays(birthdate, onDate) {
+        if (!birthdate) return null;
+        var b = new Date(birthdate + 'T00:00:00');
+        var d = onDate ? new Date(onDate + 'T00:00:00') : new Date();
+        if (isNaN(b.getTime()) || isNaN(d.getTime())) return null;
+        var diff = Math.floor((d - b) / (1000 * 60 * 60 * 24));
+        return diff < 0 ? 0 : diff;
+    }
+
     function formatZ(v) {
         if (v === null || v === undefined || isNaN(v)) return '—';
         return (v > 0 ? '+' : '') + v.toFixed(2);
@@ -505,7 +518,7 @@ nutritionist_layout_start(
 
     function statusPillClass(status) {
         if (status === 'Normal') return 'is-success';
-        if (status.indexOf('Refer') !== -1) return 'is-muted';
+        if (status.indexOf('Refer') !== -1) return 'is-info';
         if (status.indexOf('Tall') !== -1 || status.indexOf('OW') !== -1 || status.indexOf('Ob') !== -1) return 'is-orange';
         if (status.indexOf('MUW') !== -1 || status.indexOf('MSt') !== -1 || status.indexOf('MW') !== -1) return 'is-warn';
         if (!status || status === '—') return 'is-muted';
