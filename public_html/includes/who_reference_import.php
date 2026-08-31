@@ -25,6 +25,21 @@ function who_reference_column_aliases(): array
 }
 
 /**
+ * Returns the unique key for the day-based reference tables. Indicators
+ * that have been switched to age-in-days lookups (WFA, HFA) key into
+ * these day tables; the legacy monthly tables are still used as a
+ * fallback for any out-of-range days (e.g. age > 1856 days).
+ */
+function who_reference_day_table_key(string $table): ?string
+{
+	return match ($table) {
+		'who_weight_for_age_days' => 'age_days',
+		'who_height_for_age_days' => 'age_days',
+		default => null,
+	};
+}
+
+/**
  * Matches a parsed header row against the alias list and returns the column
  * index for each key it can find (missing keys are simply absent).
  *
@@ -110,8 +125,19 @@ function who_reference_import_file(string $tmpPath, array $indicatorConfig, stri
 		return ['ok' => false, 'message' => 'Could not find L, M, and S columns in that file. Expected a header row with columns named L, M, S plus an age/day/length column.'];
 	}
 
-	$targetColumn = $indicatorConfig['column']; // 'age_months' or 'height_cm'
+	$targetColumn = $indicatorConfig['column']; // 'age_months', 'age_days', or 'height_cm'
 	$table = $indicatorConfig['table'];
+
+	// Day-keyed age tables (WFA, HFA in their new day-based form) take
+	// one row per day from the expanded WHO 2006 file. The Day column is
+	// the canonical key here, not a fallback to derive monthly rows from.
+	if ($targetColumn === 'age_days') {
+		if (!isset($cols['day'])) {
+			return ['ok' => false, 'message' => 'This is a day-based reference table, but no "Day" column was found in that file.'];
+		}
+
+		return who_reference_import_day_table($table, $sex, $rows, $cols);
+	}
 
 	if ($targetColumn === 'age_months') {
 		if (isset($cols['day'])) {
@@ -221,6 +247,60 @@ function who_reference_import_age_direct(string $table, string $sex, array $rows
 	return ['ok' => true, 'message' => "Imported {$sex} monthly rows.", 'inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped];
 }
 
+/**
+ * Imports the WHO 2006 expanded daily table (one row per day) directly
+ * into a day-keyed reference table. The expanded table provides ~1857
+ * rows (Day 0..1856) per sex, which is the source of truth for the
+ * `who_weight_for_age_days` / `who_height_for_age_days` lookups used by
+ * the WAZ/HAZ calculator. The day count is intentionally NOT bounded
+ * here -- the migration that created the day tables added a unique key
+ * on (sex, age_days), so any out-of-range file is safely skipped rather
+ * than failing the whole import.
+ */
+function who_reference_import_day_table(string $table, string $sex, array $rows, array $cols): array
+{
+	$inserted = 0;
+	$updated = 0;
+	$skipped = 0;
+
+	foreach ($rows as $row) {
+		$dayRaw = $row[$cols['day']] ?? null;
+		$l = $row[$cols['l']] ?? null;
+		$m = $row[$cols['m']] ?? null;
+		$s = $row[$cols['s']] ?? null;
+
+		if ($dayRaw === null || $dayRaw === '' || !is_numeric($dayRaw) || !is_numeric($l) || !is_numeric($m) || !is_numeric($s)) {
+			$skipped++;
+			continue;
+		}
+
+		$day = (int)round((float)$dayRaw);
+
+		if ($day < 0 || $day > 1856) {
+			$skipped++;
+			continue;
+		}
+
+		$result = who_reference_upsert($table, 'age_days', $sex, $day, (float)$l, (float)$m, (float)$s);
+
+		if ($result === 'inserted') {
+			$inserted++;
+		} elseif ($result === 'updated') {
+			$updated++;
+		} else {
+			$skipped++;
+		}
+	}
+
+	return [
+		'ok' => true,
+		'message' => "Imported {$sex} day-keyed rows.",
+		'inserted' => $inserted,
+		'updated' => $updated,
+		'skipped' => $skipped,
+	];
+}
+
 /** Imports a length/height-keyed table (any decimal step - the calculator already finds the nearest row). */
 function who_reference_import_height(string $table, string $sex, array $rows, array $cols): array
 {
@@ -260,11 +340,14 @@ function who_reference_import_height(string $table, string $sex, array $rows, ar
 	return ['ok' => true, 'message' => "Imported {$sex} rows.", 'inserted' => $inserted, 'updated' => $updated, 'skipped' => $skipped];
 }
 
-/** Inserts a row, or updates it in place if (sex, column) already exists (uq_wfa / uq_hfa / uq_wfh). */
+/** Inserts a row, or updates it in place if (sex, column) already exists (uq_wfa / uq_hfa / uq_wfh / uq_wfad / uq_hfad). */
 function who_reference_upsert(string $table, string $column, string $sex, int|float $x, float $l, float $m, float $s): string
 {
 	$conn = get_db_connection();
-	$xType = $column === 'age_months' ? 'i' : 'd';
+	// age-based lookups (both monthly and day-based) are integer keys
+	// in the DB, height-based lookups use decimal so the closest-row
+	// fallback can find an exact match on a 0.1cm step.
+	$xType = in_array($column, ['age_months', 'age_days'], true) ? 'i' : 'd';
 
 	$sql = "INSERT INTO {$table} (sex, {$column}, L, M, S) VALUES (?, ?, ?, ?, ?)
 	        ON DUPLICATE KEY UPDATE L = VALUES(L), M = VALUES(M), S = VALUES(S)";

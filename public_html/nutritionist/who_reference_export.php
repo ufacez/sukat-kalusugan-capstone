@@ -6,10 +6,12 @@ require_once __DIR__ . '/../includes/who_reference_import.php';
 nutritionist_require_access();
 
 $indicators = [
-	'waz' => ['label' => 'Weight-for-Age', 'table' => 'who_weight_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'haz' => ['label' => 'Height-for-Age', 'table' => 'who_height_for_age', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'whz' => ['label' => 'Weight-for-Height (2-5y)', 'table' => 'who_weight_for_height', 'column' => 'height_cm', 'columnLabel' => 'Height (cm)'],
-	'wfl' => ['label' => 'Weight-for-Length (0-2y)', 'table' => 'who_weight_for_length', 'column' => 'height_cm', 'columnLabel' => 'Length (cm)'],
+	'waz'      => ['label' => 'Weight-for-Age (months)',   'table' => 'who_weight_for_age',      'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'waz-days' => ['label' => 'Weight-for-Age (days)',     'table' => 'who_weight_for_age_days', 'column' => 'age_days',   'columnLabel' => 'Age (days)'],
+	'haz'      => ['label' => 'Height-for-Age (months)',   'table' => 'who_height_for_age',      'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'haz-days' => ['label' => 'Height-for-Age (days)',     'table' => 'who_height_for_age_days', 'column' => 'age_days',   'columnLabel' => 'Age (days)'],
+	'whz'      => ['label' => 'Weight-for-Height (2-5y)',  'table' => 'who_weight_for_height',   'column' => 'height_cm',  'columnLabel' => 'Height (cm)'],
+	'wfl'      => ['label' => 'Weight-for-Length (0-2y)',  'table' => 'who_weight_for_length',   'column' => 'height_cm',  'columnLabel' => 'Length (cm)'],
 ];
 
 $indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
@@ -26,8 +28,14 @@ if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
 }
 
 $rangeBounds = [
-	'young' => ['age_months' => [0, 23]],
-	'old' => ['age_months' => [24, 60]],
+	'young' => [
+		'age_months' => [0, 23],
+		'age_days'   => [0, 729],
+	],
+	'old' => [
+		'age_months' => [24, 60],
+		'age_days'   => [730, 1856],
+	],
 	'all' => null,
 ];
 
@@ -36,10 +44,10 @@ $sql = "SELECT {$config['column']} AS x, L, M, S FROM {$config['table']} WHERE s
 $types = 's';
 $params = [$sex];
 
-if ($rangeBounds[$ageRange] !== null && $config['column'] === 'age_months') {
+if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months', 'age_days'], true)) {
 	[$low, $high] = $rangeBounds[$ageRange][$config['column']];
 	$sql .= " AND {$config['column']} BETWEEN ? AND ?";
-	$types .= 'dd';
+	$types .= 'ii';
 	$params[] = $low;
 	$params[] = $high;
 }

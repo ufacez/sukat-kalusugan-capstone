@@ -135,8 +135,13 @@ if ($birthDate > $parsedDate) {
 
 $ageInterval = $birthDate->diff($parsedDate);
 $ageMonths = ($ageInterval->y * 12) + $ageInterval->m;
+$ageDays = (int)$birthDate->diff($parsedDate)->format('%r%a');
 
-$metrics = calculate_who_metrics($weightKg, $heightCm, $ageMonths, $childSex);
+if ($ageDays < 0) {
+    $ageDays = 0;
+}
+
+$metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $ageMonths, $childSex);
 
 $insertStmt = mysqli_prepare(
     $conn,
@@ -146,6 +151,7 @@ $insertStmt = mysqli_prepare(
             height_cm,
             weight_kg,
             age_months,
+            age_days,
             measurement_date,
             source_type,
             waz,
@@ -161,7 +167,7 @@ $insertStmt = mysqli_prepare(
             recorded_by
         )
      VALUES
-        (?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)"
+        (?, ?, ?, ?, ?, ?, 'manual', ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)"
 );
 
 if ($insertStmt === false) {
@@ -182,11 +188,12 @@ $recordedBy = (int)($user['id'] ?? 0);
 
 mysqli_stmt_bind_param(
     $insertStmt,
-    'iddisdddssssisi',
+    'iddiisdddssssisi',
     $childId,
     $heightCm,
     $weightKg,
     $ageMonths,
+    $ageDays,
     $measurementDate,
     $waz,
     $haz,

@@ -275,6 +275,8 @@ function nutritionist_status_class(?string $status): string
         'moderately underweight', 'moderately stunted', 'moderately wasted', 'muw', 'mst', 'mw' => 'is-warn',
         'overweight', 'obese', 'ow', 'ob' => 'is-orange',
         'suw', 'sst', 'sw', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
+        // WFA overflow: WAZ > +2 is a redirect, not a real WFA label.
+        'refer to wfl/h', 'refer to wflh', 'refer', 'ref' => 'is-muted',
         'pending' => 'is-muted',
         'cancelled', 'inactive' => 'is-danger',
         default => 'is-muted',

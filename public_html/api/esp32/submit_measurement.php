@@ -480,6 +480,11 @@ if (
                         ? (int)$measurementRow['age_months']
                         : 0,
 
+                'age_days' =>
+                    isset($measurementRow['age_days'])
+                        ? (int)$measurementRow['age_days']
+                        : 0,
+
                 'waz' =>
                     isset($measurementRow['waz'])
                         ? (float)$measurementRow['waz']
@@ -701,11 +706,21 @@ $childSex =
     );
 
 $ageMonths = 0;
+$ageDays = 0;
 
 if ($childBirthdate !== '') {
 
     $ageMonths =
         doh_age_in_months(
+            $childBirthdate
+        ) ?? 0;
+
+    // WAZ/HAZ lookups use days (measurement_date - birthdate).
+    // The kiosk's "today" measurement date matches CURDATE() used in
+    // the insert below, so re-using today here keeps the day-count
+    // consistent with the row we end up writing.
+    $ageDays =
+        doh_age_in_days(
             $childBirthdate
         ) ?? 0;
 }
@@ -724,6 +739,7 @@ if ($weightKg !== null && $heightCm !== null) {
     $metrics = calculate_who_metrics(
         $weightKg,
         $heightCm,
+        $ageDays,
         $ageMonths,
         $childSex
     );
@@ -736,12 +752,12 @@ if ($weightKg !== null && $heightCm !== null) {
     $wfhStatus = $metrics['wfh_status'];
 } elseif ($weightKg !== null && $heightCm === null) {
     // Weight only — compute WAZ / WFA only; no HAZ / WHZ
-    $waz = calculate_waz($weightKg, $ageMonths, $childSex);
+    $waz = calculate_waz($weightKg, $ageDays, $childSex);
     $wfaStatus = classify_wfa_status($waz);
     $status = $wfaStatus;
 } elseif ($heightCm !== null && $weightKg === null) {
     // Height only — compute HAZ / HFA only; no WAZ / WHZ
-    $haz = calculate_haz($heightCm, $ageMonths, $childSex);
+    $haz = calculate_haz($heightCm, $ageDays, $childSex);
     $hfaStatus = classify_hfa_status($haz);
     $status = $hfaStatus;
 }
@@ -767,6 +783,7 @@ $measurementInsert =
             height_cm,
             weight_kg,
             age_months,
+            age_days,
             measurement_date,
             source_type,
             waz,
@@ -782,6 +799,7 @@ $measurementInsert =
         )
         VALUES
         (
+            ?,
             ?,
             ?,
             ?,
@@ -825,11 +843,12 @@ $deviceDbId =
 
 mysqli_stmt_bind_param(
     $measurementInsert,
-    'iddisdddssssisi',
+    'iddiisdddssssisi',
     $childId,
     $heightCm,
     $weightKg,
     $ageMonths,
+    $ageDays,
     $sourceType,
     $waz,
     $haz,

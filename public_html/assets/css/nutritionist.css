@@ -975,6 +975,10 @@
 .dashboard-chart-sidebar .stat-dot.is-primary { background: var(--admin-primary); }
 .dashboard-chart-sidebar .stat-dot.is-accent { background: var(--admin-accent); }
 .dashboard-chart-sidebar .stat-dot.is-danger { background: var(--admin-danger); }
+/* Gray for the WFA "Refer to WFL/H" overflow pill -- visually distinct
+ * from the normal/moderate/severe pills so the operator knows the row
+ * is a redirect, not a real WFA classification. */
+.dashboard-chart-sidebar .stat-dot.is-gray { background: var(--admin-muted); }
 .dashboard-chart-sidebar .stat-foot {
   margin-top: 10px;
   font-size: 0.72rem;
@@ -1195,6 +1199,8 @@
 .audit-chart-legend .audit-legend-dot.is-primary { background: var(--admin-primary); }
 .audit-chart-legend .audit-legend-dot.is-accent { background: var(--admin-accent); }
 .audit-chart-legend .audit-legend-dot.is-danger { background: var(--admin-danger); }
+/* Gray for the WFA "Refer to WFL/H" chart series. */
+.audit-chart-legend .audit-legend-dot.is-gray { background: var(--admin-muted); }
 
 .audit-chart-body {
   position: relative;

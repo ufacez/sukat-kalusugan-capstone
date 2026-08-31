@@ -7,10 +7,12 @@ require_once __DIR__ . '/../includes/who_reference_import.php';
 $user = nutritionist_require_access();
 
 $indicators = [
-	'waz' => ['label' => 'Weight-for-Age', 'table' => 'who_weight_for_age', 'unit' => 'kg', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'haz' => ['label' => 'Height-for-Age', 'table' => 'who_height_for_age', 'unit' => 'cm', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
-	'whz' => ['label' => 'Weight-for-Height (2-5y)', 'table' => 'who_weight_for_height', 'unit' => 'kg', 'column' => 'height_cm', 'columnLabel' => 'Height (cm)'],
-	'wfl' => ['label' => 'Weight-for-Length (0-2y)', 'table' => 'who_weight_for_length', 'unit' => 'kg', 'column' => 'height_cm', 'columnLabel' => 'Length (cm)'],
+	'waz'      => ['label' => 'Weight-for-Age (months)',   'table' => 'who_weight_for_age',       'unit' => 'kg', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'waz-days' => ['label' => 'Weight-for-Age (days)',     'table' => 'who_weight_for_age_days',  'unit' => 'kg', 'column' => 'age_days',   'columnLabel' => 'Age (days)'],
+	'haz'      => ['label' => 'Height-for-Age (months)',   'table' => 'who_height_for_age',       'unit' => 'cm', 'column' => 'age_months', 'columnLabel' => 'Age (months)'],
+	'haz-days' => ['label' => 'Height-for-Age (days)',     'table' => 'who_height_for_age_days',  'unit' => 'cm', 'column' => 'age_days',   'columnLabel' => 'Age (days)'],
+	'whz'      => ['label' => 'Weight-for-Height (2-5y)',  'table' => 'who_weight_for_height',    'unit' => 'kg', 'column' => 'height_cm',  'columnLabel' => 'Height (cm)'],
+	'wfl'      => ['label' => 'Weight-for-Length (0-2y)',  'table' => 'who_weight_for_length',    'unit' => 'kg', 'column' => 'height_cm',  'columnLabel' => 'Length (cm)'],
 ];
 
 // Import runs before anything is echoed, since it redirects back to this
@@ -85,10 +87,19 @@ if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
 
 // who_weight_for_height contains only the standing-height curve (65.0-120.0cm, 2-5y).
 // who_weight_for_length contains only the recumbent-length curve (45.0-110.0cm, 0-2y).
-// The age-based tables (who_weight_for_age, who_height_for_age) cover 0-60 months.
+// The legacy monthly age tables (who_weight_for_age, who_height_for_age)
+// cover 0-60 months. The day-based tables (who_weight_for_age_days,
+// who_height_for_age_days) cover 0-1856 days (~5 years + 30 days) and
+// use the same young/old split translated into days.
 $rangeBounds = [
-	'young' => ['age_months' => [0, 23]],
-	'old' => ['age_months' => [24, 60]],
+	'young' => [
+		'age_months' => [0, 23],
+		'age_days'   => [0, 729],   // < 24 completed months
+	],
+	'old' => [
+		'age_months' => [24, 60],
+		'age_days'   => [730, 1856],
+	],
 	'all' => null,
 ];
 
@@ -97,10 +108,10 @@ $sql = "SELECT {$config['column']} AS x, L, M, S FROM {$config['table']} WHERE s
 $types = 's';
 $params = [$sex];
 
-if ($rangeBounds[$ageRange] !== null && $config['column'] === 'age_months') {
+if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months', 'age_days'], true)) {
 	[$low, $high] = $rangeBounds[$ageRange][$config['column']];
 	$sql .= " AND {$config['column']} BETWEEN ? AND ?";
-	$types .= 'dd';
+	$types .= 'ii';
 	$params[] = $low;
 	$params[] = $high;
 }
@@ -162,14 +173,22 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 		</div>
 	</div>
 
-	<?php if ($config['column'] === 'age_months'): ?>
+	<?php if (in_array($config['column'], ['age_months', 'age_days'], true)): ?>
 	<div style="margin-bottom:14px;">
 		<div style="display:flex;gap:6px;flex-wrap:wrap;">
-			<?php foreach ([
-				'all' => 'All (0-60mo)',
-				'old' => '2-5 years',
-				'young' => '0-2 years',
-			] as $rangeKey => $rangeLabel): ?>
+			<?php foreach (
+				$config['column'] === 'age_days'
+					? [
+						'all'   => 'All (0-1856d)',
+						'old'   => '2-5 years (730-1856d)',
+						'young' => '0-2 years (0-729d)',
+					]
+					: [
+						'all'   => 'All (0-60mo)',
+						'old'   => '2-5 years',
+						'young' => '0-2 years',
+					]
+				as $rangeKey => $rangeLabel): ?>
 				<a
 					href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $rangeKey, $search)); ?>"
 					class="admin-pill <?php echo $rangeKey === $ageRange ? 'is-success' : 'is-muted'; ?>"
@@ -181,8 +200,33 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 	<?php endif; ?>
 
 	<?php if ($rowCount === 0): ?>
+		<?php
+			// The day-keyed tables (who_weight_for_age_days /
+			// who_height_for_age_days) start empty until either
+			//   1) the seeder in db/seeders/seed_who_age_days.php is
+			//      run, or
+			//   2) an xlsx is uploaded via this page.
+			// Without one of those, the WAZ/HAZ calculator's
+			// day-keyed lookup will fall back to the monthly table, so
+			// the page is functional but the day-precision reference
+			// isn't available. Surface that here so the operator
+			// knows what to do.
+			$isDayTable = $config['column'] === 'age_days';
+		?>
 		<div class="admin-flash is-error">
-			No reference data for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).
+			<strong>No reference data for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).</strong>
+			<?php if ($isDayTable): ?>
+				<br>
+				This is the day-keyed WHO 2006 expanded reference table (one row per day from 0 to 1856).
+				Upload the matching <code><?php echo nutritionist_e($sex === 'Male' ? 'wfa-boys' : 'wfa-girls'); ?>-zscore-expanded-tables.xlsx</code>
+				or <code><?php echo nutritionist_e($sex === 'Male' ? 'lhfa-boys' : 'lhfa-girls'); ?>-zscore-expanded-tables.xlsx</code>
+				from <code>public_html/data/who lms 2006expanded/</code> using the Import form below,
+				or run the one-shot seeder:
+				<code>php db/seeders/seed_who_age_days.php</code>.
+			<?php else: ?>
+				<br>
+				Upload the matching WHO LMS xlsx using the Import form below.
+			<?php endif; ?>
 		</div>
 	<?php else: ?>
 		<div class="admin-mini" style="margin-bottom:0;color:var(--admin-muted);">
@@ -195,10 +239,26 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 
 <?php if (nutritionist_can_write()): ?>
 <section class="nutritionist-panel" style="margin-bottom:20px;padding:16px;">
+	<?php
+		// Suggest the matching xlsx file from the bundled data folder.
+		// The day-keyed WFA / HFA tables read the *-zscore-expanded-tables.xlsx
+		// files which already ship with the repo under
+		// public_html/data/who lms 2006expanded/.
+		$expectedFiles = match ($indicator) {
+			'waz-days' => $sex === 'Male' ? 'wfa-boys-zscore-expanded-tables.xlsx' : 'wfa-girls-zscore-expanded-tables.xlsx',
+			'haz-days' => $sex === 'Male' ? 'lhfa-boys-zscore-expanded-tables.xlsx' : 'lhfa-girls-zscore-expanded-tables.xlsx',
+			default    => null,
+		};
+	?>
 	<div class="who-import-row" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
 		<div class="who-import-label" style="display:flex;align-items:center;gap:8px;color:var(--admin-muted);font-size:0.85rem;">
 			<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
 			<span>Importing: <strong><?php echo nutritionist_e($config['label']); ?> &middot; <?php echo nutritionist_e($sex); ?></strong></span>
+			<?php if ($expectedFiles !== null): ?>
+				<span style="color:var(--admin-muted);font-size:0.78rem;">
+					Expected file: <code style="background:var(--admin-surface-alt);padding:2px 6px;border-radius:4px;"><?php echo nutritionist_e($expectedFiles); ?></code>
+				</span>
+			<?php endif; ?>
 		</div>
 		<form class="who-import-actions" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>" method="post" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex:1;min-width:0;">
 			<input type="hidden" name="action" value="import">

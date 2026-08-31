@@ -77,6 +77,14 @@ function xlsx_lite_read_shared_strings(ZipArchive $zip): array
 	$strings = [];
 
 	foreach ($doc->xpath('//a:si') as $si) {
+		// Re-register the namespace on the child <si> -- simplexml's
+		// inner xpath() doesn't inherit the parent's prefix bindings,
+		// so without this './a:t' silently returns an empty array on
+		// sharedStrings.xml entries (the bug surfaces only when the
+		// xlsx uses the spreadsheetml default namespace, which every
+		// real-world export does).
+		$si->registerXPathNamespace('a', 'http://schemas.openxmlformats.org/spreadsheetml/2006/main');
+
 		// A shared string entry is either a plain <t> or one or more rich-text
 		// <r><t>...</t></r> runs that need to be concatenated.
 		$text = '';

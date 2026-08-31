@@ -27,6 +27,38 @@ function doh_age_in_months(?string $birthdate, ?DateTimeImmutable $today = null)
 	return ($age->y * 12) + $age->m;
 }
 
+/**
+ * Returns the child's age in whole days as of $onDate (defaults to today).
+ * This is the canonical age input for the WHO 2006 expanded reference
+ * tables, which provide one row per day from birth through 1856 days
+ * (~5 years + 30 days). Matches the DOH eOPT Plus convention used by
+ * `measurement_date - birthdate` on every measurement record.
+ */
+function doh_age_in_days(?string $birthdate, ?DateTimeImmutable $onDate = null): ?int
+{
+	$birthdate = trim((string)$birthdate);
+
+	if ($birthdate === '') {
+		return null;
+	}
+
+	try {
+		$birthDate = new DateTimeImmutable($birthdate);
+	} catch (Exception $exception) {
+		return null;
+	}
+
+	$referenceDate = $onDate ?? new DateTimeImmutable('today');
+
+	if ($birthDate > $referenceDate) {
+		return null;
+	}
+
+	$diffDays = (int)$birthDate->diff($referenceDate)->format('%r%a');
+
+	return max(0, $diffDays);
+}
+
 function who_lms_z_score(float $measurement, float $lmsL, float $lmsM, float $lmsS): float
 {
 	if ($measurement <= 0 || $lmsM <= 0 || $lmsS <= 0) {
@@ -45,14 +77,15 @@ function who_lookup_reference(string $table, string $sex, string $column, float 
 	$conn = get_db_connection();
 	$normalizedSex = $sex === 'Female' ? 'Female' : 'Male';
 
-	// age_months is always a whole number, and the age-based tables (WFA, HFA)
-	// have one row per integer month, so an exact match is correct there.
-	// height_cm is a continuous measurement (e.g. 92.3cm) but the WFH table is
-	// only stepped every 0.5cm (45.0, 45.5, 46.0, ...). An exact-match lookup
-	// after round($value, 1) would miss almost every real submitted height and
-	// silently fall through to who_fallback_reference() instead. So for
-	// height_cm we find the closest row in the table rather than requiring an
-	// exact match.
+	// age_months / age_days are always whole numbers, and the age-based
+	// tables (WFA, HFA) have one row per integer day or month, so an
+	// exact match is correct there. height_cm is a continuous measurement
+	// (e.g. 92.3cm) but the WFH table is only stepped every 0.5cm
+	// (45.0, 45.5, 46.0, ...). An exact-match lookup after round($value, 1)
+	// would miss almost every real submitted height and silently fall
+	// through to who_fallback_reference() instead. So for height_cm we
+	// find the closest row in the table rather than requiring an exact
+	// match.
 	if ($column === 'height_cm') {
 		$stmt = mysqli_prepare(
 			$conn,
@@ -94,8 +127,12 @@ function who_lookup_reference(string $table, string $sex, string $column, float 
 	return null;
 }
 
-function who_fallback_reference(string $metric, float $measurement, int $ageMonths = 0): array
+function who_fallback_reference(string $metric, float $measurement, int $ageDays = 0): array
 {
+	// Translate days into a rough completed-months value so the legacy
+	// weight/height regression curves below still produce plausible LMS.
+	$ageMonths = intdiv($ageDays, 30);
+
 	return match ($metric) {
 		'waz' => [
 			'L' => 0.0,
@@ -120,31 +157,56 @@ function who_fallback_reference(string $metric, float $measurement, int $ageMont
 	};
 }
 
-function calculate_waz(float $weight_kg, int $age_months, string $sex): float
+/**
+ * WAZ (Weight-for-Age z-score) using the day-keyed WHO 2006 expanded
+ * reference table. If the day row is missing (e.g. age > 1856 days) the
+ * calculator falls back to the legacy monthly table and finally to a
+ * rough regression curve.
+ */
+function calculate_waz(float $weight_kg, int $age_days, string $sex): float
 {
-	$reference = who_lookup_reference('who_weight_for_age', $sex, 'age_months', (float)$age_months)
-		?? who_fallback_reference('waz', $weight_kg, $age_months);
+	$reference = who_lookup_reference('who_weight_for_age_days', $sex, 'age_days', (float)$age_days);
+
+	if ($reference === null) {
+		// Legacy monthly fallback for any out-of-range or pre-seeded days.
+		$reference = who_lookup_reference('who_weight_for_age', $sex, 'age_months', (float)intdiv($age_days, 30));
+	}
+
+	if ($reference === null) {
+		$reference = who_fallback_reference('waz', $weight_kg, $age_days);
+	}
 
 	return round(who_lms_z_score($weight_kg, $reference['L'], $reference['M'], $reference['S']), 2);
 }
 
-function calculate_haz(float $height_cm, int $age_months, string $sex): float
+/**
+ * HAZ (Height-for-Age z-score) using the day-keyed WHO 2006 expanded
+ * reference table.
+ */
+function calculate_haz(float $height_cm, int $age_days, string $sex): float
 {
-	$reference = who_lookup_reference('who_height_for_age', $sex, 'age_months', (float)$age_months)
-		?? who_fallback_reference('haz', $height_cm, $age_months);
+	$reference = who_lookup_reference('who_height_for_age_days', $sex, 'age_days', (float)$age_days);
+
+	if ($reference === null) {
+		$reference = who_lookup_reference('who_height_for_age', $sex, 'age_months', (float)intdiv($age_days, 30));
+	}
+
+	if ($reference === null) {
+		$reference = who_fallback_reference('haz', $height_cm, $age_days);
+	}
 
 	return round(who_lms_z_score($height_cm, $reference['L'], $reference['M'], $reference['S']), 2);
 }
 
 /**
- * WHO publishes weight-for-length (recumbent, 0-23 months) and
- * weight-for-height (standing, 24-60 months) as two separate curves that
- * legitimately disagree over the 65-110cm range they both cover, because
- * the correct one depends on how the child was actually measured, not on
- * height alone. This picks the curve by $age_months (<24 -> length,
- * >=24 -> height), matching the DOH e-OPT Plus "Nut_StatusTool" sheet
- * (cell AD10) and the who_weight_for_length migration this table was
- * added for.
+ * WHO publishes weight-for-length (recumbent, 0-23 completed months) and
+ * weight-for-height (standing, 24-60 completed months) as two separate
+ * curves that legitimately disagree over the 65-110cm range they both
+ * cover, because the correct one depends on how the child was actually
+ * measured, not on height alone. The cutover uses calendar-completed
+ * months (DOH e-OPT Plus "Nut_StatusTool" sheet cell AD10), so the
+ * caller still passes the child's `age_months` from
+ * `doh_age_in_months()`.
  */
 function calculate_whz(float $weight_kg, float $height_cm, int $age_months, string $sex): float
 {
@@ -162,6 +224,11 @@ function calculate_whz(float $weight_kg, float $height_cm, int $age_months, stri
  * weight-for-height, or wasted without being underweight-for-age. The
  * `measurements.nutritional_status` column stores the single most clinically
  * severe label that applies, evaluating each axis independently.
+ *
+ * Note: WAZ > +2 is no longer part of the WFA axis (per the DOH eOPT Plus
+ * rule, the WFA tab shows a "Refer to WFL/H" pill and the WFL/H axis
+ * decides Overweight/Obese). So the "Overweight" / "Obese" labels in this
+ * consolidated status are driven exclusively by WHZ.
  *
  * Categories returned:
  *   Severely Underweight   (WAZ < -3)
@@ -212,9 +279,18 @@ function classify_nutritional_status(float $waz, float $haz, float $whz): string
 }
 
 /**
- * DOH e-OPT Plus weight-for-age classification, using the community-tool
- * coding legend (verified against public_html/data/refrence_stanrddeviations.xlsx):
- *   SUW < -3SD | MUW -3..-2SD | Normal -2..+2SD | OW > +2SD
+ * DOH e-OPT Plus Weight-for-Age classification. WFA is intentionally a
+ * one-sided (under-nutrition) axis: any z-score above +2 means the
+ * weight-for-age reading is unreliable, and the operator is redirected to
+ * the WFL/H axis instead. The pill the WFA tab renders for that case is
+ * "Use WFL/H column" -- the `wfa_status` value is the exact string
+ * stored in the `measurements.wfa_status` column, so the chart and the
+ *   history tables can match on it.
+ *
+ *   SUW              < -3SD
+ *   MUW         -3..-2SD
+ *   Normal     -2..+2SD
+ *   Refer to WFL/H   > +2SD  (DOH e-OPT Plus rule)
  */
 function classify_wfa_status(float $waz): string
 {
@@ -230,12 +306,17 @@ function classify_wfa_status(float $waz): string
 		return 'Normal';
 	}
 
-	return 'OW';
+	return 'Refer to WFL/H';
 }
 
 /**
- * DOH e-OPT Plus height-for-age classification:
- *   SSt < -3SD | MSt -3..-2SD | Normal -2..+2SD | T > +2SD
+ * DOH e-OPT Plus Height-for-Age classification. Tall is reported on the
+ * HFA tab (no redirect) because the WFA-overflow rule is WFA-specific.
+ *
+ *   SSt            < -3SD
+ *   MSt       -3..-2SD
+ *   Normal   -2..+2SD
+ *   Tall          > +2SD
  */
 function classify_hfa_status(float $haz): string
 {
@@ -255,7 +336,7 @@ function classify_hfa_status(float $haz): string
 }
 
 /**
- * DOH e-OPT Plus weight-for-length/height classification:
+ * DOH e-OPT Plus Weight-for-Length/Height classification:
  *   SW < -3SD | MW -3..-2SD | Normal -2..+2SD | OW +2..+3SD | Ob > +3SD
  */
 function classify_wfh_status(float $whz): string
@@ -281,12 +362,11 @@ function classify_wfh_status(float $whz): string
 
 /**
  * Flags a measurement as biologically implausible -- almost always a data
- * entry or device error, not a real child. These are the WHO Anthro
- * software's standard flagging thresholds (used when the extended per-age
- * SD reference tables aren't available): WAZ outside -6..5, HAZ outside
- * -6..6, WHZ outside -5..5. eOPT Plus computes a more precise per-age SD
- * cutoff (needs a 4th reference parameter our who_* tables don't carry),
- * but for catching implausible entries the practical result is the same.
+ * entry or device error, not a real child. WHO Anthro standard thresholds:
+ * WAZ outside -6..5, HAZ outside -6..6, WHZ outside -5..5. We let WAZ go
+ * up to +5 here even though the WFA tab now treats anything > +2 as
+ * "Refer to WFL/H" -- a value above +5 is still implausible and the
+ * flag should trip.
  *
  * @return array{is_flagged: bool, reason: string|null}
  */
@@ -312,10 +392,20 @@ function flag_measurement(float $waz, float $haz, float $whz): array
 	];
 }
 
-function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_months, string $sex): array
+/**
+ * Convenience wrapper used by every callsite (ESP32 submit, manual
+ * measurement entry, etc.). Accepts the day and month age values
+ * computed by the caller so we never have to re-parse birthdates.
+ *
+ * `age_days` is the canonical age input for WAZ/HAZ (see
+ * `doh_age_in_days()`); `age_months` is still used to pick between the
+ * WFL (recumbent) and WFH (standing) reference curves via
+ * `calculate_whz()`.
+ */
+function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_days, int $age_months, string $sex): array
 {
-	$waz = calculate_waz($weight_kg, $age_months, $sex);
-	$haz = calculate_haz($height_cm, $age_months, $sex);
+	$waz = calculate_waz($weight_kg, $age_days, $sex);
+	$haz = calculate_haz($height_cm, $age_days, $sex);
 	$whz = calculate_whz($weight_kg, $height_cm, $age_months, $sex);
 	$flag = flag_measurement($waz, $haz, $whz);
 
@@ -327,6 +417,7 @@ function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_mont
 		'wfa_status' => classify_wfa_status($waz),
 		'hfa_status' => classify_hfa_status($haz),
 		'wfh_status' => classify_wfh_status($whz),
+		'wfa_overflow' => $waz > 2,
 		'is_flagged' => $flag['is_flagged'],
 		'flag_reason' => $flag['reason'],
 	];

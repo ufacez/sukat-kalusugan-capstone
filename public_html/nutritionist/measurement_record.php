@@ -268,10 +268,6 @@ nutritionist_layout_start(
                         <span>Measurement date</span>
                         <input type="date" name="measurement_date" id="date-input" value="<?php echo nutritionist_e(date('Y-m-d')); ?>" max="<?php echo nutritionist_e(date('Y-m-d')); ?>" required>
                     </label>
-                    <label class="admin-field is-disabled" title="MUAC is not currently stored in the database. Leave blank.">
-                        <span>MUAC (cm) — optional</span>
-                        <input type="number" name="muac_cm" id="muac-input" step="0.1" min="5" max="30" inputmode="decimal" placeholder="e.g. 14.5 (not yet saved)">
-                    </label>
                 </div>
             </form>
 
@@ -337,7 +333,6 @@ nutritionist_layout_start(
 
     var weightInput = $('weight-input');
     var heightInput = $('height-input');
-    var muacInput = $('muac-input');
     var dateInput = $('date-input');
 
     var readoutWeight = $('readout-weight');
@@ -488,10 +483,12 @@ nutritionist_layout_start(
     function statusFromZ(waz, haz, whz) {
         // Combine non-normal axes using DOH abbreviations.
         // Exclude Normal; show all abnormal axes together.
+        // WAZ > +2 is a "Refer to WFL/H" redirect, not an OW label -- the
+        // actual overweight / obese status is read off the WFH axis.
         var parts = [];
         if (waz !== null && waz < -3) parts.push('SUW');
         else if (waz !== null && waz < -2) parts.push('MUW');
-        else if (waz !== null && waz > 2) parts.push('OW');
+        else if (waz !== null && waz > 2) parts.push('Refer to WFL/H');
 
         if (haz !== null && haz < -3) parts.push('SSt');
         else if (haz !== null && haz < -2) parts.push('MSt');
@@ -508,6 +505,7 @@ nutritionist_layout_start(
 
     function statusPillClass(status) {
         if (status === 'Normal') return 'is-success';
+        if (status.indexOf('Refer') !== -1) return 'is-muted';
         if (status.indexOf('Tall') !== -1 || status.indexOf('OW') !== -1 || status.indexOf('Ob') !== -1) return 'is-orange';
         if (status.indexOf('MUW') !== -1 || status.indexOf('MSt') !== -1 || status.indexOf('MW') !== -1) return 'is-warn';
         if (!status || status === '—') return 'is-muted';
@@ -671,7 +669,6 @@ nutritionist_layout_start(
     resetBtn.addEventListener('click', function () {
         weightInput.value = '';
         heightInput.value = '';
-        muacInput.value = '';
         dateInput.value = new Date().toISOString().slice(0, 10);
         whoResult.style.display = 'none';
         saveBtn.disabled = true;

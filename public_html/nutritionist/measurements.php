@@ -74,7 +74,7 @@ $children = admin_fetch_all(
             WHEN lm.whz > 2 THEN 'Overweight'
             ELSE 'Normal'
         END) AS nutritional_status,
-        COALESCE(lm.wfa_status, CASE WHEN lm.waz < -3 THEN 'SUW' WHEN lm.waz < -2 THEN 'MUW' WHEN lm.waz > 2 THEN 'OW' ELSE 'Normal' END) AS wfa_status,
+        COALESCE(lm.wfa_status, CASE WHEN lm.waz < -3 THEN 'SUW' WHEN lm.waz < -2 THEN 'MUW' WHEN lm.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END) AS wfa_status,
         COALESCE(lm.hfa_status, CASE WHEN lm.haz < -3 THEN 'SSt' WHEN lm.haz < -2 THEN 'MSt' WHEN lm.haz > 2 THEN 'Tall' ELSE 'Normal' END) AS hfa_status,
         COALESCE(lm.wfh_status, CASE WHEN lm.whz < -3 THEN 'SW' WHEN lm.whz < -2 THEN 'MW' WHEN lm.whz > 3 THEN 'Ob' WHEN lm.whz > 2 THEN 'OW' ELSE 'Normal' END) AS wfh_status
      FROM children c
@@ -121,7 +121,7 @@ $historyRows = admin_fetch_all(
             WHEN m.whz > 2 THEN 'Overweight'
             ELSE 'Normal'
         END) AS nutritional_status,
-        COALESCE(m.wfa_status, CASE WHEN m.waz < -3 THEN 'SUW' WHEN m.waz < -2 THEN 'MUW' WHEN m.waz > 2 THEN 'OW' ELSE 'Normal' END) AS wfa_status,
+        COALESCE(m.wfa_status, CASE WHEN m.waz < -3 THEN 'SUW' WHEN m.waz < -2 THEN 'MUW' WHEN m.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END) AS wfa_status,
         COALESCE(m.hfa_status, CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END) AS hfa_status,
         COALESCE(m.wfh_status, CASE WHEN m.whz < -3 THEN 'SW' WHEN m.whz < -2 THEN 'MW' WHEN m.whz > 3 THEN 'Ob' WHEN m.whz > 2 THEN 'OW' ELSE 'Normal' END) AS wfh_status,
         m.source_type,
@@ -590,11 +590,6 @@ nutritionist_layout_start(
                     <div class="value" id="mc-height">—</div>
                     <div class="unit">cm</div>
                 </div>
-                <div class="vital-card is-empty" id="mc-card-muac">
-                    <div class="label">MUAC</div>
-                    <div class="value" id="mc-muac">—</div>
-                    <div class="unit">cm</div>
-                </div>
             </div>
 
             <div class="mc-section-title">Nutrition assessment</div>
@@ -691,6 +686,8 @@ nutritionist_layout_start(
         if (x === 'overweight' || x === 'obese' || x === 'ow' || x === 'ob') return 'is-orange';
         if (x.indexOf('moderately') !== -1 || x === 'muw' || x === 'mst' || x === 'mw') return 'is-warn';
         if (x === 'suw' || x === 'sst' || x === 'sw' || x.indexOf('severely') !== -1) return 'is-danger';
+        // WFA overflow: WAZ > +2 is a redirect, not a real WFA label.
+        if (x.indexOf('refer') !== -1 || x === 'ref') return 'is-muted';
         if (!x) return 'is-muted';
         return 'is-danger';
     }
@@ -715,8 +712,7 @@ nutritionist_layout_start(
         var h = num(get('height'));
         text('mc-weight', w !== null ? w.toFixed(2) : '—');
         text('mc-height', h !== null ? h.toFixed(1) : '—');
-        text('mc-muac', '—'); // Not stored in DB yet
-        ['mc-card-weight','mc-card-height','mc-card-muac'].forEach(function (id) { val(id).classList.add('is-empty'); });
+        ['mc-card-weight','mc-card-height'].forEach(function (id) { val(id).classList.add('is-empty'); });
         if (w !== null) val('mc-card-weight').classList.remove('is-empty');
         if (h !== null) val('mc-card-height').classList.remove('is-empty');
 
