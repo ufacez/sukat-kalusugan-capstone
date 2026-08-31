@@ -125,6 +125,7 @@ function eopt_fetch_list(
 			p.name AS parent_name,
 			lm.id AS measurement_id,
 			lm.measurement_date,
+			DATEDIFF(?, c.birthdate) AS age_days,
 			TIMESTAMPDIFF(MONTH, c.birthdate, ?) AS age_months,
 			lm.height_cm,
 			lm.weight_kg,

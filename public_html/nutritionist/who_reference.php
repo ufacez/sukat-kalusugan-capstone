@@ -216,12 +216,22 @@ nutritionist_layout_start('WHO Reference Tables', 'Official WHO Child Growth Sta
 		<div class="admin-flash is-error">
 			<strong>No reference data for <?php echo nutritionist_e($config['label']); ?> (<?php echo nutritionist_e($sex); ?>).</strong>
 			<?php if ($isDayTable): ?>
+				<?php
+					// Single filename for the active day-based indicator +
+					// sex, so the operator copies the right xlsx from the
+					// repo's bundled data folder.
+					$dayFile = match ($indicator) {
+						'waz-days' => $sex === 'Male' ? 'wfa-boys-zscore-expanded-tables.xlsx' : 'wfa-girls-zscore-expanded-tables.xlsx',
+						'haz-days' => $sex === 'Male' ? 'lhfa-boys-zscore-expanded-tables.xlsx' : 'lhfa-girls-zscore-expanded-tables.xlsx',
+						default    => '',
+					};
+				?>
 				<br>
 				This is the day-keyed WHO 2006 expanded reference table (one row per day from 0 to 1856).
-				Upload the matching <code><?php echo nutritionist_e($sex === 'Male' ? 'wfa-boys' : 'wfa-girls'); ?>-zscore-expanded-tables.xlsx</code>
-				or <code><?php echo nutritionist_e($sex === 'Male' ? 'lhfa-boys' : 'lhfa-girls'); ?>-zscore-expanded-tables.xlsx</code>
-				from <code>public_html/data/who lms 2006expanded/</code> using the Import form below,
-				or run the one-shot seeder:
+				Upload the matching
+				<code><?php echo nutritionist_e($dayFile); ?></code>
+				from <code>public_html/who lms 2006expanded/<?php echo nutritionist_e(str_starts_with($dayFile, 'lhfa-') ? 'LHFA' : 'WFA'); ?>/</code>
+				using the Import form below, or run the one-shot seeder:
 				<code>php db/seeders/seed_who_age_days.php</code>.
 			<?php else: ?>
 				<br>

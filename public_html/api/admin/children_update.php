@@ -60,10 +60,10 @@ if ($localAreaId > 0) {
     }
 }
 
-$registrationAgeMonths = doh_age_in_months($birthdate);
+$registrationAgeDays = doh_age_in_days($birthdate);
 
-if ($registrationAgeMonths === null || $registrationAgeMonths > 60) {
-    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Birthdate must be valid and the child must be 60 months (5 years) old or younger.', 'type' => 'error']);
+if ($registrationAgeDays === null || $registrationAgeDays > 1825) {
+    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger.', 'type' => 'error']);
 }
 
 if (!in_array($sex, ['Male', 'Female'], true)) {

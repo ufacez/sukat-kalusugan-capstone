@@ -42,13 +42,17 @@ $children = kiosk_fetch_all(
 
 $childrenPayload = array_map(
     static function (array $c): array {
+        $age = kiosk_age((string) ($c['birthdate'] ?? ''));
         return [
             'id' => (int) $c['id'],
             'child_code' => (string) $c['child_code'],
             'first_name' => (string) $c['first_name'],
             'last_name' => (string) $c['last_name'],
             'sex' => (string) $c['sex'],
-            'age_months' => kiosk_age_months((string) ($c['birthdate'] ?? '')),
+            // Canonical day count -- what the WHO calculator uses.
+            'age_days' => $age['days'],
+            // Whole-number month estimate -- for the "X mo" label.
+            'age_months' => $age['months'],
             'barangay' => (string) ($c['barangay'] ?? ''),
             'parent_name' => (string) ($c['parent_name'] ?? ''),
             'status' => (string) ($c['nutritional_status'] ?? 'Pending'),
@@ -259,7 +263,18 @@ $appData = [
                                 <div class="kiosk-avatar"><?php echo kiosk_e($initials); ?></div>
                                 <div class="kiosk-child-name"><?php echo kiosk_e($fullName); ?></div>
                                 <div class="kiosk-child-meta">
-                                    <?php echo (int) $child['age_months']; ?> months · <?php echo kiosk_e($child['sex']); ?>
+                                    <?php
+                                        // Day count is the canonical age -- it
+                                        // ticks up by 1 every day automatically
+                                        // because it's recomputed from the
+                                        // child's birthdate on each page load.
+                                        // The whole-number month estimate is
+                                        // shown alongside it so the operator
+                                        // can match against the eOPT Plus
+                                        // "X mo" worksheet label.
+                                        echo (int) $child['age_days']; ?> day<?php echo (int) $child['age_days'] === 1 ? '' : 's'; ?>
+                                    · <?php echo (int) $child['age_months']; ?> mo
+                                    · <?php echo kiosk_e($child['sex']); ?>
                                 </div>
                                 <div class="kiosk-child-code"><?php echo kiosk_e($child['child_code']); ?></div>
                                 <?php if ($child['barangay'] !== ''): ?>

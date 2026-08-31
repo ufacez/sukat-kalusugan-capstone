@@ -3217,14 +3217,25 @@ function finishResults(
   // ==========================================================
 
   if (refs.resultMeta) {
+    // The kiosk child list now ships both the canonical day count
+    // and a whole-number month estimate. Day count is what the WHO
+    // calculator uses internally; the month estimate (intdiv(days,
+    // 30)) is for the "X mo" label so the operator can match it
+    // against the eOPT Plus worksheet.
+    const ageDays =
+      measurement.age_days ??
+      payload.age_days ??
+      child?.age_days ??
+      0;
+
     const ageMonths =
       measurement.age_months ??
       payload.age_months ??
       child?.age_months ??
-      0;
+      Math.floor(ageDays / 30);
 
     refs.resultMeta.textContent =
-      `${ageMonths} months old`;
+      `${ageDays} day${ageDays === 1 ? '' : 's'} (${ageMonths} mo)`;
   }
 
   // ==========================================================

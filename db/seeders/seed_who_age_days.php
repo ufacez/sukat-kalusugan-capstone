@@ -19,7 +19,17 @@
 require_once __DIR__ . '/../../public_html/includes/db.php';
 require_once __DIR__ . '/../../public_html/includes/xlsx_lite.php';
 
-$baseDir = realpath(__DIR__ . '/../../public_html/data/who lms 2006expanded');
+// Resolve the data folder from this script's location. The seeder lives
+// at   <project>/db/seeders/seed_who_age_days.php
+// so the data folder is   <project>/public_html/who lms 2006expanded
+// = 2 levels up from __DIR__, then down into public_html/who lms 2006expanded
+$baseDir = realpath(__DIR__ . '/../../public_html/who lms 2006expanded');
+
+if ($baseDir === false || $baseDir === '') {
+	fwrite(STDERR, "Could not resolve the data folder from __DIR__=" . __DIR__ . PHP_EOL);
+	fwrite(STDERR, "Tried: " . __DIR__ . '/../../public_html/who lms 2006expanded' . PHP_EOL);
+	exit(1);
+}
 
 $jobs = [
 	[
@@ -122,7 +132,14 @@ foreach ($jobs as $job) {
 			continue;
 		}
 
-		mysqli_stmt_bind_param($stmt, 'siddd', $job['sex'], $dayInt, (float)$l, (float)$m, (float)$s);
+		// mysqli_stmt_bind_param requires real variables (by-reference),
+		// so stash the cast values into locals before binding.
+		$sexVar = $job['sex'];
+		$dayVar = $dayInt;
+		$lVar = (float)$l;
+		$mVar = (float)$m;
+		$sVar = (float)$s;
+		mysqli_stmt_bind_param($stmt, 'siddd', $sexVar, $dayVar, $lVar, $mVar, $sVar);
 		$ok = mysqli_stmt_execute($stmt);
 
 		if (!$ok) {

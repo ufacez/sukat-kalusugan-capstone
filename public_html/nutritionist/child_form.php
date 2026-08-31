@@ -135,16 +135,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
     }
 
-    $registrationAgeMonths = doh_age_in_months($birthdate);
+    // Day-based age check -- 5 years is roughly 1825 days, which is
+    // the upper bound of the eOPT Plus scope.
+    $registrationAgeDays = doh_age_in_days($birthdate);
 
     if (
-        $registrationAgeMonths === null
-        || $registrationAgeMonths > 60
+        $registrationAgeDays === null
+        || $registrationAgeDays > 1825
     ) {
         admin_redirect(
             $errorBackUrl,
             [
-                'notice' => 'Birthdate must be valid and the child must be 60 months (5 years) old or younger — WHO growth references only cover 0-60 months.',
+                'notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger — WHO growth references only cover 0-5 years.',
                 'type' => 'error'
             ]
         );

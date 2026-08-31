@@ -151,7 +151,14 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                                 <span class="admin-avatar" style="background:<?php echo admin_avatar_color($child['first_name'] . ' ' . $child['last_name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
                                 <div>
                                     <div style="font-weight:700;"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
-                                    <div class="admin-mini"><?php echo admin_e((string)$child['sex']); ?> &middot; <?php echo (int)(doh_age_in_months((string)$child['birthdate']) ?? 0); ?> mo</div>
+                                    <div class="admin-mini">
+                                        <?php
+                                            $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
+                                            echo admin_e((string)$child['sex']);
+                                            echo ' &middot; ';
+                                            echo (int)$age['days']; ?> day<?php echo (int)$age['days'] === 1 ? '' : 's'; ?> · <?php echo (int)$age['months']; ?> mo
+                                        ?>
+                                    </div>
                                 </div>
                             </div>
                         </td>

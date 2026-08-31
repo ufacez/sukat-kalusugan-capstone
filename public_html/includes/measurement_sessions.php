@@ -26,6 +26,10 @@ function measurement_session_row_to_payload(array $row): array
             'measurement_id' => (int)$row['measurement_id'],
             'height_cm' => isset($row['measurement_height_cm']) ? (float)$row['measurement_height_cm'] : null,
             'weight_kg' => isset($row['measurement_weight_kg']) ? (float)$row['measurement_weight_kg'] : null,
+            // Canonical day count -- the WHO calculator uses this.
+            'age_days' => isset($row['measurement_age_days']) ? (int)$row['measurement_age_days'] : null,
+            // Whole-number month estimate (intdiv(days, 30)) for the
+            // "X mo" label.
             'age_months' => isset($row['measurement_age_months']) ? (int)$row['measurement_age_months'] : null,
             'waz' => isset($row['measurement_waz']) ? (float)$row['measurement_waz'] : null,
             'haz' => isset($row['measurement_haz']) ? (float)$row['measurement_haz'] : null,
@@ -86,6 +90,7 @@ function measurement_session_fetch_latest_for_device(mysqli $conn, string $devic
             m.height_cm AS measurement_height_cm,
             m.weight_kg AS measurement_weight_kg,
             m.age_months AS measurement_age_months,
+            m.age_days AS measurement_age_days,
             m.waz AS measurement_waz,
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,
@@ -142,6 +147,7 @@ function measurement_session_fetch_active_for_device(mysqli $conn, string $devic
             m.height_cm AS measurement_height_cm,
             m.weight_kg AS measurement_weight_kg,
             m.age_months AS measurement_age_months,
+            m.age_days AS measurement_age_days,
             m.waz AS measurement_waz,
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,
@@ -202,6 +208,7 @@ function measurement_session_fetch_by_id_for_device(
             m.height_cm AS measurement_height_cm,
             m.weight_kg AS measurement_weight_kg,
             m.age_months AS measurement_age_months,
+            m.age_days AS measurement_age_days,
             m.waz AS measurement_waz,
             m.haz AS measurement_haz,
             m.whz AS measurement_whz,

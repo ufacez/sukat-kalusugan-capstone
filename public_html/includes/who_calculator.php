@@ -2,31 +2,6 @@
 
 require_once __DIR__ . '/db.php';
 
-function doh_age_in_months(?string $birthdate, ?DateTimeImmutable $today = null): ?int
-{
-	$birthdate = trim((string)$birthdate);
-
-	if ($birthdate === '') {
-		return null;
-	}
-
-	try {
-		$birthDate = new DateTimeImmutable($birthdate);
-	} catch (Exception $exception) {
-		return null;
-	}
-
-	$referenceDate = $today ?? new DateTimeImmutable('today');
-
-	if ($birthDate > $referenceDate) {
-		return null;
-	}
-
-	$age = $birthDate->diff($referenceDate);
-
-	return ($age->y * 12) + $age->m;
-}
-
 /**
  * Returns the child's age in whole days as of $onDate (defaults to today).
  * This is the canonical age input for the WHO 2006 expanded reference
@@ -57,6 +32,72 @@ function doh_age_in_days(?string $birthdate, ?DateTimeImmutable $onDate = null):
 	$diffDays = (int)$birthDate->diff($referenceDate)->format('%r%a');
 
 	return max(0, $diffDays);
+}
+
+/**
+ * The single source of truth for any "how old is this child right now"
+ * computation in the UI. Returns both the exact day count and a
+ * whole-number month estimate derived from the day count.
+ *
+ * The month estimate uses the average number of days per calendar
+ * month (30.4375 = 365.25 / 12) and is rounded down (`intdiv`) to a
+ * whole number -- so the UI never has to deal with a decimal point.
+ *
+ * The day count is the canonical answer. The month estimate is for
+ * the eOPT Plus roster reports and the kiosk child list, which the
+ * DOH form labels with "X mo" so the operator can match it against
+ * the printed worksheet.
+ *
+ * @return array{days: int, months: int}|null
+ */
+function doh_age(?string $birthdate, ?DateTimeImmutable $onDate = null): ?array
+{
+	$days = doh_age_in_days($birthdate, $onDate);
+
+	if ($days === null) {
+		return null;
+	}
+
+	return [
+		'days' => $days,
+		// 30.4375 days per average calendar month (365.25 / 12). The
+		// intdiv() gives us a whole-number estimate, never a decimal.
+		'months' => intdiv($days, 30),
+	];
+}
+
+/**
+ * Calendar-completed months (the old DOH e-OPT Plus convention). This
+ * is a UI helper ONLY -- the WHO calculator no longer uses month-based
+ * ages internally (it uses day-based lookups everywhere). eOPT reports
+ * still print "X mo" labels, so the helper is kept for those.
+ *
+ * Deprecated for any calculation: prefer doh_age() and the
+ * `months` estimate, or doh_age_in_days() for the canonical answer.
+ */
+function doh_age_in_months(?string $birthdate, ?DateTimeImmutable $today = null): ?int
+{
+	$birthdate = trim((string)$birthdate);
+
+	if ($birthdate === '') {
+		return null;
+	}
+
+	try {
+		$birthDate = new DateTimeImmutable($birthdate);
+	} catch (Exception $exception) {
+		return null;
+	}
+
+	$referenceDate = $today ?? new DateTimeImmutable('today');
+
+	if ($birthDate > $referenceDate) {
+		return null;
+	}
+
+	$age = $birthDate->diff($referenceDate);
+
+	return ($age->y * 12) + $age->m;
 }
 
 function who_lms_z_score(float $measurement, float $lmsL, float $lmsM, float $lmsS): float
@@ -199,18 +240,25 @@ function calculate_haz(float $height_cm, int $age_days, string $sex): float
 }
 
 /**
- * WHO publishes weight-for-length (recumbent, 0-23 completed months) and
- * weight-for-height (standing, 24-60 completed months) as two separate
- * curves that legitimately disagree over the 65-110cm range they both
- * cover, because the correct one depends on how the child was actually
- * measured, not on height alone. The cutover uses calendar-completed
- * months (DOH e-OPT Plus "Nut_StatusTool" sheet cell AD10), so the
- * caller still passes the child's `age_months` from
- * `doh_age_in_months()`.
+ * WHO publishes weight-for-length (recumbent, <2y) and weight-for-height
+ * (standing, >=2y) as two separate curves that legitimately disagree over
+ * the 65-110cm range they both cover, because the correct one depends on
+ * how the child was actually measured, not on height alone.
+ *
+ * Cutover is by `age_days`: 731 days (~2 years) is the boundary. The WFL
+ * (recumbent length) curve is for kids < 731 days; WFH (standing height)
+ * for kids >= 731 days. The number 731 is the integer day count that
+ * represents two full years using the 365.25-days-per-year average, so
+ * 2y 0d 0h maps to day 730 and the WFL curve applies; 2y 1d maps to
+ * day 731 and the WFH curve applies.
+ *
+ * This mirrors what the day-keyed WFA/HFA tables use everywhere else in
+ * the calculator -- age_days is the single source of truth for the WHO
+ * lookup key.
  */
-function calculate_whz(float $weight_kg, float $height_cm, int $age_months, string $sex): float
+function calculate_whz(float $weight_kg, float $height_cm, int $age_days, string $sex): float
 {
-	$table = $age_months < 24 ? 'who_weight_for_length' : 'who_weight_for_height';
+	$table = $age_days < 731 ? 'who_weight_for_length' : 'who_weight_for_height';
 
 	$reference = who_lookup_reference($table, $sex, 'height_cm', $height_cm)
 		?? who_fallback_reference('whz', $height_cm);
@@ -394,19 +442,17 @@ function flag_measurement(float $waz, float $haz, float $whz): array
 
 /**
  * Convenience wrapper used by every callsite (ESP32 submit, manual
- * measurement entry, etc.). Accepts the day and month age values
- * computed by the caller so we never have to re-parse birthdates.
- *
- * `age_days` is the canonical age input for WAZ/HAZ (see
- * `doh_age_in_days()`); `age_months` is still used to pick between the
- * WFL (recumbent) and WFH (standing) reference curves via
- * `calculate_whz()`.
+ * measurement entry, etc.). The only age input is `age_days` -- it
+ * drives the WAZ/HAZ day-keyed lookups and the WFL/WFH cutover. The
+ * `age_months` field on the measurements row is a UI-only whole-number
+ * estimate (age_days / 30.4375, rounded) and is NOT used by the
+ * calculator itself.
  */
-function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_days, int $age_months, string $sex): array
+function calculate_who_metrics(float $weight_kg, float $height_cm, int $age_days, string $sex): array
 {
 	$waz = calculate_waz($weight_kg, $age_days, $sex);
 	$haz = calculate_haz($height_cm, $age_days, $sex);
-	$whz = calculate_whz($weight_kg, $height_cm, $age_months, $sex);
+	$whz = calculate_whz($weight_kg, $height_cm, $age_days, $sex);
 	$flag = flag_measurement($waz, $haz, $whz);
 
 	return [

@@ -338,7 +338,7 @@ function chatbot_build_measurement_context(
         (string)($child['sex'] ?? 'Unknown')
     );
 
-    $ageMonths = doh_age_in_months(
+    $age = doh_age(
         $child['birthdate'] ?? null
     );
 
@@ -359,8 +359,8 @@ function chatbot_build_measurement_context(
     $lines[] =
         'Current age: ' .
         (
-            $ageMonths !== null
-                ? $ageMonths . ' months'
+            $age !== null
+                ? $age['days'] . ' days (~' . $age['months'] . ' months)'
                 : 'unknown'
         );
 

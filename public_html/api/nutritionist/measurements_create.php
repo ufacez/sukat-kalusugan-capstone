@@ -133,15 +133,20 @@ if ($birthDate > $parsedDate) {
     api_error('Measurement date cannot be before the child\'s birthdate.', 422);
 }
 
-$ageInterval = $birthDate->diff($parsedDate);
-$ageMonths = ($ageInterval->y * 12) + $ageInterval->m;
+// age_days is the canonical input for the WHO calculator. age_months
+// is a UI-only whole-number estimate stored on the row for the eOPT
+// Plus reports -- it's never used in the calculation itself.
 $ageDays = (int)$birthDate->diff($parsedDate)->format('%r%a');
 
 if ($ageDays < 0) {
     $ageDays = 0;
 }
 
-$metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $ageMonths, $childSex);
+// Whole-number month estimate from the day count. Uses intdiv so the
+// UI never has to deal with a decimal point.
+$ageMonths = intdiv($ageDays, 30);
+
+$metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $childSex);
 
 $insertStmt = mysqli_prepare(
     $conn,

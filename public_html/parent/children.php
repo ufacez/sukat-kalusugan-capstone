@@ -179,14 +179,17 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 					<?php else: ?>
 						<?php foreach ($children as $child): ?>
 							<?php
-							$ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
+							$age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
 							?>
 							<tr data-filter-text="<?php echo parent_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'] . ' ' . (string)($child['barangay'] ?? '') . ' ' . (string)($child['local_area'] ?? '') . ' ' . ($child['nutritional_status'] ?? ''))); ?>">
 								<td>
 									<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></div>
 									<div class="admin-mini"><?php echo parent_e((string)$child['child_code']); ?> · <?php echo parent_e((string)$child['sex']); ?></div>
 								</td>
-								<td><?php echo (int)$ageMonths; ?> mo</td>
+								<td title="<?php echo (int)$age['days']; ?> days">
+									<?php echo (int)$age['months']; ?> mo
+									<div class="admin-mini" style="font-size:0.7rem;"><?php echo (int)$age['days']; ?> d</div>
+								</td>
 								<td><?php echo parent_e((string)($child['barangay'] ?? '')); ?></td>
 								<td>
 									<?php if (!empty($child['local_area'])): ?>

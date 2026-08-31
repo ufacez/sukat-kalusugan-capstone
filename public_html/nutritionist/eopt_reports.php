@@ -136,6 +136,7 @@ if ($view === 'monthly') {
 		"{$baseSelect},
 		lm.measurement_date,
 		lm.age_months,
+		lm.age_days,
 		lm.height_cm,
 		lm.weight_kg,
 		lm.wfa_status,
@@ -165,6 +166,7 @@ if ($view === 'monthly') {
 		"{$baseSelect},
 		lm.measurement_date,
 		lm.age_months,
+		lm.age_days,
 		lm.height_cm,
 		lm.weight_kg,
 		lm.waz,
@@ -403,7 +405,7 @@ if ($isSingleList) {
 		c.id, c.child_code, c.first_name, c.middle_name, c.last_name,
 		c.sex, c.birthdate, c.purok AS address,
 		bg.name AS barangay, p.name AS parent_name, p.phone AS parent_phone,
-		lm.measurement_date, lm.age_months, lm.height_cm, lm.weight_kg,
+		lm.measurement_date, lm.age_months, lm.age_days, lm.height_cm, lm.weight_kg,
 		lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.waz, lm.haz, lm.whz, lm.is_flagged
 		FROM children c
 		INNER JOIN parents p ON p.id = c.parent_id
@@ -874,7 +876,12 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td><?php echo $row['age_months'] !== null ? nutritionist_e((string)$row['age_months'] . ' mo') : '—'; ?></td>
+							<td title="<?php echo $row['age_days'] !== null ? (int)$row['age_days'] . ' days at measurement time' : ''; ?>">
+								<?php echo $row['age_months'] !== null ? nutritionist_e((string)$row['age_months'] . ' mo') : '—'; ?>
+								<?php if ($row['age_days'] !== null): ?>
+									<div class="admin-mini" style="font-size:0.7rem;"><?php echo (int)$row['age_days']; ?> d</div>
+								<?php endif; ?>
+							</td>
 							<td><?php echo $row['height_cm'] !== null ? nutritionist_e((string)$row['height_cm']) : '—'; ?></td>
 							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
@@ -980,7 +987,15 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td><?php echo nutritionist_e(followup_age_months((string)$row['birthdate'], $anchorDate)); ?> mo</td>
+							<td title="<?php
+								$ageAtAnchor = doh_age_in_days((string)$row['birthdate'], $anchorDate);
+								echo $ageAtAnchor !== null ? (int)$ageAtAnchor . ' days at anchor' : '';
+							?>">
+								<?php echo nutritionist_e(followup_age_months((string)$row['birthdate'], $anchorDate)); ?> mo
+								<?php if ($ageAtAnchor !== null): ?>
+									<div class="admin-mini" style="font-size:0.7rem;"><?php echo (int)$ageAtAnchor; ?> d</div>
+								<?php endif; ?>
+							</td>
 							<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
 							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
 							<td><?php echo nutritionist_e((string)($row['q1_measured'] ?? '—')); ?></td>

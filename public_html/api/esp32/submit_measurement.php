@@ -705,24 +705,20 @@ $childSex =
         ?? 'Male'
     );
 
-$ageMonths = 0;
 $ageDays = 0;
+$ageMonths = 0;
 
 if ($childBirthdate !== '') {
-
-    $ageMonths =
-        doh_age_in_months(
-            $childBirthdate
-        ) ?? 0;
-
-    // WAZ/HAZ lookups use days (measurement_date - birthdate).
-    // The kiosk's "today" measurement date matches CURDATE() used in
-    // the insert below, so re-using today here keeps the day-count
-    // consistent with the row we end up writing.
-    $ageDays =
-        doh_age_in_days(
-            $childBirthdate
-        ) ?? 0;
+    // age_days is the canonical input for the WHO calculator
+    // (WAZ/HAZ day-keyed lookups + WFL/WFH cutover at 731 days).
+    // age_months is a whole-number estimate derived from the day
+    // count -- it's stored on the row for the eOPT Plus reports,
+    // never for calculator use. Use the system "today" (matching
+    // CURDATE() in the insert below) so the day count lines up
+    // with the row we end up writing.
+    $age = doh_age($childBirthdate) ?? ['days' => 0, 'months' => 0];
+    $ageDays = (int)$age['days'];
+    $ageMonths = (int)$age['months'];
 }
 
 /*
@@ -740,7 +736,6 @@ if ($weightKg !== null && $heightCm !== null) {
         $weightKg,
         $heightCm,
         $ageDays,
-        $ageMonths,
         $childSex
     );
     $waz = $metrics['waz'];

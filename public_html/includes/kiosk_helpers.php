@@ -70,13 +70,36 @@ function kiosk_resolve_device_barangay(string $deviceCode): ?array
     ];
 }
 
+/**
+ * The kiosk's view of "how old is this child right now" -- always
+ * computed from the system "today" and the child's birthdate so the
+ * UI ticks up day by day without anyone having to push a button.
+ *
+ * Returns both the canonical day count and a whole-number month
+ * estimate. Day count is the source of truth; the month estimate
+ * uses intdiv(days, 30) so the UI label is always a whole number.
+ *
+ * @return array{days: int, months: int}
+ */
+function kiosk_age(?string $birthdate): array
+{
+    if (!$birthdate) {
+        return ['days' => 0, 'months' => 0];
+    }
+
+    return doh_age($birthdate) ?? ['days' => 0, 'months' => 0];
+}
+
+/**
+ * Calendar-completed months -- the old DOH e-OPT Plus convention.
+ * Deprecated for new code: prefer kiosk_age() which also returns
+ * the canonical day count. Kept only because a few kiosk fields
+ * still print "X mo" labels.
+ */
 function kiosk_age_months(?string $birthdate): int
 {
     if (!$birthdate) return 0;
 
-    // Delegates to doh_age_in_months() (includes/who_calculator.php) so this
-    // matches the DOH e-OPT Plus convention and every other screen in the
-    // app instead of using its own calendar-based calculation.
     return doh_age_in_months($birthdate) ?? 0;
 }
 

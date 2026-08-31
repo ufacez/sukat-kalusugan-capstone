@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/../includes/db.php';
-require_once __DIR__ . '/../includes/who_calculator.php';
+require_once __DIR__ . '/public_html/includes/db.php';
+require_once __DIR__ . '/public_html/includes/who_calculator.php';
 
 /*
 ============================================================
@@ -21,6 +21,13 @@ require_once __DIR__ . '/../includes/who_calculator.php';
  calls in production) returns -- WAZ/HAZ/WHZ plus wfa/hfa/wfh
  status -- so you can manually spot-check the calculator without
  going through the kiosk or touching real data.
+
+ Age input can be either:
+   - a whole number of months, or
+   - a date of birth (DOB) + date measured, from which both
+     completed months AND days are derived (matching what
+     submit_measurement.php and measurements_create.php actually
+     write to the database on every real measurement).
 
  File:
  public_html/test/manual_calculator_test.php
@@ -46,12 +53,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$sexVal = ($sex === 'F') ? 'Female' : 'Male';
 
 	$ageMonths = null;
+	$ageDays = null;
+	$referenceDate = null;
 
 	if ($ageMode === 'dob') {
 		if ($dob === '') {
 			$error = 'Please provide a date of birth.';
 		} else {
-			$referenceDate = null;
 			if ($dateMeasured !== '') {
 				try {
 					$referenceDate = new DateTimeImmutable($dateMeasured);
@@ -59,15 +67,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 					$error = 'Invalid "date measured" value.';
 				}
 			}
-			$ageMonths = doh_age_in_months($dob, $referenceDate);
-			if ($ageMonths === null) {
-				$error = $error ?? 'Could not compute age from that date of birth.';
+
+			if ($error === null) {
+				// age_days is the canonical answer the WHO calculator
+				// needs (WAZ/HAZ day-keyed lookup + WFL/WFH cutover
+				// at 731 days). age_months is a UI-only whole-number
+				// estimate derived from the day count.
+				$age = doh_age($dob, $referenceDate);
+				if ($age === null) {
+					$error = $error ?? 'Could not compute age from that date of birth.';
+				} else {
+					$ageDays = $age['days'];
+					$ageMonths = $age['months'];
+				}
 			}
 		}
 	} else {
-		$ageMonths = is_numeric($ageMonthsInput) ? (int)round((float)$ageMonthsInput) : null;
-		if ($ageMonths === null) {
+		$ageMonthsInputVal = is_numeric($ageMonthsInput) ? (int)round((float)$ageMonthsInput) : null;
+		if ($ageMonthsInputVal === null) {
 			$error = 'Please provide a valid age in months.';
+		} else {
+			// Without a DOB we can only estimate days from completed
+			// months. Real measurements store the actual day count,
+			// but for a manual spot-check this approximation is what
+			// the operator types in by hand. Use 30.4375 days per
+			// average month (365.25/12) so the test value is closer
+			// to what production would compute.
+			$ageMonths = $ageMonthsInputVal;
+			$ageDays = (int)round($ageMonthsInputVal * 30.4375);
 		}
 	}
 
@@ -78,17 +105,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$error = $error ?? 'Please provide a valid height/length in cm.';
 	}
 
-	if ($error === null && $ageMonths !== null && $weightVal !== null && $heightVal !== null) {
-		$result = calculate_who_metrics($weightVal, $heightVal, $ageMonths, $sexVal);
+	if ($error === null && $ageDays !== null && $weightVal !== null && $heightVal !== null) {
+		// age_days is the only age input the calculator needs. The
+		// month figure is for the UI label only.
+		$result = calculate_who_metrics($weightVal, $heightVal, $ageDays, $sexVal);
 		$result['age_months_used'] = $ageMonths;
+		$result['age_days_used'] = $ageDays;
 	}
 }
 
 $dohLabels = [
 	'SUW' => 'Severely Underweight', 'MUW' => 'Moderately Underweight', 'Normal' => 'Normal',
+	// "Refer to WFL/H" replaces the old WFA "Overweight" pill --
+	// any WAZ > +2 routes the operator to the WFL/H axis instead.
+	'Refer to WFL/H' => 'Refer to WFL/H (WAZ > +2)',
 	'SSt' => 'Severely Stunted', 'MSt' => 'Moderately Stunted', 'Tall' => 'Tall for age',
 	'SW' => 'Severe Wasting (SAM)', 'MW' => 'Moderate Wasting (MAM)',
-	'OW' => 'Overweight', 'Ob' => 'Obese',
+	// OW / Ob now live on the WFL/H axis (not WFA) -- per DOH eOPT
+	// Plus, WFA no longer classifies overweight / obese.
+	'OW' => 'Overweight (WFL/H)', 'Ob' => 'Obese (WFL/H)',
 ];
 
 ?><!DOCTYPE html>
@@ -97,7 +132,7 @@ $dohLabels = [
 <meta charset="UTF-8">
 <title>Manual WHO Calculator Tester</title>
 <style>
-	body { font-family: system-ui, sans-serif; max-width: 720px; margin: 32px auto; padding: 0 16px; color: #1a1a1a; }
+	body { font-family: system-ui, sans-serif; max-width: 760px; margin: 32px auto; padding: 0 16px; color: #1a1a1a; }
 	h1 { font-size: 20px; }
 	.banner { background: #fff3cd; border: 1px solid #ffe08a; padding: 8px 12px; border-radius: 6px; font-size: 13px; margin-bottom: 20px; }
 	fieldset { border: 1px solid #ddd; border-radius: 8px; padding: 16px; margin-bottom: 16px; }
@@ -117,13 +152,15 @@ $dohLabels = [
 	.status-pill { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; background: #e8f5e9; color: #2e7d32; }
 	.status-pill.warn { background: #fff3e0; color: #e65100; }
 	.status-pill.crit { background: #ffebee; color: #c62828; }
+	.status-pill.gray { background: #eceff1; color: #546e7a; }
 	.flagged { color: #c62828; font-weight: 600; }
+	.derived { color: #546e7a; font-size: 12px; }
 </style>
 </head>
 <body>
 
 <h1>Manual WHO Calculator Tester</h1>
-<div class="banner">Read-only test tool &mdash; calls the exact same <code>calculate_who_metrics()</code> function used in production. Nothing here is saved to the database.</div>
+<div class="banner">Read-only test tool &mdash; calls the exact same <code>calculate_who_metrics()</code> function used in production. Nothing here is saved to the database. Age in days is derived from DOB+date measured (or months&times;30 when entered directly) and is what the WAZ/HAZ day-keyed reference table is looked up against.</div>
 
 <?php if ($error !== null): ?>
 	<div class="error"><?php echo htmlspecialchars($error); ?></div>
@@ -161,6 +198,7 @@ $dohLabels = [
 		<div id="months-input" style="<?php echo $ageMode === 'dob' ? 'display:none;' : ''; ?>">
 			<label for="age_months">Age in months</label>
 			<input type="text" inputmode="numeric" name="age_months" id="age_months" value="<?php echo htmlspecialchars((string)$ageMonthsInput); ?>" placeholder="e.g. 22">
+			<div class="derived">Days will be approximated as months&times;30. Use the DOB mode for the exact day count that production would use.</div>
 		</div>
 
 		<div id="dob-input" class="row" style="<?php echo $ageMode === 'dob' ? '' : 'display:none;'; ?>">
@@ -182,28 +220,68 @@ $dohLabels = [
 	<fieldset>
 		<legend>Result</legend>
 		<table>
-			<tr><th>Age used</th><td><?php echo (int)$result['age_months_used']; ?> months</td></tr>
+			<tr>
+				<th>Age used (months)</th>
+				<td><?php echo (int)$result['age_months_used']; ?> months</td>
+			</tr>
+			<tr>
+				<th>Age used (days)</th>
+				<td>
+					<?php echo (int)$result['age_days_used']; ?> days
+					<span class="derived">(&#8776; <?php echo number_format((int)$result['age_days_used'] / 30.4375, 1); ?> completed months, what production stores as <code>measurements.age_days</code>)</span>
+				</td>
+			</tr>
 			<tr><th>WAZ (weight-for-age z-score)</th><td><?php echo number_format($result['waz'], 2); ?></td></tr>
 			<tr><th>HAZ (height-for-age z-score)</th><td><?php echo number_format($result['haz'], 2); ?></td></tr>
 			<tr><th>WHZ (weight-for-height z-score)</th><td><?php echo number_format($result['whz'], 2); ?></td></tr>
 		</table>
 
+		<?php
+			// Map status codes to pill variants. "Refer to WFL/H"
+			// (WFA overflow) and "Tall" (HFA above +2 SD) get their
+			// own neutral grey pill so they stand apart from the
+			// green / orange / red normal / warn / danger pattern.
+			$wfaKey = $result['wfa_status'] ?? '';
+			$hfaKey = $result['hfa_status'] ?? '';
+			$wfhKey = $result['wfh_status'] ?? '';
+			$wfaCls = ($wfaKey === 'Refer to WFL/H') ? 'gray'
+				: (in_array($wfaKey, ['SUW'], true) ? 'crit'
+				: (in_array($wfaKey, ['MUW'], true) ? 'warn' : ''));
+			$hfaCls = (in_array($hfaKey, ['SSt'], true) ? 'crit'
+				: (in_array($hfaKey, ['MSt'], true) ? 'warn' : ''));
+			$wfhCls = (in_array($wfhKey, ['SW', 'Ob'], true) ? 'crit'
+				: (in_array($wfhKey, ['MW', 'OW'], true) ? 'warn' : ''));
+			$wfaLabel = $dohLabels[$wfaKey] ?? ($wfaKey !== '' ? $wfaKey : '&mdash;');
+			$hfaLabel = $dohLabels[$hfaKey] ?? ($hfaKey !== '' ? $hfaKey : '&mdash;');
+			$wfhLabel = $dohLabels[$wfhKey] ?? ($wfhKey !== '' ? $wfhKey : '&mdash;');
+		?>
+
 		<table>
 			<tr>
 				<th>Weight-for-Age status</th>
-				<td><span class="status-pill"><?php echo htmlspecialchars($dohLabels[$result['wfa_status'] ?? ''] ?? ($result['wfa_status'] ?? '&mdash;')); ?></span></td>
+				<td><span class="status-pill <?php echo $wfaCls; ?>"><?php echo htmlspecialchars($wfaLabel); ?></span></td>
 			</tr>
 			<tr>
 				<th>Height-for-Age status</th>
-				<td><span class="status-pill"><?php echo htmlspecialchars($dohLabels[$result['hfa_status'] ?? ''] ?? ($result['hfa_status'] ?? '&mdash;')); ?></span></td>
+				<td><span class="status-pill <?php echo $hfaCls; ?>"><?php echo htmlspecialchars($hfaLabel); ?></span></td>
 			</tr>
 			<tr>
 				<th>Weight-for-Height status</th>
-				<td><span class="status-pill"><?php echo htmlspecialchars($dohLabels[$result['wfh_status'] ?? ''] ?? ($result['wfh_status'] ?? '&mdash;')); ?></span></td>
+				<td><span class="status-pill <?php echo $wfhCls; ?>"><?php echo htmlspecialchars($wfhLabel); ?></span></td>
 			</tr>
 			<tr>
 				<th>Overall nutritional_status (ENUM)</th>
 				<td><?php echo htmlspecialchars($result['nutritional_status']); ?></td>
+			</tr>
+			<tr>
+				<th>WFA overflow</th>
+				<td>
+					<?php if (!empty($result['wfa_overflow'])): ?>
+						<span class="status-pill gray">YES &mdash; WAZ &gt; +2, read overweight/obese off the WFL/H axis</span>
+					<?php else: ?>
+						No
+					<?php endif; ?>
+				</td>
 			</tr>
 			<tr>
 				<th>Flagged as implausible?</th>

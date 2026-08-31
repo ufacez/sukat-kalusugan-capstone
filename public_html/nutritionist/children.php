@@ -261,7 +261,7 @@ nutritionist_layout_start(
                 <?php endif; ?>
                 <?php foreach ($pageChildren as $child): ?>
                     <?php
-                    $ageMonths = doh_age_in_months((string)$child['birthdate']) ?? 0;
+                    $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
                     $profileUrl = nutritionist_e(app_url('/nutritionist/child_view.php?id=' . (int)$child['id']));
                     $editUrl = nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id']));
@@ -275,7 +275,7 @@ nutritionist_layout_start(
                         data-child-code="<?php echo nutritionist_e((string)$child['child_code']); ?>"
                         data-child-sex="<?php echo nutritionist_e((string)$child['sex']); ?>"
                         data-child-birthdate="<?php echo nutritionist_e((string)$child['birthdate']); ?>"
-                        data-child-age="<?php echo (int)$ageMonths; ?>"
+                        data-child-age="<?php echo (int)$age['days']; ?>"
                         data-child-localarea="<?php echo nutritionist_e((string)($child['local_area'] ?? '')); ?>"
                         data-child-areatype="<?php echo nutritionist_e((string)($child['area_type'] ?? '')); ?>"
                         data-child-address="<?php echo nutritionist_e($parentAddress); ?>"
@@ -309,7 +309,10 @@ nutritionist_layout_start(
                             </div>
                         </td>
                         <td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)$child['sex']); ?></td>
-                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;"><?php echo (int)$ageMonths; ?></td>
+                        <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;" title="<?php echo (int)$age['days']; ?> days">
+                            <?php echo (int)$age['months']; ?> mo
+                            <span style="color:var(--admin-muted);font-weight:normal;font-size:0.75rem;">(<?php echo (int)$age['days']; ?> d)</span>
+                        </td>
                         <td>
                             <div class="admin-actions" onclick="event.stopPropagation();">
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>

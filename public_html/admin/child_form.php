@@ -106,10 +106,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
-    $registrationAgeMonths = doh_age_in_months($birthdate);
+    // Form-level age validation: 0-5 years inclusive (the eOPT Plus
+    // scope). The day count is the canonical check now -- 60 months
+    // is roughly 1825 days, so we use that as the upper bound.
+    $registrationAgeDays = doh_age_in_days($birthdate);
 
-    if ($registrationAgeMonths === null || $registrationAgeMonths > 60) {
-        admin_redirect($errorBackUrl, ['notice' => 'Birthdate must be valid and the child must be 60 months (5 years) old or younger.', 'type' => 'error']);
+    if ($registrationAgeDays === null || $registrationAgeDays > 1825) {
+        admin_redirect($errorBackUrl, ['notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger.', 'type' => 'error']);
     }
 
     if (!in_array($sex, ['Male', 'Female'], true)) {
