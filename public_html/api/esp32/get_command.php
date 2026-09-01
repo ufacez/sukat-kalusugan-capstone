@@ -32,6 +32,26 @@ $deviceRow = api_device_upsert(
     'active'
 );
 
+/*
+|--------------------------------------------------------------------------
+| STORE ESP32 LOCAL IP FOR WEBSOCKET
+|--------------------------------------------------------------------------
+|
+| The ESP32 includes its WiFi.localIP() on every heartbeat so the
+| kiosk browser can connect to its WebSocket server directly (same LAN).
+|
+*/
+
+$localIp = api_string($_GET['local_ip'] ?? null, '');
+if ($localIp !== '' && preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $localIp)) {
+    $ipStmt = mysqli_prepare($conn, 'UPDATE devices SET local_ip = ? WHERE device_code = ?');
+    if ($ipStmt !== false) {
+        mysqli_stmt_bind_param($ipStmt, 'ss', $localIp, $deviceCode);
+        mysqli_stmt_execute($ipStmt);
+        mysqli_stmt_close($ipStmt);
+    }
+}
+
 if (!is_array($deviceRow)) {
     api_error(
         'Unable to validate device.',

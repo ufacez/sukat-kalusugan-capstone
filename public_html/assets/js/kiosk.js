@@ -22,6 +22,28 @@
     Boolean(data?.firebase?.enabled) &&
     firebaseBaseUrl !== "";
 
+  // ============================================================
+  // WEBSOCKET (direct ESP32 connection, same LAN)
+  // ============================================================
+
+  const wsEnabled =
+    Boolean(data?.websocket?.enabled) &&
+    Boolean(data?.websocket?.esp32_ip);
+
+  const wsEsp32Ip =
+    data?.websocket?.esp32_ip || "";
+
+  const wsPort = 80;
+
+  const wsPath = "/ws";
+
+  let wsConnection = null;
+  let wsConnected = false;
+  let wsReconnectTimer = null;
+  let wsReconnectAttempts = 0;
+  const wsMaxReconnectAttempts = 30;
+  const wsReconnectBaseMs = 1000;
+
   const pollSeconds = Math.max(
     0.2,
     Number(data?.defaults?.pollSeconds || 0.2)
@@ -1205,6 +1227,10 @@
   // SENSOR UI
   // ============================================================
 
+  // Track last weight that triggered a bars rebuild
+  let lastWeightBarsValue = -1;
+  const WEIGHT_BARS_STEP_KG = 0.05;
+
   function setWeight(
     value,
     message = "Reading weight..."
@@ -1229,7 +1255,15 @@
         message;
     }
 
-    if (refs.weightBars) {
+    // Throttle weight bars: only rebuild when weight
+    // changes by more than WEIGHT_BARS_STEP_KG.
+    // This cuts ~25 DOM ops per WS message to ~3.
+    if (
+      refs.weightBars &&
+      Math.abs(weight - lastWeightBarsValue) >= WEIGHT_BARS_STEP_KG
+    ) {
+      lastWeightBarsValue = weight;
+
       refs.weightBars.innerHTML = "";
 
       const normalized =
@@ -1623,8 +1657,7 @@
         setWeight(finalWeight, "Final stable weight");
         setHeight(finalHeight, "Final stable height");
         markMeasurementReady();
-      } else {
-        state.finalReady = false;
+      } else if (!state.finalReady) {
         state.finalSequence = 0;
         state.finalWeight = null;
         state.finalHeight = null;
@@ -1754,6 +1787,7 @@
       saveSessionToStorage();
 
       stopFirebasePolling();
+      disconnectWebSocket();
     }
   }
 
@@ -1971,18 +2005,25 @@
   }
 
   function startFirebasePolling() {
-    if (!firebaseEnabled) {
-      setChip(
-        connectedChip,
-        "Device: Firebase Off",
-        false
-      );
+    // Always try WebSocket first for local fast updates
+    connectWebSocket();
 
-      pushFeed(
-        "Firebase unavailable",
-        "Firebase is not configured.",
-        "warn"
-      );
+    if (!firebaseEnabled) {
+      if (!wsEnabled) {
+        setChip(
+          connectedChip,
+          "Device: Offline",
+          false
+        );
+      }
+
+      if (wsEnabled && !wsConnected) {
+        setChip(
+          connectedChip,
+          "Device: Waiting",
+          false
+        );
+      }
 
       return;
     }
@@ -2008,6 +2049,480 @@
 
       state.firebaseTimer =
         null;
+    }
+  }
+
+  // ============================================================
+  // WEBSOCKET — DIRECT ESP32 CONNECTION
+  // ============================================================
+  //
+  // When the kiosk browser is on the same LAN as the ESP32, a
+  // WebSocket connection gives us ~50ms push updates instead of
+  // the 200ms+ round-trip of Firebase HTTP polling. Firebase
+  // stays active for remote dashboards; WebSocket is purely a
+  // local fast-path.
+  //
+
+  function wsUrl() {
+    if (!wsEnabled || !wsEsp32Ip) {
+      return "";
+    }
+
+    return (
+      "ws://" +
+      wsEsp32Ip +
+      ":" +
+      wsPort +
+      wsPath
+    );
+  }
+
+  function connectWebSocket() {
+    if (!wsEnabled) {
+      return;
+    }
+
+    const url = wsUrl();
+
+    if (!url) {
+      return;
+    }
+
+    if (
+      wsConnection &&
+      (wsConnection.readyState ===
+        WebSocket.CONNECTING ||
+        wsConnection.readyState ===
+        WebSocket.OPEN)
+    ) {
+      return;
+    }
+
+    console.log(
+      "[SukatKalusugan] WS connecting to",
+      url
+    );
+
+    try {
+      wsConnection =
+        new WebSocket(url);
+    } catch (err) {
+      console.warn(
+        "[SukatKalusugan] WS create failed",
+        err
+      );
+      scheduleWsReconnect();
+      return;
+    }
+
+    wsConnection.onopen =
+      function () {
+        console.log(
+          "[SukatKalusugan] WS connected"
+        );
+
+        wsConnected = true;
+        wsReconnectAttempts = 0;
+
+        setChip(
+          connectedChip,
+          "Device: Connected",
+          true
+        );
+
+        // WebSocket is now the primary data path.
+        // Stop Firebase HTTP polling to eliminate
+        // duplicate DOM updates and blocking fetches.
+        stopFirebasePolling();
+
+        pushFeed(
+          "WebSocket connected",
+          "Live sensor data via local network."
+        );
+      };
+
+    wsConnection.onclose =
+      function () {
+        console.log(
+          "[SukatKalusugan] WS disconnected"
+        );
+
+        wsConnected = false;
+
+        scheduleWsReconnect();
+      };
+
+    wsConnection.onerror =
+      function (err) {
+        console.warn(
+          "[SukatKalusugan] WS error",
+          err
+        );
+
+        wsConnected = false;
+      };
+
+    wsConnection.onmessage =
+      function (event) {
+        try {
+          const payload =
+            JSON.parse(event.data);
+
+          if (
+            payload.type ===
+            "sensor_data"
+          ) {
+            handleWsPayload(payload);
+          }
+        } catch (e) {
+          console.warn(
+            "[SukatKalusugan] WS parse error",
+            e
+          );
+        }
+      };
+  }
+
+  function scheduleWsReconnect() {
+    if (
+      wsReconnectTimer ||
+      wsReconnectAttempts >=
+        wsMaxReconnectAttempts
+    ) {
+      return;
+    }
+
+    wsReconnectAttempts++;
+
+    const delayMs =
+      Math.min(
+        wsReconnectBaseMs *
+          Math.pow(
+            1.5,
+            wsReconnectAttempts - 1
+          ),
+        15000
+      );
+
+    console.log(
+      "[SukatKalusugan] WS reconnect in",
+      delayMs,
+      "ms (attempt",
+      wsReconnectAttempts,
+      ")"
+    );
+
+    wsReconnectTimer = setTimeout(
+      function () {
+        wsReconnectTimer = null;
+        connectWebSocket();
+      },
+      delayMs
+    );
+  }
+
+  function disconnectWebSocket() {
+    if (wsReconnectTimer) {
+      clearTimeout(wsReconnectTimer);
+      wsReconnectTimer = null;
+    }
+
+    wsReconnectAttempts =
+      wsMaxReconnectAttempts;
+
+    if (wsConnection) {
+      try {
+        wsConnection.close();
+      } catch (_) {}
+
+      wsConnection = null;
+    }
+
+    wsConnected = false;
+  }
+
+  function sendWsCommand(command) {
+    if (
+      !wsConnected ||
+      !wsConnection ||
+      wsConnection.readyState !==
+        WebSocket.OPEN
+    ) {
+      return false;
+    }
+
+    try {
+      wsConnection.send(
+        JSON.stringify({
+          type: "command",
+          command: command
+        })
+      );
+
+      return true;
+    } catch (err) {
+      console.warn(
+        "[SukatKalusugan] WS send error",
+        err
+      );
+
+      return false;
+    }
+  }
+
+  function handleWsPayload(payload) {
+    /*
+     * WS payload has the same shape as the Firebase
+     * latest_measurements snapshot. Feed it through the
+     * same applyFirebaseStatus() state machine so all
+     * the chip updates, progress bar, stability locking,
+     * and final_ready detection work identically.
+     */
+
+    // Update Firebase signature so polling doesn't
+    // reprocess payloads we already handled via WS.
+    state.lastFirebaseSignature =
+      JSON.stringify(payload);
+
+    // Batch rapid WS messages into animation frames.
+    // Only the latest payload in each frame is rendered.
+    if (state._wsRafId) {
+      cancelAnimationFrame(state._wsRafId);
+    }
+
+    state._wsRafId = requestAnimationFrame(
+      function () {
+        state._wsRafId = null;
+        applyWsPayload(payload);
+      }
+    );
+  }
+
+  function applyWsPayload(payload) {
+    const status =
+      normalizeStatus(
+        payload.status
+      );
+
+    const weight =
+      payload.weight_kg != null
+        ? Number(payload.weight_kg)
+        : NaN;
+
+    const height =
+      payload.height_cm != null
+        ? Number(payload.height_cm)
+        : NaN;
+
+    const hasWeight =
+      isValidWeight(weight);
+
+    const hasHeight =
+      isValidHeight(height);
+
+    state.firebaseOnline = true;
+
+    if (hasWeight) {
+      const locked =
+        updateStability(
+          "weight",
+          weight,
+          payload.weight_stable
+        );
+
+      setWeight(
+        weight,
+        locked
+          ? "Weight stable"
+          : "Reading weight..."
+      );
+    }
+
+    if (hasHeight) {
+      const locked =
+        updateStability(
+          "height",
+          height,
+          payload.height_stable
+        );
+
+      setHeight(
+        height,
+        locked
+          ? "Height stable"
+          : "Reading height..."
+      );
+    }
+
+    const finalReady =
+      payload.final_ready === true;
+
+    const finalSequence =
+      Number(
+        payload.final_sequence || 0
+      );
+
+    const sequence =
+      Number(payload.sequence || 0);
+
+    const finalWeight =
+      Number(payload.final_weight_kg);
+
+    const finalHeight =
+      Number(payload.final_height_cm);
+
+    if (
+      status === "MEASURING" ||
+      status === "WEIGHT_MEASURING" ||
+      status === "HEIGHT_MEASURING"
+    ) {
+      state.phase = "live";
+
+      if (
+        !state.processingStarted &&
+        state.step !== "live"
+      ) {
+        setStep("live");
+      }
+
+      if (
+        finalReady &&
+        finalSequence > 0 &&
+        finalSequence <= sequence &&
+        isValidWeight(finalWeight) &&
+        isValidHeight(finalHeight)
+      ) {
+        state.finalReady = true;
+        state.finalSequence =
+          finalSequence;
+        state.finalWeight =
+          finalWeight;
+        state.finalHeight =
+          finalHeight;
+        state.weight = finalWeight;
+        state.height = finalHeight;
+        state.weightLocked = true;
+        state.heightLocked = true;
+
+        setWeight(
+          finalWeight,
+          "Final stable weight"
+        );
+
+        setHeight(
+          finalHeight,
+          "Final stable height"
+        );
+
+        markMeasurementReady();
+      } else if (!state.finalReady) {
+        state.finalSequence = 0;
+        state.finalWeight = null;
+        state.finalHeight = null;
+        state.measurementReady = false;
+
+        updateProcessButton();
+      }
+
+      let progress = 20;
+
+      if (state.weightLocked) {
+        progress += 20;
+      }
+
+      if (state.heightLocked) {
+        progress += 20;
+      }
+
+      setProgress(
+        progress,
+        payload.message ||
+          "Stand still while the sensors capture your measurement..."
+      );
+
+      saveSessionToStorage();
+
+      return;
+    }
+
+    if (status === "COMPLETE") {
+      if (hasWeight) {
+        state.weightLocked = true;
+
+        setWeight(weight, "Weight captured");
+      }
+
+      if (hasHeight) {
+        state.heightLocked = true;
+
+        setHeight(height, "Height captured");
+      }
+
+      state.phase = "live";
+
+      state.submitting = false;
+
+      state.awaitingLiveResult = true;
+
+      if (
+        !state.processingStarted &&
+        state.step !== "live"
+      ) {
+        setStep("live");
+      }
+
+      markMeasurementReady();
+
+      pushFeed(
+        "Sensors complete",
+        "Weight and height captured. Click Process Measurement."
+      );
+
+      saveSessionToStorage();
+
+      return;
+    }
+
+    if (
+      status === "ERROR" ||
+      status === "CANCELLED"
+    ) {
+      state.phase = "error";
+
+      state.submitting = false;
+
+      state.awaitingLiveResult = false;
+
+      state.processingStarted = true;
+
+      updateProcessButton();
+
+      setStep("processing");
+
+      showProcessingError(
+        payload.message ||
+          payload.error_message ||
+          "Measurement failed."
+      );
+
+      setProgress(
+        100,
+        payload.message ||
+          payload.error_message ||
+          "Measurement failed."
+      );
+
+      pushFeed(
+        "Measurement failed",
+        payload.message ||
+          payload.error_message ||
+          "Unknown measurement error.",
+        "error"
+      );
+
+      saveSessionToStorage();
+
+      stopFirebasePolling();
     }
   }
 
@@ -2518,6 +3033,7 @@
       if (refs.weightBars) {
         refs.weightBars.innerHTML =
           "";
+        lastWeightBarsValue = -1;
       }
 
       if (refs.heightBar) {
@@ -3395,6 +3911,7 @@ function finishResults(
   );
 
   stopFirebasePolling();
+  disconnectWebSocket();
 
   if (state.statusTimer) {
     clearTimeout(
@@ -3735,6 +4252,7 @@ function finishResults(
     }
 
     stopFirebasePolling();
+    disconnectWebSocket();
 
     startDeviceStatusPolling();
 
@@ -3859,6 +4377,7 @@ function finishResults(
     if (refs.weightBars) {
       refs.weightBars.innerHTML =
         "";
+      lastWeightBarsValue = -1;
     }
 
     if (refs.resultChild) {
@@ -3990,7 +4509,7 @@ function finishResults(
         });
 
       fetch(
-        "api/kiosk/cancel_session.php",
+        "../api/kiosk/cancel_session.php",
         {
           method: "POST",
           headers: {
@@ -4447,7 +4966,7 @@ function finishResults(
                 });
 
               fetch(
-                "api/kiosk/cancel_session.php",
+                "../api/kiosk/cancel_session.php",
                 {
                   method: "POST",
                   headers: {
@@ -4715,6 +5234,15 @@ function finishResults(
      */
 
     checkFirebaseConnection();
+
+    /*
+     * Try WebSocket for fast local ESP32 push.
+     * Non-blocking; falls back silently if ESP32 IP unknown.
+     */
+
+    if (wsEnabled) {
+      connectWebSocket();
+    }
 
     /*
      * Poll the ESP32 heartbeat (devices.last_seen_at) so the

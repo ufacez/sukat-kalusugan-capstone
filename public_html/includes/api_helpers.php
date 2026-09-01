@@ -342,7 +342,7 @@ function api_device_upsert(string $deviceCode, ?string $location = null, ?string
 
     mysqli_stmt_close($stmt);
 
-    $lookup = mysqli_prepare($conn, 'SELECT id, device_code, location, last_seen_at, calibration_offset_height, calibration_offset_weight, hx711_calibration_factor, mounting_height_cm, status, updated_at FROM devices WHERE device_code = ? LIMIT 1');
+    $lookup = mysqli_prepare($conn, 'SELECT id, device_code, location, last_seen_at, calibration_offset_height, calibration_offset_weight, hx711_calibration_factor, mounting_height_cm, status, local_ip, updated_at FROM devices WHERE device_code = ? LIMIT 1');
 
     if ($lookup === false) {
         return null;

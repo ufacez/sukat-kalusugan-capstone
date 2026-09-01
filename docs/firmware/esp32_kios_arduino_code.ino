@@ -5,6 +5,8 @@
 #include <math.h>
 #include <WiFiManager.h>
 #include <Preferences.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include "soc/soc.h"
 #include "soc/rtc_cntl_reg.h"
 
@@ -204,6 +206,8 @@ const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
 bool hx711Ready = false;
 bool measuring = false;
 
+bool shouldProcess = false;
+
 bool calMode = false;
 bool calWaitingForWeight = false;
 float calKnownWeight = 0.0f;
@@ -216,6 +220,16 @@ unsigned long lastFirebaseUpdate = 0;
 unsigned long lastSessionValidation = 0;
 unsigned long measurementStartedAt = 0;
 unsigned long measurementSequence = 0;
+
+// =====================================================
+// WEBSOCKET
+// =====================================================
+
+AsyncWebServer wsServer(80);
+AsyncWebSocket ws("/ws");
+
+unsigned long lastWsBroadcast = 0;
+const unsigned long WS_BROADCAST_INTERVAL = 10;  // 10ms = 100fps, matches TF-Luna update rate
 
 // =====================================================
 // WIFI
@@ -667,6 +681,12 @@ bool getMeasurementCommand(
     GET_COMMAND_PATH +
     "?device_id=" +
     DEVICE_ID;
+
+  // Send ESP32's local IP so the server can store it
+  // for the kiosk browser's WebSocket direct connection.
+  if (WiFi.status() == WL_CONNECTED) {
+    url += "&local_ip=" + WiFi.localIP().toString();
+  }
 
   int httpCode;
 
@@ -1278,7 +1298,7 @@ void runMeasurement(
   // FINAL SNAPSHOT
   // ===================================================
 
-  bool shouldProcess = false;
+  shouldProcess = false;
 
   bool finalReady = false;
 
@@ -1337,6 +1357,13 @@ void runMeasurement(
     // ================================================
     // SESSION + PROCESS
     // ================================================
+    //
+    // If a WebSocket client is connected, the PROCESS
+    // command arrives instantly via onWsEvent() above
+    // and shouldProcess is already true. We still run
+    // the HTTP poll as a fallback when no WS clients
+    // are connected (e.g. Firebase-only mode).
+    //
 
     if (
       millis() -
@@ -1348,11 +1375,13 @@ void runMeasurement(
 
       bool stillValid = true;
 
-      pollSessionState(
-        sessionId,
-        stillValid,
-        shouldProcess
-      );
+      if (!shouldProcess || ws.count() == 0) {
+        pollSessionState(
+          sessionId,
+          stillValid,
+          shouldProcess
+        );
+      }
 
       // -----------------------------------------------
       // SESSION NO LONGER VALID
@@ -1670,8 +1699,15 @@ void runMeasurement(
     // ================================================
     // FIREBASE LIVE UPDATE
     // ================================================
+    //
+    // When WebSocket clients are connected, they receive
+    // data at 10ms intervals directly. Firebase is only
+    // used as a fallback when no WS clients are present
+    // (e.g. remote monitoring).
+    //
 
     if (
+      ws.count() == 0 &&
       millis() -
       lastFirebaseUpdate >=
       FIREBASE_UPDATE_INTERVAL
@@ -1680,8 +1716,8 @@ void runMeasurement(
       lastFirebaseUpdate =
         millis();
 
-      float liveWeight = lastRawWeight;
-      float liveHeight = lastRawHeight;
+      float liveWeight = haveLastRawWeight ? lastRawWeight : -1;
+      float liveHeight = haveLastRawHeight ? lastRawHeight : -1;
 
       safeFirebaseUpdate(
         sessionId,
@@ -1697,6 +1733,43 @@ void runMeasurement(
         finalSequence
       );
     }
+
+    // ================================================
+    // WEBSOCKET LIVE BROADCAST
+    // ================================================
+
+    if (
+      millis() -
+      lastWsBroadcast >=
+      WS_BROADCAST_INTERVAL
+    ) {
+      lastWsBroadcast = millis();
+
+      broadcastSensorData(
+        lastRawWeight,
+        lastRawHeight,
+        haveLastRawWeight,
+        haveLastRawHeight,
+        weightStable,
+        heightStable,
+        finalReady,
+        finalSequence,
+        finalWeightSnapshot,
+        finalHeightSnapshot,
+        "MEASURING"
+      );
+    }
+
+    // ================================================
+    // WEBSOCKET CLEANUP (inside measurement loop)
+    // ================================================
+    //
+    // loop() is blocked inside runMeasurement(), so
+    // ws.cleanupClients() in loop() never runs.
+    // Clean up here to prevent stale client buildup.
+    //
+
+    ws.cleanupClients();
 
   }
 
@@ -1871,6 +1944,148 @@ void runMeasurement(
 }
 
 // =====================================================
+// WEBSOCKET EVENT HANDLER
+// =====================================================
+
+void onWsEvent(
+  AsyncWebSocket *server,
+  AsyncWebSocketClient *client,
+  AwsEventType type,
+  void *arg,
+  uint8_t *data,
+  size_t len
+) {
+  switch (type) {
+
+    case WS_EVT_CONNECT:
+      Serial.printf(
+        "[WS] Client #%u connected from %s\n",
+        client->id(),
+        client->remoteIP().toString().c_str()
+      );
+      break;
+
+    case WS_EVT_DISCONNECT:
+      Serial.printf(
+        "[WS] Client #%u disconnected\n",
+        client->id()
+      );
+      break;
+
+    case WS_EVT_DATA: {
+      AwsFrameInfo *info =
+        (AwsFrameInfo*)arg;
+
+      if (
+        info->final &&
+        info->index == 0 &&
+        info->len == len &&
+        info->opcode == WS_TEXT
+      ) {
+        data[len] = 0;
+
+        StaticJsonDocument<128> cmdDoc;
+        DeserializationError err =
+          deserializeJson(cmdDoc, (char*)data);
+
+        if (!err) {
+          String msgType =
+            cmdDoc["type"] | "";
+
+          if (msgType == "command") {
+            String cmd =
+              cmdDoc["command"] | "";
+
+            if (
+              cmd == "PROCESS" &&
+              measuring
+            ) {
+              shouldProcess = true;
+
+              Serial.println(
+                "[WS] PROCESS command received"
+              );
+            }
+          }
+        }
+      }
+
+      break;
+    }
+
+    case WS_EVT_PONG:
+    case WS_EVT_ERROR:
+      break;
+  }
+}
+
+// =====================================================
+// WEBSOCKET BROADCAST
+// =====================================================
+//
+// Pushes live sensor data to all connected kiosk browsers.
+// Called from inside the runMeasurement() while(true) loop.
+// The JSON shape matches the Firebase latest_measurements
+// snapshot so the kiosk JS can feed it through the same
+// applyFirebaseStatus() state machine.
+//
+
+void broadcastSensorData(
+  float weight,
+  float height,
+  bool hasWeight,
+  bool hasHeight,
+  bool weightStable,
+  bool heightStable,
+  bool finalReady,
+  unsigned long finalSequence,
+  float finalWeight,
+  float finalHeight,
+  const char* status
+) {
+  if (ws.count() == 0) return;
+
+  StaticJsonDocument<384> doc;
+
+  doc["type"] = "sensor_data";
+  doc["status"] = status;
+  doc["session_id"] = currentSessionId;
+
+  if (hasWeight && !isnan(weight)) {
+    doc["weight_kg"] = weight;
+  } else {
+    doc["weight_kg"] = nullptr;
+  }
+
+  if (hasHeight && !isnan(height)) {
+    doc["height_cm"] = height;
+  } else {
+    doc["height_cm"] = nullptr;
+  }
+
+  doc["weight_stable"] = weightStable;
+  doc["height_stable"] = heightStable;
+
+  doc["final_ready"] = finalReady;
+  doc["final_sequence"] = finalSequence;
+  doc["sequence"] = millis();
+
+  if (finalReady) {
+    doc["final_weight_kg"] = finalWeight;
+    doc["final_height_cm"] = finalHeight;
+  } else {
+    doc["final_weight_kg"] = nullptr;
+    doc["final_height_cm"] = nullptr;
+  }
+
+  doc["timestamp"] = millis();
+
+  String json;
+  serializeJson(doc, json);
+  ws.textAll(json);
+}
+
+// =====================================================
 // SETUP
 // =====================================================
 
@@ -2009,6 +2224,18 @@ void setup() {
       dummyShouldMeasure,
       dummyStatus
     );
+
+    // ===================================================
+    // WEBSOCKET SERVER
+    // ===================================================
+
+    ws.onEvent(onWsEvent);
+    wsServer.addHandler(&ws);
+    wsServer.begin();
+
+    Serial.println();
+    Serial.print("[WS] WebSocket server started on /ws  IP: ");
+    Serial.println(WiFi.localIP());
   }
 
   // ===================================================
@@ -2086,6 +2313,12 @@ void loop() {
   if (hx711Ready) {
     LoadCell.update();
   }
+
+  // ===================================================
+  // WEBSOCKET CLEANUP
+  // ===================================================
+
+  ws.cleanupClients();
 
   // ===================================================
   // SERIAL CALIBRATION (idle only)

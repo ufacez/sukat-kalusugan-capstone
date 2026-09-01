@@ -98,12 +98,29 @@ $devicePayload = array_map(
 );
 
 $firebaseUrl = trim((string) firebase_database_url());
+
+// Fetch ESP32's LAN IP for WebSocket direct connection
+$esp32LocalIp = null;
+$conn = get_db_connection();
+$ipStmt = mysqli_prepare($conn, 'SELECT local_ip FROM devices WHERE device_code = ? LIMIT 1');
+if ($ipStmt !== false) {
+    mysqli_stmt_bind_param($ipStmt, 's', $deviceCode);
+    mysqli_stmt_execute($ipStmt);
+    $ipResult = mysqli_stmt_get_result($ipStmt);
+    if ($ipResult instanceof mysqli_result) {
+        $ipRow = mysqli_fetch_assoc($ipResult);
+        $esp32LocalIp = !empty($ipRow['local_ip']) ? $ipRow['local_ip'] : null;
+    }
+    mysqli_stmt_close($ipStmt);
+}
+
 $appData = [
     'children' => $childrenPayload,
     'devices' => $devicePayload,
     'demoMode' => false,
     'company' => 'Sukat Kalusugan',
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
+    'websocket' => ['enabled' => true, 'esp32_ip' => $esp32LocalIp],
     'barangay' => $kioskBarangay,
     'endpoints' => [
         'ping' => '../api/kiosk/device_status.php',
