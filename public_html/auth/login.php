@@ -31,8 +31,8 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css">
-    <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg">
+    <link rel="stylesheet" href="../assets/css/auth.css?v=2">
+    <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){
     var t=localStorage.getItem("theme");
@@ -53,12 +53,12 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </svg>
 
             <div class="auth-logo-group">
-                <div class="mark-standalone" aria-hidden="true">
-                    <img src="../assets/img/logo/logotext_forlight.svg" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="../assets/img/logo/logotext_forlight.svg" data-logo-dark="../assets/img/logo/logotext_fordark.svg">
+                <div class="mark-standalone-icon" aria-hidden="true">
+                    <img src="../assets/img/logo/logo_forlight.svg?v=2" alt="" class="mark-icon-img" data-logo-light="../assets/img/logo/logo_forlight.svg?v=2" data-logo-dark="../assets/img/logo/logo_fordark.svg?v=2">
                 </div>
 
-                <div class="mark-standalone-icon" aria-hidden="true">
-                    <img src="../assets/img/logo/logo_forlight.svg" alt="" class="mark-icon-img" data-logo-light="../assets/img/logo/logo_forlight.svg" data-logo-dark="../assets/img/logo/logo_fordark.svg">
+                <div class="mark-standalone" aria-hidden="true">
+                    <img src="../assets/img/logo/logotext_forlight.svg?v=2" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="../assets/img/logo/logotext_forlight.svg?v=2" data-logo-dark="../assets/img/logo/logotext_fordark.svg?v=2">
                 </div>
 
                 <div class="auth-tagline">

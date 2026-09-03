@@ -155,22 +155,20 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen is-active" data-kiosk-screen="welcome">
                 <div class="kiosk-welcome">
-                    <div class="kiosk-welcome-header">
-                        <img
-                            src="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg')); ?>"
-                            alt="Sukat Kalusugan"
-                            class="kiosk-welcome-logo-img"
-                        />
-                        <img
-                            src="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg')); ?>"
-                            alt="Sukat Kalusugan Icon"
-                            class="kiosk-welcome-icon-img"
-                        />
+                    <div class="auth-logo-group">
+                        <div class="mark-standalone-icon" aria-hidden="true">
+                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" alt="Sukat Kalusugan Icon" class="mark-icon-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logo_fordark.svg?v=2')); ?>">
+                        </div>
+
+                        <div class="mark-standalone" aria-hidden="true">
+                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_fordark.svg?v=2')); ?>">
+                        </div>
+
+                        <p class="auth-tagline">Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.</p>
                     </div>
 
-                    <p class="kiosk-welcome-subtitle">Tamang <span class="kiosk-highlight">Sukat</span>, Gabay sa wastong <span class="kiosk-highlight">Kalusugan</span></p>
-
                     <div class="kiosk-welcome-clock" data-kiosk-live-clock>--:--</div>
+                    <div class="kiosk-welcome-date" data-kiosk-live-date>—</div>
 
                     <div class="kiosk-device-status" data-kiosk-device-status>
                         <span class="kiosk-device-dot offline"></span>
@@ -362,7 +360,7 @@ $appData = [
                                     Hanapin Ulit
                                 </button>
                                 <button class="kiosk-btn kiosk-btn-primary" type="button" data-kiosk-action="lookup-confirm">
-                                    Piliin
+                                    Simulan na
                                 </button>
                             </div>
                         </div>
@@ -562,15 +560,8 @@ $appData = [
                     </div>
 
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="finish">
-                        TAPOS
+                        Done
                     </button>
-                    <button class="kiosk-btn kiosk-btn-text" type="button" data-kiosk-action="reset">BUMALIK SA HOME</button>
-
-                    <div class="kiosk-step-dots">
-                        <span class="kiosk-dot-ind"></span>
-                        <span class="kiosk-dot-ind"></span>
-                        <span class="kiosk-dot-ind is-active"></span>
-                    </div>
                 </div>
             </section>
 
@@ -589,35 +580,10 @@ $appData = [
                     <p class="kiosk-thankyou-msg">Nai-save na ang sukat<br>sa system.</p>
                     <p class="kiosk-thankyou-thanks">Maraming Salamat!</p>
 
-                    <div class="kiosk-thankyou-family">
-                        <svg width="160" height="100" viewBox="0 0 160 100" fill="none">
-                            <circle cx="40" cy="22" r="14" fill="#fdd"/>
-                            <rect x="28" y="36" width="24" height="30" rx="4" fill="#c94070"/>
-                            <rect x="22" y="40" width="8" height="22" rx="4" fill="#fdd"/>
-                            <rect x="50" y="40" width="8" height="22" rx="4" fill="#fdd"/>
-                            <rect x="30" y="66" width="8" height="24" rx="4" fill="#4a6741"/>
-                            <rect x="42" y="66" width="8" height="24" rx="4" fill="#4a6741"/>
-
-                            <circle cx="80" cy="30" r="11" fill="#fdd"/>
-                            <rect x="70" y="41" width="20" height="26" rx="4" fill="#2196F3"/>
-                            <rect x="65" y="44" width="7" height="20" rx="3.5" fill="#fdd"/>
-                            <rect x="88" y="44" width="7" height="20" rx="3.5" fill="#fdd"/>
-                            <rect x="72" y="67" width="6" height="20" rx="3" fill="#4a6741"/>
-                            <rect x="82" y="67" width="6" height="20" rx="3" fill="#4a6741"/>
-
-                            <circle cx="120" cy="22" r="14" fill="#fdd"/>
-                            <rect x="108" y="36" width="24" height="30" rx="4" fill="#0b6e4f"/>
-                            <rect x="102" y="40" width="8" height="22" rx="4" fill="#fdd"/>
-                            <rect x="130" y="40" width="8" height="22" rx="4" fill="#fdd"/>
-                            <rect x="110" y="66" width="8" height="24" rx="4" fill="#4a6741"/>
-                            <rect x="122" y="66" width="8" height="24" rx="4" fill="#4a6741"/>
-                        </svg>
-                    </div>
-
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-lg" type="button" data-kiosk-action="reset">
-                        BUMALIK SA HOME
+                        Balik sa Home
                     </button>
-                    <p class="kiosk-thankyou-sub">Sukatin. Bantayan. Alagaan ang kalusugan.</p>
+                    <p class="kiosk-thankyou-sub">Tamang Sukat, Gabay sa wastong Kalusugan</p>
                 </div>
             </section>
 
@@ -669,7 +635,7 @@ $appData = [
                             </div>
                             <div>
                                 <h3>Paano Gumagana?</h3>
-                                <p>1. Pindutin ang <strong>"SIMULAN ANG PAGSUKAT"</strong><br>
+                                <p>1. Pindutin ang <strong>"Simulan na"</strong><br>
                                 2. Ilagay ang pangalan, araw ng kapanganakan, kasarian, at barangay ng bata<br>
                                 3. Sundin ang mga tagubilin para sa pagsukat ng taas at timbang<br>
                                 4. Tingnan ang resulta pagkatapos ng pagsukat</p>

@@ -108,8 +108,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: min(480px, 92%);
-  aspect-ratio: 1 / 1;
+  width: 200px;
+  height: 200px;
   margin-bottom: 0.5rem;
 }
 
@@ -231,13 +231,13 @@
   background: var(--accent);
 }
 
-/* Footer row */
-  object-fit: cover;
-}
+
 
 .auth-card {
   background: rgba(255, 255, 255, 0.88);
   padding: 2rem;
+  max-width: 504px;
+  margin: 0 auto;
   align-self: center;
   position: relative;
   display: flex;
@@ -257,9 +257,6 @@
   margin-bottom: 1rem;
   padding: 0;
   width: 100%;
-  max-width: 440px;
-  margin-left: auto;
-  margin-right: auto;
 }
 
 .auth-card-header h2 {
@@ -278,15 +275,12 @@
   display: grid;
   gap: 0.85rem;
   width: 100%;
-  max-width: 440px;
-  margin: 0 auto;
 }
 
 .auth-card-footer {
   text-align: center;
-  margin: 1.5rem auto 0;
+  margin: 1.5rem 0 0;
   padding: 0;
-  max-width: 440px;
   font-size: 0.85rem;
 }
 
@@ -614,12 +608,13 @@
   }
 
   .mark-standalone-icon {
-    width: min(320px, 75%);
-    aspect-ratio: 1 / 1;
+    width: 260px;
+    height: 260px;
   }
 
   .mark-standalone {
-    width: min(420px, 90%);
+    width: min(480px, 92%);
+    height: 80px;
   }
 }
 
@@ -644,12 +639,12 @@
 
   .mark-standalone {
     width: min(340px, 92%);
-    height: 54px;
+    height: 60px;
   }
 
   .mark-standalone-icon {
-    width: min(240px, 75%);
-    aspect-ratio: 1 / 1;
+    width: 160px;
+    height: 160px;
   }
 
   .auth-row {
@@ -670,8 +665,8 @@
 
 @media (max-width: 380px) {
   .mark-standalone-icon {
-    width: min(200px, 78%);
-    aspect-ratio: 1 / 1;
+    width: 140px;
+    height: 140px;
   }
 
   .auth-hero,

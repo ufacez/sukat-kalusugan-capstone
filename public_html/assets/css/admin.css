@@ -132,9 +132,9 @@
 }
 
 .admin-brand-mark {
-  width: 72px;
-  height: 72px;
-  border-radius: 10px;
+  width: 56px;
+  height: 56px;
+  border-radius: 8px;
   background: transparent;
   border: none;
   display: flex;
@@ -142,7 +142,7 @@
   justify-content: center;
   flex-shrink: 0;
   overflow: hidden;
-  padding: 4px;
+  padding: 2px;
 }
 
 .admin-brand-img {

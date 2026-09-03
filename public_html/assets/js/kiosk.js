@@ -703,12 +703,11 @@
 
   function formatDate(date = new Date()) {
     return new Intl.DateTimeFormat(
-      "en-PH",
+      "en-US",
       {
-        weekday: "long",
-        year: "numeric",
         month: "long",
-        day: "numeric"
+        day: "numeric",
+        year: "numeric"
       }
     ).format(date);
   }
@@ -3493,6 +3492,133 @@
   }
 
   // ============================================================
+  // WAIT FOR SESSION TO BE MEASURING
+  // ============================================================
+  //
+  // Polls measurement_status.php until the backend confirms
+  // the session has been claimed by the ESP32 (status flipped
+  // from START_REQUESTED to MEASURING). Resolves true once
+  // MEASURING is confirmed, false on timeout or error.
+  //
+  // Used by processMeasurement() to avoid the 409 race when
+  // the operator clicks PROSESO faster than the ESP32's
+  // get_command.php poll can promote the row.
+
+  async function waitForSessionMeasuring(
+    sessionId,
+    options
+  ) {
+    const opts = options || {};
+    const maxAttempts =
+      Number(opts.maxAttempts) || 5;
+    const intervalMs =
+      Number(opts.intervalMs) || 500;
+
+    if (!sessionId) {
+      return false;
+    }
+
+    const endpoint =
+      (data &&
+        data.endpoints &&
+        data.endpoints.measurementStatus) ||
+      "../api/kiosk/measurement_status.php";
+
+    for (
+      let attempt = 0;
+      attempt < maxAttempts;
+      attempt++
+    ) {
+      const current =
+        state.session &&
+        Number(state.session.session_id) ===
+          Number(sessionId)
+          ? state.session
+          : null;
+
+      const currentStatus =
+        current && current.status
+          ? String(current.status).toUpperCase()
+          : "";
+
+      if (currentStatus === "MEASURING") {
+        return true;
+      }
+
+      if (
+        currentStatus === "COMPLETE" ||
+        currentStatus === "ERROR" ||
+        currentStatus === "CANCELLED"
+      ) {
+        return false;
+      }
+
+      try {
+        const response =
+          await fetch(
+            endpoint,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type":
+                  "application/json",
+                Accept:
+                  "application/json"
+              },
+              body: JSON.stringify({
+                device_id: deviceId,
+                session_id: sessionId
+              }),
+              cache: "no-store"
+            }
+          );
+
+        const json =
+          await response
+            .json()
+            .catch(() => ({}));
+
+        const remoteStatus =
+          json &&
+          json.data &&
+          json.data.status
+            ? String(json.data.status).toUpperCase()
+            : "";
+
+        if (remoteStatus === "MEASURING") {
+          if (json.data) {
+            state.session = json.data;
+            saveSessionToStorage();
+            updateSessionInfo(json.data);
+          }
+          return true;
+        }
+
+        if (
+          remoteStatus === "COMPLETE" ||
+          remoteStatus === "ERROR" ||
+          remoteStatus === "CANCELLED"
+        ) {
+          return false;
+        }
+      } catch (error) {
+        console.warn(
+          "[SukatKalusugan] waitForSessionMeasuring poll failed",
+          error
+        );
+      }
+
+      if (attempt < maxAttempts - 1) {
+        await new Promise(function (resolve) {
+          setTimeout(resolve, intervalMs);
+        });
+      }
+    }
+
+    return false;
+  }
+
+  // ============================================================
   // PROCESS MEASUREMENT
   // ============================================================
 
@@ -3523,7 +3649,7 @@
       const hasHeightManual = state.autoHeight && !state.autoWeight && state.manualWeightInput != null;
       const hasWeightManual = state.autoWeight && !state.autoHeight && state.manualHeightInput != null;
       const hasOneLive = (isValidHeight(state.finalHeight) || isValidWeight(state.finalWeight));
-      
+
       if (!state.autoHeight && isValidHeight(state.finalHeight) && state.manualWeightInput != null) {
         // Height from ESP32, weight entered manually — allow
       } else if (!state.autoWeight && isValidWeight(state.finalWeight) && state.manualHeightInput != null) {
@@ -3550,6 +3676,23 @@
       return;
     }
 
+    /*
+     * ========================================================
+     * WAIT FOR THE ESP32 TO CLAIM THE SESSION
+     * ========================================================
+     *
+     * The server only accepts a "PROCESS" command when the
+     * session is in status='MEASURING'. That transition happens
+     * when the ESP32's next get_command.php poll promotes the
+     * row from START_REQUESTED to MEASURING. If the operator
+     * clicks PROSESO faster than that poll (typical on a fast
+     * tablet where start_measurement just returned), the
+     * request would 409 and look like nothing happened.
+     *
+     * Poll measurement_status.php for up to ~2.5s until the
+     * backend confirms MEASURING, then proceed.
+     */
+
     const sessionId =
       getCurrentSessionId();
 
@@ -3561,6 +3704,49 @@
       );
 
       return;
+    }
+
+    const processBtnRef =
+      refs.processBtn ||
+      processBtn;
+
+    const processBtnOriginalText =
+      processBtnRef ? processBtnRef.textContent : null;
+
+    const processBtnOriginalDisabled =
+      processBtnRef ? processBtnRef.disabled : false;
+
+    if (processBtnRef) {
+      processBtnRef.disabled = true;
+      processBtnRef.textContent =
+        "Hinihintay ang device...";
+    }
+
+    const sessionReady = await waitForSessionMeasuring(
+      sessionId
+    );
+
+    if (!sessionReady) {
+      pushFeed(
+        "Processing blocked",
+        "Ang device ay hindi pa handa. Subukan ulit pagkatapos ng ilang segundo.",
+        "warn"
+      );
+
+      if (processBtnRef) {
+        processBtnRef.disabled =
+          processBtnOriginalDisabled;
+        processBtnRef.textContent =
+          processBtnOriginalText ||
+          "I-process ang measurement";
+      }
+
+      return;
+    }
+
+    if (processBtnRef) {
+      processBtnRef.textContent =
+        "Isinusumite...";
     }
 
     /*
@@ -3655,6 +3841,13 @@
     }
 
     if (!processRequestOk) {
+      if (processBtnRef) {
+        processBtnRef.disabled =
+          processBtnOriginalDisabled;
+        processBtnRef.textContent =
+          processBtnOriginalText ||
+          "I-process ang measurement";
+      }
       return;
     }
 
@@ -4964,14 +5157,6 @@ function finishResults(
       state.session &&
       state.session.session_id
     ) {
-      if (
-        !confirm(
-          "A measurement is active. Going back will cancel the current session. Continue?"
-        )
-      ) {
-        return;
-      }
-
       const cancelBody =
         JSON.stringify({
           device_id: deviceId,
