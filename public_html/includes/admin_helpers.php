@@ -422,7 +422,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/admin.css')) . '">';
-    echo '<link rel="icon" type="image/jpeg" href="' . admin_e(app_url('/assets/img/logo/variant01.jpg')) . '">';
+    echo '<link rel="icon" type="image/svg+xml" href="' . admin_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
 
     echo '<script>';
     echo '(function(){';
@@ -439,8 +439,8 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
 
     echo '<div class="admin-brand">';
     echo '<div class="admin-brand-mark">';
-    echo '<img src="' . admin_e(app_url('/assets/img/logo/4k_light01.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
-    echo '<img src="' . admin_e(app_url('/assets/img/logo/4k_dark01.png')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
+    echo '<img src="' . admin_e(app_url('/assets/img/logo/logo_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
+    echo '<img src="' . admin_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name">Sukat Kalusugan</div>';

@@ -135,8 +135,8 @@
   width: 72px;
   height: 72px;
   border-radius: 10px;
-  background: var(--admin-card-bg, #f8f9fa);
-  border: 1px solid var(--admin-border, #e9ecef);
+  background: transparent;
+  border: none;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -169,8 +169,8 @@
 }
 
 [data-theme="dark"] .admin-brand-mark {
-  background: var(--admin-card-bg, #1a1d20);
-  border-color: var(--admin-border, #2d3236);
+  background: transparent;
+  border-color: transparent;
 }
 
 .admin-brand-name {

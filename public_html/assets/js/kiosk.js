@@ -118,6 +118,238 @@
       "[data-kiosk-search]"
     );
 
+  // Child lookup elements
+  const childIdInput =
+    document.getElementById("childIdInput");
+
+  const clearChildIdBtn =
+    document.getElementById("clearChildId");
+
+  const lookupSubmitBtn =
+    document.getElementById("lookupSubmit");
+
+  const lookupPreview =
+    document.getElementById("lookupPreview");
+
+  let foundChild = null;
+  let searchDebounceTimer = null;
+
+  function showLookupState(stateName) {
+    document.querySelectorAll("[data-lookup-state]").forEach(function (el) {
+      el.hidden = el.getAttribute("data-lookup-state") !== stateName;
+    });
+  }
+
+  function resetLookup() {
+    if (childIdInput) childIdInput.value = "";
+    if (clearChildIdBtn) clearChildIdBtn.hidden = true;
+    if (lookupPreview) {
+      lookupPreview.hidden = true;
+      lookupPreview.innerHTML = "";
+    }
+    foundChild = null;
+    showLookupState("idle");
+  }
+
+  function populateFoundCard(child) {
+    foundChild = child;
+
+    const nameEl = document.getElementById("foundChildName");
+    const codeEl = document.getElementById("foundChildCode");
+    const ageEl = document.getElementById("foundChildAge");
+    const sexEl = document.getElementById("foundChildSex");
+
+    if (nameEl) nameEl.textContent = child.first_name + " " + child.last_name;
+    if (codeEl) codeEl.textContent = child.child_code;
+    if (ageEl) {
+      var months = child.age_months || 0;
+      var days = child.age_days || 0;
+      var primary = months >= 12
+        ? Math.floor(months / 12) + " taon, " + (months % 12) + " buwan"
+        : months + " buwan";
+      ageEl.textContent = primary + " (" + days + " araw)";
+    }
+    if (sexEl) sexEl.textContent = child.sex === "Male" ? "Lalaki" : "Babae";
+  }
+
+  function selectChildFromPreview(child) {
+    populateFoundCard(child);
+    state.child = child;
+    if (lookupPreview) lookupPreview.hidden = true;
+    showLookupState("found");
+  }
+
+  function buildPreviewCardHtml(c) {
+    var months = c.age_months || 0;
+    var days = c.age_days || 0;
+    var ageText = months >= 12
+      ? Math.floor(months / 12) + " taon, " + (months % 12) + " buwan · " + days + " araw"
+      : months + " buwan · " + days + " araw";
+    var firstInitial = (c.first_name || "?").charAt(0).toUpperCase();
+    var lastInitial = (c.last_name || "?").charAt(0).toUpperCase();
+    var initials = firstInitial + lastInitial;
+    var sexLabel = c.sex === "Male" ? "Lalaki" : "Babae";
+    var sexIcon = c.sex === "Male" ? "♂" : "♀";
+
+    return (
+      '<button type="button" class="kiosk-lookup-preview-card" ' +
+        'data-preview-child-id="' + c.id + '">' +
+        '<div class="kiosk-lookup-preview-avatar">' + escapeHtml(initials) + '</div>' +
+        '<div class="kiosk-lookup-preview-info">' +
+          '<div class="kiosk-lookup-preview-name">' +
+            escapeHtml(c.first_name + " " + c.last_name) +
+          '</div>' +
+          '<div class="kiosk-lookup-preview-meta">' +
+            '<span>' + escapeHtml(ageText) + '</span>' +
+            '<span class="kiosk-lookup-preview-meta-dot"></span>' +
+            '<span>' + sexIcon + ' ' + escapeHtml(sexLabel) + '</span>' +
+          '</div>' +
+          '<div class="kiosk-lookup-preview-code">' +
+            escapeHtml(c.child_code || "") +
+          '</div>' +
+        '</div>' +
+      '</button>'
+    );
+  }
+
+  function renderLookupPreview(matches) {
+    if (!lookupPreview) return;
+
+    if (!matches || matches.length === 0) {
+      lookupPreview.innerHTML =
+        '<div class="kiosk-lookup-preview-empty">' +
+          'Walang nahanap na record. Subukan ang ibang pangalan o Child ID.' +
+        '</div>';
+      lookupPreview.hidden = false;
+      return;
+    }
+
+    var html = matches.slice(0, 5).map(buildPreviewCardHtml).join("");
+    lookupPreview.innerHTML = html;
+    lookupPreview.hidden = false;
+
+    lookupPreview
+      .querySelectorAll("[data-preview-child-id]")
+      .forEach(function (btn) {
+        btn.addEventListener("click", function () {
+          var childId = btn.getAttribute("data-preview-child-id");
+          var child = (data.children || []).find(function (c) {
+            return String(c.id) === String(childId);
+          });
+          if (child) {
+            selectChildFromPreview(child);
+          }
+        });
+      });
+  }
+
+  function handleLiveSearch() {
+    if (!childIdInput) return;
+    var input = childIdInput.value.trim();
+
+    if (!input) {
+      if (lookupPreview) {
+        lookupPreview.hidden = true;
+        lookupPreview.innerHTML = "";
+      }
+      return;
+    }
+
+    var children = data.children || [];
+    var lowerInput = input.toLowerCase();
+    var matches = children.filter(function (c) {
+      var code = (c.child_code || "").toLowerCase();
+      var firstName = (c.first_name || "").toLowerCase();
+      var lastName = (c.last_name || "").toLowerCase();
+      var fullName = (firstName + " " + lastName).trim();
+      return (
+        code.indexOf(lowerInput) !== -1 ||
+        firstName.indexOf(lowerInput) !== -1 ||
+        lastName.indexOf(lowerInput) !== -1 ||
+        fullName.indexOf(lowerInput) !== -1
+      );
+    });
+
+    renderLookupPreview(matches);
+  }
+
+  function handleChildLookup() {
+    const input = (childIdInput?.value || "").trim();
+    if (!input) return;
+
+    showLookupState("searching");
+
+    setTimeout(function () {
+      const children = data.children || [];
+      const lowerInput = input.toLowerCase();
+      const match = children.find(function (c) {
+        const code = (c.child_code || "").toLowerCase();
+        const firstName = (c.first_name || "").toLowerCase();
+        const lastName = (c.last_name || "").toLowerCase();
+        const fullName = (firstName + " " + lastName).trim();
+        return (
+          code === lowerInput ||
+          fullName === lowerInput ||
+          firstName === lowerInput ||
+          lastName === lowerInput ||
+          fullName.indexOf(lowerInput) !== -1
+        );
+      });
+
+      if (!match) {
+        showLookupState("idle");
+        pushFeed(
+          "Hindi nahanap",
+          "Walang record na may ganiyang Child ID. Subukan muli.",
+          "warn"
+        );
+        return;
+      }
+
+      populateFoundCard(match);
+      if (lookupPreview) lookupPreview.hidden = true;
+      showLookupState("found");
+    }, 600);
+  }
+
+  if (childIdInput) {
+    childIdInput.addEventListener("input", function () {
+      if (clearChildIdBtn) clearChildIdBtn.hidden = !childIdInput.value;
+
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+      }
+      searchDebounceTimer = setTimeout(handleLiveSearch, 200);
+    });
+    childIdInput.addEventListener("keydown", function (e) {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        handleChildLookup();
+      } else if (e.key === "Escape") {
+        if (lookupPreview) {
+          lookupPreview.hidden = true;
+        }
+      }
+    });
+  }
+
+  if (clearChildIdBtn) {
+    clearChildIdBtn.addEventListener("click", function () {
+      if (childIdInput) {
+        childIdInput.value = "";
+        childIdInput.focus();
+        clearChildIdBtn.hidden = true;
+      }
+    });
+  }
+
+  if (lookupSubmitBtn) {
+    lookupSubmitBtn.addEventListener("click", handleChildLookup);
+  }
+
+  const processBtn =
+    document.getElementById("processBtn");
+
   const clock =
     document.querySelector(
       "[data-kiosk-clock]"
@@ -212,6 +444,16 @@
         "[data-kiosk-weight-bars]"
       ),
 
+    heightIndicator:
+      document.querySelector(
+        "[data-kiosk-height-indicator]"
+      ),
+
+    weightIndicator:
+      document.querySelector(
+        "[data-kiosk-weight-indicator]"
+      ),
+
     progressValue:
       document.querySelector(
         "[data-kiosk-progress-value]"
@@ -291,6 +533,44 @@
       document.querySelector(
         "[data-kiosk-result-source]"
       ),
+
+    resultSex:
+      document.querySelector(
+        "[data-kiosk-result-sex]"
+      ),
+
+    resultDate:
+      document.querySelector(
+        "[data-kiosk-result-date]"
+      ),
+
+    resultTime:
+      document.querySelector(
+        "[data-kiosk-result-time]"
+      ),
+
+    resultInitials:
+      document.querySelector(
+        "[data-kiosk-result-initials]"
+      ),
+
+    resultWfaStatus:
+      document.querySelector(
+        "[data-kiosk-result-wfa-status]"
+      ),
+
+    resultHfaStatus:
+      document.querySelector(
+        "[data-kiosk-result-hfa-status]"
+      ),
+
+    resultWflhStatus:
+      document.querySelector(
+        "[data-kiosk-result-wflh-status]"
+      ),
+
+    resultBmi:
+      null,
 
     sessionId:
       document.querySelector(
@@ -736,10 +1016,14 @@
   function setStep(step) {
     const allowed = [
       "welcome",
-      "select",
-      "live",
+      "privacy",
+      "child-lookup",
+      "measurement",
       "processing",
-      "results"
+      "results",
+      "thankyou",
+      "view-results",
+      "info"
     ];
 
     if (!allowed.includes(step)) {
@@ -768,64 +1052,90 @@
       return;
     }
 
+    const prevStep = state.step;
     state.step = step;
 
     body.dataset.kioskStep = step;
 
-    if (welcomeScreen) {
-      welcomeScreen.hidden =
-        step !== "welcome";
-    }
-
-    if (stepBar) {
-      stepBar.hidden =
-        step === "welcome";
-    }
-
-    if (stage) {
-      stage.hidden =
-        step === "welcome";
-    }
+    // Determine transition direction
+    const stepOrder = ["welcome", "privacy", "child-lookup", "measurement", "processing", "results", "thankyou"];
+    const prevIdx = stepOrder.indexOf(prevStep);
+    const newIdx = stepOrder.indexOf(step);
+    const goingForward = newIdx >= prevIdx;
 
     screens.forEach(screen => {
-      const active =
-        screen.getAttribute(
-          "data-kiosk-screen"
-        ) === step;
+      const screenName = screen.getAttribute("data-kiosk-screen");
+      const active = screenName === step;
 
-      if (
-        !active &&
-        screen.contains(
-          document.activeElement
-        )
-      ) {
+      if (!active && screen.contains(document.activeElement)) {
         document.activeElement.blur();
       }
 
-      screen.hidden = !active;
+      // Remove transition classes
+      screen.classList.remove("is-active", "is-exit-left");
 
-      screen.classList.toggle(
-        "is-visible",
-        active
-      );
+      if (active) {
+        // Entering: set initial state then animate in
+        screen.hidden = false;
+        screen.style.display = "";
 
-      screen.setAttribute(
-        "aria-hidden",
-        String(!active)
-      );
+        // Force reflow
+        void screen.offsetHeight;
+
+        screen.classList.add("is-active");
+      } else {
+        // Exiting
+        screen.classList.remove("is-active");
+
+        if (screenName === prevStep) {
+          // The screen we're leaving
+          if (goingForward) {
+            screen.classList.add("is-exit-left");
+          }
+        }
+
+        // Hide after transition
+        setTimeout(() => {
+          if (!screen.classList.contains("is-active")) {
+            screen.hidden = true;
+          }
+        }, 450);
+      }
+
+      screen.setAttribute("aria-hidden", String(!active));
     });
+
+    if (welcomeScreen) {
+      welcomeScreen.hidden = (step !== "welcome");
+    }
+
+    if (stepBar) {
+      stepBar.hidden = true;
+    }
+
+    if (stage) {
+      stage.hidden = true;
+    }
 
     stepButtons.forEach(button => {
-      const target =
-        button.getAttribute(
-          "data-kiosk-step-jump"
-        );
-
-      button.classList.toggle(
-        "is-active",
-        target === step
-      );
+      const target = button.getAttribute("data-kiosk-step-jump");
+      button.classList.toggle("is-active", target === step);
     });
+
+    // Reset privacy checkboxes when entering privacy screen
+    if (step === "privacy") {
+      var cb = document.getElementById("privacyCheckbox");
+      var ib = document.getElementById("infoSheetCheckbox");
+      var btn = document.getElementById("privacyContinueBtn");
+      if (cb) cb.checked = false;
+      if (ib) ib.checked = false;
+      if (btn) btn.disabled = true;
+    }
+
+    // Reset child lookup when entering lookup screen
+    if (step === "child-lookup") {
+      resetLookup();
+    }
 
     saveSessionToStorage();
   }
@@ -854,7 +1164,7 @@
 
     if (refs.progressRing) {
       const circumference =
-        2 * Math.PI * 68;
+        2 * Math.PI * 88;
 
       refs.progressRing.style.strokeDasharray =
         String(circumference);
@@ -932,25 +1242,25 @@
 
     if (state.processingStarted) {
       button.textContent =
-        "Processing...";
+        "Pinoproseso...";
     } else if (ready) {
       button.textContent =
-        "Process Measurement";
+        "I-process ang measurement";
     } else if (
       state.weightLocked &&
       !state.heightLocked
     ) {
       button.textContent =
-        "Waiting for Height";
+        "Naghihintay ng Taas";
     } else if (
       !state.weightLocked &&
       state.heightLocked
     ) {
       button.textContent =
-        "Waiting for Weight";
+        "Naghihintay ng Timbang";
     } else {
       button.textContent =
-        "Waiting for Final Stable Reading";
+        "Naghihintay ng Stable na Reading";
     }
   }
 
@@ -992,7 +1302,7 @@
 
     if (heroNote) {
       heroNote.textContent =
-        "Measurement ready. Click Process Measurement to continue.";
+        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
     }
 
     updateProcessButton();
@@ -1130,10 +1440,10 @@
       startButton.textContent =
         state.submitting ||
         state.startRequestInProgress
-          ? "Starting..."
+          ? "Sinisimulan..."
           : deviceUnavailable
           ? "Device Offline"
-          : "Start Measurement";
+          : "SIMULAN";
     }
 
     /*
@@ -1255,6 +1565,19 @@
         message;
     }
 
+    // Update stability icon
+    const weightStatusIcon =
+      refs.weightStatus?.querySelector(
+        ".kiosk-status-icon"
+      );
+    if (weightStatusIcon) {
+      weightStatusIcon.className =
+        "kiosk-status-icon " +
+        (message.includes("stable") || message.includes("captured")
+          ? "stable"
+          : "waiting");
+    }
+
     // Throttle weight bars: only rebuild when weight
     // changes by more than WEIGHT_BARS_STEP_KG.
     // This cuts ~25 DOM ops per WS message to ~3.
@@ -1302,6 +1625,16 @@
       true
     );
 
+    // Update horizontal weight bar indicator (0-50 kg scale)
+    if (refs.weightIndicator) {
+      const barPercent = Math.min(
+        100,
+        Math.max(0, (weight / 50) * 100)
+      );
+      refs.weightIndicator.style.left =
+        `${barPercent}%`;
+    }
+
     return true;
   }
 
@@ -1329,6 +1662,19 @@
         message;
     }
 
+    // Update stability icon
+    const heightStatusIcon =
+      refs.heightStatus?.querySelector(
+        ".kiosk-status-icon"
+      );
+    if (heightStatusIcon) {
+      heightStatusIcon.className =
+        "kiosk-status-icon " +
+        (message.includes("stable") || message.includes("captured")
+          ? "stable"
+          : "waiting");
+    }
+
     if (refs.heightBar) {
       const percentage =
         Math.min(
@@ -1341,6 +1687,21 @@
 
       refs.heightBar.style.width =
         `${percentage}%`;
+    }
+
+    // Update ruler indicator position
+    if (refs.heightIndicator) {
+      const rulerPercent =
+        Math.min(
+          100,
+          Math.max(
+            0,
+            (height / 150) * 100
+          )
+        );
+
+      refs.heightIndicator.style.bottom =
+        `${rulerPercent}%`;
     }
 
     setChip(
@@ -1518,20 +1879,20 @@
     // so the kiosk never flashes an error/blank screen first.
     // ==========================================================
 
-    if (
-      [
-        "START_REQUESTED",
-        "GET_READY"
-      ].includes(status)
-    ) {
-      state.phase = "live";
-
       if (
-        !state.processingStarted &&
-        state.step !== "live"
+        [
+          "START_REQUESTED",
+          "GET_READY"
+        ].includes(status)
       ) {
-        setStep("live");
-      }
+        state.phase = "live";
+
+        if (
+          !state.processingStarted &&
+          state.step !== "measurement"
+        ) {
+          setStep("measurement");
+        }
 
       const secondsLeft =
         Number.isFinite(
@@ -1553,12 +1914,12 @@
 
       if (refs.weightStatus) {
         refs.weightStatus.textContent =
-          "Please step on the platform...";
+          "Tumayo sa platform...";
       }
 
       if (refs.heightStatus) {
         refs.heightStatus.textContent =
-          "Please step on the platform...";
+          "Tumayo sa platform...";
       }
 
       saveSessionToStorage();
@@ -1581,9 +1942,9 @@
 
       if (
         !state.processingStarted &&
-        state.step !== "live"
+        state.step !== "measurement"
       ) {
-        setStep("live");
+        setStep("measurement");
       }
 
       const deviceWeightStable =
@@ -1609,8 +1970,8 @@
         setWeight(
           weight,
           locked
-            ? "Weight stable"
-            : "Reading weight..."
+            ? "Timbang stable"
+            : "Binabasa ang timbang..."
         );
       }
 
@@ -1625,8 +1986,8 @@
         setHeight(
           height,
           locked
-            ? "Height stable"
-            : "Reading height..."
+            ? "Taas stable"
+            : "Binabasa ang taas..."
         );
       }
 
@@ -1654,8 +2015,8 @@
         state.weightLocked = true;
         state.heightLocked = true;
 
-        setWeight(finalWeight, "Final stable weight");
-        setHeight(finalHeight, "Final stable height");
+        setWeight(finalWeight, "Huling timbang na stable");
+        setHeight(finalHeight, "Huling taas na stable");
         markMeasurementReady();
       } else if (!state.finalReady) {
         state.finalSequence = 0;
@@ -1721,9 +2082,9 @@
 
       if (
         !state.processingStarted &&
-        state.step !== "live"
+        state.step !== "measurement"
       ) {
-        setStep("live");
+        setStep("measurement");
       }
 
       markMeasurementReady();
@@ -1739,8 +2100,8 @@
     }
 
     // ==========================================================
-    // ERROR — never shown on Step 2. We advance to Step 3
-    // (processing) and show the failure banner there instead.
+    // ERROR — never shown on measurement screens. We advance to
+    // processing and show the failure banner there instead.
     // ==========================================================
 
     if (
@@ -2124,6 +2485,15 @@
         wsConnected = true;
         wsReconnectAttempts = 0;
 
+        var welcomeDot = document.querySelector("[data-kiosk-device-status] .kiosk-device-dot");
+        var welcomeLabel = document.querySelector("[data-kiosk-device-status] .kiosk-device-label");
+        if (welcomeDot) {
+          welcomeDot.classList.add("online");
+        }
+        if (welcomeLabel) {
+          welcomeLabel.textContent = "Device online";
+        }
+
         setChip(
           connectedChip,
           "Device: Connected",
@@ -2333,8 +2703,8 @@
       setWeight(
         weight,
         locked
-          ? "Weight stable"
-          : "Reading weight..."
+          ? "Timbang stable"
+          : "Binabasa ang timbang..."
       );
     }
 
@@ -2349,8 +2719,8 @@
       setHeight(
         height,
         locked
-          ? "Height stable"
-          : "Reading height..."
+          ? "Taas stable"
+          : "Binabasa ang taas..."
       );
     }
 
@@ -2380,9 +2750,9 @@
 
       if (
         !state.processingStarted &&
-        state.step !== "live"
+        state.step !== "measurement"
       ) {
-        setStep("live");
+        setStep("measurement");
       }
 
       if (
@@ -2406,12 +2776,12 @@
 
         setWeight(
           finalWeight,
-          "Final stable weight"
+          "Huling timbang na stable"
         );
 
         setHeight(
           finalHeight,
-          "Final stable height"
+          "Huling taas na stable"
         );
 
         markMeasurementReady();
@@ -2466,9 +2836,9 @@
 
       if (
         !state.processingStarted &&
-        state.step !== "live"
+        state.step !== "measurement"
       ) {
-        setStep("live");
+        setStep("measurement");
       }
 
       markMeasurementReady();
@@ -2686,9 +3056,9 @@
       ) {
         if (
           !state.processingStarted &&
-          state.step !== "live"
+          state.step !== "measurement"
         ) {
-          setStep("live");
+          setStep("measurement");
         }
 
         if (scheduleNext) {
@@ -2712,28 +3082,29 @@
          * Process Measurement, stay on Live.
          */
 
+      if (
+        !state.processingStarted &&
+        state.step !== "measurement"
+      ) {
         if (
-          !state.processingStarted
+          isValidWeight(
+            state.weight
+          ) &&
+          isValidHeight(
+            state.height
+          )
         ) {
-          if (
-            isValidWeight(
-              state.weight
-            ) &&
-            isValidHeight(
-              state.height
-            )
-          ) {
-            state.measurementReady =
-              true;
+          state.measurementReady =
+            true;
 
-            state.awaitingLiveResult =
-              true;
+          state.awaitingLiveResult =
+            true;
 
-            setStep("live");
+          setStep("measurement");
 
-            markMeasurementReady();
-          }
+          markMeasurementReady();
         }
+      }
 
         return payload;
       }
@@ -2792,13 +3163,13 @@
       getSelectedChild();
 
     if (!child) {
-      pushFeed(
-        "Start blocked",
-        "Choose a child first.",
-        "warn"
-      );
+      // No child selected yet — go to child lookup
+      setStep("child-lookup");
 
-      setStep("select");
+      pushFeed(
+        "Child lookup",
+        "Enter Child ID to find the record."
+      );
 
       return false;
     }
@@ -2837,15 +3208,16 @@
       state.deviceStatusChecked &&
       !state.deviceOnline
     ) {
+      // Device is offline — show a clear warning but still navigate
+      // to the measurement screen so the operator can see the layout
+      // and try reconnecting the device. The PROSESO button will stay
+      // disabled because markMeasurementReady() never fires without
+      // live data, so no measurement can be submitted.
       pushFeed(
-        "Start blocked",
-        "The kiosk device is offline. Check the ESP32 power and connection.",
-        "error"
+        "Device offline",
+        "Hindi makakonekta sa device. I-check ang ESP32 at subukan muli.",
+        "warn"
       );
-
-      syncStartButtonState();
-
-      return false;
     }
 
     state.startRequestInProgress =
@@ -3000,14 +3372,14 @@
       syncStartButtonState();
 
       // ========================================================
-      // LIVE SCREEN
+      // HEIGHT SCREEN
       // ========================================================
 
-      setStep("live");
+      setStep("measurement");
 
       setProgress(
         10,
-        "Please step on the platform now."
+        "Tumayo sa platform ngayon."
       );
 
       if (refs.weightReadout) {
@@ -3022,12 +3394,12 @@
 
       if (refs.weightStatus) {
         refs.weightStatus.textContent =
-          "Please step on the platform...";
+          "Tumayo sa platform...";
       }
 
       if (refs.heightStatus) {
         refs.heightStatus.textContent =
-          "Please step on the platform...";
+          "Tumayo sa platform...";
       }
 
       if (refs.weightBars) {
@@ -3097,7 +3469,16 @@
         "error"
       );
 
-      setStep("select");
+      // Only bounce back to child-lookup if the device was online
+      // (so the failure was unexpected). If the device was offline,
+      // stay on the measurement screen so the operator can see the
+      // device-offline state and try reconnecting.
+      if (
+        !state.deviceStatusChecked ||
+        state.deviceOnline
+      ) {
+        setStep("child-lookup");
+      }
 
       return false;
     } finally {
@@ -3307,7 +3688,7 @@
 
     setProgress(
       65,
-      "Preparing measurement..."
+      "Hinihintay mag-send ng sukat yung device..."
     );
 
     pushFeed(
@@ -3315,100 +3696,72 @@
       `${
         state.child.child_code ||
         "Child"
-      } · Session #${sessionId} · calculating growth indicators`
+      } · Session #${sessionId} · waiting for ESP32 to finalize`
     );
 
-    const stages = [
-      {
-        progress: 70,
-        message:
-          "Calculating weight-for-age..."
-      },
-
-      {
-        progress: 76,
-        message:
-          "Calculating height-for-age..."
-      },
-
-      {
-        progress: 82,
-        message:
-          "Calculating weight-for-height..."
-      },
-
-      {
-        progress: 88,
-        message:
-          "Classifying nutritional status..."
-      },
-
-      {
-        progress: 94,
-        message:
-          "Saving measurement..."
-      }
-    ];
-
-    let index = 0;
-
     if (state.processingTimer) {
-      clearInterval(
-        state.processingTimer
-      );
+      clearInterval(state.processingTimer);
     }
 
-    state.processingTimer =
-      setInterval(
-        async () => {
-          if (
-            index <
-            stages.length
-          ) {
-            const stageData =
-              stages[index];
+    // Smooth indeterminate progress while we wait for the real backend
+    // result. Starts at 65% and creeps toward 92% over ~5 seconds, then
+    // holds at 92% with a "pinagproseso pa..." message until the backend
+    // (refreshMeasurementStatus) reports COMPLETE or ERROR.
+    const smoothStartPct = 65;
+    const smoothEndPct = 92;
+    const smoothDurationMs = 5000;
+    const smoothStepMs = 100;
+    const smoothStepPct =
+      ((smoothEndPct - smoothStartPct) /
+        (smoothDurationMs / smoothStepMs));
+    let currentPct = smoothStartPct;
+    const startedAt = Date.now();
 
-            setProgress(
-              stageData.progress,
-              stageData.message
-            );
+    state.processingTimer = setInterval(async () => {
+      const elapsed = Date.now() - startedAt;
 
-            index++;
+      if (elapsed < smoothDurationMs) {
+        // Smoothly interpolate progress.
+        currentPct = Math.min(
+          smoothEndPct,
+          smoothStartPct + smoothStepPct * (elapsed / smoothStepMs)
+        );
+        setProgress(
+          Math.round(currentPct),
+          elapsed < smoothDurationMs / 2
+            ? "Hinihintay mag-send ng sukat yung device..."
+            : "Kumukuha ng data para sa mga growth indicators..."
+        );
+        return;
+      }
 
-            return;
-          }
+      // Reached the cap — show "almost done" and let the backend
+      // polling take over.
+      clearInterval(state.processingTimer);
+      state.processingTimer = null;
 
-          clearInterval(
-            state.processingTimer
-          );
-
-          state.processingTimer =
-            null;
-
-          const status =
-            await refreshMeasurementStatus(
-              false
-            );
-
-          if (
-            status &&
-            normalizeStatus(
-              status.status
-            ) === "COMPLETE"
-          ) {
-            finishResults(
-              status,
-              state.weight,
-              state.height
-            );
-
-            return;
-          }
-
-          await waitForBackendCompletion();
-        },
-        900
+      setProgress(
+        94,
+        "Fina-finalize na yung sukat, wait lang..."
       );
+
+      const status = await refreshMeasurementStatus(false);
+
+      if (
+        status &&
+        normalizeStatus(status.status) === "COMPLETE"
+      ) {
+        finishResults(
+          status,
+          state.weight,
+          state.height
+        );
+
+        return;
+      }
+
+      await waitForBackendCompletion();
+    }, smoothStepMs);
   }
 
   // ============================================================
@@ -3506,7 +3859,7 @@
       state.backendCompletionTimer =
         setTimeout(
           check,
-          1000
+          500
         );
     };
 
@@ -3638,6 +3991,43 @@
     return "is-muted";
   }
 
+  function nutritionalStatusBadgeClass(status) {
+    const normalized = String(
+      status || ""
+    ).trim().toLowerCase();
+
+    if (normalized === "normal" || normalized === "tall") {
+      return "is-normal";
+    }
+
+    if (
+      normalized === "moderately underweight" ||
+      normalized === "moderately stunted" ||
+      normalized === "moderately wasted" ||
+      normalized === "muw" || normalized === "mst" || normalized === "mw"
+    ) {
+      return "is-underweight";
+    }
+
+    if (
+      normalized === "overweight" || normalized === "obese" ||
+      normalized === "ow" || normalized === "ob"
+    ) {
+      return "is-overweight";
+    }
+
+    if (
+      normalized === "severely underweight" ||
+      normalized === "severely stunted" ||
+      normalized === "severely wasted" ||
+      normalized === "suw" || normalized === "sst" || normalized === "sw"
+    ) {
+      return "is-severe";
+    }
+
+    return "is-normal";
+  }
+
   function applyStatusPillClass(status) {
     if (!refs.resultStatus) {
       return;
@@ -3751,7 +4141,9 @@ function finishResults(
       Math.floor(ageDays / 30);
 
     refs.resultMeta.textContent =
-      `${ageDays} day${ageDays === 1 ? '' : 's'} (${ageMonths} mo)`;
+      ageMonths >= 12
+        ? `${Math.floor(ageMonths / 12)} taon, ${ageMonths % 12} buwan (${ageDays} araw)`
+        : `${ageMonths} buwan (${ageDays} araw)`;
   }
 
   // ==========================================================
@@ -3880,6 +4272,85 @@ function finishResults(
   if (refs.resultSource) {
     refs.resultSource.textContent =
       "ESP32 → Firebase → SQL → WHO";
+  }
+
+  // ==========================================================
+  // SEX
+  // ==========================================================
+
+  if (refs.resultSex) {
+    refs.resultSex.textContent =
+      child?.sex || measurement?.sex || "—";
+  }
+
+  // ==========================================================
+  // DATE / TIME
+  // ==========================================================
+
+  const now = new Date();
+  if (refs.resultDate) {
+    refs.resultDate.textContent =
+      new Intl.DateTimeFormat("en-PH", {
+        month: "long",
+        day: "numeric",
+        year: "numeric",
+      }).format(now);
+  }
+  if (refs.resultTime) {
+    refs.resultTime.textContent =
+      new Intl.DateTimeFormat("en-PH", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }).format(now);
+  }
+
+  // ==========================================================
+  // INITIALS
+  // ==========================================================
+
+  if (refs.resultInitials) {
+    const init = (
+      (child?.first_name?.[0] || "") +
+      (child?.last_name?.[0] || "")
+    ).toUpperCase();
+    refs.resultInitials.textContent = init || "—";
+  }
+
+  // ==========================================================
+  // NUTRITIONAL STATUS AXES (WFA, HFA, WFL/H)
+  // ==========================================================
+
+  const wfaStatus =
+    measurement?.wfa_status ||
+    measurement?.nutritional_status ||
+    "—";
+
+  const hfaStatus =
+    measurement?.hfa_status ||
+    "—";
+
+  const wflhStatus =
+    measurement?.wflh_status ||
+    measurement?.nutritional_status ||
+    "—";
+
+  if (refs.resultWfaStatus) {
+    refs.resultWfaStatus.textContent = wfaStatus;
+    refs.resultWfaStatus.className =
+      "kiosk-status-badge " + nutritionalStatusBadgeClass(wfaStatus);
+  }
+
+  if (refs.resultHfaStatus) {
+    refs.resultHfaStatus.textContent = hfaStatus;
+    refs.resultHfaStatus.className =
+      "kiosk-status-badge " + nutritionalStatusBadgeClass(hfaStatus);
+  }
+
+  if (refs.resultWflhStatus) {
+    refs.resultWflhStatus.textContent = wflhStatus;
+    refs.resultWflhStatus.className =
+      "kiosk-status-badge " + nutritionalStatusBadgeClass(wflhStatus);
   }
 
   // ==========================================================
@@ -4121,10 +4592,10 @@ function finishResults(
     );
 
     // ==========================================================
-    // ALWAYS RETURN TO LIVE
+    // ALWAYS RETURN TO HEIGHT MEASUREMENT
     // ==========================================================
 
-    setStep("live");
+    setStep("measurement");
 
     if (
       isValidWeight(
@@ -4198,7 +4669,7 @@ function finishResults(
         state.measurementReady =
           true;
 
-        setStep("live");
+        setStep("measurement");
 
         markMeasurementReady();
       }
@@ -4356,7 +4827,7 @@ function finishResults(
 
     if (refs.weightStatus) {
       refs.weightStatus.textContent =
-        "Waiting for HX711...";
+        "Naghihintay ng timbang...";
     }
 
     if (refs.heightReadout) {
@@ -4366,7 +4837,7 @@ function finishResults(
 
     if (refs.heightStatus) {
       refs.heightStatus.textContent =
-        "Waiting for TF-Luna...";
+        "Naghihintay ng taas...";
     }
 
     if (refs.heightBar) {
@@ -4432,7 +4903,7 @@ function finishResults(
 
     setProgress(
       0,
-      "Ready to measure"
+      "Handa nang sumukat"
     );
 
     setChip(
@@ -4461,7 +4932,7 @@ function finishResults(
 
     if (heroNote) {
       heroNote.textContent =
-        "Select a child, then start the measurement.";
+        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
     }
 
     syncStartButtonState();
@@ -4671,6 +5142,15 @@ function finishResults(
       state.deviceStatusChecked =
         true;
 
+      var welcomeDot = document.querySelector("[data-kiosk-device-status] .kiosk-device-dot");
+      var welcomeLabel = document.querySelector("[data-kiosk-device-status] .kiosk-device-label");
+      if (welcomeDot) {
+        welcomeDot.classList.toggle("online", online);
+      }
+      if (welcomeLabel) {
+        welcomeLabel.textContent = online ? "Device online" : "Device offline";
+      }
+
       setChip(
         connectedChip,
         online
@@ -4754,6 +5234,15 @@ function finishResults(
 
       state.deviceStatusChecked =
         true;
+
+      var welcomeDot = document.querySelector("[data-kiosk-device-status] .kiosk-device-dot");
+      var welcomeLabel = document.querySelector("[data-kiosk-device-status] .kiosk-device-label");
+      if (welcomeDot) {
+        welcomeDot.classList.remove("online");
+      }
+      if (welcomeLabel) {
+        welcomeLabel.textContent = "Device offline";
+      }
 
       setChip(
         connectedChip,
@@ -4876,27 +5365,315 @@ function finishResults(
             action === "start"
           ) {
             event.preventDefault();
-
-            if (
-              !getSelectedChild()
-            ) {
-              setStep("select");
-
-              pushFeed(
-                "Select child",
-                "Choose a child before starting."
-              );
-
-              return;
-            }
-
-            startMeasurementFlow();
-
+            setStep("privacy");
             return;
           }
 
           // ====================================================
-          // PROCEED LIVE
+          // VIEW RESULTS (from welcome)
+          // ====================================================
+
+          if (
+            action === "view-results"
+          ) {
+            event.preventDefault();
+            populateViewResults();
+            setStep("view-results");
+            return;
+          }
+
+          // ====================================================
+          // INFO (from welcome)
+          // ====================================================
+
+          if (
+            action === "info"
+          ) {
+            event.preventDefault();
+            setStep("info");
+            return;
+          }
+
+          // ====================================================
+          // OPEN FULL PRIVACY NOTICE MODAL
+          // ====================================================
+
+          if (
+            action === "open-full-privacy"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("privacyModal");
+            if (modal) {
+              modal.hidden = false;
+            }
+            return;
+          }
+
+          // ====================================================
+          // CLOSE PRIVACY NOTICE MODAL
+          // ====================================================
+
+          if (
+            action === "close-privacy-modal"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("privacyModal");
+            if (modal) {
+              modal.hidden = true;
+            }
+            return;
+          }
+
+          // ====================================================
+          // OPEN INFORMATION SHEET MODAL
+          // ====================================================
+
+          if (
+            action === "open-info-sheet"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("infoSheetModal");
+            if (modal) {
+              modal.hidden = false;
+            }
+            return;
+          }
+
+          // ====================================================
+          // CLOSE INFORMATION SHEET MODAL
+          // ====================================================
+
+          if (
+            action === "close-info-sheet"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("infoSheetModal");
+            if (modal) {
+              modal.hidden = true;
+            }
+            return;
+          }
+
+          // ====================================================
+          // PRIVACY CONTINUE (go to child lookup)
+          // ====================================================
+
+          if (
+            action === "privacy-continue"
+          ) {
+            event.preventDefault();
+            setStep("child-lookup");
+            return;
+          }
+
+          // ====================================================
+          // BACK TO WELCOME
+          // ====================================================
+
+          if (
+            action === "back-to-welcome"
+          ) {
+            event.preventDefault();
+            setStep("welcome");
+            return;
+          }
+
+          // ====================================================
+          // BACK TO PRIVACY (from child-lookup)
+          // ====================================================
+
+          if (
+            action === "back-to-privacy"
+          ) {
+            event.preventDefault();
+            setStep("privacy");
+            return;
+          }
+
+          // ====================================================
+          // BACK TO INFO (from height)
+          // ====================================================
+
+          if (
+            action === "back-to-info"
+          ) {
+            event.preventDefault();
+            setStep("child-lookup");
+            return;
+          }
+
+          // ====================================================
+          // BACK TO LOOKUP (from measurement)
+          // ====================================================
+
+          if (
+            action === "back-to-lookup"
+          ) {
+            event.preventDefault();
+            setStep("child-lookup");
+            return;
+          }
+
+          // ====================================================
+          // LOOKUP: RETRY (try again)
+          // ====================================================
+
+          if (
+            action === "lookup-retry"
+          ) {
+            event.preventDefault();
+            resetLookup();
+            return;
+          }
+
+          // ====================================================
+          // LOOKUP: CONFIRM (child found, proceed)
+          // ====================================================
+
+          if (
+            action === "lookup-confirm"
+          ) {
+            event.preventDefault();
+            if (foundChild) {
+              state.child = foundChild;
+              pushFeed("Bata napili", foundChild.first_name + " " + foundChild.last_name);
+              // Reset the readouts so they don't show stale data from a
+              // previous attempt.
+              if (refs.weightReadout) {
+                refs.weightReadout.textContent = "--.--";
+              }
+              if (refs.heightReadout) {
+                refs.heightReadout.textContent = "--.-";
+              }
+              if (refs.weightStatus) {
+                refs.weightStatus.textContent = "Naghihintay...";
+              }
+              if (refs.heightStatus) {
+                refs.heightStatus.textContent = "Naghihintay...";
+              }
+              if (refs.weightBars) {
+                refs.weightBars.innerHTML = "";
+                lastWeightBarsValue = -1;
+              }
+              if (refs.heightBar) {
+                refs.heightBar.style.width = "0%";
+              }
+              // Reflect the actual device connectivity in the chips so
+              // the operator immediately knows whether readings will
+              // come in or not.
+              if (
+                state.deviceStatusChecked &&
+                !state.deviceOnline
+              ) {
+                setChip(
+                  connectedChip,
+                  "Device: Offline",
+                  false
+                );
+                setChip(
+                  loadCellChip,
+                  "Scale: Offline",
+                  false
+                );
+                setChip(
+                  lidarChip,
+                  "LiDAR: Offline",
+                  false
+                );
+                if (refs.weightStatus) {
+                  refs.weightStatus.textContent =
+                    "Device offline";
+                }
+                if (refs.heightStatus) {
+                  refs.heightStatus.textContent =
+                    "Device offline";
+                }
+              } else {
+                setChip(
+                  connectedChip,
+                  "Device: Waiting",
+                  false
+                );
+                setChip(
+                  loadCellChip,
+                  "Scale: Waiting",
+                  false
+                );
+                setChip(
+                  lidarChip,
+                  "LiDAR: Waiting",
+                  false
+                );
+              }
+              // Always navigate to the measurement screen first so the
+              // user sees the live measurement UI even if the device is
+              // offline (common during development). The start flow
+              // below handles the actual session creation and will
+              // gracefully fall back if the device is unreachable.
+              setStep("measurement");
+              startMeasurementFlow();
+            } else {
+              pushFeed(
+                "Walang napiling bata",
+                "Maghanap muna ng bata bago magpatuloy.",
+                "warn"
+              );
+            }
+            return;
+          }
+
+          // ====================================================
+          // LOOKUP: OPEN HELP MODAL
+          // ====================================================
+
+          if (
+            action === "open-lookup-help"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("lookupHelpModal");
+            if (modal) modal.hidden = false;
+            return;
+          }
+
+          // ====================================================
+          // LOOKUP: CLOSE HELP MODAL
+          // ====================================================
+
+          if (
+            action === "close-lookup-help"
+          ) {
+            event.preventDefault();
+            var modal = document.getElementById("lookupHelpModal");
+            if (modal) modal.hidden = true;
+            return;
+          }
+
+          // ====================================================
+          // BACK TO HEIGHT (from weight)
+          // ====================================================
+
+          if (
+            action === "back-to-height"
+          ) {
+            event.preventDefault();
+            setStep("measurement");
+            return;
+          }
+
+          // ====================================================
+          // FINISH (from results → thankyou)
+          // ====================================================
+
+          if (
+            action === "finish"
+          ) {
+            event.preventDefault();
+            setStep("thankyou");
+            return;
+          }
+
+          // ====================================================
+          // PROCEED LIVE (kept for compatibility)
           // ====================================================
 
           if (
@@ -4917,9 +5694,8 @@ function finishResults(
           }
 
           // ====================================================
-          // BACK TO SELECT (from the Live screen) — deselects the
-          // child and clears the pending session, same teardown as
-          // a full reset, just landing on Select instead of Welcome.
+          // BACK TO INFO (from measurement) — deselects the
+          // child and clears the pending session.
           // ====================================================
 
           if (
@@ -4977,17 +5753,17 @@ function finishResults(
                 }
               )
                 .then(function () {
-                  clearSelectionAndSession(
-                    "select",
-                    "Back to selection",
-                    "Session cancelled. Choose a child to continue."
-                  );
+            clearSelectionAndSession(
+              "child-lookup",
+              "Back to lookup",
+              "Session cancelled. Enter Child ID to continue."
+            );
                 })
                 .catch(function () {
                   clearSelectionAndSession(
-                    "select",
-                    "Back to selection",
-                    "Child deselected. Choose a child to continue."
+                    "child-lookup",
+                    "Back to lookup",
+                    "Child deselected. Enter Child ID to continue."
                   );
                 });
 
@@ -4995,9 +5771,9 @@ function finishResults(
             }
 
             clearSelectionAndSession(
-              "select",
-              "Back to selection",
-              "Child deselected. Choose a child to continue."
+              "child-lookup",
+              "Back to lookup",
+              "Child deselected. Enter Child ID to continue."
             );
 
             return;
@@ -5036,90 +5812,109 @@ function finishResults(
     });
 
     // ----------------------------------------------------------
-    // STEP BUTTONS
+    // STEP BUTTONS (hidden in new design, kept for compatibility)
     // ----------------------------------------------------------
 
     stepButtons.forEach(button => {
       button.addEventListener(
         "click",
         () => {
-          const target =
-            button.getAttribute(
-              "data-kiosk-step-jump"
-            );
-
-          if (
-            target === "select"
-          ) {
-            if (
-              !isMeasurementActive() &&
-              !state.processingStarted
-            ) {
-              setStep("select");
-            }
-
-            return;
-          }
-
-          if (
-            target === "live"
-          ) {
-            /*
-             * This tab used to only check state.session, which meant
-             * a leftover/restored session let you jump straight to
-             * the live screen with no regard for whether the device
-             * is actually connected right now — the one path in the
-             * UI that skipped the device-offline guard entirely.
-             */
-            if (
-              state.session &&
-              !state.processingStarted &&
-              !(
-                state.deviceStatusChecked &&
-                !state.deviceOnline
-              )
-            ) {
-              setStep("live");
-            } else if (
-              state.deviceStatusChecked &&
-              !state.deviceOnline
-            ) {
-              pushFeed(
-                "Live view unavailable",
-                "The kiosk device is offline. Check the ESP32 power and connection.",
-                "warn"
-              );
-            }
-
-            return;
-          }
-
-          if (
-            target === "processing"
-          ) {
-            pushFeed(
-              "Step locked",
-              "Click Process Measurement to continue.",
-              "warn"
-            );
-
-            return;
-          }
-
-          if (
-            target === "results"
-          ) {
-            pushFeed(
-              "Step locked",
-              "Results are available after processing.",
-              "warn"
-            );
-
-            return;
-          }
+          // Step bar is hidden in the new 6-step design
         }
       );
     });
+
+    // ----------------------------------------------------------
+    // (child-info form removed — replaced by child-lookup)
+    // ----------------------------------------------------------
+  }
+
+  // ============================================================
+  // VIEW RESULTS — Populate children list
+  // ============================================================
+
+  function populateViewResults() {
+    const list = document.getElementById("viewResultsList");
+    const search = document.getElementById("viewResultsSearch");
+    if (!list) return;
+
+    const children = data.children || [];
+
+    function render(filter) {
+      const q = (filter || "").toLowerCase();
+      const filtered = q
+        ? children.filter(
+            (c) =>
+              (c.first_name + " " + c.last_name)
+                .toLowerCase()
+                .includes(q) ||
+              (c.child_code || "").toLowerCase().includes(q)
+          )
+        : children;
+
+      if (filtered.length === 0) {
+        list.innerHTML =
+          '<div class="kiosk-view-results-empty">' +
+          '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#d4e5dc" stroke-width="2"><circle cx="24" cy="24" r="20"/><line x1="18" y1="24" x2="30" y2="24"/><line x1="24" y1="18" x2="24" y2="30"/></svg>' +
+          "<p>" +
+          (q
+            ? "Walang nakitang resulta para sa \"" + q + "\""
+            : "Wala pang rehistradong bata sa kiosk na ito.") +
+          "</p></div>";
+        return;
+      }
+
+      list.innerHTML = filtered
+        .map(function (c) {
+          var initials = (
+            (c.first_name || "").charAt(0) +
+            (c.last_name || "").charAt(0)
+          ).toUpperCase();
+          var statusClass = nutritionalStatusBadgeClass(c.status);
+          var ageText =
+            c.age_months >= 12
+              ? Math.floor(c.age_months / 12) +
+                " taon, " +
+                (c.age_months % 12) +
+                " buwan"
+              : c.age_months + " buwan";
+          return (
+            '<div class="kiosk-view-results-card" data-child-id="' +
+            c.id +
+            '">' +
+            '<div class="kiosk-view-results-card-avatar">' +
+            initials +
+            "</div>" +
+            '<div class="kiosk-view-results-card-info">' +
+            '<div class="kiosk-view-results-card-name">' +
+            (c.first_name + " " + c.last_name) +
+            "</div>" +
+            '<div class="kiosk-view-results-card-meta">' +
+            ageText +
+            " &middot; " +
+            (c.sex === "Male" ? "Lalaki" : "Babae") +
+            " &middot; " +
+            (c.barangay || "N/A") +
+            "</div>" +
+            "</div>" +
+            '<span class="kiosk-view-results-card-badge ' +
+            statusClass +
+            '">' +
+            (c.status || "Pending") +
+            "</span>" +
+            "</div>"
+          );
+        })
+        .join("");
+    }
+
+    render("");
+    if (search) {
+      search.value = "";
+      search.oninput = function () {
+        render(search.value);
+      };
+    }
   }
 
   // ============================================================
@@ -5222,6 +6017,23 @@ function finishResults(
   async function initialize() {
     bindEvents();
 
+    var privacyCheckbox = document.getElementById("privacyCheckbox");
+    var infoSheetCheckbox = document.getElementById("infoSheetCheckbox");
+    var privacyContinueBtn = document.getElementById("privacyContinueBtn");
+
+    function updateContinueBtn() {
+      if (privacyContinueBtn) {
+        privacyContinueBtn.disabled = !(privacyCheckbox && privacyCheckbox.checked && infoSheetCheckbox && infoSheetCheckbox.checked);
+      }
+    }
+
+    if (privacyCheckbox) {
+      privacyCheckbox.addEventListener("change", updateContinueBtn);
+    }
+    if (infoSheetCheckbox) {
+      infoSheetCheckbox.addEventListener("change", updateContinueBtn);
+    }
+
     bindVisibilityHandling();
 
     bindUnloadHandling();
@@ -5292,7 +6104,7 @@ function finishResults(
 
     if (heroNote) {
       heroNote.textContent =
-        "Select a child, then start the measurement.";
+        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
     }
 
     if (refs.resultSource) {

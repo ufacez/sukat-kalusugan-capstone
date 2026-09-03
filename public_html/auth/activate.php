@@ -26,7 +26,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css">
-    <link rel="icon" type="image/jpeg" href="../assets/img/logo/variant01.jpg">
+    <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg">
     <script>
     (function(){
     var t=localStorage.getItem("theme");
@@ -46,15 +46,18 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 <path d="M0,280 C70,260 110,300 190,220 C250,160 290,180 400,100" />
             </svg>
 
-            <div class="mark-standalone" aria-hidden="true">
-                <img src="../assets/img/logo/4k_light01.png" alt="Sukat Kalusugan" class="mark-standalone-img logo-light">
-                <img src="../assets/img/logo/4k_dark01.png" alt="Sukat Kalusugan" class="mark-standalone-img logo-dark">
-            </div>
+            <div class="auth-logo-group">
+                <div class="mark-standalone" aria-hidden="true">
+                    <img src="../assets/img/logo/logotext_forlight.svg" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="../assets/img/logo/logotext_forlight.svg" data-logo-dark="../assets/img/logo/logotext_fordark.svg">
+                </div>
 
-            <h1 class="system-title">Sukat Kalusugan</h1>
+                <div class="mark-standalone-icon" aria-hidden="true">
+                    <img src="../assets/img/logo/logo_forlight.svg" alt="" class="mark-icon-img" data-logo-light="../assets/img/logo/logo_forlight.svg" data-logo-dark="../assets/img/logo/logo_fordark.svg">
+                </div>
 
-            <div class="auth-tagline">
-               Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.
+                <div class="auth-tagline">
+                   Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.
+                </div>
             </div>
         </section>
 
@@ -118,6 +121,13 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
 
     <script>
     (function(){
+        function swapLogos(isDark){
+            document.querySelectorAll('[data-logo-light]').forEach(function(img){
+                img.src = isDark ? img.getAttribute('data-logo-dark') : img.getAttribute('data-logo-light');
+            });
+        }
+        swapLogos(document.documentElement.getAttribute('data-theme') === 'dark');
+
         var toggle = document.querySelector('[data-auth-theme-toggle]');
         if (!toggle) return;
         var current = document.documentElement.getAttribute('data-theme') || 'light';
@@ -126,6 +136,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
             isDark = !isDark;
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            swapLogos(isDark);
         });
     })();
     </script>
