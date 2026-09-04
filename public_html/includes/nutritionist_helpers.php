@@ -243,6 +243,7 @@ function nutritionist_layout_end(): void
     echo '</div>';
     echo '</div>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js')) . '"></script>';
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js')) . '"></script>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
 
     $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'staff'];
@@ -305,6 +306,138 @@ function nutritionist_calendar_label(string $entryType): string
         'oplan_timbang' => 'Oplan Timbang',
         default => ucfirst($entryType),
     };
+}
+
+/**
+ * Canonical event-type color tokens used by both the dashboard and the
+ * appointments-page calendars. Returns an array keyed by entryType with
+ * `color`, `label`, and a short CSS-friendly hex.
+ */
+function nutritionist_calendar_legend(): array
+{
+    return [
+        ['type' => 'appointment',    'label' => 'Appointment',    'color' => '#E03131'],
+        ['type' => 'meeting',        'label' => 'Meeting',        'color' => '#4a9fd5'],
+        ['type' => 'oplan_timbang',  'label' => 'Oplan Timbang',  'color' => '#16a34a'],
+    ];
+}
+
+/**
+ * Renders the shared nutritionist calendar grid. Days are interactive
+ * buttons that carry the day's full ISO date plus a JSON-serialized list
+ * of events so the JS layer can populate the detail panel on click.
+ *
+ * Each $entriesByDay[$day] entry must contain:
+ *   - type  (string, one of: appointment|meeting|oplan_timbang)
+ *   - title (string)
+ *   - time  (?string, "g:i A" formatted, optional)
+ *   - id    (?int, optional — appointment id for cross-linking)
+ *   - location (?string)
+ *   - status (?string, "overdue"|"cancelled"|null)
+ *   - color (?string, override; otherwise looked up by type)
+ *
+ * @param array<int, array<int, array<string, mixed>>> $entriesByDay
+ */
+function nutritionist_render_calendar_grid(
+    DateTimeImmutable $monthAnchor,
+    array $entriesByDay,
+    DateTimeImmutable $today
+): string {
+    $firstWeekday = (int)$monthAnchor->format('w');
+    $daysInMonth = (int)$monthAnchor->format('t');
+    $monthIso = $monthAnchor->format('Y-m');
+
+    $html = '<div class="sk-cal-grid">';
+    foreach (['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'] as $wk) {
+        $html .= '<span class="sk-cal-weekday">' . nutritionist_e($wk) . '</span>';
+    }
+
+    for ($i = 0; $i < $firstWeekday; $i++) {
+        $html .= '<span class="sk-cal-day is-empty" aria-hidden="true"></span>';
+    }
+
+    for ($d = 1; $d <= $daysInMonth; $d++) {
+        $dayEntries = $entriesByDay[$d] ?? [];
+        $isoDate = $monthAnchor->setDate(
+            (int)$monthAnchor->format('Y'),
+            (int)$monthAnchor->format('n'),
+            $d
+        )->format('Y-m-d');
+
+        $isToday = $today->format('Y-m-d') === $isoDate;
+        $hasEntries = $dayEntries !== [];
+
+        $hasOverdue = false;
+        foreach ($dayEntries as $entry) {
+            if (($entry['status'] ?? null) === 'overdue') {
+                $hasOverdue = true;
+                break;
+            }
+        }
+
+        $classes = ['sk-cal-day'];
+        if ($isToday) {
+            $classes[] = 'is-today';
+        }
+        if ($hasEntries) {
+            $classes[] = 'has-events';
+        }
+        if ($hasOverdue) {
+            $classes[] = 'has-overdue';
+        }
+
+        $dotsHtml = '';
+        if ($hasEntries) {
+            $dotsHtml .= '<span class="sk-cal-day-dots">';
+            foreach (array_slice($dayEntries, 0, 3) as $entry) {
+                $type = (string)($entry['type'] ?? 'appointment');
+                $color = (string)($entry['color'] ?? nutritionist_calendar_color($type));
+                $dotsHtml .= '<span class="sk-cal-day-dot" style="background:' . nutritionist_e($color) . ';"></span>';
+            }
+            if (count($dayEntries) > 3) {
+                $dotsHtml .= '<span class="sk-cal-day-more">+' . (count($dayEntries) - 3) . '</span>';
+            }
+            $dotsHtml .= '</span>';
+        }
+
+        $payload = [];
+        foreach ($dayEntries as $entry) {
+            $type = (string)($entry['type'] ?? 'appointment');
+            $payload[] = [
+                'type' => $type,
+                'title' => (string)($entry['title'] ?? ''),
+                'time' => isset($entry['time']) ? (string)$entry['time'] : null,
+                'id' => isset($entry['id']) ? (int)$entry['id'] : null,
+                'location' => isset($entry['location']) ? (string)$entry['location'] : null,
+                'status' => isset($entry['status']) ? (string)$entry['status'] : null,
+                'color' => (string)($entry['color'] ?? nutritionist_calendar_color($type)),
+                'label' => nutritionist_calendar_label($type),
+            ];
+        }
+
+        $payloadJson = json_encode(
+            $payload,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE
+        );
+
+        $html .= '<button type="button"'
+            . ' class="' . nutritionist_e(implode(' ', $classes)) . '"'
+            . ' data-calendar-day="' . nutritionist_e($isoDate) . '"'
+            . ' data-calendar-entries=\'' . nutritionist_e((string)$payloadJson) . '\''
+            . ' aria-label="' . nutritionist_e($monthAnchor->format('F') . ' ' . $d . ', ' . $monthAnchor->format('Y')) . '">'
+            . '<span class="sk-cal-day-num">' . $d . '</span>'
+            . $dotsHtml
+            . '</button>';
+    }
+
+    $rendered = $firstWeekday + $daysInMonth;
+    while ($rendered % 7 !== 0) {
+        $html .= '<span class="sk-cal-day is-empty" aria-hidden="true"></span>';
+        $rendered++;
+    }
+    $html .= '</div>';
+
+    return $html;
 }
 
 // ----------------------------------------------------------------------

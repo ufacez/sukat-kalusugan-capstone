@@ -29,6 +29,7 @@ $appointments = admin_fetch_all(
 		a.status,
 		a.notes,
 		a.appointment_type,
+		a.location,
 		c.first_name,
 		c.last_name,
 		c.child_code,
@@ -36,7 +37,7 @@ $appointments = admin_fetch_all(
 		b.name AS nutritionist_barangay
 	 FROM appointments a
 	 INNER JOIN children c ON c.id = a.child_id
-	 INNER JOIN users u ON u.id = a.nutritionist_id
+	 LEFT JOIN users u ON u.id = a.nutritionist_id
 	 LEFT JOIN barangays b ON b.id = u.barangay_id
 	 WHERE a.parent_id = ?
 	 ORDER BY a.scheduled_at DESC, a.id DESC',
@@ -47,6 +48,25 @@ $appointments = admin_fetch_all(
 $pendingCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'pending'));
 $confirmedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'confirmed'));
 $completedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'completed'));
+
+$perPage = 5;
+$totalAppointments = count($appointments);
+$recentMode = !isset($_GET['page']);
+$totalPages = max(1, (int)ceil($totalAppointments / $perPage));
+$tablePage = max(1, (int)($_GET['page'] ?? 1));
+if ($tablePage > $totalPages) {
+	$tablePage = $totalPages;
+}
+
+if ($recentMode) {
+	$visibleAppointments = array_slice($appointments, 0, $perPage);
+	$tableStart = 0;
+	$tableEnd = count($visibleAppointments);
+} else {
+	$tableStart = ($tablePage - 1) * $perPage;
+	$tableEnd = min($tableStart + $perPage, $totalAppointments);
+	$visibleAppointments = array_slice($appointments, $tableStart, $perPage);
+}
 
 $actions = '<a class="admin-btn" href="'
 	. parent_e(app_url('/parent/appointment_form.php'))
@@ -103,38 +123,38 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 	<div class="parent-table-head" style="margin-bottom:12px;">
 		<div>
 			<h2 class="admin-section-title" style="margin-bottom:2px;">Appointment Schedule</h2>
-			<p class="admin-section-subtitle">Recent appointment requests and their current status.</p>
+			<p class="admin-section-subtitle"><?php echo $recentMode ? 'Showing the 5 most recent appointments.' : 'Recent appointment requests and their current status.'; ?></p>
 		</div>
 		<input class="admin-search" data-admin-filter="#appointments-table" type="search" placeholder="Search appointments" style="min-width:250px;">
 	</div>
 
 	<div class="parent-table-wrap">
-		<table class="parent-table" id="appointments-table">
+		<table class="parent-table" id="appointments-table" data-no-paginate>
 			<thead>
 				<tr>
-					<th>Date & time</th>
-					<th>Child</th>
-					<th>Nutritionist</th>
-					<th>Status</th>
-					<th>Notes</th>
-					<th>Action</th>
+					<th style="width:140px;">Date &amp; time</th>
+					<th style="width:150px;">Child</th>
+					<th style="width:170px;">Nutritionist</th>
+					<th style="width:110px;">Status</th>
+					<th style="min-width:140px;">Notes</th>
+					<th style="width:110px;">Action</th>
 				</tr>
 			</thead>
 			<tbody>
-				<?php if ($appointments === []): ?>
+				<?php if ($visibleAppointments === []): ?>
 					<tr><td colspan="6" style="color:var(--admin-muted);">No appointments have been created yet.</td></tr>
 				<?php else: ?>
-					<?php foreach ($appointments as $appointment): ?>
-						<tr data-filter-text="<?php echo parent_e(strtolower($appointment['scheduled_at'] . ' ' . $appointment['first_name'] . ' ' . $appointment['last_name'] . ' ' . $appointment['nutritionist_name'] . ' ' . $appointment['status'])); ?>">
+					<?php foreach ($visibleAppointments as $appointment): ?>
+						<tr data-filter-text="<?php echo parent_e(strtolower($appointment['scheduled_at'] . ' ' . $appointment['first_name'] . ' ' . $appointment['last_name'] . ' ' . ($appointment['nutritionist_name'] ?? '') . ' ' . $appointment['status'])); ?>">
 							<td><?php echo parent_e((string)$appointment['scheduled_at']); ?></td>
 							<td>
 								<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($appointment['first_name'] . ' ' . $appointment['last_name']); ?></div>
 								<div class="admin-mini"><?php echo parent_e((string)$appointment['child_code']); ?></div>
 							</td>
-							<td>
-								<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e((string)$appointment['nutritionist_name']); ?></div>
-								<div class="admin-mini"><?php echo parent_e((string)($appointment['nutritionist_barangay'] ?? '')); ?></div>
-							</td>
+						<td>
+							<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e((string)($appointment['nutritionist_name'] ?? 'Unassigned nutritionist')); ?></div>
+							<div class="admin-mini"><?php echo parent_e((string)($appointment['nutritionist_barangay'] ?? '')); ?></div>
+						</td>
 							<td><span class="admin-pill <?php echo parent_status_class((string)$appointment['status']); ?>"><?php echo parent_e(ucfirst((string)$appointment['status'])); ?></span></td>
 							<td style="color:var(--admin-muted);">
 								<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup'): ?>
@@ -161,7 +181,74 @@ parent_layout_start('Appointments', 'Request follow-ups and manage your appointm
 			</tbody>
 		</table>
 	</div>
+
+	<?php if ($totalAppointments > $perPage): ?>
+		<div class="admin-table-pagination" style="margin-top:12px;">
+			<span class="admin-table-page-info">
+				<?php echo $recentMode
+					? 'Showing the 5 most recent of ' . $totalAppointments . ' appointments'
+					: 'Showing ' . ($tableStart + 1) . '–' . $tableEnd . ' of ' . $totalAppointments . ' appointments'; ?>
+			</span>
+			<div class="admin-table-pages">
+				<?php if ($recentMode): ?>
+					<a class="admin-table-page-btn" href="<?php echo parent_e(app_url('/parent/appointments.php?page=1')); ?>">View all</a>
+				<?php else: ?>
+					<?php
+					$linkFor = static function (int $p) use ($totalPages): string {
+						return app_url('/parent/appointments.php?page=' . max(1, min($p, $totalPages)));
+					};
+					?>
+					<button class="admin-table-page-btn" <?php echo $tablePage <= 1 ? 'disabled' : ''; ?> data-href="<?php echo parent_e($linkFor($tablePage - 1)); ?>">‹</button>
+					<?php
+					$pageNumbers = [];
+					if ($totalPages <= 7) {
+						$pageNumbers = range(1, $totalPages);
+					} else {
+						$pageNumbers = [1, 2, 3];
+						if ($tablePage > 4) {
+							$pageNumbers[] = '…';
+						}
+						if ($tablePage > 3 && $tablePage < $totalPages - 1) {
+							$pageNumbers[] = $tablePage;
+						}
+						if ($tablePage < $totalPages - 2) {
+							$pageNumbers[] = '…';
+						}
+						$pageNumbers[] = $totalPages - 1;
+						$pageNumbers[] = $totalPages;
+						$pageNumbers = array_values(array_unique($pageNumbers));
+					}
+					foreach ($pageNumbers as $pn):
+						if ($pn === '…'): ?>
+							<span class="admin-table-page-dots">…</span>
+						<?php else:
+							$cls = 'admin-table-page-btn' . ($pn === $tablePage ? ' is-active' : ''); ?>
+							<button class="<?php echo $cls; ?>" data-href="<?php echo parent_e($linkFor((int)$pn)); ?>"><?php echo (int)$pn; ?></button>
+						<?php endif;
+					endforeach; ?>
+					<button class="admin-table-page-btn" <?php echo $tablePage >= $totalPages ? 'disabled' : ''; ?> data-href="<?php echo parent_e($linkFor($tablePage + 1)); ?>">›</button>
+				<?php endif; ?>
+			</div>
+		</div>
+	<?php endif; ?>
 </section>
+
+<script>
+(function () {
+	document.querySelectorAll('.admin-table-pagination .admin-table-page-btn[data-href]').forEach(function (btn) {
+		btn.addEventListener('click', function (e) {
+			if (this.disabled) {
+				e.preventDefault();
+				return;
+			}
+			var href = this.getAttribute('data-href');
+			if (href) {
+				window.location.href = href;
+			}
+		});
+	});
+})();
+</script>
 
 <?php
 parent_layout_end();

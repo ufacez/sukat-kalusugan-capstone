@@ -7,6 +7,7 @@ require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/firebase_sync.php';
+require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -1042,6 +1043,21 @@ push_latest_measurement(
 
 /*
 |--------------------------------------------------------------------------
+| EOPT FOLLOW-UP SYNCHRONIZATION
+|--------------------------------------------------------------------------
+|
+| After a kiosk measurement is committed, immediately materialize the
+| child's next mandatory follow-up based on the new classification.
+| This is what makes "what appointment will they get" reflect on the
+| parent's portal the next time they load it — we no longer wait for a
+| nutritionist to manually open the Appointments page.
+|
+*/
+
+$followupSync = followup_sync_for_child($childId);
+
+/*
+|--------------------------------------------------------------------------
 | RESPONSE
 |--------------------------------------------------------------------------
 */
@@ -1107,6 +1123,14 @@ api_success(
 
         'firebase_synced' =>
             firebase_database_url() !== '',
+
+        'followup' => [
+            'generated' => (int)$followupSync['generated'],
+            'completed' => (int)$followupSync['completed'],
+            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
+            'track' => $followupSync['track'],
+            'category' => $followupSync['category'],
+        ],
     ],
     'Measurement saved successfully.'
 );

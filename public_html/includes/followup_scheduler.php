@@ -296,30 +296,27 @@ function followup_card_state(
 }
 
 /**
- * Runs one automatic synchronization pass over every child inside the
- * current user's barangay scope:
+ * Runs one automatic synchronization pass for a single child — auto-completes
+ * any satisfied follow-up, recategorizes any open follow-up whose stored
+ * category has been improved by a new measurement, and books the next
+ * mandatory cycle if no open follow-up remains.
  *
- *   1. AUTO-COMPLETE any open follow-up already satisfied by a newer
- *      measurement (taken within the grace window before/at the due date);
- *   2. GENERATE the missing next-cycle follow-up appointment per child.
+ * Designed for measurement-ingestion endpoints (kiosk + manual) where we
+ * want to materialize a follow-up immediately for the child that was just
+ * measured, without needing a session-authenticated nutritionist user.
  *
- * Called automatically on the Appointments page load; safe to call often.
- *
- * @return array{generated: int, completed: int}
+ * @return array{generated: int, completed: int, recategorized: int, track: ?string, category: string}
  */
-function followup_sync_for_scope(array $user): array
+function followup_sync_for_child(int $childId): array
 {
-	$scopeParams = [];
-	$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
+	$conn = get_db_connection();
 
-	$children = admin_fetch_all(
-		"SELECT
+	$child = admin_fetch_one(
+		'SELECT
 			c.id,
-			c.child_code,
-			c.first_name,
-			c.last_name,
 			c.birthdate,
 			c.parent_id,
+			c.barangay_id,
 			lm.id AS last_measurement_id,
 			lm.measurement_date,
 			lm.wfa_status,
@@ -332,87 +329,175 @@ function followup_sync_for_scope(array $user): array
 			ORDER BY m.measurement_date DESC, m.id DESC
 			LIMIT 1
 		 )
-		 WHERE {$scope}",
-		str_repeat('i', count($scopeParams)),
-		$scopeParams
+		 WHERE c.id = ?
+		 LIMIT 1',
+		'i',
+		[$childId]
 	);
 
-	$openFollowups = admin_fetch_all(
-		"SELECT id, child_id, scheduled_at
-		 FROM appointments
-		 WHERE appointment_type = 'followup'
-		   AND status IN ('pending', 'confirmed')"
-	);
-
-	$openByChild = [];
-	foreach ($openFollowups as $row) {
-		$openByChild[(int)$row['child_id']][] = $row;
+	if ($child === null) {
+		return ['generated' => 0, 'completed' => 0, 'recategorized' => 0, 'track' => null, 'category' => ''];
 	}
 
 	$today = new DateTimeImmutable('today');
-	$generated = 0;
+
+	$openFollowups = admin_fetch_all(
+		"SELECT id, child_id, scheduled_at, followup_track, followup_category, source_measurement_id
+		 FROM appointments
+		 WHERE child_id = ?
+		   AND appointment_type = 'followup'
+		   AND status IN ('pending', 'confirmed')",
+		'i',
+		[$childId]
+	);
+
 	$completed = 0;
+	foreach ($openFollowups as $followup) {
+		try {
+			$scheduledDate = new DateTimeImmutable((string)$followup['scheduled_at']);
+			$satisfiedFrom = $scheduledDate->setTime(0, 0)->modify('-' . FOLLOWUP_GRACE_DAYS . ' days');
+		} catch (Exception) {
+			continue;
+		}
 
-	foreach ($children as $child) {
-		$childId = (int)$child['id'];
+		$measuredAt = $child['measurement_date'] ?? null;
 
-		/*
-		 | Pass 1 — auto-completion: the follow-up cycle is satisfied when a
-		 | measurement exists dated on/after (scheduled date - grace days),
-		 | i.e. the family showed up for the mandatory re-measurement.
-		 */
-		foreach ($openByChild[$childId] ?? [] as $followup) {
+		if (
+			$measuredAt !== null
+			&& $measuredAt !== ''
+			&& new DateTimeImmutable((string)$measuredAt) >= $satisfiedFrom
+		) {
+			$ok = admin_execute(
+				"UPDATE appointments
+				 SET status = 'completed',
+				     notes = CONCAT(COALESCE(notes, ''), ' - Re-measurement recorded ', ?, '. Auto-completed by EOPT scheduler.')
+				 WHERE id = ?
+				   AND status IN ('pending', 'confirmed')",
+				'si',
+				[(string)$measuredAt, (int)$followup['id']]
+			);
+
+			if ($ok) {
+				$completed++;
+			}
+		}
+	}
+
+	/*
+	 * Pass 1.5 — recategorize: if a re-measurement has IMPROVED the child's
+	 * classification AND the existing follow-up is still >= 7 days away,
+	 * cancel the old row and let Pass 2 regenerate a fresh one with the
+	 * new (better) category. Worsening classifications leave the old
+	 * appointment alone — a monthly follow-up is still appropriate.
+	 */
+	$recategorized = 0;
+	$stillOpen = admin_fetch_all(
+		"SELECT id, scheduled_at, followup_track, followup_category, source_measurement_id
+		 FROM appointments
+		 WHERE child_id = ?
+		   AND appointment_type = 'followup'
+		   AND status IN ('pending', 'confirmed')",
+		'i',
+		[$childId]
+	);
+
+	if ($stillOpen !== []) {
+		$classif = followup_classify_child($child, $today);
+		$newRank = followup_category_severity_rank($classif['category']);
+		$newTrack = $classif['track'];
+		$swapCutoff = $today->modify('+' . FOLLOWUP_GRACE_DAYS . ' days')->setTime(0, 0);
+
+		foreach ($stillOpen as $openRow) {
 			try {
-				$scheduledDate = new DateTimeImmutable((string)$followup['scheduled_at']);
-				$satisfiedFrom = $scheduledDate->setTime(0, 0)->modify('-' . FOLLOWUP_GRACE_DAYS . ' days');
+				$openDate = new DateTimeImmutable((string)$openRow['scheduled_at']);
 			} catch (Exception) {
 				continue;
 			}
 
-			$measuredAt = $child['measurement_date'] ?? null;
+			if ($openDate < $swapCutoff) {
+				continue;
+			}
 
-			if (
-				$measuredAt !== null
-				&& $measuredAt !== ''
-				&& new DateTimeImmutable((string)$measuredAt) >= $satisfiedFrom
-			) {
-				$ok = admin_execute(
-					"UPDATE appointments
-					 SET status = 'completed',
-					     notes = CONCAT(COALESCE(notes, ''), ' - Re-measurement recorded ', ?, '. Auto-completed by EOPT scheduler.')
-					 WHERE id = ?
-					   AND status IN ('pending', 'confirmed')",
-					'si',
-					[(string)$measuredAt, (int)$followup['id']]
+			$oldCategory = (string)($openRow['followup_category'] ?? '');
+			$oldRank = followup_category_severity_rank($oldCategory);
+
+			if ($newRank >= $oldRank) {
+				continue;
+			}
+
+			$newLabel = $newCategory = $classif['category'];
+			$triggerMeasurementId = $child['last_measurement_id'] !== null ? (int)$child['last_measurement_id'] : null;
+			$measuredAt = $child['measurement_date'] ?? date('Y-m-d');
+			$noteFragment = sprintf(
+				' - Reclassified %s → %s on %s (measurement #%d). New follow-up scheduled.',
+				$oldCategory !== '' ? $oldCategory : 'unspecified',
+				$newLabel !== '' ? $newLabel : 'Normal',
+				(string)$measuredAt,
+				$triggerMeasurementId ?? 0
+			);
+
+			$ok = admin_execute(
+				"UPDATE appointments
+				 SET status = 'cancelled',
+				     notes = CONCAT(COALESCE(notes, ''), ?)
+				 WHERE id = ?
+				   AND status IN ('pending', 'confirmed')",
+				'si',
+				[$noteFragment, (int)$openRow['id']]
+			);
+
+			if ($ok) {
+				$recategorized++;
+
+				log_action(
+					null,
+					'FOLLOWUP_RECLASSIFIED',
+					'info',
+					sprintf(
+						'Follow-up #%d for child #%d reclassified: %s → %s (track %s → %s) after measurement #%d on %s.',
+						(int)$openRow['id'],
+						$childId,
+						$oldCategory !== '' ? $oldCategory : 'unspecified',
+						$newLabel !== '' ? $newLabel : 'Normal',
+						(string)($openRow['followup_track'] ?? ''),
+						(string)($newTrack ?? ''),
+						$triggerMeasurementId ?? 0,
+						(string)$measuredAt
+					)
 				);
-
-				if ($ok) {
-					$completed++;
-					unset($openByChild[$childId]);
-				}
 			}
 		}
+	}
 
-		/*
-		 | Pass 2 — generation: exactly ONE open follow-up per child at a
-		 | time. When none remains, book the next mandatory cycle.
-		 */
-		if (($openByChild[$childId] ?? []) !== []) {
-			continue;
-		}
+	$remainingOpen = admin_fetch_all(
+		"SELECT id FROM appointments
+		 WHERE child_id = ?
+		   AND appointment_type = 'followup'
+		   AND status IN ('pending', 'confirmed')",
+		'i',
+		[$childId]
+	);
 
-		$classif = followup_classify_child($child, $today);
+	if ($remainingOpen !== []) {
+		return ['generated' => 0, 'completed' => $completed, 'recategorized' => $recategorized, 'track' => null, 'category' => ''];
+	}
 
-		if ($classif['track'] === null) {
-			continue;
-		}
+	$classif = followup_classify_child($child, $today);
 
-		$due = followup_next_due(
-			$child['measurement_date'] ?? null,
-			$classif['track'],
-			$today
-		)->setTime(9, 0, 0);
+	if ($classif['track'] === null) {
+		return ['generated' => 0, 'completed' => $completed, 'recategorized' => $recategorized, 'track' => null, 'category' => ''];
+	}
 
+	$due = followup_next_due(
+		$child['measurement_date'] ?? null,
+		$classif['track'],
+		$today
+	)->setTime(9, 0, 0);
+
+	$nutritionistId = followup_pick_nutritionist_for_child($conn, (int)$child['barangay_id']);
+
+	$generated = 0;
+	if ($nutritionistId > 0) {
 		$ok = admin_execute(
 			"INSERT INTO appointments
 				(child_id, parent_id, nutritionist_id, scheduled_at, status,
@@ -423,7 +508,7 @@ function followup_sync_for_scope(array $user): array
 			[
 				$childId,
 				(int)$child['parent_id'],
-				(int)$user['id'],
+				$nutritionistId,
 				$due->format('Y-m-d H:i:s'),
 				'followup',
 				$classif['track'],
@@ -438,20 +523,134 @@ function followup_sync_for_scope(array $user): array
 		}
 	}
 
-	if ($generated > 0 || $completed > 0) {
+	return [
+		'generated' => $generated,
+		'completed' => $completed,
+		'recategorized' => $recategorized,
+		'track' => $classif['track'],
+		'category' => $classif['category'],
+	];
+}
+
+/**
+ * Severity rank used to compare two eOPT categories for the recategorize
+ * pass. Higher rank = more severe. Multi-code categories (e.g. "SUW+St")
+ * resolve to the maximum of their component codes.
+ *
+ *   0 = Normal / Needs baseline / 0-23 mo (no real classification)
+ *   1 = OW
+ *   2 = MUW / MSt / MW
+ *   3 = SUW / SSt / SW / Ob
+ */
+function followup_category_severity_rank(?string $category): int
+{
+	$category = (string)$category;
+
+	if ($category === '' || strcasecmp($category, 'Normal') === 0) {
+		return 0;
+	}
+
+	$codeRanks = [
+		'SUW' => 3, 'SSt' => 3, 'SW' => 3, 'Ob' => 3,
+		'MUW' => 2, 'MSt' => 2, 'MW' => 2,
+		'OW' => 1,
+	];
+
+	$parts = explode('+', $category);
+	$max = 0;
+
+	foreach ($parts as $part) {
+		$max = max($max, $codeRanks[$part] ?? 0);
+	}
+
+	return $max;
+}
+
+/**
+ * Pick an active nutritionist assigned to the given barangay. Returns 0
+ * when no active nutritionist is assigned (caller should skip insert).
+ */
+function followup_pick_nutritionist_for_child(mysqli $conn, int $barangayId): int
+{
+	if ($barangayId <= 0) {
+		return 0;
+	}
+
+	$stmt = mysqli_prepare(
+		$conn,
+		"SELECT u.id
+		 FROM users u
+		 INNER JOIN roles r ON r.id = u.role_id
+		 WHERE r.name = 'nutritionist'
+		   AND u.status = 'active'
+		   AND u.barangay_id = ?
+		 ORDER BY u.id ASC
+		 LIMIT 1"
+	);
+
+	if ($stmt === false) {
+		return 0;
+	}
+
+	mysqli_stmt_bind_param($stmt, 'i', $barangayId);
+	mysqli_stmt_execute($stmt);
+	$result = mysqli_stmt_get_result($stmt);
+	$row = $result instanceof mysqli_result ? mysqli_fetch_assoc($result) : null;
+	mysqli_stmt_close($stmt);
+
+	return $row !== null ? (int)$row['id'] : 0;
+}
+
+/**
+ * Runs one automatic synchronization pass over every child inside the
+ * current user's barangay scope. Delegates per-child to
+ * followup_sync_for_child() so the scope pass and the measurement-time
+ * pass share identical classification, recategorization, and generation
+ * rules.
+ *
+ * Called automatically on the Appointments page load; safe to call often.
+ *
+ * @return array{generated: int, completed: int, recategorized: int}
+ */
+function followup_sync_for_scope(array $user): array
+{
+	$scopeParams = [];
+	$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
+
+	$children = admin_fetch_all(
+		"SELECT c.id
+		 FROM children c
+		 WHERE {$scope}",
+		str_repeat('i', count($scopeParams)),
+		$scopeParams
+	);
+
+	$generated = 0;
+	$completed = 0;
+	$recategorized = 0;
+
+	foreach ($children as $child) {
+		$result = followup_sync_for_child((int)$child['id']);
+		$generated += (int)$result['generated'];
+		$completed += (int)$result['completed'];
+		$recategorized += (int)($result['recategorized'] ?? 0);
+	}
+
+	if ($generated > 0 || $completed > 0 || $recategorized > 0) {
 		log_action(
 			(int)($user['id'] ?? 0) ?: null,
 			'FOLLOWUP_SYNC',
 			'info',
 			sprintf(
-				'EOPT follow-up sync: %d generated, %d auto-completed.',
+				'EOPT follow-up sync: %d generated, %d auto-completed, %d reclassified.',
 				$generated,
-				$completed
+				$completed,
+				$recategorized
 			)
 		);
 	}
 
-	return ['generated' => $generated, 'completed' => $completed];
+	return ['generated' => $generated, 'completed' => $completed, 'recategorized' => $recategorized];
 }
 
 /**

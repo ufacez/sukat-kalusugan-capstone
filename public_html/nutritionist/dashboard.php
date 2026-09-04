@@ -454,31 +454,75 @@ while (count($calendarCells) % 7 !== 0) {
 }
 
 $calendarEntries = [];
+$overdueByDay = [];
 foreach ($appointments as $appointment) {
-	$date = new DateTimeImmutable((string)$appointment['scheduled_at']);
-	if ($date->format('Y-m') === $calendarDate->format('Y-m')) {
-		$day = (int)$date->format('j');
-		$calendarEntries[$day][] = [
-			'type' => 'appointment',
-			'color' => nutritionist_calendar_color('appointment'),
-			'title' => $appointment['first_name'] . ' ' . $appointment['last_name'] . ' (Appointment)',
-			'time' => $date->format('g:i A'),
-		];
+	try {
+		$date = new DateTimeImmutable((string)$appointment['scheduled_at']);
+	} catch (Exception) {
+		continue;
 	}
-}
-
-foreach ($monthEvents as $eventRow) {
-	$date = new DateTimeImmutable((string)$eventRow['event_date']);
+	if ($date->format('Y-m') !== $calendarDate->format('Y-m')) {
+		continue;
+	}
 	$day = (int)$date->format('j');
+	$status = (string)($appointment['status'] ?? 'pending');
+	$isOverdue = in_array($status, ['pending', 'confirmed'], true)
+		&& $date->format('Y-m-d') < $today->format('Y-m-d');
+	$effectiveStatus = $isOverdue ? 'overdue' : $status;
+	if ($isOverdue) {
+		$overdueByDay[$day] = ($overdueByDay[$day] ?? 0) + 1;
+	}
 	$calendarEntries[$day][] = [
-		'type' => $eventRow['event_type'],
-		'color' => nutritionist_calendar_color((string)$eventRow['event_type']),
-		'title' => $eventRow['title'],
-		'time' => $eventRow['event_time'] !== null ? (new DateTimeImmutable((string)$eventRow['event_date'] . ' ' . $eventRow['event_time']))->format('g:i A') : null,
-		'id' => (int)$eventRow['id'],
+		'type' => 'appointment',
+		'color' => nutritionist_calendar_color('appointment'),
+		'title' => $appointment['first_name'] . ' ' . $appointment['last_name'] . ' (Appointment)',
+		'time' => $date->format('g:i A'),
+		'id' => (int)$appointment['id'],
+		'location' => '',
+		'status' => $effectiveStatus,
 	];
 }
 
+foreach ($monthEvents as $eventRow) {
+	try {
+		$date = new DateTimeImmutable((string)$eventRow['event_date']);
+	} catch (Exception) {
+		continue;
+	}
+	$day = (int)$date->format('j');
+	$eventType = (string)$eventRow['event_type'];
+	$eventTime = $eventRow['event_time'] !== null && $eventRow['event_time'] !== ''
+		? (new DateTimeImmutable((string)$eventRow['event_date'] . ' ' . (string)$eventRow['event_time']))->format('g:i A')
+		: null;
+	$calendarEntries[$day][] = [
+		'type' => $eventType,
+		'color' => nutritionist_calendar_color($eventType),
+		'title' => (string)$eventRow['title'],
+		'time' => $eventTime,
+		'id' => (int)$eventRow['id'],
+		'location' => (string)($eventRow['location'] ?? ''),
+		'status' => null,
+	];
+}
+
+$todayStr = $today->format('Y-m-d');
+$todayInCurrentMonth = ((int)$today->format('Y') === (int)$calendarDate->format('Y')
+	&& (int)$today->format('n') === (int)$calendarDate->format('n'));
+$defaultCalendarDay = null;
+if ($todayInCurrentMonth && isset($calendarEntries[(int)$today->format('j')])) {
+	$defaultCalendarDay = $todayStr;
+} else {
+	foreach ($calendarEntries as $dayKey => $entries) {
+		if ($entries !== []) {
+			$defaultCalendarDay = $calendarDate->setDate(
+				(int)$calendarDate->format('Y'),
+				(int)$calendarDate->format('n'),
+				$dayKey
+			)->format('Y-m-d');
+			break;
+		}
+	}
+}
 $recentPage = max(1, (int)($_GET['rmp'] ?? 1));
 $recentPageSize = 5;
 $recentTotal = count($measurements);
@@ -766,101 +810,96 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		</div>
 
 		<?php
-		$firstWeekday = (int)$calendarDate->format('w');
-		$daysInMonth = (int)$calendarDate->format('t');
-		$calendarCells = array_merge(array_fill(0, $firstWeekday, null), range(1, $daysInMonth));
-		while (count($calendarCells) % 7 !== 0) {
-			$calendarCells[] = null;
-		}
-
-		// Event list shown below the calendar — mirrors the screenshot
-		// reference: a "Today" pill on the active date, time, title, location.
 		$todayStr = $today->format('Y-m-d');
-		$todayEvents = [];
-		foreach ($monthEvents as $ev) {
-			if ($ev['event_date'] === $todayStr) {
-				$todayEvents[] = $ev;
+		$initIsoDay = $defaultCalendarDay ?? $todayStr;
+		$initDayNum = (int)(new DateTimeImmutable($initIsoDay))->format('j');
+		$initEntries = $calendarEntries[$initDayNum] ?? [];
+		$initEntries = array_slice($initEntries, 0, 3);
+		$initLabelDate = new DateTimeImmutable($initIsoDay);
+		$initLabel = $initLabelDate->format('l, F j, Y');
+		$isInitToday = $initIsoDay === $todayStr;
+		$scheduledCount = count($appointments) + count($monthEvents);
+		$hasAnyEntries = false;
+		foreach ($calendarEntries as $entries) {
+			if ($entries !== []) {
+				$hasAnyEntries = true;
+				break;
 			}
 		}
-		$scheduledCount = count($monthEvents);
-		$isTodayCurrentMonth = $calendarDate->format('Y-m') === $today->format('Y-m');
 		?>
 
-		<div class="dashboard-calendar-grid">
-			<div class="dashboard-calendar-weekdays">
-				<?php foreach (['S', 'M', 'T', 'W', 'T', 'F', 'S'] as $dayLabel): ?>
-					<div class="dashboard-calendar-weekday"><?php echo nutritionist_e($dayLabel); ?></div>
-				<?php endforeach; ?>
-			</div>
-			<div class="dashboard-calendar-days">
-				<?php foreach ($calendarCells as $day): ?>
-					<?php if ($day === null): ?>
-						<div class="dashboard-calendar-day is-empty"></div>
-					<?php else: ?>
-						<?php
-						$isToday = $day === (int)$today->format('j') && $calendarDate->format('Y-m') === $today->format('Y-m');
-						$dayEntries = $calendarEntries[$day] ?? [];
-						$dayTitleParts = array_map(static fn(array $entry): string => ($entry['time'] !== null ? $entry['time'] . ' ' : '') . $entry['title'], $dayEntries);
-						?>
-						<button type="button" class="dashboard-calendar-day<?php echo $isToday ? ' is-today' : ''; ?><?php echo $dayEntries !== [] ? ' has-events' : ''; ?>" data-calendar-day="<?php echo (int)$day; ?>" title="<?php echo nutritionist_e(implode(' · ', $dayTitleParts)); ?>">
-							<span class="dashboard-calendar-day-num"><?php echo (int)$day; ?></span>
-							<?php if ($dayEntries !== []): ?>
-								<span class="dashboard-calendar-day-dots">
-									<?php foreach (array_slice($dayEntries, 0, 3) as $event): ?>
-										<span class="dashboard-calendar-day-dot" style="background:<?php echo nutritionist_e($event['color']); ?>;"></span>
-									<?php endforeach; ?>
-								</span>
-							<?php endif; ?>
-						</button>
-					<?php endif; ?>
-				<?php endforeach; ?>
-			</div>
+		<div class="sk-cal-wrap" data-sk-calendar data-sk-calendar-detail="dashboard-calendar-events" data-sk-calendar-default="<?php echo nutritionist_e($defaultCalendarDay ?? ''); ?>">
+			<?php echo nutritionist_render_calendar_grid($calendarDate, $calendarEntries, $today); ?>
 		</div>
 
-		<?php if ($scheduledCount > 0 || count($monthEvents) > 0 || count($todayEvents) > 0): ?>
-		<div class="dashboard-calendar-events" id="dashboard-calendar-events">
-			<div class="dashboard-calendar-events-head">
+		<?php if ($hasAnyEntries): ?>
+		<div class="sk-cal-detail" id="dashboard-calendar-events" data-calendar-detail>
+			<div class="sk-cal-detail-head">
 				<div>
-					<div class="dashboard-calendar-events-title"><?php echo $isTodayCurrentMonth ? 'Today' : nutritionist_e($calendarDate->format('l, F j')); ?><?php if ($isTodayCurrentMonth): ?> <span class="dashboard-calendar-events-today">Today</span><?php endif; ?></div>
-					<div class="dashboard-calendar-events-sub"><?php echo (int)$scheduledCount; ?> scheduled</div>
-				</div>
-			</div>
-			<?php
-			$displayEvents = !empty($todayEvents) ? $todayEvents : array_slice($monthEvents, 0, 2);
-			?>
-			<?php foreach ($displayEvents as $te): ?>
-				<?php
-				$eventDate = new DateTimeImmutable((string)$te['event_date']);
-				$teTime = $te['event_time'] !== null ? (new DateTimeImmutable('1970-01-01 ' . $te['event_time']))->format('g:i A') : null;
-				$teLabel = nutritionist_calendar_label((string)$te['event_type']);
-				?>
-				<div class="dashboard-calendar-event">
-					<div class="dashboard-calendar-event-meta">
-						<?php if ($teTime !== null): ?>
-							<div class="dashboard-calendar-event-time"><?php echo nutritionist_e($teTime); ?></div>
+					<div class="sk-cal-detail-title" data-calendar-detail-title>
+						<?php echo nutritionist_e($initLabel); ?>
+						<?php if ($isInitToday): ?>
+							<span class="sk-cal-detail-today">Today</span>
 						<?php endif; ?>
-						<div class="dashboard-calendar-event-title"><?php echo nutritionist_e((string)$te['title']); ?></div>
-						<div class="dashboard-calendar-event-sub">
-							<span class="dashboard-calendar-event-type">
-								<span class="dashboard-calendar-event-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$te['event_type'])); ?>;"></span>
-								<?php echo nutritionist_e($teLabel); ?>
-							</span>
-							<?php if (!empty($te['location'])): ?>
-								<span class="dashboard-calendar-event-sep">·</span>
-								<span class="dashboard-calendar-event-loc"><?php echo nutritionist_e((string)$te['location']); ?></span>
-							<?php endif; ?>
-						</div>
+					</div>
+					<div class="sk-cal-detail-sub" data-calendar-detail-sub>
+						<?php echo count($initEntries); ?> event<?php echo count($initEntries) !== 1 ? 's' : ''; ?>
 					</div>
 				</div>
-			<?php endforeach; ?>
-
-			<div class="dashboard-calendar-events-legend">
-				<div class="dashboard-calendar-events-legend-item"><span class="dashboard-calendar-events-legend-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('appointment')); ?>;"></span>Appointment</div>
-				<div class="dashboard-calendar-events-legend-item"><span class="dashboard-calendar-events-legend-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('meeting')); ?>;"></span>Meeting</div>
-				<div class="dashboard-calendar-events-legend-item"><span class="dashboard-calendar-events-legend-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('oplan_timbang')); ?>;"></span>Oplan Timbang</div>
+			</div>
+			<div class="sk-cal-event-list is-compact" data-calendar-detail-list>
+				<?php if ($initEntries === []): ?>
+					<div class="sk-cal-detail-empty" data-calendar-detail-empty>
+						No events on this day. Click another date to see its schedule.
+					</div>
+				<?php else: ?>
+					<?php foreach ($initEntries as $te):
+						$teTime = $te['time'] ?? null;
+						$teLabel = nutritionist_calendar_label((string)$te['type']);
+						$teColor = (string)($te['color'] ?? nutritionist_calendar_color((string)$te['type']));
+						$teStatus = (string)($te['status'] ?? '');
+						$hasStatus = in_array($teStatus, ['overdue', 'cancelled', 'completed'], true);
+						$teLoc = (string)($te['location'] ?? '');
+						$teId = isset($te['id']) ? (int)$te['id'] : 0;
+					?>
+					<div class="sk-cal-event" data-entry-type="<?php echo nutritionist_e((string)$te['type']); ?>">
+						<div class="sk-cal-event-head">
+							<span class="sk-cal-event-dot" style="background:<?php echo nutritionist_e($teColor); ?>;"></span>
+							<span class="sk-cal-event-type"><?php echo nutritionist_e($teLabel); ?></span>
+							<?php if ($hasStatus): ?>
+								<span class="sk-cal-event-status is-<?php echo nutritionist_e($teStatus); ?>"><?php echo nutritionist_e(ucfirst($teStatus)); ?></span>
+							<?php endif; ?>
+						</div>
+						<div class="sk-cal-event-body">
+							<?php if ($teTime !== null): ?>
+								<div class="sk-cal-event-time"><?php echo nutritionist_e($teTime); ?></div>
+							<?php endif; ?>
+							<div class="sk-cal-event-title"><?php echo nutritionist_e((string)$te['title']); ?></div>
+							<?php if ($teLoc !== ''): ?>
+								<div class="sk-cal-event-loc">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+									<span><?php echo nutritionist_e($teLoc); ?></span>
+								</div>
+							<?php endif; ?>
+						</div>
+						<?php if ($teId > 0): ?>
+							<a class="sk-cal-event-action" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_form.php?id=' . $teId)); ?>">Open →</a>
+						<?php endif; ?>
+					</div>
+					<?php endforeach; ?>
+				<?php endif; ?>
 			</div>
 
-			<a class="admin-btn-secondary dashboard-calendar-view-all" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">View full calendar →</a>
+			<div class="sk-cal-detail-legend">
+				<?php foreach (nutritionist_calendar_legend() as $legendItem): ?>
+					<div class="sk-cal-detail-legend-item">
+						<span class="sk-cal-detail-legend-dot" style="background:<?php echo nutritionist_e($legendItem['color']); ?>;"></span>
+						<?php echo nutritionist_e($legendItem['label']); ?>
+					</div>
+				<?php endforeach; ?>
+			</div>
+
+			<a class="sk-cal-detail-link" data-calendar-detail-link href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?from=' . $initIsoDay . '&to=' . $initIsoDay)); ?>">View full calendar →</a>
 		</div>
 		<?php endif; ?>
 	</article>
