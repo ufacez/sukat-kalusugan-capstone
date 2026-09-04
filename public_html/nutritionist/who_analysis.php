@@ -20,6 +20,8 @@ $scopeBarangay = nutritionist_scope_fragment($user, 'c.barangay_id', $barangayPa
 $barangayOptions = admin_fetch_all(
 	"SELECT id, name FROM barangays WHERE status = 'active' ORDER BY name ASC"
 );
+$isAdmin = ($user['role'] ?? '') === 'admin';
+$lockedBarangay = !$isAdmin && $barangayParams !== [];
 
 /* ---------- base query ---------- */
 $sql = "SELECT
@@ -98,6 +100,15 @@ function who_age_group_months(?string $birthdate): ?string
 
 /* ---------- classify ---------- */
 $analyzed = array_values(array_filter($rows, static fn(array $r): bool => $r['measurement_id'] !== null));
+
+/* ---------- apply age group filter ---------- */
+if ($filterAgeGroup !== '' && $filterAgeGroup !== 'all') {
+	$analyzed = array_values(array_filter($analyzed, static function(array $r) use ($filterAgeGroup): bool {
+		$ag = who_age_group_months($r['birthdate']);
+		return $ag === $filterAgeGroup;
+	}));
+}
+
 $total    = count($analyzed);
 
 $normalCount   = 0;
@@ -122,6 +133,11 @@ $prevStuntedWasted_MStMW = 0; $prevStuntedWasted_MStSW = 0; $prevStuntedWasted_S
 
 $ageGroups = ['0-5','6-11','12-23','24-35','36-47','48-59'];
 $ageGroupLabels = ['0-5 mo','6-11 mo','12-23 mo','24-35 mo','36-47 mo','48-59 mo'];
+if ($filterAgeGroup !== '' && $filterAgeGroup !== 'all' && in_array($filterAgeGroup, $ageGroups, true)) {
+	$idx = array_search($filterAgeGroup, $ageGroups, true);
+	$ageGroups = [$ageGroups[$idx]];
+	$ageGroupLabels = [$ageGroupLabels[$idx]];
+}
 $ageData = [];
 foreach ($ageGroups as $ag) {
 	$ageData[$ag] = ['Normal' => 0, 'At Risk' => 0, 'Problems' => 0];
@@ -267,12 +283,28 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 <section class="who-filters-bar">
 	<div class="who-filter-group">
 		<label class="who-filter-label">Barangay</label>
-		<select id="whoFilterBarangay" class="admin-select">
-			<option value="all">All Barangays</option>
-			<?php foreach ($barangayOptions as $b): ?>
-				<option value="<?php echo nutritionist_e((string)$b['id']); ?>" <?php echo $filterBarangay === (string)$b['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($b['name']); ?></option>
-			<?php endforeach; ?>
-		</select>
+		<?php if ($lockedBarangay): ?>
+			<?php
+				$lockedId = $barangayParams[0] ?? null;
+				$lockedName = '';
+				if ($lockedId !== null) {
+					foreach ($barangayOptions as $b) {
+						if ((string)$b['id'] === (string)$lockedId) { $lockedName = $b['name']; break; }
+					}
+				}
+			?>
+			<input type="hidden" name="barangay" id="whoFilterBarangay" value="<?php echo nutritionist_e((string)$lockedId); ?>">
+			<select class="admin-select" disabled>
+				<option value="<?php echo nutritionist_e((string)$lockedId); ?>" selected><?php echo nutritionist_e($lockedName ?: 'My Barangay'); ?></option>
+			</select>
+		<?php else: ?>
+			<select id="whoFilterBarangay" class="admin-select">
+				<option value="all">All Barangays</option>
+				<?php foreach ($barangayOptions as $b): ?>
+					<option value="<?php echo nutritionist_e((string)$b['id']); ?>" <?php echo $filterBarangay === (string)$b['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($b['name']); ?></option>
+				<?php endforeach; ?>
+			</select>
+		<?php endif; ?>
 	</div>
 	<div class="who-filter-group">
 		<label class="who-filter-label">Date Range</label>
@@ -387,7 +419,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			</div>
 			<div class="who-info-bar">
 				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-				<span>WFA: MUW (Mildly Underweight), SUW (Severely Underweight)</span>
+				<span>WFA: MUW (Moderately Underweight), SUW (Severely Underweight)</span>
 			</div>
 		</div>
 
@@ -424,7 +456,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			</div>
 			<div class="who-info-bar">
 				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-				<span>WFL/H: MW (Moderate Wasting), SW (Severe Wasting), OW (Overweight), Ob (Obese)</span>
+				<span>WFL/H: MW (Moderately Wasting), SW (Severely Wasting), OW (Overweight), Ob (Obese)</span>
 			</div>
 		</div>
 	</div>
@@ -991,8 +1023,14 @@ window.WHO_DATA = {
   var baseUrl = window.location.pathname;
   document.getElementById('whoApplyBtn').addEventListener('click', function(){
     var p = [], v;
-    v = document.getElementById('whoFilterBarangay').value;
-    if (v !== 'all') p.push('barangay='+encodeURIComponent(v));
+    var barangayEl = document.getElementById('whoFilterBarangay');
+    if (barangayEl && barangayEl.tagName === 'SELECT') {
+      v = barangayEl.value;
+      if (v !== 'all') p.push('barangay='+encodeURIComponent(v));
+    } else if (barangayEl) {
+      v = barangayEl.value;
+      if (v) p.push('barangay='+encodeURIComponent(v));
+    }
     v = document.getElementById('whoFilterDateFrom').value;
     if (v) p.push('date_from='+encodeURIComponent(v));
     v = document.getElementById('whoFilterDateTo').value;
