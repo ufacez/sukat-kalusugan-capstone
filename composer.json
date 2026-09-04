@@ -3,7 +3,8 @@
     "description": "Sukat Kalusugan capstone project — server-side dependencies.",
     "require": {
         "php": ">=7.4",
-        "phpmailer/phpmailer": "^6.9"
+        "phpmailer/phpmailer": "^6.9",
+        "tecnickcom/tcpdf": "^6.11"
     },
     "config": {
         "optimize-autoloader": true

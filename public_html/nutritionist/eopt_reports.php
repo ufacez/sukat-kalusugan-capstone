@@ -5,27 +5,6 @@ require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 $user = nutritionist_require_access();
 
-/**
- * ==========================================================================
- * EOPT REPORTS — Operation Timbang Plus monitoring rosters
- * --------------------------------------------------------------------------
- * MONTHLY view (April to December):
- *   Roster 1 · ALL children aged 0-23 months, regardless of status;
- *   Roster 2 · older children 24-59 months who are MALNOURISHED
- *              (Obese / Overweight / Moderately Underweight / Severely Underweight /
- *              Moderately Stunted / Severely Stunted / Moderately Wasted / Severely Wasted);
- *   Roster 3 · older children 24-59 months still without any measurement
- *              (they must be found and baselined).
- *
- * QUARTERLY view (rounds every April / July / October):
- *   Older children 24-59 months classified NORMAL during the annual OPT
- *   baseline round (Q1 = January-March) — re-checked once per quarter.
- *
- * Ages are evaluated at the END of the selected reporting month, matching
- * how DOH enumerators decide which band a preschool child belongs to.
- * ==========================================================================
- */
-
 $view = (string)($_GET['view'] ?? 'monthly');
 if (!in_array($view, ['monthly', 'quarterly'], true)) {
 	$view = 'monthly';
@@ -37,362 +16,134 @@ if ($year < 2020 || $year > 2100) {
 }
 
 $currentMonth = (int)date('n');
-
-/*
- | Monthly runs April-December. Default to the current month when it is a
- | monitoring month; otherwise start with April.
- */
 $month = (int)($_GET['month'] ?? ($currentMonth >= 4 && $currentMonth <= 12 ? $currentMonth : 4));
 if ($month < 4 || $month > 12) {
 	$month = 4;
 }
 
-/*
- | Quarterly rounds happen in April, July and October. Default to the
- | upcoming round relative to today.
- */
 $defaultCheckupMonth = 7;
-
 foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
 	if ((int)date('n') <= $candidateRound) {
 		$defaultCheckupMonth = $candidateRound;
 		break;
 	}
 }
-
 $checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
 if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
 	$checkupMonth = 7;
 }
 
 $barangayFilter = (int)($_GET['barangay_id'] ?? 0);
-
 $scopeParams = [];
 $scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
 
 $barangayFilterSql = '';
 $barangayFilterParams = [];
-
 if ($barangayFilter > 0) {
 	$barangayFilterSql = ' AND c.barangay_id = ?';
 	$barangayFilterParams[] = $barangayFilter;
 }
 
 $barangays = admin_barangay_options();
-
-/*
- |--------------------------------------------------------------------------
- | Shared SELECT fragments. `lm` is the child's LATEST measurement ever
- | (current standing); `q1` is the LATEST measurement inside the Q1 window.
- |--------------------------------------------------------------------------
- */
-$baseSelect = "SELECT
-	c.id,
-	c.child_code,
-	c.first_name,
-	c.middle_name,
-	c.last_name,
-	c.sex,
-	c.birthdate,
-	c.purok,
-	bg.name AS barangay,
-	p.name AS parent_name,
-	p.phone AS parent_phone";
-
-$latestJoin = " INNER JOIN measurements lm ON lm.id = (
-	SELECT m2.id FROM measurements m2
-	WHERE m2.child_id = c.id
-	ORDER BY m2.measurement_date DESC, m2.id DESC
-	LIMIT 1
- )";
-
-$q1WindowStart = sprintf('%04d-01-01', $year);
-$q1WindowEnd = sprintf('%04d-03-31', $year);
-$quarterLabel = sprintf('Q%d', intdiv($checkupMonth - 1, 3));
-
-/*
- |--------------------------------------------------------------------------
- | MONTHLY VIEW QUERIES
- |--------------------------------------------------------------------------
- */
-$infantRows = [];
-$malnourishedRows = [];
-$needsBaselineRows = [];
-
-if ($view === 'monthly') {
-	try {
-		$anchorDate = new DateTimeImmutable(sprintf('%04d-%02d-t', $year, $month));
-	} catch (Exception) {
-		$anchorDate = new DateTimeImmutable('today');
-	}
-
-	// Scope/barangay params bind as ints; the anchor date binds as a string.
-	$intTypes = str_repeat('i', count($scopeParams) + count($barangayFilterParams));
-
-	$params = array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')]);
-
-	// Roster 1 — ALL children aged 0-23 months at month-end, any status.
-	$infantRows = admin_fetch_all(
-		"{$baseSelect},
-		lm.measurement_date,
-		lm.age_months,
-		lm.age_days,
-		lm.height_cm,
-		lm.weight_kg,
-		lm.wfa_status,
-		lm.hfa_status,
-		lm.wfh_status,
-		lm.is_flagged
-		FROM children c
-		INNER JOIN parents p ON p.id = c.parent_id
-		LEFT JOIN barangays bg ON bg.id = c.barangay_id
-		LEFT JOIN measurements lm ON lm.id = (
-			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
-			ORDER BY m2.measurement_date DESC, m2.id DESC
-			LIMIT 1
-		)
-		WHERE {$scope}{$barangayFilterSql}
-		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 23
-		ORDER BY c.last_name ASC, c.first_name ASC",
-		$intTypes . 's',
-		$params
-	);
-
-	// Roster 2 — malnourished 24-59 months (any axis outside Normal).
-	$params = array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')]);
-
-	$malnourishedRows = admin_fetch_all(
-		"{$baseSelect},
-		lm.measurement_date,
-		lm.age_months,
-		lm.age_days,
-		lm.height_cm,
-		lm.weight_kg,
-		lm.waz,
-		lm.haz,
-		lm.whz,
-		lm.wfa_status,
-		lm.hfa_status,
-		lm.wfh_status,
-		lm.is_flagged,
-		lm.flag_reason
-		FROM children c
-		INNER JOIN parents p ON p.id = c.parent_id
-		LEFT JOIN barangays bg ON bg.id = c.barangay_id
-		{$latestJoin}
-		WHERE {$scope}{$barangayFilterSql}
-		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
-		AND (
-			lm.wfa_status IN ('SUW','MUW','OW')
-			OR lm.hfa_status IN ('SSt','MSt')
-			OR lm.wfh_status IN ('SW','MW','OW','Ob')
-		  )
-		ORDER BY c.last_name ASC, c.first_name ASC",
-		$intTypes . 's',
-		$params
-	);
-
-	// Roster 3 — 24-59 months with NO measurement on record yet.
-	$params = array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')]);
-
-	$needsBaselineRows = admin_fetch_all(
-		"{$baseSelect}
-		FROM children c
-		INNER JOIN parents p ON p.id = c.parent_id
-		LEFT JOIN barangays bg ON bg.id = c.barangay_id
-		WHERE {$scope}{$barangayFilterSql}
-		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
-		  AND NOT EXISTS (
-			SELECT 1 FROM measurements m3 WHERE m3.child_id = c.id
-		  )
-		ORDER BY c.last_name ASC, c.first_name ASC",
-		$intTypes . 's',
-		$params
-	);
+$barangayName = 'All barangays within scope';
+if ($barangayFilter > 0) {
+	$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayFilter]);
+	$barangayName = (string)($brgyRow['name'] ?? '');
 }
 
-/*
- |--------------------------------------------------------------------------
- | QUARTERLY VIEW QUERY — normal-in-Q1 cohort, aged 24-59 mo at round end
- |--------------------------------------------------------------------------
- */
-$quarterlyRows = [];
-
-if ($view === 'quarterly') {
-	try {
-		$anchorDate = new DateTimeImmutable(sprintf('%04d-%02d-t', $year, $checkupMonth));
-	} catch (Exception) {
-		$anchorDate = new DateTimeImmutable('today');
-	}
-
-	$intTypes = str_repeat('i', count($scopeParams) + count($barangayFilterParams));
-	$params = array_merge($scopeParams, $barangayFilterParams, [$q1WindowStart, $q1WindowEnd, $anchorDate->format('Y-m-d')]);
-
-	$quarterlyRows = admin_fetch_all(
-		"{$baseSelect},
-		q1.measurement_date AS q1_measured,
-		q1.wfa_status AS q1_wfa,
-		q1.hfa_status AS q1_hfa,
-		q1.wfh_status AS q1_wfh,
-		q1.weight_kg AS q1_weight,
-		q1.height_cm AS q1_height,
-		lm.measurement_date AS latest_measured,
-		lm.wfa_status AS latest_wfa,
-		lm.hfa_status AS latest_hfa,
-		lm.wfh_status AS latest_wfh
-		FROM children c
-		INNER JOIN parents p ON p.id = c.parent_id
-		LEFT JOIN barangays bg ON bg.id = c.barangay_id
-		INNER JOIN measurements q1 ON q1.id = (
-			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
-			  AND m2.measurement_date BETWEEN ? AND ?
-			ORDER BY m2.measurement_date DESC, m2.id DESC
-			LIMIT 1
-		)
-		LEFT JOIN measurements lm ON lm.id = (
-			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
-			ORDER BY m2.measurement_date DESC, m2.id DESC
-			LIMIT 1
-		)
-		WHERE {$scope}{$barangayFilterSql}
-		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
-		  AND q1.wfa_status = 'Normal'
-		  AND q1.hfa_status = 'Normal'
-		  AND q1.wfh_status = 'Normal'
-		  AND q1.is_flagged = 0
-		ORDER BY c.last_name ASC, c.first_name ASC",
-		$intTypes . 'sss',
-		$params
-	);
+try {
+	$anchorDate = new DateTimeImmutable(sprintf('%04d-%02d-t', $year, $month));
+} catch (Exception) {
+	$anchorDate = new DateTimeImmutable('today');
 }
 
 $monthsList = [4 => 'April', 5 => 'May', 6 => 'June', 7 => 'July', 8 => 'August', 9 => 'September', 10 => 'October', 11 => 'November', 12 => 'December'];
 $roundsList = [4 => 'April Round', 7 => 'July Round', 10 => 'October Round'];
 
-$totalMonitored = count($infantRows) + count($malnourishedRows) + count($needsBaselineRows);
-$flaggedCount = count(array_filter(array_merge($infantRows, $malnourishedRows), static fn(array $row): bool => !empty($row['is_flagged'])));
+$periodLabel = $view === 'monthly'
+	? $monthsList[$month] . ' ' . $year
+	: $roundsList[$checkupMonth] . ' ' . $year;
 
-$recheckedCount = count(array_filter($quarterlyRows, static function (array $row): bool {
-	return !empty($row['latest_measured']) && (string)$row['latest_measured'] > $q1WindowEnd;
-}));
-
-$exportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query([
-	'view' => $view,
-	'year' => $year,
-	'month' => $month,
-	'checkup_month' => $checkupMonth,
-	'barangay_id' => $barangayFilter,
-]);
-
-/*
- |--------------------------------------------------------------------------
- | SINGLE-LIST VIEW MODE — V2 combined monitoring lists
- | Renders the roster for one monitoring list and an Export button.
- |--------------------------------------------------------------------------
- */
 $listCodes = [
 	'0-23' => [
-		'sheet' => 'List_0_23',
 		'title' => 'MONITORING LIST FOR CHILDREN 0-23 MONTHS OLD',
+		'description' => 'All children below 24 months weighed monthly regardless of status.',
 		'axis' => 'All children (monthly weighing)',
 		'condition' => '1=1',
-		'age_min' => 0,
-		'age_max' => 23,
-		'is_infant' => true,
+		'age_min' => 0, 'age_max' => 23,
 	],
 	'MW' => [
-		'sheet' => 'List_MW',
-		'title' => 'MONITORING LIST FOR MODERATELY WASTED CHILDREN 0-59 MONTHS OLD',
+		'title' => 'List_MW — Moderately Wasted (MAM)',
+		'description' => 'Children with Weight-for-Height status MW (11.5-12.4).',
 		'axis' => 'Weight-for-Height',
 		'condition' => "lm.wfh_status = 'MW'",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'age_min' => 0, 'age_max' => 59,
 	],
 	'SW' => [
-		'sheet' => 'List_SW',
-		'title' => 'MONITORING LIST FOR SEVERELY WASTED CHILDREN 0-59 MONTHS OLD',
+		'title' => 'List_SW — Severely Wasted (SAM)',
+		'description' => 'Children with Weight-for-Height status SW (<11.5).',
 		'axis' => 'Weight-for-Height',
 		'condition' => "lm.wfh_status = 'SW'",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'age_min' => 0, 'age_max' => 59,
 	],
 	'MSt_SSt' => [
-		'sheet' => 'List_MSt_SSt',
-		'title' => 'MONITORING LIST FOR MODERATELY OR SEVERELY STUNTED CHILDREN 0-59 MONTHS OLD',
+		'title' => 'List_MSt&SSt — Moderately or Severely Stunted',
+		'description' => 'Children with Height-for-Age below -2SD.',
 		'axis' => 'Height-for-Age',
-		'condition' => "lm.hfa_status IN ('St','SSt')",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'condition' => "lm.hfa_status IN ('MSt','SSt')",
+		'age_min' => 0, 'age_max' => 59,
 	],
 	'OW_Ob' => [
-		'sheet' => 'List_OW_Ob',
-		'title' => 'MONITORING LIST FOR OVERWEIGHT OR OBESE CHILDREN 0-59 MONTHS OLD',
+		'title' => 'List_OW&Ob — Overweight or Obese',
+		'description' => 'Children with Weight-for-Age OW or WFH OW/Ob.',
 		'axis' => 'Weight-for-Age / Weight-for-Height',
 		'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'age_min' => 0, 'age_max' => 59,
 	],
-	'MUW_SUW_MSt_SSt' => [
-		'sheet' => 'List_MUW_SUW_MSt_SSt',
-		'title' => 'MODERATELY/SEVERELY UNDERWEIGHT + MODERATELY/SEVERELY STUNTED 0-59 MONTHS OLD',
+	'MUW' => [
+		'title' => 'List_MUW — Moderately Underweight',
+		'description' => 'Children with Weight-for-Age status MUW.',
+		'axis' => 'Weight-for-Age',
+		'condition' => "lm.wfa_status = 'MUW'",
+		'age_min' => 0, 'age_max' => 59,
+	],
+	'SUW_MSt_SSt' => [
+		'title' => 'List_SUW, MSt&SSt — Severely Underweight + Stunted',
+		'description' => 'Children with SUW and MSt/SSt simultaneously.',
 		'axis' => 'Weight-for-Age + Height-for-Age',
-		'condition' => "(lm.wfa_status IN ('UW','SUW') AND lm.hfa_status IN ('St','SSt'))",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'condition' => "(lm.wfa_status = 'SUW' AND lm.hfa_status IN ('MSt','SSt'))",
+		'age_min' => 0, 'age_max' => 59,
 	],
 	'MSt_SSt_MW_SW' => [
-		'sheet' => 'List_MSt_SSt_MW_SW',
-		'title' => 'MODERATELY/SEVERELY STUNTED + MODERATELY/SEVERELY WASTED 0-59 MONTHS OLD',
+		'title' => 'List_MSt,SSt,MW&SW — Stunted + Wasted',
+		'description' => 'Children with MSt/SSt and MW/SW simultaneously.',
 		'axis' => 'Height-for-Age + Weight-for-Height',
-		'condition' => "(lm.hfa_status IN ('St','SSt') AND lm.wfh_status IN ('MW','SW'))",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))",
+		'age_min' => 0, 'age_max' => 59,
 	],
 	'MSt_SSt_OW_Ob' => [
-		'sheet' => 'List_MSt_SSt_OW_Ob',
-		'title' => 'MODERATELY/SEVERELY STUNTED + OVERWEIGHT OR OBESE 0-59 MONTHS OLD',
+		'title' => 'List_MSt,SSt,OW&Ob — Stunted + Overweight/Obese',
+		'description' => 'Children with MSt/SSt and OW/Ob simultaneously.',
 		'axis' => 'Height-for-Age + Weight-for-Height',
-		'condition' => "(lm.hfa_status IN ('St','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))",
-		'age_min' => 0,
-		'age_max' => 59,
-		'is_infant' => false,
+		'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))",
+		'age_min' => 0, 'age_max' => 59,
 	],
 ];
-// Case-insensitive lookup so ?list=ob, ?list=OB, ?list=Ob all work.
+
 $listParamRaw = trim((string)($_GET['list'] ?? ''));
 $listParamKey = strtolower($listParamRaw);
 $listCodeLowerMap = [];
-foreach ($listCodes as $code => $spec) { $listCodeLowerMap[strtolower($code)] = $code; }
+foreach ($listCodes as $code => $spec) {
+	$listCodeLowerMap[strtolower($code)] = $code;
+}
 $isSingleList = $listParamKey !== '' && isset($listCodeLowerMap[$listParamKey]);
 $listParam = $isSingleList ? $listCodeLowerMap[$listParamKey] : $listParamRaw;
-$listRows = [];
 
 if ($isSingleList) {
 	$spec = $listCodes[$listParam];
-
-	$listView = (string)($_GET['view'] ?? 'monthly');
-	if (!in_array($listView, ['monthly', 'quarterly'], true)) {
-		$listView = 'monthly';
-	}
-	$listMonth = (int)($_GET['month'] ?? $month);
-	$listCheckup = (int)($_GET['checkup_month'] ?? $checkupMonth);
-
 	$listAnchorDate = null;
 	try {
-		if ($listView === 'monthly') {
-			$listAnchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $listMonth)))->modify('last day of this month');
-		} else {
-			$listAnchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $listCheckup)))->modify('last day of this month');
-		}
+		$listAnchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->modify('last day of this month');
 	} catch (Exception) {
 		$listAnchorDate = new DateTimeImmutable('today');
 	}
@@ -410,7 +161,10 @@ if ($isSingleList) {
 		FROM children c
 		INNER JOIN parents p ON p.id = c.parent_id
 		LEFT JOIN barangays bg ON bg.id = c.barangay_id
-		{$latestJoin}
+		INNER JOIN measurements lm ON lm.id = (
+			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		)
 		WHERE {$scope}{$barangayFilterSql}
 		  AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$spec['age_min']} AND {$spec['age_max']}
 		  AND {$spec['condition']}
@@ -420,297 +174,76 @@ if ($isSingleList) {
 	);
 }
 
-$actions = '<a class="admin-btn" href="' . nutritionist_e($exportUrl) . '">' . admin_action_icon('export') . ' Export eOPT Workbook (.xlsx)</a>'
-	. '<button type="button" class="admin-btn-secondary" onclick="window.print()">' . admin_action_icon('print') . ' Print / Save as PDF</button>';
+$baseTypes = str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's';
+$baseParams = array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')]);
 
-nutritionist_layout_start('EOPT Reports', 'Operation Timbang Plus monitoring rosters — monthly and quarterly views following the DOH schedule.', 'eopt_reports', $actions);
-?>
-<style>
-	@media print {
-		.nutritionist-sidebar, .nutritionist-topbar, .admin-search, .eopt-report-controls, .nutritionist-page-actions { display: none !important; }
-		.nutritionist-content { margin: 0 !important; padding: 0 !important; }
-		body { background: #fff !important; }
-	}
-	.eopt-report-controls { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; margin-bottom: 20px; }
-	.eopt-report-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--admin-muted); }
-	.eopt-report-controls select { padding: 8px 10px; border-radius: 8px; border: 1px solid var(--admin-border); }
-	.eopt-print-header { display: none; }
-	@media print { .eopt-print-header { display: block; margin-bottom: 16px; } }
-</style>
+$infantCount = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c
+	 INNER JOIN measurements m ON m.child_id = c.id
+	 WHERE {$scope}{$barangayFilterSql}
+	   AND m.measurement_date <= ?
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 23",
+	$baseTypes . 's',
+	array_merge($baseParams, [$anchorDate->format('Y-m-d')])
+);
 
-<?php if ($isSingleList): ?>
-<?php
-	$spec = $listCodes[$listParam];
-	$listExportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query([
-		'list'        => $listParam,
-		'year'        => $year,
-		'barangay_id' => $barangayFilter,
-		'view'        => (string)($_GET['view'] ?? 'monthly'),
-	]);
-?>
-<style>
-	.eopt-list-breadcrumbs { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--admin-muted); margin-bottom:16px; }
-	.eopt-list-breadcrumbs a { color:var(--admin-text); }
-	.eopt-list-header { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; margin-bottom:16px; }
-	.eopt-list-header h2 { margin:0; }
-	.eopt-list-export { padding: 10px 18px; background: #1f6feb; color:#fff; border-radius: 8px; text-decoration:none; font-weight:600; }
-	.eopt-list-export:hover { background: #1857c4; }
-</style>
+$totalAssessed = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c
+	 INNER JOIN measurements m ON m.child_id = c.id
+	 WHERE {$scope}{$barangayFilterSql}
+	   AND m.measurement_date <= ?",
+	$baseTypes,
+	$baseParams
+);
 
-<div class="eopt-list-breadcrumbs">
-	<a href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports.php?view=' . urlencode((string)($_GET['view'] ?? 'monthly')) . '&year=' . (int)$year . '&barangay_id=' . (int)$barangayFilter)); ?>">← Back to EOPT Reports</a>
-</div>
+$latestJoin = " INNER JOIN measurements lm ON lm.id = (
+	SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+	ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+)";
 
-<div class="eopt-list-header">
-	<div>
-		<h2 style="margin:0;font-size:20px;"><?php echo nutritionist_e($spec['title']); ?></h2>
-		<div style="color:var(--admin-muted);font-size:13px;margin-top:4px;">
-			<?php echo nutritionist_e($spec['axis']); ?>
-			&nbsp;·&nbsp; Age 0–59 months
-			&nbsp;·&nbsp; Year <?php echo (int)$year; ?>
-			<?php if ($barangayFilter > 0): ?>
-				&nbsp;·&nbsp; Barangay #<?php echo (int)$barangayFilter; ?>
-			<?php endif; ?>
-		</div>
-	</div>
-	<a class="eopt-list-export" href="<?php echo nutritionist_e($listExportUrl); ?>">⬇ Export this list (.xlsx)</a>
-</div>
+$malnourishedCount = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c {$latestJoin}
+	 WHERE {$scope}{$barangayFilterSql}
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+	   AND (lm.wfa_status IN ('SUW','MUW') OR lm.hfa_status IN ('SSt','MSt') OR lm.wfh_status IN ('SW','MW'))",
+	$baseTypes,
+	$baseParams
+);
 
-<?php if ($listRows === []): ?>
-	<div class="admin-mini" style="margin-top:8px;">No children currently match this monitoring list for the selected filters.</div>
-<?php else: ?>
-		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:900px;">
-				<thead>
-					<tr>
-						<th>No.</th>
-						<th>Address</th>
-					<th>Mother / Caregiver</th>
-					<th>Full Name of Child</th>
-					<th>Sex</th>
-					<th>Birthdate</th>
-					<th>Height (cm)</th>
-					<th>Weight (kg)</th>
-					<th>WFA</th>
-					<th>HFA</th>
-					<th>WFH</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ($listRows as $i => $row): ?>
-					<tr>
-						<td><?php echo $i + 1; ?></td>
-						<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
-						<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-						<td>
-							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-							<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
-						</td>
-						<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-						<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
-						<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '—'; ?></td>
-						<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '—'; ?></td>
-						<td><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></td>
-						<td><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></td>
-						<td><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
-	</div>
-<?php endif; ?>
+$affectedCount = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c {$latestJoin}
+	 WHERE {$scope}{$barangayFilterSql}
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+	   AND (lm.wfa_status IN ('SUW','MUW') OR lm.hfa_status IN ('SSt','MSt') OR lm.wfh_status IN ('SW','MW') OR lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))",
+	$baseTypes,
+	$baseParams
+);
 
-<div class="admin-mini" style="margin-top:16px;">
-	This is one of the eight official V2 monitoring lists. The matching <code><?php echo nutritionist_e($spec['sheet']); ?></code> sheet uses the same DOH-formatted template with follow-up visit columns as the rest of the workbook.
-</div>
+$dqIssueCount = 0;
+$dqDupCount = count(admin_fetch_all(
+	"SELECT 1 FROM children c1 WHERE c1.first_name != '' AND c1.last_name != '' AND c1.birthdate IS NOT NULL
+	 GROUP BY c1.first_name, c1.last_name, c1.birthdate HAVING COUNT(*) > 1", '', []
+));
+$dqMissingSex = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.sex IS NULL AND {$scope}{$barangayFilterSql}",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)), array_merge($scopeParams, $barangayFilterParams));
+$dqMissingDob = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NULL AND {$scope}{$barangayFilterSql}",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)), array_merge($scopeParams, $barangayFilterParams));
+$dqOverAge = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NOT NULL AND TIMESTAMPDIFF(YEAR, c.birthdate, CURDATE()) > 4 AND {$scope}{$barangayFilterSql}",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)), array_merge($scopeParams, $barangayFilterParams));
+$dqHeightNoWeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.height_cm IS NOT NULL AND m.weight_kg IS NULL AND {$scope}{$barangayFilterSql}",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)), array_merge($scopeParams, $barangayFilterParams));
+$dqWeightNoHeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.weight_kg IS NOT NULL AND m.height_cm IS NULL AND {$scope}{$barangayFilterSql}",
+	str_repeat('i', count($scopeParams) + count($barangayFilterParams)), array_merge($scopeParams, $barangayFilterParams));
 
-<?php else: ?>
+$dqIssueCount = $dqDupCount + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
 
-<div class="eopt-print-header">
-	<h2 style="margin:0;">EOPT Plus Report — <?php echo nutritionist_e($view === 'monthly' ? ($monthsList[$month] . ' ' . $year . ' Monitoring') : ($roundsList[$checkupMonth] . ' ' . $year)); ?></h2>
-	<div style="color:#666;font-size:13px;">Generated <?php echo nutritionist_e(date('F j, Y')); ?> · City Health Office — Nutrition Program</div>
-</div>
-
-<form class="eopt-report-controls" method="get">
-	<label>
-		View
-		<select name="view" onchange="this.form.submit()">
-			<option value="monthly" <?php echo $view === 'monthly' ? 'selected' : ''; ?>>Monthly Monitoring (April–December)</option>
-			<option value="quarterly" <?php echo $view === 'quarterly' ? 'selected' : ''; ?>>Quarterly Rounds (Apr / Jul / Oct)</option>
-		</select>
-	</label>
-	<?php if ($view === 'monthly'): ?>
-		<label>
-			Month
-			<select name="month" onchange="this.form.submit()">
-				<?php foreach ($monthsList as $monthNo => $monthName): ?>
-					<option value="<?php echo (int)$monthNo; ?>" <?php echo $month === (int)$monthNo ? 'selected' : ''; ?>><?php echo nutritionist_e($monthName); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
-	<?php else: ?>
-		<label>
-			Checkup Round
-			<select name="checkup_month" onchange="this.form.submit()">
-				<?php foreach ($roundsList as $monthNo => $roundName): ?>
-					<option value="<?php echo (int)$monthNo; ?>" <?php echo $checkupMonth === (int)$monthNo ? 'selected' : ''; ?>><?php echo nutritionist_e($roundName); ?></option>
-				<?php endforeach; ?>
-			</select>
-		</label>
-	<?php endif; ?>
-	<label>
-		Year
-		<select name="year" onchange="this.form.submit()">
-			<?php for ($y = (int)date('Y'); $y >= (int)date('Y') - 4; $y--): ?>
-				<option value="<?php echo $y; ?>" <?php echo $year === $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
-			<?php endfor; ?>
-		</select>
-	</label>
-	<label>
-		Barangay
-		<select name="barangay_id" onchange="this.form.submit()">
-			<option value="0">All (within your scope)</option>
-			<?php foreach ($barangays as $barangay): ?>
-				<option value="<?php echo (int)$barangay['id']; ?>" <?php echo $barangayFilter === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
-			<?php endforeach; ?>
-		</select>
-	</label>
-</form>
-
-<section class="admin-grid-cards" style="margin-bottom:20px;">
-	<?php if ($view === 'monthly'): ?>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Children monitored this month</div>
-					<div class="admin-card-value"><?php echo $totalMonitored; ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-up">All 0–23 mo + malnourished/unmeasured 24–59 mo</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Infants &amp; toddlers (0–23 mo)</div>
-					<div class="admin-card-value"><?php echo count($infantRows); ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-up">Monthly weighing regardless of status</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-danger">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Malnourished (24–59 mo)</div>
-					<div class="admin-card-value"><?php echo count($malnourishedRows); ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-danger">Monthly follow-up until rehabilitated</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-danger">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Flagged measurements</div>
-					<div class="admin-card-value" style="<?php echo $flaggedCount > 0 ? 'color:#E03131;' : ''; ?>"><?php echo $flaggedCount; ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-danger">Implausible values — re-measure before reporting</span>
-					</div>
-				</div>
-			</div>
-		</article>
-	<?php else: ?>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Q1-normal cohort (24–59 mo)</div>
-					<div class="admin-card-value"><?php echo count($quarterlyRows); ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-up">Baseline Jan–Mar <?php echo $year; ?> · due in the <?php echo nutritionist_e(explode(' ', $roundsList[$checkupMonth])[0]); ?> round</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-success">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Re-checked this round</div>
-					<div class="admin-card-value"><?php echo $recheckedCount; ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-up">New measurement recorded after Mar 31</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-success">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Still normal</div>
-					<div class="admin-card-value"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) === [] && !empty($row['latest_measured']))); ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-up">Latest measurement shows no deterioration</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-danger">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Moved to monthly track</div>
-					<div class="admin-card-value" style="color:#B08900;"><?php echo count(array_filter($quarterlyRows, static fn(array $row): bool => followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null) !== [])); ?></div>
-					<div class="admin-card-meta">
-						<span class="admin-card-trend is-danger">Deteriorated after Q1 — now monitored monthly</span>
-					</div>
-				</div>
-			</div>
-		</article>
-	<?php endif; ?>
-</section>
-
-<?php
-/*
- |--------------------------------------------------------------------------
- | MONITORING LISTS HUB — V2 combined lists
- | Counts pulled live from the same population used by the export.
- |--------------------------------------------------------------------------
- */
 $listCountRows = admin_fetch_all(
-	"SELECT
-	 lm.wfa_status, lm.hfa_status, lm.wfh_status
-	 FROM children c
-	 {$latestJoin}
+	"SELECT lm.wfa_status, lm.hfa_status, lm.wfh_status
+	 FROM children c {$latestJoin}
 	 WHERE {$scope}{$barangayFilterSql}
 	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
-	str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
-	array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
+	$baseTypes,
+	$baseParams
 );
 
 $listCounts = array_fill_keys(array_keys($listCodes), 0);
@@ -719,83 +252,131 @@ foreach ($listCountRows as $cr) {
 	$hfa = $cr['hfa_status'] ?? null;
 	$wfh = $cr['wfh_status'] ?? null;
 
-	if ($wfh === 'MW') { $listCounts['MW']++; }
-	if ($wfh === 'SW') { $listCounts['SW']++; }
-	if (in_array($hfa, ['St', 'SSt'], true)) { $listCounts['MSt_SSt']++; }
-	if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) { $listCounts['OW_Ob']++; }
-	if (in_array($wfa, ['UW', 'SUW'], true) && in_array($hfa, ['St', 'SSt'], true)) { $listCounts['MUW_SUW_MSt_SSt']++; }
-	if (in_array($hfa, ['St', 'SSt'], true) && in_array($wfh, ['MW', 'SW'], true)) { $listCounts['MSt_SSt_MW_SW']++; }
-	if (in_array($hfa, ['St', 'SSt'], true) && ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) { $listCounts['MSt_SSt_OW_Ob']++; }
+	if ($wfh === 'MW') $listCounts['MW']++;
+	if ($wfh === 'SW') $listCounts['SW']++;
+	if (in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['MSt_SSt']++;
+	if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) $listCounts['OW_Ob']++;
+	if ($wfa === 'MUW') $listCounts['MUW']++;
+	if ($wfa === 'SUW' && in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['SUW_MSt_SSt']++;
+	if (in_array($hfa, ['MSt', 'SSt'], true) && in_array($wfh, ['MW', 'SW'], true)) $listCounts['MSt_SSt_MW_SW']++;
+	if (in_array($hfa, ['MSt', 'SSt'], true) && ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $listCounts['MSt_SSt_OW_Ob']++;
 }
+$listCounts['0-23'] = (int)$infantCount;
 
-$infantCountRows = admin_fetch_all(
-	"SELECT COUNT(*) AS cnt FROM children c
-	 LEFT JOIN measurements lm ON lm.id = (
-		SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
-		ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
-	 )
-	 WHERE {$scope}{$barangayFilterSql}
-	   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 23",
-	str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
-	array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
-);
-$listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
+$actions = '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))) . '">' . admin_action_icon('export') . ' Generate Report</a>'
+	. '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))) . '">' . admin_action_icon('export') . ' Export Data</a>';
+
+nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
 ?>
-<section class="nutritionist-card" style="margin-bottom:20px;">
-	<header class="nutritionist-card-head">
-		<h3>Monitoring Lists — V2 Combined View &amp; Export</h3>
-		<p class="admin-mini" style="margin:0;">Eight official V2 monitoring lists for the selected reporting period. Click <strong>View</strong> for the on-screen roster, or <strong>Export .xlsx</strong> to download the DOH-formatted sheet.</p>
-	</header>
-	<div class="nutritionist-table-wrap" style="padding:0;">
-		<table class="nutritionist-table" style="margin:0;">
-			<thead>
-				<tr>
-					<th style="width:28%;">List</th>
-					<th style="width:32%;">Axis / Definition</th>
-					<th style="width:10%;text-align:right;">Children</th>
-					<th style="width:30%;">Actions</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php foreach ($listCodes as $code => $spec): ?>
-					<?php
-						$viewLink = app_url('/nutritionist/eopt_reports.php') . '?' . http_build_query([
-							'list'        => $code,
-							'view'        => $view,
-							'year'        => $year,
-							'month'       => $month,
-							'checkup_month' => $checkupMonth,
-							'barangay_id' => $barangayFilter,
-						]);
-						$exportLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query([
-							'list'        => $code,
-							'year'        => $year,
-							'barangay_id' => $barangayFilter,
-							'view'        => $view,
-						]);
-					?>
-					<tr>
-						<td><strong><?php echo nutritionist_e($spec['sheet']); ?></strong><div class="admin-mini"><?php echo nutritionist_e($spec['title']); ?></div></td>
-						<td><?php echo nutritionist_e($spec['axis']); ?></td>
-						<td style="text-align:right;font-weight:600;"><?php echo (int)($listCounts[$code] ?? 0); ?></td>
-						<td>
-							<div class="admin-actions">
-								<a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e($viewLink); ?>"><?php echo admin_action_icon('view'); ?></a>
-								<a class="admin-icon-btn admin-icon-btn-primary" title="Export .xlsx" href="<?php echo nutritionist_e($exportLink); ?>"><?php echo admin_action_icon('export'); ?></a>
-							</div>
-						</td>
-					</tr>
-				<?php endforeach; ?>
-			</tbody>
-		</table>
+
+<style>
+	.rp-filter-bar { display:flex; gap:10px; flex-wrap:wrap; align-items:end; padding:16px 20px; background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:14px; margin-bottom:18px; }
+	.rp-filter-bar label { display:flex; flex-direction:column; gap:4px; font-size:12px; color:var(--admin-muted); font-weight:600; }
+	.rp-filter-bar select { padding:8px 10px; border-radius:8px; border:1px solid var(--admin-border); background:var(--admin-field-bg); color:var(--admin-text); font-size:13px; font-weight:500; }
+	.rp-filter-bar select:focus { border-color:var(--admin-primary); outline:none; }
+	.rp-active-filters { font-size:12px; color:var(--admin-primary); font-weight:600; padding:8px 0 0; }
+	.rp-section { margin-bottom:24px; }
+	.rp-section-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; flex-wrap:wrap; gap:8px; }
+	.rp-section-title { font-size:15px; font-weight:700; color:var(--admin-text); letter-spacing:-0.02em; }
+	.rp-section-subtitle { font-size:12px; color:var(--admin-muted); margin-top:2px; }
+	.rp-stat-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:24px; }
+	.rp-stat-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:14px; padding:18px 20px; transition:all 0.15s ease; }
+	.rp-stat-card:hover { border-color:rgba(11,110,79,0.2); box-shadow:0 2px 12px rgba(11,110,79,0.06); }
+	.rp-stat-label { font-size:11px; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--admin-muted); margin-bottom:6px; }
+	.rp-stat-value { font-size:28px; font-weight:800; letter-spacing:-0.03em; color:var(--admin-text); line-height:1; }
+	.rp-stat-meta { font-size:11px; color:var(--admin-muted); margin-top:6px; font-weight:500; }
+	.rp-form-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; }
+	.rp-form-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:16px; padding:22px; transition:all 0.15s ease; position:relative; overflow:hidden; }
+	.rp-form-card:hover { border-color:var(--admin-primary); box-shadow:0 4px 16px rgba(11,110,79,0.08); }
+	.rp-form-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--admin-primary); }
+	.rp-form-name { font-size:15px; font-weight:700; color:var(--admin-text); margin-bottom:4px; }
+	.rp-form-desc { font-size:12px; color:var(--admin-muted); line-height:1.5; margin-bottom:12px; }
+	.rp-form-meta { display:flex; gap:12px; align-items:center; margin-bottom:14px; flex-wrap:wrap; }
+	.rp-form-count { font-size:13px; font-weight:600; color:var(--admin-text); }
+	.rp-form-actions { display:flex; gap:8px; flex-wrap:wrap; }
+	.rp-form-actions .admin-btn, .rp-form-actions .admin-btn-secondary, .rp-form-actions .admin-icon-btn { font-size:12px; min-height:34px; padding:0 12px; }
+	.rp-monitor-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:12px; }
+	.rp-monitor-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:12px; padding:16px; transition:all 0.15s ease; }
+	.rp-monitor-card:hover { border-color:rgba(11,110,79,0.2); box-shadow:0 2px 10px rgba(11,110,79,0.05); }
+	.rp-monitor-name { font-size:13px; font-weight:700; color:var(--admin-text); margin-bottom:3px; }
+	.rp-monitor-desc { font-size:11px; color:var(--admin-muted); line-height:1.4; margin-bottom:10px; }
+	.rp-monitor-footer { display:flex; justify-content:space-between; align-items:center; }
+	.rp-monitor-count { font-size:18px; font-weight:800; color:var(--admin-primary); }
+	.rp-monitor-actions { display:flex; gap:6px; }
+	.rp-monitor-actions .admin-icon-btn { width:30px; height:30px; min-height:30px; border-radius:8px; }
+	.rp-table-section { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:16px; padding:18px; box-shadow:var(--admin-shadow); margin-bottom:18px; }
+	.rp-table-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; flex-wrap:wrap; gap:8px; }
+	.rp-table-title { font-size:14px; font-weight:700; color:var(--admin-text); }
+	.rp-table-subtitle { font-size:12px; color:var(--admin-muted); }
+	.rp-breadcrumb { display:flex; gap:8px; align-items:center; font-size:13px; color:var(--admin-muted); margin-bottom:16px; }
+	.rp-breadcrumb a { color:var(--admin-text); text-decoration:none; font-weight:600; }
+	.rp-breadcrumb a:hover { color:var(--admin-primary); }
+	.rp-chart-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:16px; }
+	.rp-chart-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:14px; padding:18px; }
+	.rp-chart-title { font-size:13px; font-weight:700; color:var(--admin-text); margin-bottom:12px; }
+	.rp-dqc-grid { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+	.rp-dqc-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:12px; padding:14px; text-align:center; transition:all 0.15s ease; }
+	.rp-dqc-card:hover { border-color:rgba(11,110,79,0.2); }
+	.rp-dqc-card.is-ok { border-left:3px solid var(--admin-primary); }
+	.rp-dqc-card.is-warn { border-left:3px solid #d97706; }
+	.rp-dqc-card.is-danger { border-left:3px solid var(--admin-danger); }
+	.rp-dqc-count { font-size:22px; font-weight:800; color:var(--admin-text); }
+	.rp-dqc-label { font-size:11px; color:var(--admin-muted); font-weight:600; margin-top:4px; }
+	.rp-followup-status-row { display:flex; gap:16px; margin-bottom:14px; flex-wrap:wrap; }
+	.rp-followup-pill { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; padding:6px 12px; border-radius:8px; background:var(--admin-surface-alt); border:1px solid var(--admin-border); }
+	.rp-followup-pill .count { font-size:16px; font-weight:800; }
+	.rp-export-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:14px; }
+	.rp-export-card { background:var(--admin-surface); border:1px solid var(--admin-border); border-radius:14px; padding:20px; }
+	@media print {
+		.nutritionist-sidebar, .nutritionist-topbar, .rp-filter-bar, .rp-form-actions, .rp-monitor-actions, .rp-chart-card:last-child { display:none !important; }
+		.rp-stat-grid, .rp-form-grid, .rp-monitor-grid, .rp-dqc-grid { grid-template-columns:repeat(2, 1fr); }
+	}
+	@media (max-width:1200px) {
+		.rp-stat-grid { grid-template-columns:repeat(2, 1fr); }
+		.rp-form-grid { grid-template-columns:1fr; }
+		.rp-monitor-grid { grid-template-columns:repeat(2, 1fr); }
+		.rp-dqc-grid { grid-template-columns:repeat(2, 1fr); }
+	}
+	@media (max-width:720px) {
+		.rp-stat-grid { grid-template-columns:1fr; }
+		.rp-monitor-grid { grid-template-columns:1fr; }
+		.rp-dqc-grid { grid-template-columns:1fr; }
+		.rp-chart-grid { grid-template-columns:1fr; }
+	}
+</style>
+
+<?php if ($isSingleList): ?>
+<?php
+	$spec = $listCodes[$listParam];
+	$listExportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query([
+		'list' => $listParam, 'year' => $year, 'barangay_id' => $barangayFilter, 'view' => $view,
+	]);
+	$listPdfUrl = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query([
+		'report_type' => 'list', 'list_code' => $listParam, 'year' => $year, 'barangay_id' => $barangayFilter, 'view' => $view,
+	]);
+?>
+
+<div class="rp-breadcrumb">
+	<a href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports.php?' . http_build_query(['view' => $view, 'year' => $year, 'barangay_id' => $barangayFilter]))); ?>">&larr; Back to Reports</a>
+	<span>/</span>
+	<span><?php echo nutritionist_e($spec['title']); ?></span>
+</div>
+
+<div class="rp-table-section">
+	<div class="rp-table-head">
+		<div>
+			<div class="rp-table-title"><?php echo nutritionist_e($spec['title']); ?></div>
+			<div class="rp-table-subtitle"><?php echo nutritionist_e($spec['axis']); ?> &middot; Age <?php echo $spec['age_min']; ?>-<?php echo $spec['age_max']; ?> months &middot; Year <?php echo $year; ?></div>
+		</div>
+		<div style="display:flex;gap:8px;">
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($listPdfUrl); ?>" style="font-size:12px;min-height:34px;">PDF</a>
+			<a class="admin-btn" href="<?php echo nutritionist_e($listExportUrl); ?>" style="font-size:12px;min-height:34px;"><?php echo admin_action_icon('export'); ?> Excel</a>
+		</div>
 	</div>
-</section>
 
-<?php if ($view === 'monthly'): ?>
-
-	<section class="nutritionist-panel" style="margin-bottom:20px;">
-		<div class="admin-section-title" style="margin-bottom:2px;">Roster 1 — All Infants &amp; Toddlers (0–23 Months)</div>
-		<div class="admin-mini" style="margin-bottom:12px;">Every child below 24 months is weighed EVERY month regardless of nutritional status · <?php echo count($infantRows); ?> children · ages as of <?php echo nutritionist_e($anchorDate->format('M j, Y')); ?></div>
+	<?php if (empty($listRows)): ?>
+		<div class="admin-mini" style="padding:24px;text-align:center;color:var(--admin-muted);">No children currently match this monitoring list for the selected filters.</div>
+	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
 			<table class="nutritionist-table" style="min-width:900px;">
 				<thead>
@@ -810,14 +391,11 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 						<th>Weight (kg)</th>
 						<th>WFA</th>
 						<th>HFA</th>
-					<th>WFH</th>
+						<th>WFH</th>
 					</tr>
 				</thead>
 				<tbody>
-					<?php if ($infantRows === []): ?>
-						<tr><td colspan="11" style="color:var(--admin-muted);text-align:center;padding:24px;">No children aged 0–23 months in scope.</td></tr>
-					<?php endif; ?>
-					<?php foreach ($infantRows as $i => $row): ?>
+					<?php foreach ($listRows as $i => $row): ?>
 						<tr>
 							<td><?php echo $i + 1; ?></td>
 							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
@@ -828,203 +406,645 @@ $listCounts['0-23'] = (int)($infantCountRows[0]['cnt'] ?? 0);
 							</td>
 							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
 							<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
-							<td><?php echo $row['height_cm'] !== null ? nutritionist_e((string)$row['height_cm']) : '—'; ?></td>
-							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? 'Not measured')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? 'Not measured')); ?></span></td>
+							<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '—'; ?></td>
+							<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '—'; ?></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></span></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></span></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></span></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
 			</table>
 		</div>
-	</section>
+		<div class="admin-mini" style="margin-top:12px;"><?php echo count($listRows); ?> children in this list</div>
+	<?php endif; ?>
+</div>
 
-	<section class="nutritionist-panel" style="margin-bottom:20px;">
-		<div class="admin-section-title" style="margin-bottom:2px;">Roster 2 — Malnourished Older Children (24–59 Months)</div>
-		<div class="admin-mini" style="margin-bottom:12px;">Children with abnormal WFA/HFA/WFH — followed up EVERY month until recovery · <?php echo count($malnourishedRows); ?> children</div>
-		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:1000px;">
-				<thead>
-					<tr>
-						<th>No.</th>
-						<th>Address</th>
-						<th>Mother / Caregiver</th>
-						<th>Full Name of Child</th>
-						<th>Sex</th>
-						<th>Age</th>
-						<th>Height (cm)</th>
-						<th>Weight (kg)</th>
-						<th>WFA</th>
-						<th>HFA</th>
-						<th>WFH</th>
-					<th>Category</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php if ($malnourishedRows === []): ?>
-						<tr><td colspan="12" style="color:var(--admin-muted);text-align:center;padding:24px;">No malnourished children aged 24–59 months — great news.</td></tr>
-					<?php endif; ?>
-					<?php foreach ($malnourishedRows as $i => $row): ?>
-						<?php $categoryCodes = implode('+', followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null)); ?>
-						<tr>
-							<td><?php echo $i + 1; ?></td>
-							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
-							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-							<td>
-								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
-							</td>
-							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td title="<?php echo $row['age_days'] !== null ? (int)$row['age_days'] . ' days at measurement time' : ''; ?>">
-								<?php echo $row['age_months'] !== null ? nutritionist_e((string)$row['age_months'] . ' mo') : '—'; ?>
-								<?php if ($row['age_days'] !== null): ?>
-									<div class="admin-mini" style="font-size:0.7rem;"><?php echo (int)$row['age_days']; ?> d</div>
-								<?php endif; ?>
-							</td>
-							<td><?php echo $row['height_cm'] !== null ? nutritionist_e((string)$row['height_cm']) : '—'; ?></td>
-							<td><?php echo $row['weight_kg'] !== null ? nutritionist_e((string)$row['weight_kg']) : '—'; ?></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? 'Not measured')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? 'Not measured')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? 'Not measured')); ?></span></td>
-							<td><span class="admin-pill is-danger"><?php echo nutritionist_e(followup_category_label($categoryCodes) ?: 'At risk'); ?></span></td>
-						</tr>
+<?php else: ?>
+
+<div class="rp-filter-bar">
+	<form method="get" id="rp-filter-form" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;width:100%;">
+		<label>
+			View
+			<select name="view" onchange="this.form.submit()">
+				<option value="monthly" <?php echo $view === 'monthly' ? 'selected' : ''; ?>>Monthly Monitoring</option>
+				<option value="quarterly" <?php echo $view === 'quarterly' ? 'selected' : ''; ?>>Quarterly Rounds</option>
+			</select>
+		</label>
+		<?php if ($view === 'monthly'): ?>
+			<label>
+				Month
+				<select name="month" onchange="this.form.submit()">
+					<?php foreach ($monthsList as $mNo => $mName): ?>
+						<option value="<?php echo $mNo; ?>" <?php echo $month === $mNo ? 'selected' : ''; ?>><?php echo nutritionist_e($mName); ?></option>
 					<?php endforeach; ?>
-				</tbody>
-			</table>
+				</select>
+			</label>
+		<?php else: ?>
+			<label>
+				Checkup Round
+				<select name="checkup_month" onchange="this.form.submit()">
+					<?php foreach ($roundsList as $rNo => $rName): ?>
+						<option value="<?php echo $rNo; ?>" <?php echo $checkupMonth === $rNo ? 'selected' : ''; ?>><?php echo nutritionist_e($rName); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+		<?php endif; ?>
+		<label>
+			Year
+			<select name="year" onchange="this.form.submit()">
+				<?php for ($y = (int)date('Y'); $y >= (int)date('Y') - 4; $y--): ?>
+					<option value="<?php echo $y; ?>" <?php echo $year === $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
+				<?php endfor; ?>
+			</select>
+		</label>
+		<label>
+			Barangay
+			<select name="barangay_id" onchange="this.form.submit()">
+				<option value="0">All (within your scope)</option>
+				<?php foreach ($barangays as $b): ?>
+					<option value="<?php echo (int)$b['id']; ?>" <?php echo $barangayFilter === (int)$b['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($b['name']); ?></option>
+				<?php endforeach; ?>
+			</select>
+		</label>
+		<div style="flex:1;"></div>
+		<div class="rp-active-filters">
+			Currently: <?php echo nutritionist_e($periodLabel); ?> &middot; <?php echo nutritionist_e($barangayName); ?>
 		</div>
-	</section>
+	</form>
+</div>
 
-	<?php if ($needsBaselineRows !== []): ?>
-		<section class="nutritionist-panel">
-			<div class="admin-section-title" style="margin-bottom:2px;">Roster 3 — Older Children Without Baseline Measurement (24–59 Months)</div>
-			<div class="admin-mini" style="margin-bottom:12px;">These children have never been weighed or measured. Locate them and record an OPT baseline immediately · <?php echo count($needsBaselineRows); ?> children</div>
-			<div class="nutritionist-table-wrap">
-				<table class="nutritionist-table">
+<div class="rp-stat-grid">
+	<div class="rp-stat-card">
+		<div class="rp-stat-label">Total Children Assessed</div>
+		<div class="rp-stat-value"><?php echo (int)$totalAssessed; ?></div>
+		<div class="rp-stat-meta">0–59 months with at least one measurement</div>
+	</div>
+	<div class="rp-stat-card">
+		<div class="rp-stat-label">Infants &amp; Toddlers (0–23 mo)</div>
+		<div class="rp-stat-value" style="color:var(--admin-primary);"><?php echo (int)$infantCount; ?></div>
+		<div class="rp-stat-meta">Monthly weighing regardless of status</div>
+	</div>
+	<div class="rp-stat-card">
+		<div class="rp-stat-label">Malnourished Children</div>
+		<div class="rp-stat-value" style="color:#b45309;"><?php echo (int)$malnourishedCount; ?></div>
+		<div class="rp-stat-meta">Underweight / Stunted / Wasted (0–59 mo)</div>
+	</div>
+	<div class="rp-stat-card">
+		<div class="rp-stat-label">Data Quality Issues</div>
+		<div class="rp-stat-value" style="<?php echo $dqIssueCount > 0 ? 'color:var(--admin-danger);' : ''; ?>"><?php echo (int)$dqIssueCount; ?></div>
+		<div class="rp-stat-meta"><?php echo $dqIssueCount > 0 ? 'Records requiring review' : 'No issues found'; ?></div>
+	</div>
+</div>
+
+<section class="rp-section">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">EOPT Plus Reports</div>
+			<div class="rp-section-subtitle">Core Operation Timbang Plus report forms for the selected reporting period</div>
+		</div>
+	</div>
+	<div class="rp-form-grid">
+		<div class="rp-form-card">
+			<div class="rp-form-name">OPT Plus Form 1A</div>
+			<div class="rp-form-desc">Master list of all measured children aged 0–59 months for the reporting period.</div>
+			<div class="rp-form-meta">
+				<span class="admin-pill is-success">Ready</span>
+				<span class="rp-form-count"><?php echo (int)$totalAssessed; ?> records</span>
+			</div>
+			<div class="rp-form-actions">
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports.php?view=' . $view . '&year=' . $year . '&month=' . $month . '&barangay_id=' . $barangayFilter)); ?>">View</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">PDF</a>
+				<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+			</div>
+		</div>
+		<div class="rp-form-card">
+			<div class="rp-form-name">OPT Plus Form 1B</div>
+			<div class="rp-form-desc">Consolidated nutritional assessment summary by sex and age group (WFA, HFA, WFH).</div>
+			<div class="rp-form-meta">
+				<span class="admin-pill is-success">Ready</span>
+				<span class="rp-form-count">Summary report</span>
+			</div>
+			<div class="rp-form-actions">
+				<a class="admin-btn-secondary" href="#nutrition-analysis">View</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">PDF</a>
+				<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+			</div>
+		</div>
+		<div class="rp-form-card">
+			<div class="rp-form-name">OPT Plus Form 1C</div>
+			<div class="rp-form-desc">List of affected or at-risk children aged 0–59 months (malnourished + overweight/obese).</div>
+			<div class="rp-form-meta">
+				<span class="admin-pill is-success">Ready</span>
+				<span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span>
+			</div>
+			<div class="rp-form-actions">
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">View / PDF</a>
+				<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+			</div>
+		</div>
+	</div>
+</section>
+
+<section class="rp-section">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Monitoring Reports</div>
+			<div class="rp-section-subtitle">Official eOPT Plus monitoring lists for the selected period. Click to view full roster.</div>
+		</div>
+	</div>
+	<div class="rp-monitor-grid">
+		<?php foreach ($listCodes as $code => $spec): ?>
+			<?php
+				$count = $listCounts[$code] ?? 0;
+				$viewLink = app_url('/nutritionist/eopt_reports.php') . '?' . http_build_query([
+					'list' => $code, 'view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter,
+				]);
+				$pdfLink = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query([
+					'report_type' => 'list', 'list_code' => $code, 'year' => $year, 'barangay_id' => $barangayFilter, 'view' => $view,
+				]);
+				$exportLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query([
+					'list' => $code, 'year' => $year, 'barangay_id' => $barangayFilter, 'view' => $view,
+				]);
+				$statusClass = $count > 0 ? 'is-success' : 'is-muted';
+				$statusLabel = $count > 0 ? 'Ready' : 'No Data';
+			?>
+			<div class="rp-monitor-card">
+				<div class="rp-monitor-name"><?php echo nutritionist_e($spec['title']); ?></div>
+				<div class="rp-monitor-desc"><?php echo nutritionist_e($spec['description']); ?></div>
+				<div class="rp-monitor-footer">
+					<div class="rp-monitor-count"><?php echo $count; ?></div>
+					<div style="display:flex;gap:4px;align-items:center;">
+						<span class="admin-pill <?php echo $statusClass; ?>" style="font-size:10px;"><?php echo $statusLabel; ?></span>
+						<div class="rp-monitor-actions">
+							<a class="admin-icon-btn" title="View List" href="<?php echo nutritionist_e($viewLink); ?>"><?php echo admin_action_icon('view'); ?></a>
+							<a class="admin-icon-btn" title="PDF" href="<?php echo nutritionist_e($pdfLink); ?>"><?php echo admin_action_icon('print'); ?></a>
+							<a class="admin-icon-btn admin-icon-btn-primary" title="Excel" href="<?php echo nutritionist_e($exportLink); ?>"><?php echo admin_action_icon('export'); ?></a>
+						</div>
+					</div>
+				</div>
+			</div>
+		<?php endforeach; ?>
+	</div>
+</section>
+
+<section class="rp-section" id="nutrition-analysis">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Nutrition Analysis</div>
+			<div class="rp-section-subtitle">Barangay Nutritional Status Summary — sex-aggregated classifications for 0–23 and 0–59 month children</div>
+		</div>
+		<div style="display:flex;gap:8px;">
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Generate PDF</a>
+		</div>
+	</div>
+
+	<?php
+	$summaryRows = admin_fetch_all(
+		"SELECT
+			c.sex,
+			CASE WHEN TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) < 24 THEN '0-23' ELSE '24-59' END AS age_band,
+			m.wfa_status, m.hfa_status, m.wfh_status
+		 FROM children c
+		 INNER JOIN measurements m ON m.id = (
+			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE {$scope}{$barangayFilterSql}
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) BETWEEN 0 AND 59",
+		's' . str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
+		array_merge([$anchorDate->format('Y-m-d')], $scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
+	);
+
+	$bucket = static fn(): array => [
+		'Male' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
+		'Female' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
+		'Total' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
+	];
+
+	$wfaS = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
+	$hfaS = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
+	$wfhS = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
+
+	foreach ($summaryRows as $row) {
+		$sexLabel = (string)$row['sex'] === 'Male' ? 'Male' : 'Female';
+		$ageBand = (string)$row['age_band'];
+		foreach ([['wfa_status', &$wfaS], ['hfa_status', &$hfaS], ['wfh_status', &$wfhS]] as [$field, &$ref]) {
+			$val = $row[$field] ?? null;
+			if ($val === null || !isset($ref[$val])) continue;
+			$ref[$val][$sexLabel][$ageBand]++;
+			$ref[$val][$sexLabel]['total']++;
+			$ref[$val]['Total'][$ageBand]++;
+			$ref[$val]['Total']['total']++;
+		}
+		unset($ref);
+	}
+
+	$renderSummaryTable = function(string $title, array $data) use ($scopeParams, $barangayFilterParams, $barangayFilterSql, $scope): void {
+		$totalAll = 0;
+		foreach ($data as $d) { $totalAll += (int)$d['Total']['total']; }
+	?>
+		<div class="rp-table-section" style="margin-bottom:12px;">
+			<div class="rp-table-title" style="margin-bottom:10px;"><?php echo nutritionist_e($title); ?></div>
+			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+				<table class="nutritionist-table" style="min-width:750px;">
 					<thead>
 						<tr>
-							<th>No.</th>
-							<th>Child</th>
-							<th>Sex</th>
-							<th>Barangay</th>
-							<th>Parent / Guardian</th>
-							<th>Contact</th>
+							<th>Status</th>
+							<th>Male 0-23</th>
+							<th>Male 24-59</th>
+							<th>Male Total</th>
+							<th>Female 0-23</th>
+							<th>Female 24-59</th>
+							<th>Female Total</th>
+							<th>Grand Total</th>
+							<th>%</th>
 						</tr>
 					</thead>
 					<tbody>
-						<?php foreach ($needsBaselineRows as $i => $row): ?>
+						<?php foreach ($data as $status => $counts): ?>
+							<?php $gt = (int)$counts['Total']['total']; ?>
 							<tr>
-								<td><?php echo $i + 1; ?></td>
-								<td>
-									<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-									<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
-								</td>
-								<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-								<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
-								<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-								<td><?php echo nutritionist_e((string)($row['parent_phone'] ?? '—')); ?></td>
+								<td><strong><?php echo nutritionist_e($status); ?></strong></td>
+								<td><?php echo (int)$counts['Male']['0-23']; ?></td>
+								<td><?php echo (int)$counts['Male']['24-59']; ?></td>
+								<td><?php echo (int)$counts['Male']['total']; ?></td>
+								<td><?php echo (int)$counts['Female']['0-23']; ?></td>
+								<td><?php echo (int)$counts['Female']['24-59']; ?></td>
+								<td><?php echo (int)$counts['Female']['total']; ?></td>
+								<td><strong><?php echo $gt; ?></strong></td>
+								<td><?php echo $totalAll > 0 ? number_format(($gt / $totalAll) * 100, 1) . '%' : '0.0%'; ?></td>
 							</tr>
 						<?php endforeach; ?>
 					</tbody>
 				</table>
 			</div>
-		</section>
-	<?php endif; ?>
-
-<?php else: ?>
-
-	<section class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:2px;">Quarterly Round — <?php echo nutritionist_e($roundsList[$checkupMonth] . ' ' . $year); ?></div>
-		<div class="admin-mini" style="margin-bottom:12px;">
-			Cohort: children aged 24–59 months classified NORMAL during the Q1 (January–March <?php echo $year; ?>) OPT baseline round.
-			Malnourished cases found in Q1 are excluded — they belong to the MONTHLY monitoring lists.
-			· <?php echo count($quarterlyRows); ?> children in cohort · <?php echo $recheckedCount; ?> already re-checked.
 		</div>
-		<div class="nutritionist-table-wrap">
-			<table class="nutritionist-table">
+	<?php
+	};
+
+	$renderSummaryTable('WEIGHT-FOR-AGE (WFA)', $wfaS);
+	$renderSummaryTable('HEIGHT-FOR-AGE (HFA)', $hfaS);
+	$renderSummaryTable('WEIGHT-FOR-LENGTH/HEIGHT (WFH)', $wfhS);
+	?>
+</section>
+
+<section class="rp-section" id="prevalence-graphs">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Prevalence and Graphs</div>
+			<div class="rp-section-subtitle">Community-level prevalence of malnutrition indicators for children 0–59 months</div>
+		</div>
+		<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Generate PDF Report</a>
+	</div>
+
+	<?php
+	$prevBaseParams = array_merge($scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')]);
+	$allPrev = admin_fetch_all(
+		"SELECT lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.weight_kg, lm.height_cm
+		 FROM children c {$latestJoin}
+		 WHERE {$scope}{$barangayFilterSql}
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		$baseTypes,
+		$prevBaseParams
+	);
+
+	$prevTotal = count($allPrev);
+	$prevCounts = ['wasted' => 0, 'stunted' => 0, 'ow_ob' => 0, 'underweight' => 0, 'uw_or_stunted' => 0, 'stunted_or_owob' => 0];
+	$muacC = ['normal' => 0, 'mam' => 0, 'sam' => 0];
+
+	foreach ($allPrev as $c) {
+		$wfa = $c['wfa_status'] ?? null;
+		$hfa = $c['hfa_status'] ?? null;
+		$wfh = $c['wfh_status'] ?? null;
+		$w = $c['weight_kg'] !== null ? (float)$c['weight_kg'] : null;
+		$h = $c['height_cm'] !== null ? (float)$c['height_cm'] : null;
+
+		if (in_array($wfh, ['MW', 'SW'], true)) $prevCounts['wasted']++;
+		if (in_array($hfa, ['MSt', 'SSt'], true)) $prevCounts['stunted']++;
+		if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) $prevCounts['ow_ob']++;
+		if (in_array($wfa, ['MUW', 'SUW'], true)) $prevCounts['underweight']++;
+		if (in_array($wfa, ['MUW', 'SUW'], true) || in_array($hfa, ['MSt', 'SSt'], true)) $prevCounts['uw_or_stunted']++;
+		if (in_array($hfa, ['MSt', 'SSt'], true) || ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $prevCounts['stunted_or_owob']++;
+
+		if ($w !== null && $h !== null && $h > 0) {
+			$muacEst = ($w / $h) * 10;
+			if ($muacEst >= 12.5) $muacC['normal']++;
+			elseif ($muacEst >= 11.5) $muacC['mam']++;
+			else $muacC['sam']++;
+		}
+	}
+	?>
+
+	<div class="rp-table-section">
+		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+			<table class="nutritionist-table" style="min-width:600px;">
 				<thead>
 					<tr>
-						<th>No.</th>
-						<th>Child</th>
-						<th>Sex</th>
-						<th>Age</th>
-						<th>Barangay</th>
-						<th>Parent / Guardian</th>
-						<th>Q1 Measured</th>
-						<th>Q1 WFA</th>
-						<th>Q1 HFA</th>
-						<th>Q1 WFH</th>
-						<th>Latest Measured</th>
-						<th>Current Standing</th>
-						<th>Round Compliance</th>
+						<th>Indicator</th>
+						<th style="text-align:right;">Number</th>
+						<th style="text-align:right;">Prevalence</th>
 					</tr>
 				</thead>
 				<tbody>
-					<?php if ($quarterlyRows === []): ?>
-						<tr><td colspan="13" style="color:var(--admin-muted);text-align:center;padding:24px;">No Q1-normal children aged 24–59 months in this round.</td></tr>
-					<?php endif; ?>
-					<?php foreach ($quarterlyRows as $i => $row): ?>
-						<?php
-						$hasRecheck = !empty($row['latest_measured']) && (string)$row['latest_measured'] > $q1WindowEnd;
-						$abnormalNow = followup_abnormal_codes($row['latest_wfa'] ?? null, $row['latest_hfa'] ?? null, $row['latest_wfh'] ?? null);
-						$roundPassed = $anchorDate < new DateTimeImmutable('today');
-
-						if (!$hasRecheck && $roundPassed) {
-							$complianceLabel = 'Missed round';
-							$complianceClass = 'is-danger';
-						} elseif ($hasRecheck) {
-							$complianceLabel = 'Re-checked';
-							$complianceClass = 'is-success';
-						} else {
-							$complianceLabel = 'Awaiting re-check';
-							$complianceClass = 'is-warn';
-						}
-						?>
+					<?php
+					$indicators = [
+						['Wasted (MW + SW)', $prevCounts['wasted']],
+						['Stunted (MSt + SSt)', $prevCounts['stunted']],
+						['Overweight / Obese', $prevCounts['ow_ob']],
+						['Underweight (MUW + SUW)', $prevCounts['underweight']],
+						['Underweight and/or Stunted', $prevCounts['uw_or_stunted']],
+						['Stunted and/or OW/Obese', $prevCounts['stunted_or_owob']],
+					];
+					foreach ($indicators as [$label, $count]):
+						$pctVal = $prevTotal > 0 ? number_format(($count / $prevTotal) * 100, 1) . '%' : '0.0%';
+					?>
 						<tr>
-							<td><?php echo $i + 1; ?></td>
-							<td>
-								<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
-								<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
-							</td>
-							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td title="<?php
-								$ageAtAnchor = doh_age_in_days((string)$row['birthdate'], $anchorDate);
-								echo $ageAtAnchor !== null ? (int)$ageAtAnchor . ' days at anchor' : '';
-							?>">
-								<?php echo nutritionist_e(followup_age_months((string)$row['birthdate'], $anchorDate)); ?> mo
-								<?php if ($ageAtAnchor !== null): ?>
-									<div class="admin-mini" style="font-size:0.7rem;"><?php echo (int)$ageAtAnchor; ?> d</div>
-								<?php endif; ?>
-							</td>
-							<td><?php echo nutritionist_e((string)($row['barangay'] ?? '')); ?></td>
-							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-							<td><?php echo nutritionist_e((string)($row['q1_measured'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['q1_wfa'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['q1_hfa'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['q1_wfh'] ?? '—')); ?></td>
-							<td><?php echo nutritionist_e((string)($row['latest_measured'] ?? '—')); ?></td>
-							<td>
-								<?php if (!empty($row['latest_measured'])): ?>
-									<span class="admin-pill <?php echo $abnormalNow === [] ? 'is-success' : 'is-danger'; ?>">
-										<?php echo nutritionist_e($abnormalNow === [] ? 'Still normal' : followup_category_label(implode('+', $abnormalNow))); ?>
-									</span>
-								<?php else: ?>
-									<span class="admin-mini">No data</span>
-								<?php endif; ?>
-							</td>
-							<td><span class="admin-pill <?php echo $complianceClass; ?>"><?php echo nutritionist_e($complianceLabel); ?></span></td>
+							<td><?php echo nutritionist_e($label); ?></td>
+							<td style="text-align:right;font-weight:600;"><?php echo $count; ?></td>
+							<td style="text-align:right;font-weight:600;color:var(--admin-primary);"><?php echo $pctVal; ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
 			</table>
 		</div>
-	</section>
+	</div>
 
-<?php endif; ?>
+	<div class="rp-chart-grid">
+		<div class="rp-chart-card">
+			<div class="rp-chart-title">Malnutrition Prevalence</div>
+			<canvas id="rp-prevalence-chart" height="220"></canvas>
+		</div>
+		<div class="rp-chart-card">
+			<div class="rp-chart-title">MUAC Status Distribution</div>
+			<canvas id="rp-muac-chart" height="220"></canvas>
+		</div>
+	</div>
+</section>
 
-<div class="admin-mini" style="margin-top:16px;">
-	Export generates the official V2 format Excel workbook: one sheet per monitoring list (List_0_23 · List_MW · List_SW · List_MSt_SSt · List_OW_Ob · List_MUW_SUW_MSt_SSt · List_MSt_SSt_MW_SW · List_MSt_SSt_OW_Ob) plus the barangay summary — with follow-up visit columns on every sheet. Each list can also be exported on its own via the Monitoring Lists panel above, or viewed at <code>?list=MW</code>.
-</div>
+<section class="rp-section" id="data-quality">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Data Quality Check</div>
+			<div class="rp-section-subtitle">Summary of data completeness and quality issues across all child records</div>
+		</div>
+		<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query(['year' => $year, 'barangay_id' => $barangayFilter]))); ?>">Export DQC Report</a>
+	</div>
+
+	<div class="rp-dqc-grid">
+		<?php
+		$dqcIssues = [
+			['Repeated name and birthdate', $dqDupCount, $dqDupCount > 0 ? 'warn' : 'ok', 'duplicate_name_dob'],
+			['Missing sex', (int)$dqMissingSex, (int)$dqMissingSex > 0 ? 'danger' : 'ok', 'missing_sex'],
+			['Missing date of birth', (int)$dqMissingDob, (int)$dqMissingDob > 0 ? 'danger' : 'ok', 'missing_birthdate'],
+			['No parent or address', 0, 'ok', 'no_parent'],
+			['Children older than 59 months', (int)$dqOverAge, (int)$dqOverAge > 0 ? 'warn' : 'ok', 'over_59_months'],
+			['Height but no weight', (int)$dqHeightNoWeight, (int)$dqHeightNoWeight > 0 ? 'warn' : 'ok', 'height_no_weight'],
+			['Weight but no height', (int)$dqWeightNoHeight, (int)$dqWeightNoHeight > 0 ? 'warn' : 'ok', 'weight_no_height'],
+			['No MUAC where applicable', 0, 'ok', 'no_muac'],
+		];
+		foreach ($dqcIssues as [$label, $count, $severity, $code]):
+			$link = $count > 0 ? app_url('/nutritionist/eopt_dqc_records.php?issue=' . $code . '&year=' . $year . '&barangay_id=' . $barangayFilter) : '#';
+		?>
+			<a href="<?php echo nutritionist_e($link); ?>" class="rp-dqc-card is-<?php echo $severity; ?>" style="text-decoration:none;color:inherit;<?php echo $count === 0 ? 'opacity:0.6;' : ''; ?>">
+				<div class="rp-dqc-count" style="color:<?php echo $severity === 'ok' ? 'var(--admin-primary)' : ($severity === 'warn' ? '#d97706' : 'var(--admin-danger)'); ?>;"><?php echo $count; ?></div>
+				<div class="rp-dqc-label"><?php echo nutritionist_e($label); ?></div>
+			</a>
+		<?php endforeach; ?>
+	</div>
+</section>
+
+<section class="rp-section" id="followup-referral">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Follow-up and Referral</div>
+			<div class="rp-section-subtitle">Children requiring follow-up monitoring and referral management</div>
+		</div>
+	</div>
+
+	<?php
+	$followupRows = admin_fetch_all(
+		"SELECT
+			c.id AS child_id, c.child_code, c.first_name, c.middle_name, c.last_name,
+			c.sex, c.birthdate, p.name AS parent_name, bg.name AS barangay,
+			lm.measurement_date, lm.weight_kg, lm.height_cm,
+			lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.nutritional_status,
+			a.id AS appt_id, a.scheduled_at, a.status AS appt_status,
+			a.followup_track, a.followup_category,
+			TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months
+		 FROM appointments a
+		 INNER JOIN children c ON c.id = a.child_id
+		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
+		 LEFT JOIN measurements lm ON lm.id = (
+			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE a.appointment_type = 'followup' AND a.status IN ('pending','scheduled')
+		   AND {$scope}{$barangayFilterSql}
+		 ORDER BY a.scheduled_at ASC LIMIT 20",
+		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
+		array_merge($scopeParams, $barangayFilterParams)
+	);
+
+	$followupCounts = ['pending' => 0, 'scheduled' => 0, 'completed' => 0, 'referred' => 0];
+	$fcRows = admin_fetch_all(
+		"SELECT a.status, COUNT(*) AS cnt FROM appointments a
+		 INNER JOIN children c ON c.id = a.child_id
+		 WHERE a.appointment_type = 'followup' AND {$scope}{$barangayFilterSql}
+		 GROUP BY a.status",
+		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
+		array_merge($scopeParams, $barangayFilterParams)
+	);
+	foreach ($fcRows as $fr) {
+		$st = (string)$fr['status'];
+		if (isset($followupCounts[$st])) $followupCounts[$st] = (int)$fr['cnt'];
+	}
+	?>
+
+	<div class="rp-followup-status-row">
+		<div class="rp-followup-pill"><span class="count" style="color:#d97706;"><?php echo $followupCounts['pending']; ?></span> Pending</div>
+		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $followupCounts['scheduled']; ?></span> Scheduled</div>
+		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $followupCounts['completed']; ?></span> Completed</div>
+		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-danger);"><?php echo $followupCounts['referred']; ?></span> Referred</div>
+	</div>
+
+	<?php if (empty($followupRows)): ?>
+		<div class="rp-table-section">
+			<div class="admin-mini" style="padding:20px;text-align:center;color:var(--admin-muted);">No children currently require follow-up for the selected filters.</div>
+		</div>
+	<?php else: ?>
+		<div class="rp-table-section">
+			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
+				<table class="nutritionist-table" style="min-width:900px;">
+					<thead>
+						<tr>
+							<th>Child</th>
+							<th>Age</th>
+							<th>Status</th>
+							<th>Last Measurement</th>
+							<th>Weight</th>
+							<th>Height</th>
+							<th>Follow-up</th>
+							<th>Scheduled</th>
+							<th>Action</th>
+						</tr>
+					</thead>
+					<tbody>
+						<?php foreach ($followupRows as $i => $row): ?>
+							<?php
+							$abnormal = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
+							$catLabel = $abnormal ? followup_category_label(implode('+', $abnormal)) : 'Normal';
+							?>
+							<tr>
+								<td>
+									<div style="font-weight:600;"><?php echo nutritionist_e(trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''))); ?></div>
+									<div class="admin-mini"><?php echo nutritionist_e((string)$row['child_code']); ?></div>
+								</td>
+								<td><?php echo (int)$row['age_months']; ?> mo</td>
+								<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e($catLabel); ?></span></td>
+								<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? '—')); ?></td>
+								<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) . ' kg' : '—'; ?></td>
+								<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) . ' cm' : '—'; ?></td>
+								<td><span class="admin-pill <?php echo (string)$row['appt_status'] === 'pending' ? 'is-warn' : 'is-info'; ?>"><?php echo nutritionist_e(ucfirst((string)$row['appt_status'])); ?></span></td>
+								<td><?php echo nutritionist_e((string)($row['scheduled_at'] ?? '—')); ?></td>
+								<td>
+									<a class="admin-icon-btn" title="Referral PDF" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=referral&child_id=' . (int)$row['child_id'])); ?>"><?php echo admin_action_icon('print'); ?></a>
+								</td>
+							</tr>
+						<?php endforeach; ?>
+					</tbody>
+				</table>
+			</div>
+		</div>
+	<?php endif; ?>
+</section>
+
+<section class="rp-section" id="export-center">
+	<div class="rp-section-head">
+		<div>
+			<div class="rp-section-title">Export Center</div>
+			<div class="rp-section-subtitle">Export complete eOPT Plus data for consolidation and reporting</div>
+		</div>
+	</div>
+	<div class="rp-export-grid">
+		<div class="rp-export-card">
+			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook (.xlsx)</div>
+			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all 8 monitoring lists in DOH format.</div>
+			<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>"><?php echo admin_action_icon('export'); ?> Download Excel Workbook</a>
+		</div>
+		<div class="rp-export-card">
+			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">Formal PDF Reports</div>
+			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Printable official report forms with headers, signatures, and DOH formatting.</div>
+			<div style="display:flex;gap:8px;flex-wrap:wrap;">
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Form 1A PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Form 1B PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Form 1C PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Summary PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query(['year' => $year, 'view' => $view, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter]))); ?>">Prevalence PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query(['year' => $year, 'barangay_id' => $barangayFilter]))); ?>">DQC PDF</a>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+	const prevData = <?php echo json_encode([
+		'indicators' => array_map(fn($item) => ['label' => $item[0], 'count' => $item[1], 'prevalence' => $prevTotal > 0 ? round(($item[1] / $prevTotal) * 100, 1) : 0], $indicators),
+		'muac' => [
+			['label' => 'Normal', 'count' => $muacC['normal']],
+			['label' => 'MAM', 'count' => $muacC['mam']],
+			['label' => 'SAM', 'count' => $muacC['sam']],
+		],
+	], JSON_UNESCAPED_UNICODE); ?>;
+
+	const greenPalette = ['#0b6e4f','#16a34a','#22c55e','#86efac','#bbf7d0'];
+	const statusColors = {
+		'Wasted (MW + SW)': '#dc2626',
+		'Stunted (MSt + SSt)': '#d97706',
+		'Overweight / Obese': '#ea580c',
+		'Underweight (MUW + SUW)': '#b91c1c',
+		'Underweight and/or Stunted': '#92400e',
+		'Stunted and/or OW/Obese': '#c2410c',
+	};
+
+	const prevCanvas = document.getElementById('rp-prevalence-chart');
+	if (prevCanvas) {
+		new Chart(prevCanvas, {
+			type: 'bar',
+			data: {
+				labels: prevData.indicators.map(d => d.label),
+				datasets: [{
+					label: 'Prevalence (%)',
+					data: prevData.indicators.map(d => d.prevalence),
+					backgroundColor: prevData.indicators.map(d => statusColors[d.label] || '#0b6e4f'),
+					borderRadius: 4,
+					barThickness: 28,
+				}]
+			},
+			options: {
+				indexAxis: 'y',
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { display: false },
+					tooltip: {
+						callbacks: {
+							label: function(ctx) { return ctx.parsed.x + '% (' + prevData.indicators[ctx.dataIndex].count + ' children)'; }
+						}
+					}
+				},
+				scales: {
+					x: {
+						beginAtZero: true,
+						max: 100,
+						ticks: { callback: function(v) { return v + '%'; }, font: { size: 11 } },
+						grid: { color: 'rgba(0,0,0,0.05)' }
+					},
+					y: {
+						ticks: { font: { size: 11 } },
+						grid: { display: false }
+					}
+				}
+			}
+		});
+	}
+
+	const muacCanvas = document.getElementById('rp-muac-chart');
+	if (muacCanvas) {
+		const muacTotal = prevData.muac.reduce((s, d) => s + d.count, 0);
+		new Chart(muacCanvas, {
+			type: 'doughnut',
+			data: {
+				labels: prevData.muac.map(d => d.label + ' (' + d.count + ')'),
+				datasets: [{
+					data: prevData.muac.map(d => d.count),
+					backgroundColor: ['#16a34a', '#d97706', '#dc2626'],
+					borderWidth: 2,
+					borderColor: '#fff',
+				}]
+			},
+			options: {
+				responsive: true,
+				maintainAspectRatio: false,
+				plugins: {
+					legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } },
+					tooltip: {
+						callbacks: {
+							label: function(ctx) {
+								const pct = muacTotal > 0 ? ((ctx.parsed / muacTotal) * 100).toFixed(1) : 0;
+								return ctx.label + ': ' + pct + '%';
+							}
+						}
+					}
+				}
+			}
+		});
+	}
+})();
+</script>
 
 <?php endif; ?>
 
