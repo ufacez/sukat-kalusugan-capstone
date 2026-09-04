@@ -49,6 +49,7 @@ $children = admin_fetch_all(
         c.is_ip,
         c.has_disability,
         c.parent_id,
+        c.household_id,
         bg.name AS barangay,
         la.area_name AS local_area,
         la.area_type,
@@ -56,11 +57,16 @@ $children = admin_fetch_all(
         p.parent_type AS parent_kind,
         p.phone AS parent_phone,
         p.email AS parent_email,
-        p.address AS parent_address
+        p.address AS parent_address,
+        h.household_code AS household_code,
+        h.address AS household_address,
+        h.lat AS household_lat,
+        h.lng AS household_lng
      FROM children c
      INNER JOIN parents p ON p.id = c.parent_id
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
      LEFT JOIN local_areas la ON la.id = c.local_area_id
+     LEFT JOIN households h ON h.id = c.household_id AND h.status = 'active'
      WHERE {$whereSql}
      ORDER BY c.last_name ASC, c.first_name ASC",
     $types,
@@ -287,6 +293,11 @@ nutritionist_layout_start(
                         data-parent-kind="<?php echo nutritionist_e((string)($child['parent_kind'] ?? '')); ?>"
                         data-parent-phone="<?php echo nutritionist_e((string)($child['parent_phone'] ?? '')); ?>"
                         data-parent-email="<?php echo nutritionist_e((string)($child['parent_email'] ?? '')); ?>"
+                        data-household-id="<?php echo (int)($child['household_id'] ?? 0); ?>"
+                        data-household-code="<?php echo nutritionist_e((string)($child['household_code'] ?? '')); ?>"
+                        data-household-address="<?php echo nutritionist_e((string)($child['household_address'] ?? '')); ?>"
+                        data-household-lat="<?php echo $child['household_lat'] !== null ? nutritionist_e((string)$child['household_lat']) : ''; ?>"
+                        data-household-lng="<?php echo $child['household_lng'] !== null ? nutritionist_e((string)$child['household_lng']) : ''; ?>"
                     >
                         <td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($child['child_code']); ?></td>
                         <td class="address-cell">
@@ -400,6 +411,11 @@ nutritionist_layout_start(
             <div class="cc-row"><span class="label">Type</span><span class="value" id="cc-parent-kind">—</span></div>
             <div class="cc-row"><span class="label">Phone</span><span class="value" id="cc-parent-phone">—</span></div>
             <div class="cc-row"><span class="label">Email</span><span class="value" id="cc-parent-email">—</span></div>
+
+            <div class="cc-section">Household / Spot</div>
+            <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
+            <div class="cc-row"><span class="label">Address</span><span class="value" id="cc-household-address">—</span></div>
+            <div class="cc-row"><span class="label">Coordinates</span><span class="value" id="cc-household-coords" style="font-family:monospace;font-size:11px;">—</span></div>
         </div>
         <div class="cc-foot">
             <a class="admin-btn-secondary" id="cc-edit" href="#">Edit profile</a>
@@ -420,6 +436,7 @@ nutritionist_layout_start(
         if (!row) return;
         var get = function (k) { return row.getAttribute('data-child-' + k) || ''; };
         var getP = function (k) { return row.getAttribute('data-parent-' + k) || ''; };
+        var getH = function (k) { return row.getAttribute('data-household-' + k) || ''; };
 
         var name = get('name');
         var code = get('code');
@@ -452,6 +469,18 @@ nutritionist_layout_start(
         text('cc-parent-kind', getP('kind'));
         text('cc-parent-phone', getP('phone'));
         text('cc-parent-email', getP('email'));
+
+        var hhCode = getH('code');
+        var hhAddress = getH('address');
+        var hhLat = getH('lat');
+        var hhLng = getH('lng');
+        text('cc-household-code', hhCode ? ('HH-' + String(getH('id') || '0').padStart(4, '0') + ' · ' + hhCode) : '—');
+        text('cc-household-address', hhAddress || '—');
+        if (hhLat && hhLng) {
+            text('cc-household-coords', parseFloat(hhLat).toFixed(7) + ', ' + parseFloat(hhLng).toFixed(7));
+        } else {
+            text('cc-household-coords', '—');
+        }
 
         var editLink = val('cc-edit');
         if (editLink) {

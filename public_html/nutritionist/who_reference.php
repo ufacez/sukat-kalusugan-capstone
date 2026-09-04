@@ -73,7 +73,13 @@ if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months
 	$params[] = $high;
 }
 
-$sql .= " ORDER BY {$config['column']} ASC";
+/*
+ * Sort by the row's id (import / create order) so the original seeded
+ * reference rows come first and any newly-imported LMS values show up
+ * at the end. The data is still grouped sensibly because the importer
+ * writes rows in the natural order of the source spreadsheet.
+ */
+$sql .= " ORDER BY id ASC";
 $rows = admin_fetch_all($sql, $types, $params);
 $rowCount = count($rows);
 $minX = $rowCount > 0 ? $rows[0]['x'] : null;

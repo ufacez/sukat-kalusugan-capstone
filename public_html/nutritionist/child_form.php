@@ -54,6 +54,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
     $parentId = (int)($_POST['parent_id'] ?? 0);
     $localAreaId = (int)($_POST['local_area_id'] ?? 0);
+    $householdId = (int)($_POST['household_id'] ?? 0);
 
     $errorBackUrl = '/nutritionist/child_form.php'
         . ($childId > 0 ? '?id=' . $childId : '');
@@ -135,6 +136,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
     }
 
+    // Validate household belongs to the same barangay (if provided)
+    $validatedHouseholdId = null;
+    if ($householdId > 0) {
+        $household = admin_fetch_one(
+            'SELECT id, barangay_id FROM households WHERE id = ? AND status = "active" LIMIT 1',
+            'i',
+            [$householdId]
+        );
+        if ($household && (int)$household['barangay_id'] === (int)$barangayId) {
+            $validatedHouseholdId = (int)$household['id'];
+        }
+    }
+
     // Day-based age check -- 5 years is roughly 1825 days, which is
     // the upper bound of the eOPT Plus scope.
     $registrationAgeDays = doh_age_in_days($birthdate);
@@ -181,9 +195,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                  local_area_id = ?,
                  is_ip = ?,
                  has_disability = ?,
-                 parent_id = ?
+                 parent_id = ?,
+                 household_id = ?
              WHERE id = ?',
-            'ssssssssiiii',
+            'ssssssssiiiii',
             [
                 $childCode,
                 $firstName,
@@ -196,6 +211,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $isIp,
                 $hasDisability,
                 $parentId,
+                $validatedHouseholdId,
                 $childId
             ]
         );
@@ -231,10 +247,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                     local_area_id,
                     is_ip,
                     has_disability,
-                    parent_id
+                    parent_id,
+                    household_id
                 )
-             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            'ssssssssiii',
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            'ssssssssiiii',
             [
                 $childCode,
                 $firstName,
@@ -246,7 +263,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $validatedLocalAreaId ?? 0,
                 $isIp,
                 $hasDisability,
-                $parentId
+                $parentId,
+                $validatedHouseholdId
             ]
         );
 
@@ -298,6 +316,7 @@ if ($editId > 0) {
             c.has_disability,
             c.parent_id,
             c.local_area_id,
+            c.household_id,
             p.name AS parent_name,
             bg.name AS barangay,
             bg.id AS barangay_id_resolved,
@@ -351,6 +370,19 @@ $parents = admin_fetch_all(
     str_repeat('i', count($parentParams)),
     $parentParams
 );
+
+$householdBarangayFilter = (int)($editChild['barangay_id'] ?? $user['barangay_id'] ?? 0);
+$households = [];
+if ($householdBarangayFilter > 0) {
+    $households = admin_fetch_all(
+        "SELECT id, household_code, address
+           FROM households
+          WHERE barangay_id = ? AND status = 'active'
+          ORDER BY household_code",
+        'i',
+        [$householdBarangayFilter]
+    );
+}
 
 $actions = '<a class="admin-btn-secondary" href="'
     . nutritionist_e(app_url('/nutritionist/children.php'))
@@ -662,6 +694,53 @@ nutritionist_layout_start(
                 style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;"
             >
                 Optional. Purok, sitio, subdivision, or other local area within the barangay.
+            </small>
+
+        </label>
+
+
+        <label class="admin-field">
+
+            <span>
+                Household / Spot
+            </span>
+
+            <select
+                name="household_id"
+                id="household-select"
+                data-current-household="<?php echo (int)($editChild['household_id'] ?? 0); ?>"
+            >
+
+                <option value="">
+                    -- None --
+                </option>
+
+                <?php foreach ($households as $hh): ?>
+
+                    <option
+                        value="<?php echo (int)$hh['id']; ?>"
+                        <?php echo ((int)($editChild['household_id'] ?? 0) === (int)$hh['id'])
+                            ? 'selected'
+                            : ''; ?>
+                    >
+
+                        <?php
+                        echo nutritionist_e($hh['household_code']);
+                        if (!empty($hh['address'])) {
+                            echo ' · ' . nutritionist_e($hh['address']);
+                        }
+                        ?>
+
+                    </option>
+
+                <?php endforeach; ?>
+
+            </select>
+
+            <small
+                style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;"
+            >
+                Optional. Links this child to a household spot on the barangay risk map. Scoped to the parent's barangay.
             </small>
 
         </label>

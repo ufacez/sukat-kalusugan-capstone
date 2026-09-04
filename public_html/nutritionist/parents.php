@@ -65,12 +65,17 @@ $parents = admin_fetch_all(
 		p.barangay_id,
 		bg.name AS barangay,
 		p.status,
+		p.household_id,
+		h.household_code AS household_code,
+		h.address AS household_address,
+		h.lat AS household_lat,
+		h.lng AS household_lng,
 		COUNT(DISTINCT c.id) AS children_count,
 		COUNT(DISTINCT a.id) AS appointment_count,
-		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count,
-		MAX(lm.measurement_date) AS latest_measurement
+		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count
 	 FROM parents p
 	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
+	 LEFT JOIN households h ON h.id = p.household_id AND h.status = 'active'
      LEFT JOIN children c ON c.parent_id = p.id AND {$childScope}
      LEFT JOIN appointments a ON a.parent_id = p.id
 	 LEFT JOIN measurements lm ON lm.id = (
@@ -81,7 +86,7 @@ $parents = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE {$parentScope}
-	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status
+	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
 	 ORDER BY p.name ASC",
 	str_repeat('i', count($childScopeParams) + count($parentScopeParams)),
 	array_merge($childScopeParams, $parentScopeParams)
@@ -180,14 +185,28 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 					<th>Children</th>
 					<th>Appointments</th>
 					<th>Follow-up</th>
-					<th>Latest measurement</th>
-					<th>Status</th>
 					<th>Actions</th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php foreach ($parents as $parent): ?>
-					<tr data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'])); ?>">
+					<tr
+						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'])); ?>"
+						data-parent-id="<?php echo (int)$parent['id']; ?>"
+						data-parent-name="<?php echo nutritionist_e($parent['name']); ?>"
+						data-parent-type="<?php echo nutritionist_e($parent['parent_type']); ?>"
+						data-parent-email="<?php echo nutritionist_e($parent['email']); ?>"
+						data-parent-phone="<?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?>"
+						data-parent-address="<?php echo nutritionist_e((string)($parent['address'] ?? '')); ?>"
+						data-parent-barangay="<?php echo nutritionist_e((string)($parent['barangay'] ?? '')); ?>"
+						data-parent-status="<?php echo nutritionist_e($parent['status']); ?>"
+						data-parent-children="<?php echo (int)$parent['children_count']; ?>"
+						data-household-id="<?php echo (int)($parent['household_id'] ?? 0); ?>"
+						data-household-code="<?php echo nutritionist_e((string)($parent['household_code'] ?? '')); ?>"
+						data-household-address="<?php echo nutritionist_e((string)($parent['household_address'] ?? '')); ?>"
+						data-household-lat="<?php echo $parent['household_lat'] !== null ? nutritionist_e((string)$parent['household_lat']) : ''; ?>"
+						data-household-lng="<?php echo $parent['household_lng'] !== null ? nutritionist_e((string)$parent['household_lng']) : ''; ?>"
+					>
 						<td>
 							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($parent['name']); ?></div>
 							<div class="admin-mini"><?php echo nutritionist_e((string)($parent['address'] ?? '')); ?></div>
@@ -196,13 +215,12 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e($parent['email']); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?></td>
 						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['barangay'] ?? '')); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
+<td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
 						<td style="color:var(--admin-muted);"><?php echo (int)$parent['appointment_count']; ?></td>
-						<td style="color:var(--admin-muted);"><?php echo (int)($parent['follow_up_count'] ?? 0); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['latest_measurement'] ?? 'n/a')); ?></td>
-						<td><span class="admin-pill <?php echo $parent['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo nutritionist_e(ucfirst($parent['status'])); ?></span></td>
+						<td style="color:var(--admin-muted);"><?php echo (int)$parent['follow_up_count'] ?? 0; ?></td>
 						<td>
 							<div class="admin-actions">
+								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
 								<?php if (nutritionist_can_write('parents.update')): ?>
 								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
 								<?php endif; ?>
@@ -221,6 +239,126 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 		</table>
 	</div>
 </section>
+
+<div class="pc-overlay" id="pc-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+	<div class="pc-modal">
+		<div class="pc-head">
+			<div class="avatar" id="pc-avatar">--</div>
+			<div class="meta">
+				<div class="name" id="pc-name">Parent name</div>
+				<div class="sub" id="pc-sub">—</div>
+			</div>
+			<button type="button" class="close" id="pc-close" aria-label="Close">×</button>
+		</div>
+		<div class="pc-body">
+			<div class="pc-section">Contact information</div>
+			<div class="pc-row"><span class="label">Email</span><span class="value" id="pc-email">—</span></div>
+			<div class="pc-row"><span class="label">Phone</span><span class="value" id="pc-phone">—</span></div>
+			<div class="pc-row"><span class="label">Type</span><span class="value" id="pc-type">—</span></div>
+			<div class="pc-row"><span class="label">Status</span><span class="value" id="pc-status">—</span></div>
+			<div class="pc-row"><span class="label">Linked children</span><span class="value" id="pc-children">—</span></div>
+
+			<div class="pc-section">Address</div>
+			<div class="pc-row"><span class="label">Barangay</span><span class="value" id="pc-barangay">—</span></div>
+			<div class="pc-row"><span class="label">Street address</span><span class="value" id="pc-address">—</span></div>
+
+			<div class="pc-section">Household / Spot</div>
+			<div class="pc-row"><span class="label">Household code</span><span class="value" id="pc-household-code">—</span></div>
+			<div class="pc-row"><span class="label">Address</span><span class="value" id="pc-household-address">—</span></div>
+			<div class="pc-row"><span class="label">Coordinates</span><span class="value" id="pc-household-coords" style="font-family:monospace;font-size:11px;">—</span></div>
+		</div>
+		<div class="pc-foot">
+			<a class="admin-btn-secondary" id="pc-edit" href="#">Edit parent</a>
+			<button type="button" class="admin-btn" id="pc-close-2">Close</button>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	var overlay = document.getElementById('pc-overlay');
+	if (!overlay) return;
+
+	function val(id) { return document.getElementById(id); }
+	function text(id, v) { var el = val(id); if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v; }
+
+	function openParentCard(row) {
+		if (!row) return;
+		var get = function (k) { return row.getAttribute('data-parent-' + k) || ''; };
+		var getH = function (k) { return row.getAttribute('data-household-' + k) || ''; };
+
+		var name = get('name');
+		var initials = (name.split(' ').filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0).toUpperCase(); }).join('')) || '--';
+		val('pc-avatar').textContent = initials;
+		val('pc-avatar').style.background = '#6366f1';
+
+		text('pc-name', name);
+		text('pc-sub', get('type') + ' · ' + get('email'));
+
+		text('pc-email', get('email'));
+		text('pc-phone', get('phone'));
+		text('pc-type', get('type'));
+		text('pc-status', get('status').charAt(0).toUpperCase() + get('status').slice(1));
+		text('pc-children', get('children'));
+
+		text('pc-barangay', get('barangay'));
+		text('pc-address', get('address'));
+
+		var hhCode = getH('code');
+		var hhAddress = getH('address');
+		var hhLat = getH('lat');
+		var hhLng = getH('lng');
+		text('pc-household-code', hhCode ? ('HH-' + String(getH('id') || '0').padStart(4, '0') + ' · ' + hhCode) : '—');
+		text('pc-household-address', hhAddress || '—');
+		if (hhLat && hhLng) {
+			text('pc-household-coords', parseFloat(hhLat).toFixed(7) + ', ' + parseFloat(hhLng).toFixed(7));
+		} else {
+			text('pc-household-coords', '—');
+		}
+
+		var editLink = val('pc-edit');
+		if (editLink) {
+			editLink.setAttribute('href', '<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php')); ?>?id=' + (get('id') || ''));
+		}
+
+		overlay.classList.add('is-open');
+		overlay.setAttribute('aria-hidden', 'false');
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeParentCard() {
+		overlay.classList.remove('is-open');
+		overlay.setAttribute('aria-hidden', 'true');
+		document.body.style.overflow = '';
+	}
+
+	document.querySelectorAll('[data-view-parent-card]').forEach(function (btn) {
+		btn.addEventListener('click', function (e) {
+			e.stopPropagation();
+			var row = btn.closest('tr');
+			openParentCard(row);
+		});
+	});
+
+	document.querySelectorAll('#parents-table tr').forEach(function (row) {
+		row.addEventListener('click', function (e) {
+			if (e.target.closest('a, button, form')) return;
+			openParentCard(row);
+		});
+	});
+
+	['pc-close', 'pc-close-2'].forEach(function (id) {
+		var el = document.getElementById(id);
+		if (el) el.addEventListener('click', closeParentCard);
+	});
+	overlay.addEventListener('click', function (e) {
+		if (e.target === overlay) closeParentCard();
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeParentCard();
+	});
+})();
+</script>
 
 <?php
 nutritionist_layout_end();

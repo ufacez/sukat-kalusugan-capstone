@@ -2005,9 +2005,9 @@
 /* --- GeoMapper-style layout: map + right sidebar --- */
 .admin-riskmap-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
-  align-items: start;
+  align-items: stretch;
 }
 
 .admin-riskmap-mapwrap {
@@ -2214,6 +2214,16 @@
 
   .admin-riskmap-search-input {
     width: 140px;
+  }
+
+  .admin-spotmap-sidebar {
+    position: relative;
+    top: 0;
+    max-height: none;
+  }
+
+  .admin-spotmap-panel {
+    max-height: none;
   }
 }
 

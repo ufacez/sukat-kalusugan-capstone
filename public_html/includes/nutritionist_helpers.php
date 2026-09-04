@@ -15,7 +15,7 @@ function nutritionist_nav_items(): array
         ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php')],
         ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
         ['key' => 'who_reference', 'label' => 'WHO Reference', 'href' => app_url('/nutritionist/who_reference.php')],
-        ['key' => 'risk_map', 'label' => 'Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
+        ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
@@ -44,7 +44,7 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Community',
             'items' => [
-                ['key' => 'risk_map', 'label' => 'Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
+                ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
                 ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
             ],
         ],
@@ -257,8 +257,12 @@ function nutritionist_scope_fragment(array $user, string $column, array &$params
 {
     $barangayId = $user['barangay_id'] ?? null;
 
-    if (($user['role'] ?? '') === 'admin' || $barangayId === null || $barangayId === '') {
+    if (($user['role'] ?? '') === 'admin') {
         return '1=1';
+    }
+
+    if ($barangayId === null || $barangayId === '') {
+        return '0=1';
     }
 
     $params[] = (int)$barangayId;

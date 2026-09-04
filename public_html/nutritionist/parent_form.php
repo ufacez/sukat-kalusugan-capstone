@@ -61,6 +61,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	$status = trim((string)($_POST['status'] ?? 'active'));
 	$password = (string)($_POST['password'] ?? '');
 	$passwordConfirm = (string)($_POST['password_confirm'] ?? '');
+	$householdIdRaw = trim((string)($_POST['household_id'] ?? ''));
+	$householdId = $householdIdRaw !== '' ? (int)$householdIdRaw : null;
 	$redirectBack = '/nutritionist/parent_form.php' . ($action === 'update' && $parentId > 0 ? '?id=' . $parentId : '');
 
 	if (
@@ -122,12 +124,27 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		}
 	}
 
+	/*
+	 * Household validation: if a household is selected, it must
+	 * belong to the parent's barangay.
+	 */
+	if ($householdId !== null && $barangayId !== null) {
+		$householdCheck = admin_fetch_one(
+			'SELECT id FROM households WHERE id = ? AND barangay_id = ? AND status = "active" LIMIT 1',
+			'ii',
+			[$householdId, $barangayId]
+		);
+		if (!$householdCheck) {
+			$householdId = null;
+		}
+	}
+
 	if ($action === 'create') {
 		$hash = password_hash($password, PASSWORD_DEFAULT);
 		$ok = admin_execute(
-			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssssss',
-			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status]
+			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			'sssssssssi',
+			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
 		);
 
 		if ($ok) {
@@ -142,15 +159,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		if ($password !== '') {
 			$hash = password_hash($password, PASSWORD_DEFAULT);
 			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
-				'sssssssssi',
-				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $parentId]
+				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
+				'sssssssssii',
+				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
 			);
 		} else {
 			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
-				'ssssssssi',
-				[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $parentId]
+				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
+				'ssssssssii',
+				[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
 			);
 		}
 
@@ -173,7 +190,7 @@ $editingParent = null;
 
 if ($editId > 0) {
 	$editingParent = admin_fetch_one(
-		'SELECT id, name, email, parent_type, phone, address, barangay_id, local_area_id, status
+		'SELECT id, name, email, parent_type, phone, address, barangay_id, local_area_id, household_id, status
 		 FROM parents
 		 WHERE id = ?
 		 LIMIT 1',
@@ -226,6 +243,19 @@ if ($editingParent !== null) {
             }
         }
     }
+}
+
+$householdBarangayFilter = (int)($editingParent['barangay_id'] ?? $scopedBarangayId);
+$households = [];
+if ($householdBarangayFilter > 0) {
+    $households = admin_fetch_all(
+        "SELECT id, household_code, address
+           FROM households
+          WHERE barangay_id = ? AND status = 'active'
+          ORDER BY household_code",
+        'i',
+        [$householdBarangayFilter]
+    );
 }
 
 $actions = '<a class="admin-btn-secondary" href="'
@@ -332,6 +362,19 @@ nutritionist_layout_start(
 				<option value="">-- Select Local Area --</option>
 			</select>
 			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking. Scoped to the assigned barangay.</small>
+		</label>
+
+		<label class="admin-field">
+			<span>Household / Spot</span>
+			<select name="household_id" id="pf-household-select" data-current-household="<?php echo (int)($editingParent['household_id'] ?? 0); ?>" data-scoped-barangay="<?php echo (int)$householdBarangayFilter; ?>">
+				<option value="">-- None --</option>
+				<?php foreach ($households as $hh): ?>
+					<option value="<?php echo (int)$hh['id']; ?>" <?php echo ((int)($editingParent['household_id'] ?? 0) === (int)$hh['id']) ? 'selected' : ''; ?>>
+						<?php echo nutritionist_e($hh['household_code']); ?><?php echo $hh['address'] !== null && $hh['address'] !== '' ? ' · ' . nutritionist_e($hh['address']) : ''; ?>
+					</option>
+				<?php endforeach; ?>
+			</select>
+			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Links this parent to a household spot on the barangay risk map. Scoped to the parent's barangay.</small>
 		</label>
 
 		<div class="admin-field-wide">
