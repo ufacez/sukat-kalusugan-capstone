@@ -377,7 +377,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			<div class="who-dist-layout">
 				<div class="who-pie-wrap"><canvas id="whoPieWfa" width="180" height="180"></canvas></div>
 				<div class="who-classification-table">
-					<div class="who-ct-head"><span>Classification</span><span>Count</span><span>Percentage</span></div>
+					<div class="who-ct-head"><span></span><span>Classification</span><span>Count</span><span>Percentage</span></div>
 					<div class="who-ct-row"><span class="who-dot is-green"></span><span>Normal</span><span><?php echo $wfaNormal; ?></span><span><?php echo $total > 0 ? round(($wfaNormal/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-yellow"></span><span>MUW</span><span><?php echo $wfaMUW; ?></span><span><?php echo $total > 0 ? round(($wfaMUW/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-red"></span><span>SUW</span><span><?php echo $wfaSUW; ?></span><span><?php echo $total > 0 ? round(($wfaSUW/$total)*100,1) : 0; ?>%</span></div>
@@ -395,7 +395,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			<div class="who-dist-layout">
 				<div class="who-pie-wrap"><canvas id="whoPieHfa" width="180" height="180"></canvas></div>
 				<div class="who-classification-table">
-					<div class="who-ct-head"><span>Classification</span><span>Count</span><span>Percentage</span></div>
+					<div class="who-ct-head"><span></span><span>Classification</span><span>Count</span><span>Percentage</span></div>
 					<div class="who-ct-row"><span class="who-dot is-green"></span><span>Normal</span><span><?php echo $hfaNormal; ?></span><span><?php echo $total > 0 ? round(($hfaNormal/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-blue"></span><span>Tall</span><span><?php echo $hfaTall; ?></span><span><?php echo $total > 0 ? round(($hfaTall/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-yellow"></span><span>MSt</span><span><?php echo $hfaMSt; ?></span><span><?php echo $total > 0 ? round(($hfaMSt/$total)*100,1) : 0; ?>%</span></div>
@@ -413,7 +413,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			<div class="who-dist-layout">
 				<div class="who-pie-wrap"><canvas id="whoPieWfh" width="180" height="180"></canvas></div>
 				<div class="who-classification-table">
-					<div class="who-ct-head"><span>Classification</span><span>Count</span><span>Percentage</span></div>
+					<div class="who-ct-head"><span></span><span>Classification</span><span>Count</span><span>Percentage</span></div>
 					<div class="who-ct-row"><span class="who-dot is-green"></span><span>Normal</span><span><?php echo $wfhNormal; ?></span><span><?php echo $total > 0 ? round(($wfhNormal/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-yellow"></span><span>MW</span><span><?php echo $wfhMW; ?></span><span><?php echo $total > 0 ? round(($wfhMW/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-red"></span><span>SW</span><span><?php echo $wfhSW; ?></span><span><?php echo $total > 0 ? round(($wfhSW/$total)*100,1) : 0; ?>%</span></div>
@@ -434,25 +434,27 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 		<div class="who-panel-head">
 			<h2 class="admin-section-title">Distribution by Age Group & Sex</h2>
 		</div>
-		<div class="who-bar-chart-wrap">
-			<canvas id="whoAgeBarChart"></canvas>
-		</div>
 		<div class="who-trend-legend">
 			<span class="who-legend-item"><span class="who-legend-dot" style="background:#22c55e"></span> Normal</span>
 			<span class="who-legend-item"><span class="who-legend-dot" style="background:#f59e0b"></span> At Risk</span>
 			<span class="who-legend-item"><span class="who-legend-dot" style="background:#ef4444"></span> Problems</span>
 		</div>
-		<div class="who-sex-block">
-			<div class="who-sex-donut-wrap">
-				<canvas id="whoSexPie" width="140" height="140"></canvas>
-				<div class="who-sex-center">
-					<span class="who-sex-total"><?php echo number_format($sexTotal); ?></span>
-					<span class="who-sex-label">Total</span>
-				</div>
+		<div class="who-age-sex-row">
+			<div class="who-bar-chart-wrap">
+				<canvas id="whoAgeBarChart"></canvas>
 			</div>
-			<div class="who-sex-legend">
-				<div class="who-sex-row"><span class="who-dot is-blue"></span> Male: <?php echo $sexCounts['Male']; ?> (<?php echo $sexPct['Male']; ?>%)</div>
-				<div class="who-sex-row"><span class="who-dot is-pink"></span> Female: <?php echo $sexCounts['Female']; ?> (<?php echo $sexPct['Female']; ?>%)</div>
+			<div class="who-sex-block">
+				<div class="who-sex-donut-wrap">
+					<canvas id="whoSexPie" width="120" height="120"></canvas>
+					<div class="who-sex-center">
+						<span class="who-sex-total"><?php echo number_format($sexTotal); ?></span>
+						<span class="who-sex-label">Total</span>
+					</div>
+				</div>
+				<div class="who-sex-legend">
+					<div class="who-sex-row"><span class="who-dot is-blue"></span> Male: <?php echo $sexCounts['Male']; ?> (<?php echo $sexPct['Male']; ?>%)</div>
+					<div class="who-sex-row"><span class="who-dot is-pink"></span> Female: <?php echo $sexCounts['Female']; ?> (<?php echo $sexPct['Female']; ?>%)</div>
+				</div>
 			</div>
 		</div>
 	</div>
@@ -661,7 +663,7 @@ window.WHO_DATA = {
   animateDonut('whoPieWfa', [D.wfa.n, D.wfa.muw, D.wfa.suw, D.wfa.ref], ['#22c55e','#f59e0b','#ef4444','#3b82f6']);
   animateDonut('whoPieHfa', [D.hfa.n, D.hfa.tall, D.hfa.mst, D.hfa.sst], ['#22c55e','#3b82f6','#f59e0b','#ef4444']);
   animateDonut('whoPieWfh', [D.wfh.n, D.wfh.mw, D.wfh.sw, D.wfh.ow, D.wfh.ob], ['#22c55e','#f59e0b','#ef4444','#f97316','#ea580c']);
-  animateDonut('whoSexPie', [D.sex.male, D.sex.female], ['#3b82f6','#ec4899'], { size: 140, hole: 0.62 });
+  animateDonut('whoSexPie', [D.sex.male, D.sex.female], ['#3b82f6','#ec4899'], { size: 120, hole: 0.62 });
 
   /* ====================================================================
    * ANIMATED AGE GROUP BAR CHART
@@ -682,7 +684,7 @@ window.WHO_DATA = {
     var maxV = Math.max.apply(null, allV.concat([1]));
     maxV = Math.ceil(maxV * 1.15);
 
-    var padL = 36, padR = 10, padT = 14, padB = 50;
+    var padL = 40, padR = 12, padT = 16, padB = 58;
     var cW = w - padL - padR, cH = h - padT - padB;
     var gCount = labels.length;
     var gW = cW / gCount;
@@ -736,10 +738,21 @@ window.WHO_DATA = {
         if (isHover) hoverInfo = { x: bx + barW/2, y: by - 10, val: val, label: ['Normal','At Risk','Problems'][bi], color: colors[bi] };
       });
 
-      ctx.fillStyle = getCSS('--admin-muted') || '#94a3b8';
-      ctx.font = '10px Inter, sans-serif';
+      /* x-axis label — straight, two-line for legibility */
+      ctx.fillStyle = getCSS('--admin-text') || '#1e293b';
+      ctx.font = '600 11px Inter, sans-serif';
       ctx.textAlign = 'center';
-      ctx.fillText(label, cx, h - 12);
+      ctx.textBaseline = 'top';
+      /* split "0-5 mo" into two lines: "0-5" / "mo" */
+      var parts = label.split(' ');
+      if (parts.length > 1) {
+        ctx.fillText(parts[0], cx, h - 40);
+        ctx.fillStyle = getCSS('--admin-muted') || '#94a3b8';
+        ctx.font = '500 10px Inter, sans-serif';
+        ctx.fillText(parts[1], cx, h - 26);
+      } else {
+        ctx.fillText(label, cx, h - 32);
+      }
     });
 
     return hoverInfo;
@@ -772,8 +785,8 @@ window.WHO_DATA = {
       var allV = nD.concat(rD).concat(pD);
       var maxV = Math.max.apply(null, allV.concat([1]));
       maxV = Math.ceil(maxV * 1.15);
-      var padL = 36, padR = 10, padT = 14, padB = 50;
-      var cW = rect.width - padL - padR, cH = rect.height - padT - padB;
+      var padL = 40, padR = 12, padT = 16, padB = 58;
+      var cW = rect.width - padL - padR, cH = 260 - padT - padB;
       var gW = cW / labels.length;
       var barW = Math.min(gW * 0.24, 22);
       var gap = 3;
@@ -835,11 +848,11 @@ window.WHO_DATA = {
     var items = D.prev[key];
     var total = D.total;
     var rect = canvas.parentElement.getBoundingClientRect();
-    var w = rect.width, h = 280;
+    var w = rect.width, h = 300;
     var ctx = setupCanvas(canvas, w, h);
 
     var maxPct = 100;
-    var padL = 46, padR = 14, padT = 24, padB = 60;
+    var padL = 46, padR = 14, padT = 24, padB = 80;
     var cW = w - padL - padR, cH = h - padT - padB;
     var barCount = items.length;
     var groupW = cW / barCount;
@@ -888,18 +901,18 @@ window.WHO_DATA = {
       ctx.textAlign = 'center';
       if (animPct >= 0.95) ctx.fillText(it.count + ' · ' + pct.toFixed(1) + '%', cx, by - 10);
 
-      /* x label */
-      ctx.save();
-      ctx.translate(cx, padT + cH + 12);
-      ctx.rotate(-0.4);
-      ctx.fillStyle = getCSS('--admin-muted') || '#94a3b8';
-      ctx.font = '9px Inter, sans-serif';
-      ctx.textAlign = 'right';
+      /* x label — straight, larger */
+      ctx.fillStyle = getCSS('--admin-text') || '#1e293b';
+      ctx.font = '600 12px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
       var lines = it.label.split('\n');
+      var lineH = 14;
+      var totalH = lines.length * lineH;
+      var startY = padT + cH + 16 - (totalH - lineH) / 2;
       lines.forEach(function(line, li){
-        ctx.fillText(line, 0, li * 11);
+        ctx.fillText(line, cx, startY + li * lineH);
       });
-      ctx.restore();
     });
 
     document.getElementById('whoPrevTitle').textContent = prevTitles[key] || '';
@@ -936,8 +949,8 @@ window.WHO_DATA = {
       var mx = e.clientX - rect.left, my = e.clientY - rect.top;
       var items = D.prev[prevAnimKey];
       var total = D.total;
-      var padL = 46, padR = 14, padT = 24, padB = 60;
-      var cW = rect.width - padL - padR, cH = rect.height - padT - padB;
+      var padL = 46, padR = 14, padT = 24, padB = 80;
+      var cW = rect.width - padL - padR, cH = 300 - padT - padB;
       var groupW = cW / items.length;
       var barW = Math.min(groupW * 0.5, 54);
 
