@@ -51,6 +51,23 @@ switch ($issue) {
 		);
 		break;
 
+	case 'missing_information':
+		$issueTitle = 'Children with Missing Information';
+		$issueDescription = 'These children are missing a first name, last name, or date of birth.';
+		$records = admin_fetch_all(
+			"SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name, c.sex, c.birthdate,
+				bg.name AS barangay, p.name AS parent_name
+			 FROM children c
+			 LEFT JOIN parents p ON p.id = c.parent_id
+			 LEFT JOIN barangays bg ON bg.id = c.barangay_id
+			 WHERE (COALESCE(c.first_name, '') = '' OR COALESCE(c.last_name, '') = '' OR c.birthdate IS NULL)
+			   AND {$scope}{$barangayFilterSql}
+			 ORDER BY c.last_name, c.first_name",
+			str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
+			array_merge($scopeParams, $barangayFilterParams)
+		);
+		break;
+
 	case 'missing_sex':
 		$issueTitle = 'Children with Missing Sex';
 		$issueDescription = 'These children do not have a recorded sex field.';
@@ -92,7 +109,7 @@ switch ($issue) {
 			 FROM children c
 			 LEFT JOIN parents p ON p.id = c.parent_id
 			 LEFT JOIN barangays bg ON bg.id = c.barangay_id
-			 WHERE (p.id IS NULL OR p.name IS NULL OR p.name = '')
+			 WHERE (p.id IS NULL OR p.name IS NULL OR p.name = '' OR (c.local_area_id IS NULL AND COALESCE(p.address, '') = ''))
 			   AND {$scope}{$barangayFilterSql}
 			 ORDER BY c.last_name, c.first_name",
 			str_repeat('i', count($scopeParams) + count($barangayFilterParams)),

@@ -147,8 +147,9 @@ function pdf_scope_and_filter(): array {
 	$barangayFilterParams = [];
 	$barangayName = 'All barangays within scope';
 
-	if ($user['barangay_id'] ?? 0 > 0) {
-		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [(int)$user['barangay_id']]);
+	$userBarangayId = (int)($user['barangay_id'] ?? 0);
+	if ($userBarangayId > 0) {
+		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$userBarangayId]);
 		$barangayName = (string)($brgyRow['name'] ?? '');
 	} elseif ($barangayFilter > 0) {
 		$barangayFilterSql = ' AND c.barangay_id = ?';
@@ -188,8 +189,8 @@ function pdf_scope_and_filter(): array {
 }
 
 function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ageMax = 59): array {
-	$params = array_merge($f['scope_params'], [$f['anchor_param']]);
-	$types = str_repeat('i', count($f['scope_params'])) . 's';
+	$params = array_merge([$f['anchor_param']], $f['scope_params'], [$f['anchor_param']]);
+	$types = 's' . str_repeat('i', count($f['scope_params'])) . 's';
 
 	return admin_fetch_all(
 		"SELECT
@@ -204,7 +205,7 @@ function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ag
 		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
@@ -288,15 +289,15 @@ function pdf_generate_form1a(array $f): TCPDF {
 		 LEFT JOIN local_areas la ON la.id = c.local_area_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
 		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
 		 ORDER BY c.last_name ASC, c.first_name ASC, c.middle_name ASC",
-		'ss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
-		array_merge([$f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
+		'ssss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
 	);
 
 	$cols = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date of Measurement', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nutritional Status (WFL/H)', 'Disability'];
@@ -340,7 +341,7 @@ function pdf_generate_form1a(array $f): TCPDF {
 }
 
 function pdf_generate_nutstatus(array $f): TCPDF {
-	$pdf = pdf_base('NutStatus - Community Level e-OPT Plus Tool', 'Landscape');
+	$pdf = pdf_base('NutStatusTool - Community Level e-OPT Plus Tool', 'Landscape');
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
@@ -364,15 +365,15 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 		 LEFT JOIN local_areas la ON la.id = c.local_area_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
 		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
 		 ORDER BY c.last_name ASC, c.first_name ASC",
-		str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 'sss',
-		array_merge($f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param'], $f['anchor_param'], $f['anchor_param']])
+		'ssss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
 	);
 
 	$columns = [
@@ -634,8 +635,8 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
 		 )
 		 WHERE {$f['scope']}{$f['barangay_filter_sql']}",
-		'ss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-		array_merge([$f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
+		's' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge([$f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
 	);
 
 	$definitions = [
@@ -692,7 +693,8 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 			$allTotal = $summary[$axis][$code]['0-59']['Boys'] + $summary[$axis][$code]['0-59']['Girls'];
 			$earlyPrev = $denominators[$axis]['0-23'] > 0 ? number_format(($earlyTotal / $denominators[$axis]['0-23']) * 100, 2) . '%' : '0.00%';
 			$allPrev = $denominators[$axis]['0-59'] > 0 ? number_format(($allTotal / $denominators[$axis]['0-59']) * 100, 2) . '%' : '0.00%';
-			pdf_data_row($pdf, [$label, $summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev, $summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
+			$statusLabel = $definitions[$axis][$code] ?? $code;
+			pdf_data_row($pdf, [$statusLabel, $summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev, $summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
 			$i++;
 		}
 		$pdf->Ln(3);
@@ -781,7 +783,6 @@ function pdf_generate_form1c(array $f): TCPDF {
 function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	$listSpecs = [
 		'0-23' => ['title' => 'MONITORING LIST FOR CHILDREN 0-23 MONTHS OLD', 'axis' => 'All children (monthly weighing)', 'condition' => '1=1', 'age_min' => 0, 'age_max' => 23],
-		'MUAC' => ['title' => 'MONITORING LIST FOR MUAC STATUS', 'axis' => 'MUAC Assessment', 'condition' => '1=1', 'age_min' => 0, 'age_max' => 59],
 		'MW' => ['title' => 'MONITORING LIST FOR MODERATELY WASTED CHILDREN (MAM)', 'axis' => 'Weight-for-Height', 'condition' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59],
 		'SW' => ['title' => 'MONITORING LIST FOR SEVERELY WASTED CHILDREN (SAM)', 'axis' => 'Weight-for-Height', 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt' => ['title' => 'MONITORING LIST FOR MODERATELY OR SEVERELY STUNTED CHILDREN', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
@@ -809,7 +810,7 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
 	$rows = pdf_fetch_list($f, $spec['condition'], $spec['age_min'], $spec['age_max']);
-	pdf_render_list_table($pdf, $rows, $listCode !== '0-23' && $listCode !== 'MUAC');
+	pdf_render_list_table($pdf, $rows, $listCode !== '0-23');
 
 	return $pdf;
 }
@@ -846,16 +847,12 @@ function pdf_generate_prevalence(array $f): TCPDF {
 	$counts = [
 		'wasted' => 0, 'stunted' => 0, 'ow_ob' => 0,
 		'underweight' => 0, 'uw_or_stunted' => 0, 'stunted_or_owob' => 0,
-		'muac_normal' => 0, 'muac_mam' => 0, 'muac_sam' => 0,
 	];
 
 	foreach ($allChildren as $c) {
 		$wfa = $c['wfa_status'] ?? null;
 		$hfa = $c['hfa_status'] ?? null;
 		$wfh = $c['wfh_status'] ?? null;
-		$w = $c['weight_kg'] !== null ? (float)$c['weight_kg'] : null;
-		$h = $c['height_cm'] !== null ? (float)$c['height_cm'] : null;
-
 		if (in_array($wfh, ['MW', 'SW'], true)) $counts['wasted']++;
 		if (in_array($hfa, ['MSt', 'SSt'], true)) $counts['stunted']++;
 		if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) $counts['ow_ob']++;
@@ -863,12 +860,6 @@ function pdf_generate_prevalence(array $f): TCPDF {
 		if (in_array($wfa, ['MUW', 'SUW'], true) || in_array($hfa, ['MSt', 'SSt'], true)) $counts['uw_or_stunted']++;
 		if (in_array($hfa, ['MSt', 'SSt'], true) || ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $counts['stunted_or_owob']++;
 
-		if ($w !== null && $h !== null && $h > 0) {
-			$muacEst = ($w / $h) * 10;
-			if ($muacEst >= 12.5) $counts['muac_normal']++;
-			elseif ($muacEst >= 11.5) $counts['muac_mam']++;
-			else $counts['muac_sam']++;
-		}
 	}
 
 	$pct = $total > 0 ? fn(int $n): string => number_format(($n / $total) * 100, 1) . '%' : fn(int $n): string => '0.0%';
@@ -891,19 +882,6 @@ function pdf_generate_prevalence(array $f): TCPDF {
 		pdf_data_row($pdf, [$label, $count, $pct($count)], $widths, $i % 2 === 0, ['L', 'C', 'C']);
 		$i++;
 	}
-
-	$pdf->Ln(6);
-	$pdf->SetFont('helvetica', 'B', 9);
-	$pdf->Cell(0, 6, 'MUAC STATUS DISTRIBUTION', 0, 1);
-	$pdf->Ln(1);
-
-	$muacTotal = $counts['muac_normal'] + $counts['muac_mam'] + $counts['muac_sam'];
-	$muacPct = $muacTotal > 0 ? fn(int $n): string => number_format(($n / $muacTotal) * 100, 1) . '%' : fn(int $n): string => '0.0%';
-
-	pdf_table_header($pdf, ['MUAC Status', 'Number', 'Percentage'], $widths);
-	pdf_data_row($pdf, ['Normal (>=12.5 cm)', $counts['muac_normal'], $muacPct($counts['muac_normal'])], $widths, true, ['L', 'C', 'C']);
-	pdf_data_row($pdf, ['MAM (11.5-12.4 cm)', $counts['muac_mam'], $muacPct($counts['muac_mam'])], $widths, false, ['L', 'C', 'C']);
-	pdf_data_row($pdf, ['SAM (<11.5 cm)', $counts['muac_sam'], $muacPct($counts['muac_sam'])], $widths, true, ['L', 'C', 'C']);
 
 	$pdf->Ln(4);
 	$pdf->SetFont('helvetica', '', 8);
@@ -1158,9 +1136,6 @@ function pdf_generate_referral(int $childId): TCPDF {
 			['Measurement Date:', (string)$latestMeasurement['measurement_date']],
 			['Weight (kg):', $latestMeasurement['weight_kg'] !== null ? number_format((float)$latestMeasurement['weight_kg'], 2) : 'N/A'],
 			['Height/Length (cm):', $latestMeasurement['height_cm'] !== null ? number_format((float)$latestMeasurement['height_cm'], 1) : 'N/A'],
-			['MUAC (estimated):', ($latestMeasurement['weight_kg'] !== null && $latestMeasurement['height_cm'] !== null && (float)$latestMeasurement['height_cm'] > 0)
-				? number_format(((float)$latestMeasurement['weight_kg'] / (float)$latestMeasurement['height_cm']) * 10, 1) . ' cm'
-				: 'N/A'],
 			['WFA:', (string)($latestMeasurement['wfa_status'] ?? 'N/A')],
 			['HFA:', (string)($latestMeasurement['hfa_status'] ?? 'N/A')],
 			['WFH/WFL-H:', (string)($latestMeasurement['wfh_status'] ?? 'N/A')],

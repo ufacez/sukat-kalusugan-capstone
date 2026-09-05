@@ -63,7 +63,7 @@ $periodLabel = $view === 'monthly'
 	: $roundsList[$checkupMonth] . ' ' . $year;
 
 $activeTab = (string)($_GET['tab'] ?? 'overview');
-$validTabs = ['overview', 'monitoring', 'analysis', 'prevalence', 'dqc', 'followup', 'export'];
+$validTabs = ['overview', 'eopt_forms', 'nutrition', 'monitoring', 'dqc'];
 if (!in_array($activeTab, $validTabs, true)) {
 	$activeTab = 'overview';
 }
@@ -82,6 +82,7 @@ $listCodes = [
 	'MSt_SSt_OW_Ob' => ['title' => 'List_MSt,SSt,OW&Ob — Stunted+OW/Ob', 'desc' => 'MSt/SSt with OW/Ob.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 ];
 
+$listRows = [];
 $listParamRaw = trim((string)($_GET['list'] ?? ''));
 $listParamKey = strtolower($listParamRaw);
 $listCodeLowerMap = [];
@@ -93,6 +94,7 @@ $listParam = $isSingleList ? $listCodeLowerMap[$listParamKey] : $listParamRaw;
 
 if ($isSingleList) {
 	$spec = $listCodes[$listParam];
+	$listRows = [];
 	$listAnchor = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->modify('last day of this month');
 	$listParams = array_merge($scopeParams, [$listAnchor->format('Y-m-d')]);
 	$listRows = admin_fetch_all(
@@ -161,10 +163,12 @@ $baseIntParams = array_merge($scopeParams, $barangayFilterParams);
 $baseIntTypes = str_repeat('i', count($baseIntParams));
 $dqMissingSex = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.sex IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
 $dqMissingDob = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
+$dqMissingInformation = admin_scalar("SELECT COUNT(*) FROM children c WHERE (COALESCE(c.first_name, '') = '' OR COALESCE(c.last_name, '') = '' OR c.birthdate IS NULL) AND {$scope}", $baseIntTypes, $baseIntParams);
+$dqNoParentAddress = admin_scalar("SELECT COUNT(*) FROM children c LEFT JOIN parents p ON p.id = c.parent_id WHERE (p.id IS NULL OR COALESCE(p.name, '') = '' OR (c.local_area_id IS NULL AND COALESCE(p.address, '') = '')) AND {$scope}", $baseIntTypes, $baseIntParams);
 $dqOverAge = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NOT NULL AND TIMESTAMPDIFF(YEAR, c.birthdate, CURDATE()) > 4 AND {$scope}", $baseIntTypes, $baseIntParams);
 $dqHeightNoWeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.height_cm IS NOT NULL AND m.weight_kg IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
 $dqWeightNoHeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.weight_kg IS NOT NULL AND m.height_cm IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqIssueCount = $dqDupCount + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
+$dqIssueCount = $dqDupCount + $dqMissingInformation + $dqNoParentAddress + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
 
 $listCountRows = admin_fetch_all(
 	"SELECT lm.wfa_status, lm.hfa_status, lm.wfh_status FROM children c {$latestJoin}
@@ -185,8 +189,12 @@ foreach ($listCountRows as $cr) {
 }
 $listCounts['0-23'] = (int)$infantCount;
 
-$actions = '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))) . '">' . admin_action_icon('export') . ' Generate Report</a>'
-	. '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))) . '">' . admin_action_icon('export') . ' Export Data</a>';
+$actions = '<details class="rp-export-menu"><summary class="admin-btn">' . admin_action_icon('export') . ' Export Data</summary>'
+	. '<div class="rp-export-popover">'
+	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))) . '">Export Excel</a>'
+	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))) ) . '">Export CSV</a>'
+	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['consolidation' => 1]))) ) . '">Export for Consolidation</a>'
+	. '</div></details>';
 
 nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
 ?>
@@ -201,13 +209,14 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-tab{font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-muted);cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);white-space:nowrap;text-decoration:none}
 .rp-tab:hover{border-color:rgba(11,110,79,0.35);color:var(--admin-primary);transform:translateY(-1px);box-shadow:0 2px 8px rgba(11,110,79,0.12)}
 .rp-tab.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);border-color:rgba(11,110,79,0.35);box-shadow:0 2px 10px rgba(11,110,79,0.18)}
+.rp-export-menu{position:relative;margin-left:8px}.rp-export-menu summary{list-style:none;cursor:pointer}.rp-export-menu summary::-webkit-details-marker{display:none}.rp-export-popover{position:absolute;right:0;top:calc(100% + 6px);z-index:5;min-width:190px;padding:6px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:8px;box-shadow:var(--admin-shadow)}.rp-export-popover a{display:block;padding:8px 10px;color:var(--admin-text);font-size:12px;text-decoration:none;border-radius:5px}.rp-export-popover a:hover{background:var(--admin-surface-alt);color:var(--admin-primary)}
 .rp-panel{display:none}
 .rp-panel.is-active{display:block}
-.rp-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:20px}
-.rp-stat-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:16px 18px;transition:all 0.15s ease}
+.rp-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
+.rp-stat-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:10px;padding:12px 14px;transition:all 0.15s ease;min-width:0}
 .rp-stat-card:hover{border-color:rgba(11,110,79,0.2);box-shadow:0 2px 12px rgba(11,110,79,0.06)}
 .rp-stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--admin-muted);margin-bottom:5px}
-.rp-stat-value{font-size:26px;font-weight:800;letter-spacing:-0.03em;color:var(--admin-text);line-height:1}
+.rp-stat-value{font-size:24px;font-weight:800;letter-spacing:-0.03em;color:var(--admin-text);line-height:1}
 .rp-stat-meta{font-size:11px;color:var(--admin-muted);margin-top:5px;font-weight:500}
 .rp-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .rp-form-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:all 0.15s ease}
@@ -230,6 +239,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-monitor-actions .admin-icon-btn{width:28px;height:28px;min-height:28px;border-radius:7px;font-size:11px}
 .rp-section{margin-bottom:20px}
 .rp-section-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px}
+.rp-shortcut{font-size:12px;color:var(--admin-primary);font-weight:700;text-decoration:none}.rp-shortcut:hover{text-decoration:underline}
 .rp-section-title{font-size:15px;font-weight:700;color:var(--admin-text);letter-spacing:-0.02em}
 .rp-section-sub{font-size:12px;color:var(--admin-muted);margin-top:2px}
 .rp-table-section{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:16px;box-shadow:var(--admin-shadow);margin-bottom:14px;overflow:hidden}
@@ -337,7 +347,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 		</select></label>
 		<label>Barangay<select name="barangay_id" onchange="this.form.submit()">
 			<?php foreach ($barangays as $b): ?>
-				<option value="<?php echo (int)$b['id']; ?>" selected><?php echo nutritionist_e($b['name']); ?></option>
+				<option value="<?php echo (int)$b['id']; ?>" <?php echo $barangayFilter === (int)$b['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($b['name']); ?></option>
 			<?php endforeach; ?>
 		</select></label>
 		<div style="flex:1;"></div>
@@ -352,72 +362,43 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 ?>
 <div class="rp-tabs" id="rpTabs">
 	<a class="rp-tab <?php echo $activeTab === 'overview' ? 'is-active' : ''; ?>" data-tab="overview" href="<?php echo nutritionist_e($tabUrl('overview')); ?>">Overview</a>
+	<a class="rp-tab <?php echo $activeTab === 'eopt_forms' ? 'is-active' : ''; ?>" data-tab="eopt_forms" href="<?php echo nutritionist_e($tabUrl('eopt_forms')); ?>">EOPT Forms</a>
+	<a class="rp-tab <?php echo $activeTab === 'nutrition' ? 'is-active' : ''; ?>" data-tab="nutrition" href="<?php echo nutritionist_e($tabUrl('nutrition')); ?>">Nutrition Status</a>
 	<a class="rp-tab <?php echo $activeTab === 'monitoring' ? 'is-active' : ''; ?>" data-tab="monitoring" href="<?php echo nutritionist_e($tabUrl('monitoring')); ?>">Monitoring Lists</a>
-	<a class="rp-tab <?php echo $activeTab === 'analysis' ? 'is-active' : ''; ?>" data-tab="analysis" href="<?php echo nutritionist_e($tabUrl('analysis')); ?>">Nutrition Analysis</a>
-	<a class="rp-tab <?php echo $activeTab === 'prevalence' ? 'is-active' : ''; ?>" data-tab="prevalence" href="<?php echo nutritionist_e($tabUrl('prevalence')); ?>">Prevalence &amp; Graphs</a>
 	<a class="rp-tab <?php echo $activeTab === 'dqc' ? 'is-active' : ''; ?>" data-tab="dqc" href="<?php echo nutritionist_e($tabUrl('dqc')); ?>">Data Quality</a>
-	<a class="rp-tab <?php echo $activeTab === 'followup' ? 'is-active' : ''; ?>" data-tab="followup" href="<?php echo nutritionist_e($tabUrl('followup')); ?>">Follow-up</a>
-	<a class="rp-tab <?php echo $activeTab === 'export' ? 'is-active' : ''; ?>" data-tab="export" href="<?php echo nutritionist_e($tabUrl('export')); ?>">Export</a>
 </div>
 
 <?php if ($activeTab === 'overview'): ?>
 <div class="rp-panel is-active" data-panel="overview">
 	<div class="rp-stat-grid">
 		<div class="rp-stat-card"><div class="rp-stat-label">Total Assessed</div><div class="rp-stat-value"><?php echo (int)$totalAssessed; ?></div><div class="rp-stat-meta">0–59 mo with measurement</div></div>
-		<div class="rp-stat-card"><div class="rp-stat-label">Infants (0–23 mo)</div><div class="rp-stat-value" style="color:var(--admin-primary);"><?php echo (int)$infantCount; ?></div><div class="rp-stat-meta">Monthly weighing</div></div>
-		<div class="rp-stat-card"><div class="rp-stat-label">Malnourished</div><div class="rp-stat-value" style="color:#b45309;"><?php echo (int)$malnourishedCount; ?></div><div class="rp-stat-meta">UW / Stunted / Wasted</div></div>
-		<div class="rp-stat-card"><div class="rp-stat-label">DQ Issues</div><div class="rp-stat-value" style="<?php echo $dqIssueCount > 0 ? 'color:var(--admin-danger);' : ''; ?>"><?php echo (int)$dqIssueCount; ?></div><div class="rp-stat-meta"><?php echo $dqIssueCount > 0 ? 'Needs review' : 'Clean'; ?></div></div>
+		<div class="rp-stat-card"><div class="rp-stat-label">0–23 Months</div><div class="rp-stat-value" style="color:var(--admin-primary);"><?php echo (int)$infantCount; ?></div><div class="rp-stat-meta">Children assessed</div></div>
+		<div class="rp-stat-card"><div class="rp-stat-label">Affected Children</div><div class="rp-stat-value" style="color:#b45309;"><?php echo (int)$affectedCount; ?></div><div class="rp-stat-meta">Wasted, stunted, underweight, or overweight</div></div>
+		<div class="rp-stat-card"><div class="rp-stat-label">Data Quality Issues</div><div class="rp-stat-value" style="<?php echo $dqIssueCount > 0 ? 'color:var(--admin-danger);' : ''; ?>"><?php echo (int)$dqIssueCount; ?></div><div class="rp-stat-meta"><?php echo $dqIssueCount > 0 ? 'Needs review' : 'No issues found'; ?></div></div>
 	</div>
 	<div class="rp-section">
-		<div class="rp-section-head"><div><div class="rp-section-title">EOPT Plus Reports</div><div class="rp-section-sub">Core report forms for the selected period</div></div></div>
+		<div class="rp-section-head"><div><div class="rp-section-title">Report Categories</div><div class="rp-section-sub">Open a report category for the selected period</div></div></div>
 		<div class="rp-form-grid">
 			<div class="rp-form-card">
-				<div class="rp-form-name">OPT Plus Form 1A</div>
-				<div class="rp-form-desc">Master list of all measured children 0–59 months.</div>
-				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> records</span></div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
+				<div class="rp-form-name">EOPT Forms</div><div class="rp-form-desc">OPT Plus Form 1A, 1B, and 1C.</div><div class="rp-form-actions"><a class="admin-btn" href="<?php echo nutritionist_e($tabUrl('eopt_forms')); ?>">Open Forms</a></div>
 			</div>
 			<div class="rp-form-card">
-				<div class="rp-form-name">OPT Plus Form 1B</div>
-				<div class="rp-form-desc">Consolidated nutritional status summary (WFA, HFA, WFH).</div>
-				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Summary</span></div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
+				<div class="rp-form-name">Nutrition Status</div><div class="rp-form-desc">NutStatusTool roster and NutStatusBrgy summary.</div><div class="rp-form-actions"><a class="admin-btn" href="<?php echo nutritionist_e($tabUrl('nutrition')); ?>">Open Nutrition Status</a></div>
 			</div>
 			<div class="rp-form-card">
-				<div class="rp-form-name">OPT Plus Form 1C</div>
-				<div class="rp-form-desc">List of affected / at-risk children 0–59 months.</div>
-				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span></div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
-			</div>
-			<div class="rp-form-card">
-				<div class="rp-form-name">NutStatus</div>
-				<div class="rp-form-desc">Community-level child roster with sex, age, residence, and nutritional status details.</div>
-				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Summary</span></div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus'])))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
-			</div>
-			<div class="rp-form-card">
-				<div class="rp-form-name">NutStatusBrgy</div>
-				<div class="rp-form-desc">Barangay-level sex-disaggregated nutritional status summary for presentations and monitoring.</div>
-				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 and 0–59 months</span></div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
+				<div class="rp-form-name">Monitoring Lists</div><div class="rp-form-desc">Prepared child lists and risk-specific monitoring rosters.</div><div class="rp-form-actions"><a class="admin-btn" href="<?php echo nutritionist_e($tabUrl('monitoring')); ?>">Open Lists</a></div>
 			</div>
 		</div>
 	</div>
+</div>
+
+<?php elseif ($activeTab === 'eopt_forms'): ?>
+<div class="rp-panel is-active" data-panel="eopt_forms">
+	<div class="rp-section"><div class="rp-section-head"><div><div class="rp-section-title">EOPT Forms</div><div class="rp-section-sub">OPT Plus forms generated from the selected reporting period and barangay.</div></div></div><div class="rp-form-grid">
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1A</div><div class="rp-form-desc">Master list of preschool children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a'])))); ?>">Excel</a></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1B</div><div class="rp-form-desc">Consolidated nutrition assessment results.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Consolidated results</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b'])))); ?>">Excel</a></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1C</div><div class="rp-form-desc">Affected and at-risk children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c'])))); ?>">Excel</a></div></div>
+	</div></div>
 </div>
 
 <?php elseif ($activeTab === 'monitoring'): ?>
@@ -448,22 +429,15 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				</div>
 			<?php endforeach; ?>
 		</div>
-		<div class="rp-section" style="margin-top:22px;">
-			<div class="rp-section-head"><div><div class="rp-section-title">Barangay Summary</div><div class="rp-section-sub">Sex-disaggregated NutStatusBrgy tables for 0–23 and 0–59 months.</div></div></div>
-			<div class="rp-form-card" style="max-width:520px;">
-				<div class="rp-form-name">NutStatusBrgy</div>
-				<div class="rp-form-desc">Automated WFA, HFA, and WFL/H summary with prevalence and caregiver totals.</div>
-				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
-				</div>
-			</div>
-		</div>
 	</div>
 </div>
 
-<?php elseif ($activeTab === 'analysis'): ?>
-<div class="rp-panel is-active" data-panel="analysis">
+<?php elseif ($activeTab === 'nutrition'): ?>
+<div class="rp-panel is-active" data-panel="nutrition">
+	<div class="rp-section"><div class="rp-section-head"><div><div class="rp-section-title">Nutrition Status Reports</div><div class="rp-section-sub">Detailed child status and barangay-level nutrition summaries.</div></div></div><div class="rp-form-grid">
+		<div class="rp-form-card"><div class="rp-form-name">NutStatusTool</div><div class="rp-form-desc">Detailed nutrition-status dataset with child, measurement, and WFA/HFA/WFL-H indicators.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus'])))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>">Excel</a></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">NutStatusBrgy</div><div class="rp-form-desc">Barangay-level sex-disaggregated summary for 0–23 and 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 &amp; 0–59 months</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>">Excel</a></div></div>
+	</div></div>
 	<?php
 	$summaryRows = admin_fetch_all(
 		"SELECT c.sex,
@@ -575,13 +549,14 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 			<?php
 			$dqcItems = [
 				['Repeated name/birthdate', $dqDupCount, $dqDupCount > 0 ? 'warn' : 'ok', 'duplicate_name_dob'],
+				['Missing information', (int)$dqMissingInformation, (int)$dqMissingInformation > 0 ? 'danger' : 'ok', 'missing_information'],
+				['No parent/address', (int)$dqNoParentAddress, (int)$dqNoParentAddress > 0 ? 'danger' : 'ok', 'no_parent'],
 				['Missing sex', (int)$dqMissingSex, (int)$dqMissingSex > 0 ? 'danger' : 'ok', 'missing_sex'],
 				['Missing birthdate', (int)$dqMissingDob, (int)$dqMissingDob > 0 ? 'danger' : 'ok', 'missing_birthdate'],
 				['No parent/address', 0, 'ok', 'no_parent'],
 				['Older than 59 mo', (int)$dqOverAge, (int)$dqOverAge > 0 ? 'warn' : 'ok', 'over_59_months'],
 				['Height, no weight', (int)$dqHeightNoWeight, (int)$dqHeightNoWeight > 0 ? 'warn' : 'ok', 'height_no_weight'],
 				['Weight, no height', (int)$dqWeightNoHeight, (int)$dqWeightNoHeight > 0 ? 'warn' : 'ok', 'weight_no_height'],
-				['No MUAC', 0, 'ok', 'no_muac'],
 			];
 			foreach ($dqcItems as [$label, $count, $sev, $code]):
 				$link = $count > 0 ? app_url('/nutritionist/eopt_dqc_records.php?issue=' . $code . '&' . http_build_query($filterParams)) : '#';
@@ -666,7 +641,7 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook (.xlsx)</div>
 			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format.</div>
 			<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Download Excel Workbook</a>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatus Excel</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatusTool Excel</a>
 			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatusBrgy Excel</a>
 		</div>
 		<div class="rp-export-card">
@@ -676,7 +651,7 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">Form 1A PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">Form 1B PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">Form 1C PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams))); ?>">NutStatus PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams))); ?>">NutStatusTool PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams))); ?>">NutStatusBrgy PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Summary PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query($filterParams))); ?>">Prevalence PDF</a>
@@ -697,15 +672,6 @@ document.querySelectorAll('#rpTabs').forEach(function(row){
 		tab.classList.add('is-active');
 	});
 });
-<?php if ($activeTab === 'prevalence'): ?>
-(function(){
-	var prevData = <?php echo json_encode(['indicators' => array_map(fn($i) => ['label' => $i[0], 'count' => $i[1], 'pct' => $prevTotal > 0 ? round(($i[1]/$prevTotal)*100,1) : 0], $indicators)], JSON_UNESCAPED_UNICODE); ?>;
-	var colors = {'Wasted (MW + SW)':'#dc2626','Stunted (MSt + SSt)':'#d97706','Overweight / Obese':'#ea580c','Underweight (MUW + SUW)':'#b91c1c','Underweight and/or Stunted':'#92400e','Stunted and/or OW/Obese':'#c2410c'};
-	var pc = document.getElementById('rp-prevalence-chart');
-	if(pc) new Chart(pc,{type:'bar',data:{labels:prevData.indicators.map(function(d){return d.label}),datasets:[{label:'Prevalence (%)',data:prevData.indicators.map(function(d){return d.pct}),backgroundColor:prevData.indicators.map(function(d){return colors[d.label]||'#0b6e4f'}),borderRadius:4,barThickness:26}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:function(c){return c.parsed.x+'% ('+prevData.indicators[c.dataIndex].count+')'}}}},scales:{x:{beginAtZero:true,max:100,ticks:{callback:function(v){return v+'%'},font:{size:11}},grid:{color:'rgba(0,0,0,0.05)'}},y:{ticks:{font:{size:11}},grid:{display:false}}}}});
-
-})();
-<?php endif; ?>
 </script>
 
 <?php endif; ?>

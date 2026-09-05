@@ -109,8 +109,8 @@ function eopt_fetch_list(
 	int $ageMin = 0,
 	int $ageMax = 59
 ): array {
-	$params = array_merge([$anchorParam, $anchorParam], $scopeParams, [$anchorParam]);
-	$types = 'ss' . str_repeat('i', count($scopeParams)) . 's';
+	$params = array_merge([$anchorParam, $anchorParam, $anchorParam], $scopeParams, [$anchorParam]);
+	$types = 'sss' . str_repeat('i', count($scopeParams)) . 's';
 
 	return admin_fetch_all(
 		"SELECT
@@ -142,7 +142,7 @@ function eopt_fetch_list(
 		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
-			WHERE m2.child_id = c.id
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
@@ -192,6 +192,7 @@ $isNutStatusBrgy = $reportParam === 'nutstatusbrgy';
 $isForm1A = $reportParam === 'form1a';
 $isForm1B = $reportParam === 'form1b';
 $isForm1C = $reportParam === 'form1c';
+$exportFormat = strtolower(trim((string)($_GET['format'] ?? 'xlsx')));
 $listParamKey = strtolower($listParamRaw);
 $codeLowerMap = [];
 foreach ($listsSpec as $spec) {
@@ -256,8 +257,8 @@ if ($isNutStatusBrgy) {
 			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
 		 )
 		 WHERE {$scope}",
-		'ss' . str_repeat('i', count($scopeParams)),
-		array_merge([$anchorParam, $anchorParam], $scopeParams)
+		's' . str_repeat('i', count($scopeParams)),
+		array_merge([$anchorParam], $scopeParams)
 	);
 	$definitions = [
 		'WFA' => ['Normal' => 'Normal', 'MUW' => 'Moderately Underweight', 'SUW' => 'Severely Underweight'],
@@ -617,7 +618,7 @@ if ($isNutStatus) {
 	}
 
 	$sheets[] = [
-		'name' => 'NutStatus',
+		'name' => 'NutStatusTool',
 		'widths' => $nutStatusWidths,
 		'merges' => array_map(
 			fn($rowNumber) => 'A' . $rowNumber . ':P' . $rowNumber,
@@ -908,6 +909,24 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	];
 }
 
+$csvRequested = $exportFormat === 'csv' || isset($_GET['consolidation']);
+if ($csvRequested) {
+	ob_end_clean();
+	header('Content-Type: text/csv; charset=utf-8');
+	header('Content-Disposition: attachment; filename="eopt-consolidation-' . date('Y-m-d') . '.csv"');
+	header('Cache-Control: no-store');
+	$output = fopen('php://output', 'w');
+	foreach ($sheets as $sheet) {
+		fputcsv($output, [$sheet['name']]);
+		foreach ($sheet['rows'] as $row) {
+			fputcsv($output, array_map(static fn($cell) => $cell['v'] ?? '', $row));
+		}
+		fputcsv($output, []);
+	}
+	fclose($output);
+	exit;
+}
+
 $tmpBase = tempnam(sys_get_temp_dir(), 'eopt_report_');
 $tmpPath = $tmpBase . '.xlsx';
 @unlink($tmpBase);
@@ -923,8 +942,8 @@ if (!xlsx_lite_write_workbook($tmpPath, $sheets)) {
 }
 
 if ($isNutStatus) {
-	log_action((int)$user['id'], 'EOPT_NUTSTATUS_EXPORT', 'info', sprintf('Exported NutStatus roster (%s, %s).', $view, $periodLabel));
-	$downloadName = 'nutstatus-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
+	log_action((int)$user['id'], 'EOPT_NUTSTATUS_EXPORT', 'info', sprintf('Exported NutStatusTool roster (%s, %s).', $view, $periodLabel));
+	$downloadName = 'nutstatustool-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isNutStatusBrgy) {
 	log_action((int)$user['id'], 'EOPT_NUTSTATUSBRGY_EXPORT', 'info', sprintf('Exported NutStatusBrgy summary (%s, %s).', $view, $periodLabel));
 	$downloadName = 'nutstatusbrgy-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
