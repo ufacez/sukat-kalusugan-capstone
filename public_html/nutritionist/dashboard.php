@@ -389,16 +389,16 @@ $upcomingAppointments = array_values(array_filter(
 
 // WHO chart data — real computed from measurements for three axes
 $chartMonths = [];
-for ($offset = 5; $offset >= -6; $offset--) {
-	$month = $today->modify(($offset >= 0 ? '-' : '+') . abs($offset) . ' months');
+for ($offset = 11; $offset >= 0; $offset--) {
+	$month = $today->modify('-' . abs($offset) . ' months');
 	$chartMonths[] = $month->format('M');
 }
 
 function buildChartData(array $measurements, string $statusField): array {
 	$months = [];
 	$today = new DateTimeImmutable('today');
-	for ($offset = 5; $offset >= -6; $offset--) {
-		$month = $today->modify(($offset >= 0 ? '-' : '+') . abs($offset) . ' months');
+	for ($offset = 11; $offset >= 0; $offset--) {
+		$month = $today->modify('-' . abs($offset) . ' months');
 		$months[$month->format('Y-m')] = 0;
 	}
 	// WFA gains a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2).
@@ -1332,7 +1332,7 @@ var chartDataEmbedded = {
 			months.forEach(function (m, i) {
 				var lbl = document.createElement('div');
 				lbl.className = 'audit-chart-x-label';
-				var currentMonthIndex = Math.floor((months.length - 1) / 2);
+				var currentMonthIndex = months.length - 1;
 				lbl.textContent = (i % 2 === 0 || i === currentMonthIndex || i === months.length - 1) ? m : '';
 				xAxisEl.appendChild(lbl);
 			});
