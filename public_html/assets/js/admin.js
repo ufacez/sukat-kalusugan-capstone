@@ -4,14 +4,23 @@
   // updates the localStorage value, the data-theme attribute, and the
   // visible label of the sidebar toggle.
   const getPreferredTheme = () => {
-    const stored = localStorage.getItem("theme");
+    let stored = null;
+    try {
+      stored = localStorage.getItem("theme");
+    } catch (error) {
+      stored = null;
+    }
     if (stored) return stored;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+    return typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   };
 
   const applyTheme = (theme, flashButton) => {
     document.documentElement.setAttribute("data-theme", theme);
-    localStorage.setItem("theme", theme);
+    try {
+      localStorage.setItem("theme", theme);
+    } catch (error) {
+      // Theme persistence is optional; sidebar navigation must still work.
+    }
     if (flashButton) {
       // Brief pulse so the user gets a visual confirmation of the switch.
       flashButton.classList.remove("is-flashing");
@@ -30,17 +39,47 @@
     });
   });
 
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function (e) {
-    if (!localStorage.getItem("theme")) {
+  const colorSchemeQuery = typeof window.matchMedia === "function"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+  const handleColorSchemeChange = function (e) {
+    let hasStoredTheme = false;
+    try {
+      hasStoredTheme = Boolean(localStorage.getItem("theme"));
+    } catch (error) {
+      hasStoredTheme = false;
+    }
+    if (!hasStoredTheme) {
       applyTheme(e.matches ? "dark" : "light");
     }
-  });
+  };
+
+  if (colorSchemeQuery && typeof colorSchemeQuery.addEventListener === "function") {
+    colorSchemeQuery.addEventListener("change", handleColorSchemeChange);
+  } else if (colorSchemeQuery && typeof colorSchemeQuery.addListener === "function") {
+    colorSchemeQuery.addListener(handleColorSchemeChange);
+  }
 
   const sidebar = document.querySelector("[data-admin-sidebar]");
   const toggle = document.querySelector("[data-admin-sidebar-toggle]");
+  const shell = document.querySelector(".admin-shell");
   let overlay = document.querySelector("[data-admin-sidebar-overlay]");
+  const getStoredValue = (key) => {
+    try {
+      return localStorage.getItem(key);
+    } catch (error) {
+      return null;
+    }
+  };
+  const setStoredValue = (key, value) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (error) {
+      // Preference persistence is optional.
+    }
+  };
 
-  if (sidebar && toggle) {
+  if (sidebar && toggle && shell) {
     if (!overlay) {
       overlay = document.createElement("div");
       overlay.className = "admin-sidebar-overlay";
@@ -48,44 +87,79 @@
       sidebar.insertAdjacentElement("afterend", overlay);
     }
 
-    toggle.setAttribute("aria-expanded", "false");
-    sidebar.setAttribute("aria-hidden", "true");
-
     const isMobile = () => window.innerWidth <= 920;
 
-    const openSidebar = () => {
+    // Restore the desktop collapsed preference on load.
+    const savedCollapse = getStoredValue("sidebar_collapsed");
+    if (savedCollapse === "true" && !isMobile()) {
+      shell.classList.add("is-collapsed");
+    }
+
+    // Sync the ARIA state on load so screen readers know whether the
+    // sidebar is currently expanded (open) or collapsed (closed).
+    const syncAria = () => {
+      if (isMobile()) {
+        const open = sidebar.classList.contains("is-open");
+        toggle.setAttribute("aria-expanded", open ? "true" : "false");
+        sidebar.setAttribute("aria-hidden", open ? "false" : "true");
+      } else {
+        const collapsed = shell.classList.contains("is-collapsed");
+        toggle.setAttribute("aria-expanded", collapsed ? "false" : "true");
+        sidebar.setAttribute("aria-hidden", "false");
+      }
+    };
+    syncAria();
+
+    // Desktop: toggle the .is-collapsed class on the shell. The CSS
+    // collapses the sidebar to a 68px rail in response to that class.
+    const toggleDesktop = () => {
+      shell.classList.toggle("is-collapsed");
+      const collapsed = shell.classList.contains("is-collapsed");
+      setStoredValue("sidebar_collapsed", collapsed ? "true" : "false");
+      syncAria();
+    };
+
+    // Mobile: open the drawer as an overlay.
+    const openMobile = () => {
       sidebar.classList.add("is-open");
       overlay.classList.add("is-open");
       document.body.classList.add("no-scroll");
-      toggle.setAttribute("aria-expanded", "true");
-      sidebar.setAttribute("aria-hidden", "false");
+      syncAria();
     };
 
-    const closeSidebar = () => {
+    const closeMobile = () => {
       sidebar.classList.remove("is-open");
       overlay.classList.remove("is-open");
       document.body.classList.remove("no-scroll");
-      toggle.setAttribute("aria-expanded", "false");
-      sidebar.setAttribute("aria-hidden", "true");
+      syncAria();
     };
 
-    toggle.addEventListener("click", () => {
-      if (sidebar.classList.contains("is-open")) {
-        closeSidebar();
+    toggle.addEventListener("click", (event) => {
+      event.preventDefault();
+      if (isMobile()) {
+        if (sidebar.classList.contains("is-open")) {
+          closeMobile();
+        } else {
+          openMobile();
+        }
       } else {
-        openSidebar();
+        toggleDesktop();
       }
     });
 
-    overlay.addEventListener("click", closeSidebar);
+    overlay.addEventListener("click", closeMobile);
 
     sidebar.querySelectorAll("a").forEach((link) => {
-      link.addEventListener("click", closeSidebar);
+      link.addEventListener("click", () => {
+        if (isMobile()) {
+          closeMobile();
+        }
+      });
     });
 
     document.addEventListener("keydown", (event) => {
-      if (event.key === "Escape" && sidebar.classList.contains("is-open")) {
-        closeSidebar();
+      if (event.key === "Escape" && isMobile() && sidebar.classList.contains("is-open")) {
+        closeMobile();
       }
     });
 
@@ -131,7 +205,7 @@
       const dx = touch.clientX - touchStartX;
       const sidebarWidth = sidebar.offsetWidth || 280;
       if (dx < -sidebarWidth * 0.3) {
-        closeSidebar();
+        closeMobile();
       }
       sidebar.style.transform = "";
     };
@@ -139,34 +213,30 @@
     sidebar.addEventListener("touchcancel", endTouch, { passive: true });
 
     window.addEventListener("resize", () => {
-      if (window.innerWidth > 920 && sidebar.classList.contains("is-open")) {
-        closeSidebar();
-      }
-      // Clear any inline transform when crossing breakpoints.
       if (!isMobile()) {
+        // Crossing up to desktop — clear the mobile drawer state and
+        // any inline transform left over from a swipe gesture.
+        sidebar.classList.remove("is-open");
+        overlay.classList.remove("is-open");
+        document.body.classList.remove("no-scroll");
         sidebar.style.transform = "";
+        syncAria();
+      } else {
+        // Crossing down to mobile — clear the desktop collapsed state
+        // so the drawer starts in the "closed" position.
+        shell.classList.remove("is-collapsed");
+        setStoredValue("sidebar_collapsed", "false");
+        syncAria();
       }
     });
   }
 
-  // Sidebar collapse (desktop)
-  const collapseBtn = document.querySelector("[data-admin-sidebar-collapse]");
-  const shell = document.querySelector(".admin-shell");
-  if (collapseBtn && shell) {
-    const savedCollapse = localStorage.getItem("sidebar_collapsed");
-    if (savedCollapse === "true" && window.innerWidth > 920) {
-      shell.classList.add("is-collapsed");
-    }
-    collapseBtn.addEventListener("click", () => {
-      shell.classList.toggle("is-collapsed");
-      localStorage.setItem("sidebar_collapsed", shell.classList.contains("is-collapsed"));
-    });
-    window.addEventListener("resize", () => {
-      if (window.innerWidth <= 920) {
-        shell.classList.remove("is-collapsed");
-      }
-    });
-  }
+  // Strip out the legacy standalone sidebar collapse button if it's still
+  // around — the topbar burger now handles both mobile drawer and desktop
+  // collapse, so the chevron button is a no-op.
+  document.querySelectorAll("[data-admin-sidebar-collapse]").forEach((btn) => {
+    btn.remove();
+  });
 
   document.querySelectorAll("[data-admin-confirm]").forEach((button) => {
     button.addEventListener("click", (event) => {

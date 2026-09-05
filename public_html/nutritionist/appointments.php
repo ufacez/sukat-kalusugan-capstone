@@ -197,9 +197,10 @@ $filterStatus = (string)($_GET['status'] ?? '');
 $filterChildId = (int)($_GET['child'] ?? 0);
 $filterFrom = (string)($_GET['from'] ?? '');
 $filterTo = (string)($_GET['to'] ?? '');
+$filterType = (string)($_GET['type'] ?? '');
 $tableSearch = trim((string)($_GET['q'] ?? ''));
 $tablePage = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 10;
+$perPage = 5;
 
 $monthParam = (string)($_GET['m'] ?? $now->format('Y-m'));
 try {
@@ -334,6 +335,15 @@ foreach ($appointments as $appointment) {
 
 	if ($filterStatus !== '' && $status !== $filterStatus) {
 		continue;
+	}
+	if ($filterType !== '') {
+		$type = (string)($appointment['appointment_type'] ?? 'regular');
+		$typeMatches = match ($filterType) {
+			'followup' => $type === 'followup',
+			'regular' => in_array($type, ['regular', 'consultation'], true),
+			default => true,
+		};
+		if (!$typeMatches) continue;
 	}
 	if ($filterChildId > 0 && $childId !== $filterChildId) {
 		continue;
@@ -594,7 +604,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 					$fullName = $appt['first_name'] . ' ' . $appt['last_name'];
 					$initials = admin_initials($fullName);
 					$avatarBg = admin_avatar_color($fullName);
-					$typeLabel = $appt['appointment_type'] === 'followup' ? 'Follow-up Visit' : (($appt['appointment_type'] ?? '') === 'consultation' ? 'Consultation' : 'Nutrition Consultation');
+					$typeLabel = $appt['appointment_type'] === 'followup' ? 'Follow-up Visit' : 'Nutrition Consultation';
 					$timeRange = $dt->format('g:i A');
 					try {
 						$endDt = $dt->modify('+1 hour');
@@ -630,7 +640,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 		<?php endif; ?>
 	</section>
 
-	<!-- ============ FILTERS / QUICK STATS / REMINDER ============ -->
+	<!-- ============ FILTERS / QUICK STATS ============ -->
 	<aside class="appt-side">
 
 		<section class="appt-card">
@@ -710,14 +720,6 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 			</div>
 		</section>
 
-		<section class="appt-card appt-reminder">
-			<div class="appt-reminder-head">
-				<span class="appt-reminder-icon"><?php echo admin_action_icon('lightbulb'); ?></span>
-				<span class="appt-reminder-label">Reminder</span>
-			</div>
-			<p class="appt-reminder-body">Please make sure to update the appointment status after the visit to keep records accurate.</p>
-		</section>
-
 	</aside>
 </div>
 
@@ -726,10 +728,10 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 	<div class="appt-card-head">
 		<div>
 			<h3 class="appt-card-title">All Appointments</h3>
-			<p class="appt-card-sub"><?php echo $displayTotal; ?> matching result<?php echo $displayTotal !== 1 ? 's' : ''; ?><?php echo ($filterStatus || $filterChildId || $filterFrom || $filterTo || $tableSearch) ? ' (filtered)' : ''; ?></p>
+			<p class="appt-card-sub"><?php echo $displayTotal; ?> matching result<?php echo $displayTotal !== 1 ? 's' : ''; ?><?php echo ($filterStatus || $filterType || $filterChildId || $filterFrom || $filterTo || $tableSearch) ? ' (filtered)' : ''; ?></p>
 		</div>
 		<div class="appt-table-tools">
-			<form method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" class="appt-search-form">
+			<form id="appointment-search-form" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" class="appt-search-form">
 				<?php if ($filterStatus !== ''): ?><input type="hidden" name="status" value="<?php echo nutritionist_e($filterStatus); ?>"><?php endif; ?>
 				<?php if ($filterChildId > 0): ?><input type="hidden" name="child" value="<?php echo $filterChildId; ?>"><?php endif; ?>
 				<?php if ($filterFrom !== ''): ?><input type="hidden" name="from" value="<?php echo nutritionist_e($filterFrom); ?>"><?php endif; ?>
@@ -737,10 +739,15 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 				<?php echo admin_action_icon('search'); ?>
 				<input type="search" name="q" value="<?php echo nutritionist_e($tableSearch); ?>" placeholder="Search by child name, parent, or appointment type…" class="appt-search-input">
 				<?php if ($tableSearch !== ''): ?>
-					<a class="appt-search-clear" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php' . (($filterStatus || $filterChildId || $filterFrom || $filterTo) ? '?' . http_build_query(array_filter(['status' => $filterStatus, 'child' => $filterChildId ?: null, 'from' => $filterFrom, 'to' => $filterTo])) : ''))); ?>" title="Clear search">×</a>
+					<a class="appt-search-clear" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php' . (($filterStatus || $filterType || $filterChildId || $filterFrom || $filterTo) ? '?' . http_build_query(array_filter(['status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId ?: null, 'from' => $filterFrom, 'to' => $filterTo])) : ''))); ?>" title="Clear search">×</a>
 				<?php endif; ?>
 			</form>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?export=xlsx' . ($filterStatus ? '&status=' . $filterStatus : ''))); ?>" title="Export to Excel"><?php echo admin_action_icon('export'); ?> Export</a>
+			<select name="type" class="appt-type-filter" aria-label="Filter by appointment type" form="appointment-search-form" onchange="document.getElementById('appointment-search-form').requestSubmit()">
+				<option value="">All Types</option>
+				<option value="followup" <?php echo $filterType === 'followup' ? 'selected' : ''; ?>>Follow-up Visit</option>
+				<option value="regular" <?php echo $filterType === 'regular' ? 'selected' : ''; ?>>Nutrition Consultation</option>
+			</select>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?export=xlsx' . http_build_query(array_filter(['status' => $filterStatus, 'type' => $filterType]), '', '&'))); ?>" title="Export to Excel"><?php echo admin_action_icon('export'); ?> Export</a>
 		</div>
 	</div>
 
@@ -764,7 +771,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 				<?php foreach ($tableRows as $appt):
 					$dt = $appt['scheduled_dt'];
 					$isFollowup = $appt['appointment_type'] === 'followup';
-					$typeLabel = $isFollowup ? 'Follow-up Visit' : (($appt['appointment_type'] ?? '') === 'consultation' ? 'Consultation' : 'Nutrition Consultation');
+					$typeLabel = $isFollowup ? 'Follow-up Visit' : 'Nutrition Consultation';
 					if ($isFollowup) {
 						$trackLabel = !empty($appt['followup_track']) ? ucfirst((string)$appt['followup_track']) : '';
 						if ($trackLabel !== '') {
@@ -787,9 +794,11 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 							<div class="appt-t-sub"><?php echo nutritionist_e((string)($appt['parent_phone'] ?? '')); ?></div>
 						</td>
 						<td><?php echo nutritionist_e($typeLabel); ?></td>
-						<td class="appt-t-loc">
+						<td>
+							<span class="appt-t-loc">
 							<?php echo admin_action_icon('location'); ?>
 							<span><?php echo nutritionist_e((string)$appt['location']); ?></span>
+							</span>
 						</td>
 						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$appt['status']); ?>"><?php echo nutritionist_e(ucfirst((string)$appt['status'])); ?></span></td>
 						<td>
@@ -824,7 +833,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 		<div class="admin-table-pages">
 			<?php
 			$queryBase = array_filter([
-				'status' => $filterStatus, 'child' => $filterChildId > 0 ? $filterChildId : null,
+				'status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId > 0 ? $filterChildId : null,
 				'from' => $filterFrom, 'to' => $filterTo, 'q' => $tableSearch,
 			], static fn($v) => $v !== null && $v !== '');
 			$linkFor = static function (int $p) use ($queryBase): string {
@@ -867,11 +876,31 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 
 <script>
 (function () {
+	var searchForm = document.getElementById('appointment-search-form');
+	if (searchForm) {
+		var searchInput = searchForm.querySelector('input[name="q"]');
+		var searchTimer;
+		searchForm.addEventListener('submit', function (event) {
+			event.preventDefault();
+			var params = new URLSearchParams(new FormData(searchForm));
+			var url = searchForm.action + '?' + params.toString() + '#all-appointments';
+			window.location.assign(url);
+		});
+		if (searchInput) {
+			searchInput.addEventListener('input', function () {
+				window.clearTimeout(searchTimer);
+				searchTimer = window.setTimeout(function () {
+					searchForm.requestSubmit();
+				}, 350);
+			});
+		}
+	}
+
 	document.querySelectorAll('.appt-table-pagination .admin-table-page-btn[data-href], .admin-table-pagination .admin-table-page-btn[data-href]').forEach(function (btn) {
 		btn.addEventListener('click', function (e) {
 			if (this.disabled) { e.preventDefault(); return; }
 			var href = this.getAttribute('data-href');
-			if (href) { window.location.href = href; }
+			if (href) { window.location.href = href + '#all-appointments'; }
 		});
 	});
 })();

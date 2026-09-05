@@ -53,7 +53,7 @@
 
     let actionHtml = "";
     if (entry.id) {
-      const href = "/nutritionist/appointment_form.php?id=" + encodeURIComponent(entry.id);
+      const href = "appointment_form.php?id=" + encodeURIComponent(entry.id);
       actionHtml = '<a class="sk-cal-event-action" href="' + escapeHtml(href) + '">Open →</a>';
     }
 
@@ -74,7 +74,18 @@
     );
   }
 
+  function limitRepeatedAppointments(entries) {
+    let appointmentShown = false;
+    return entries.filter((entry) => {
+      if (entry.type !== "appointment") return true;
+      if (appointmentShown) return false;
+      appointmentShown = true;
+      return true;
+    });
+  }
+
   function renderDetail(detailEl, iso, entries) {
+    const visibleEntries = limitRepeatedAppointments(entries);
     const titleEl = detailEl.querySelector("[data-calendar-detail-title]");
     const subEl = detailEl.querySelector("[data-calendar-detail-sub]");
     const listEl = detailEl.querySelector("[data-calendar-detail-list]");
@@ -92,39 +103,39 @@
     }
 
     if (subEl) {
-      subEl.textContent = entries.length + " event" + (entries.length === 1 ? "" : "s");
+      subEl.textContent = visibleEntries.length + " event" + (visibleEntries.length === 1 ? "" : "s");
     }
 
-    if (entries.length === 0) {
+    if (visibleEntries.length === 0) {
       listEl.innerHTML = "";
       if (emptyEl) emptyEl.style.display = "";
-      if (linkEl) linkEl.setAttribute("aria-hidden", "true");
-      return;
-    }
+    } else {
+      if (emptyEl) emptyEl.style.display = "none";
 
-    if (emptyEl) emptyEl.style.display = "none";
-
-    const compact = entries.slice(0, COMPACT_LIMIT);
-    let html = compact.map(buildEventCard).join("");
-    if (entries.length > COMPACT_LIMIT) {
-      html +=
-        '<button type="button" class="sk-cal-show-more" data-calendar-show-more>' +
-        "+ " + (entries.length - COMPACT_LIMIT) + " more" +
-        "</button>";
-      html += '<div class="sk-cal-event-list-extra" hidden>';
-      html += entries.slice(COMPACT_LIMIT).map(buildEventCard).join("");
-      html += "</div>";
+      const compact = visibleEntries.slice(0, COMPACT_LIMIT);
+      let html = compact.map(buildEventCard).join("");
+      if (visibleEntries.length > COMPACT_LIMIT) {
+        html +=
+          '<button type="button" class="sk-cal-show-more" data-calendar-show-more>' +
+          "+ " + (visibleEntries.length - COMPACT_LIMIT) + " more" +
+          "</button>";
+        html += '<div class="sk-cal-event-list-extra" hidden>';
+        html += visibleEntries.slice(COMPACT_LIMIT).map(buildEventCard).join("");
+        html += "</div>";
+      }
+      listEl.innerHTML = html;
     }
-    listEl.innerHTML = html;
 
     if (linkEl) {
       linkEl.setAttribute("aria-hidden", "false");
-      linkEl.setAttribute("href", "/nutritionist/appointments.php?from=" + iso + "&to=" + iso);
+      linkEl.setAttribute("href", "appointments.php?from=" + encodeURIComponent(iso) + "&to=" + encodeURIComponent(iso));
     }
   }
 
   function setupCalendar(scope) {
-    const grid = (scope || document).querySelector("[data-sk-calendar]");
+    const grid = scope && scope.matches && scope.matches("[data-sk-calendar]")
+      ? scope
+      : (scope || document).querySelector("[data-sk-calendar]");
     if (!grid) return;
 
     const detailId = grid.getAttribute("data-sk-calendar-detail");
@@ -146,11 +157,6 @@
       detailEl.setAttribute("data-calendar-active-day", iso);
     }
 
-    function clearSelection() {
-      days.forEach((btn) => btn.classList.remove(SELECTED_CLASS));
-      detailEl.removeAttribute("data-calendar-active-day");
-    }
-
     days.forEach((btn) => {
       btn.addEventListener("click", () => {
         const iso = btn.getAttribute("data-calendar-day");
@@ -162,28 +168,6 @@
           entries = JSON.parse(raw);
         } catch (e) {
           entries = [];
-        }
-
-        const alreadySelected = btn.classList.contains(SELECTED_CLASS);
-        if (alreadySelected) {
-          clearSelection();
-          if (defaultIso) {
-            const defaultBtn = grid.querySelector(
-              '[data-calendar-day="' + defaultIso + '"]'
-            );
-            if (defaultBtn) {
-              let defaultEntries = [];
-              try {
-                defaultEntries = JSON.parse(
-                  defaultBtn.getAttribute("data-calendar-entries") || "[]"
-                );
-              } catch (e) {}
-              selectDay(defaultIso, defaultEntries);
-            }
-          } else {
-            renderDetail(detailEl, iso, []);
-          }
-          return;
         }
 
         selectDay(iso, entries);

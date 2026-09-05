@@ -170,8 +170,10 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/app.css')) . '">';
-    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin.css')) . '">';
-    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css')) . '">';
+    $adminCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin.css');
+    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin.css?v=' . $adminCssVersion)) . '">';
+    $nutritionistCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/nutritionist.css');
+    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css?v=' . $nutritionistCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . nutritionist_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
 
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/chatbot.css')) . '">';
@@ -193,10 +195,11 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<img src="' . nutritionist_e(app_url('/assets/img/logo/logo_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
     echo '<img src="' . nutritionist_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
+    echo '<div class="admin-brand-text">';
+    echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
+    echo '<div class="admin-brand-sub">Nutritionist console</div>';
     echo '</div>';
-    echo '<button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse title="Toggle sidebar">';
-    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
-    echo '</button>';
+    echo '</div>';
 
     echo '<nav class="admin-nav">';
     foreach (nutritionist_grouped_nav_items() as $groupIndex => $group) {
@@ -279,8 +282,10 @@ function nutritionist_layout_end(): void
     echo '</main>';
     echo '</div>';
     echo '</div>';
-    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js')) . '"></script>';
-    echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js')) . '"></script>';
+    $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
+    $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
 
     $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'staff'];
@@ -425,14 +430,27 @@ function nutritionist_render_calendar_grid(
 
         $dotsHtml = '';
         if ($hasEntries) {
+            $dotEntries = [];
+            $seenDotTypes = [];
+            foreach ($dayEntries as $entry) {
+                $type = (string)($entry['type'] ?? 'appointment');
+                if (isset($seenDotTypes[$type])) {
+                    continue;
+                }
+                $seenDotTypes[$type] = true;
+                $dotEntries[] = $entry;
+                if (count($dotEntries) === 3) {
+                    break;
+                }
+            }
             $dotsHtml .= '<span class="sk-cal-day-dots">';
-            foreach (array_slice($dayEntries, 0, 3) as $entry) {
+            foreach ($dotEntries as $entry) {
                 $type = (string)($entry['type'] ?? 'appointment');
                 $color = (string)($entry['color'] ?? nutritionist_calendar_color($type));
                 $dotsHtml .= '<span class="sk-cal-day-dot" style="background:' . nutritionist_e($color) . ';"></span>';
             }
-            if (count($dayEntries) > 3) {
-                $dotsHtml .= '<span class="sk-cal-day-more">+' . (count($dayEntries) - 3) . '</span>';
+            if (count($dayEntries) > count($dotEntries)) {
+                $dotsHtml .= '<span class="sk-cal-day-more">+' . (count($dayEntries) - count($dotEntries)) . '</span>';
             }
             $dotsHtml .= '</span>';
         }

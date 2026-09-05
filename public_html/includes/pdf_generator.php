@@ -150,6 +150,11 @@ function pdf_scope_and_filter(): array {
 	if ($user['barangay_id'] ?? 0 > 0) {
 		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [(int)$user['barangay_id']]);
 		$barangayName = (string)($brgyRow['name'] ?? '');
+	} elseif ($barangayFilter > 0) {
+		$barangayFilterSql = ' AND c.barangay_id = ?';
+		$barangayFilterParams[] = $barangayFilter;
+		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayFilter]);
+		$barangayName = (string)($brgyRow['name'] ?? $barangayName);
 	}
 
 	try {
@@ -260,23 +265,45 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 }
 
 function pdf_generate_form1a(array $f): TCPDF {
-	$pdf = pdf_base('OPT Plus Form 1A - Master List of Measured Children', 'Landscape');
+	$pdf = pdf_base('OPT Plus Form 1A - Preschool Master List', 'Landscape');
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
-	$pdf->SetFont('helvetica', 'B', 11);
-	$pdf->Cell(0, 7, 'OPT PLUS FORM 1A: MASTER LIST OF MEASURED CHILDREN 0-59 MONTHS OLD', 0, 1, 'C');
-	$pdf->Ln(2);
+	$pdf->SetFont('helvetica', 'B', 10);
+	$pdf->Cell(0, 6, 'OPT PLUS FORM 1A: PRE-PRINTED LIST OF PRESCHOOL CHILDREN IN THE BARANGAY', 0, 1, 'C');
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'Names are alphabetically arranged. Add new or previously unlisted children at the end of this list.', 0, 1, 'C');
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
-	$allRows = pdf_fetch_list($f, '1=1', 0, 59);
+	$allRows = admin_fetch_all(
+		"SELECT
+			c.child_code, c.first_name, c.middle_name, c.last_name, c.sex,
+			c.birthdate, c.is_ip, c.has_disability, la.area_name AS address,
+			p.name AS parent_name, lm.measurement_date, lm.height_cm, lm.weight_kg,
+			lm.wfh_status,
+			DATEDIFF(?, c.birthdate) AS age_days,
+			TIMESTAMPDIFF(MONTH, c.birthdate, ?) AS age_months
+		 FROM children c
+		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN local_areas la ON la.id = c.local_area_id
+		 INNER JOIN measurements lm ON lm.id = (
+			SELECT m2.id FROM measurements m2
+			WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC
+			LIMIT 1
+		 )
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+		 ORDER BY c.last_name ASC, c.first_name ASC, c.middle_name ASC",
+		'ss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
+		array_merge([$f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
+	);
 
-	$cols = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
-	$widths = [10, 25, 30, 45, 12, 20, 18, 18, 12, 12, 12];
+	$cols = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date of Measurement', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nutritional Status (WFL/H)', 'Disability'];
+	$widths = [14, 24, 29, 41, 10, 10, 17, 20, 16, 16, 15, 15, 31, 15];
 
 	pdf_table_header($pdf, $cols, $widths);
 
-	$count = 0;
 	foreach ($allRows as $i => $row) {
 		if ($pdf->GetY() > 175) {
 			$pdf->AddPage();
@@ -285,109 +312,302 @@ function pdf_generate_form1a(array $f): TCPDF {
 
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
 		pdf_data_row($pdf, [
-			$count + 1,
+			(string)($row['child_code'] ?? ''),
 			(string)($row['address'] ?? ''),
-			(string)$row['parent_name'],
+			(string)($row['parent_name'] ?? ''),
 			$fullName,
-			(string)$row['sex'],
-			(string)$row['birthdate'],
-			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
+			!empty($row['is_ip']) ? 'YES' : 'NO',
+			(string)($row['sex'] ?? ''),
+			(string)($row['birthdate'] ?? ''),
+			(string)($row['measurement_date'] ?? ''),
 			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
-			(string)($row['wfa_status'] ?? ''),
-			(string)($row['hfa_status'] ?? ''),
+			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
+			(int)$row['age_months'],
+			(int)$row['age_days'],
 			(string)($row['wfh_status'] ?? ''),
-		], $widths, $i % 2 === 0);
-		$count++;
+			!empty($row['has_disability']) ? 'YES' : 'NO',
+		], $widths, $i % 2 === 0, array_fill(0, count($cols), 'C'));
 	}
 
-	pdf_totals_row($pdf, 'TOTAL NUMBER OF CHILDREN:', $count, $widths);
+	for ($blankRow = 0; $blankRow < 5; $blankRow++) {
+		pdf_data_row($pdf, array_fill(0, count($cols), ''), $widths, false);
+	}
+
+	pdf_totals_row($pdf, 'TOTAL NUMBER OF CHILDREN:', count($allRows), $widths);
+	pdf_signature_block($pdf);
+
+	return $pdf;
+}
+
+function pdf_generate_nutstatus(array $f): TCPDF {
+	$pdf = pdf_base('NutStatus - Community Level e-OPT Plus Tool', 'Landscape');
+	$pdf->AddPage();
+	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
+
+	$pdf->SetFont('helvetica', 'B', 10);
+	$pdf->Cell(0, 7, 'COMMUNITY LEVEL e-OPT PLUS TOOL: NUTRITIONAL STATUS', 0, 1, 'C');
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'Region III - Central Luzon | Province: Pampanga | Municipality/City: City of San Fernando', 0, 1, 'C');
+	$pdf->Ln(2);
+	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
+
+	$rows = admin_fetch_all(
+		"SELECT
+			c.child_code, c.first_name, c.middle_name, c.last_name, c.sex,
+			c.birthdate, c.is_ip, c.has_disability, la.area_name AS address,
+			p.name AS parent_name, lm.measurement_date, lm.height_cm, lm.weight_kg,
+			lm.wfa_status, lm.hfa_status, lm.wfh_status,
+			DATEDIFF(?, c.birthdate) AS age_days,
+			TIMESTAMPDIFF(MONTH, c.birthdate, ?) AS age_months
+		 FROM children c
+		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN local_areas la ON la.id = c.local_area_id
+		 INNER JOIN measurements lm ON lm.id = (
+			SELECT m2.id FROM measurements m2
+			WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC
+			LIMIT 1
+		 )
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+		 ORDER BY c.last_name ASC, c.first_name ASC",
+		str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 'sss',
+		array_merge($f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param'], $f['anchor_param'], $f['anchor_param']])
+	);
+
+	$columns = [
+		'Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name', 'IP?', 'Sex',
+		'Date of Birth', 'Date Measured', 'Weight kg', 'Height cm', 'Age mo.', 'Age days',
+		'WFA Status', 'HFA Status', 'WFL/H Status', 'Disability',
+	];
+	$widths = [13, 22, 25, 31, 10, 10, 16, 18, 14, 14, 12, 13, 22, 20, 24, 14];
+	pdf_table_header($pdf, $columns, $widths);
+
+	foreach ($rows as $index => $row) {
+		if ($pdf->GetY() > 180) {
+			$pdf->AddPage();
+			pdf_table_header($pdf, $columns, $widths);
+		}
+
+		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
+		$wfaStatus = (string)($row['wfa_status'] ?? '');
+		if ($wfaStatus === 'Refer to WFL/H') {
+			$wfaStatus = 'Use WFL/H column';
+		}
+
+		pdf_data_row($pdf, [
+			(string)($row['child_code'] ?? ''),
+			(string)($row['address'] ?? ''),
+			(string)($row['parent_name'] ?? ''),
+			$fullName,
+			!empty($row['is_ip']) ? 'YES' : 'NO',
+			(string)($row['sex'] ?? ''),
+			(string)($row['birthdate'] ?? ''),
+			(string)($row['measurement_date'] ?? ''),
+			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
+			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
+			(int)$row['age_months'],
+			(int)$row['age_days'],
+			$wfaStatus,
+			(string)($row['hfa_status'] ?? ''),
+			(string)($row['wfh_status'] ?? ''),
+			!empty($row['has_disability']) ? 'YES' : 'NO',
+		], $widths, $index % 2 === 0, array_fill(0, count($columns), 'C'));
+	}
+
+	pdf_totals_row($pdf, 'TOTAL NUMBER OF CHILDREN:', count($rows), $widths);
 	pdf_signature_block($pdf);
 
 	return $pdf;
 }
 
 function pdf_generate_form1b(array $f): TCPDF {
-	$pdf = pdf_base('OPT Plus Form 1B - Nutritional Status Summary');
+	$pdf = pdf_base('OPT Plus Form 1B - Nutritional Status Consolidation', 'Landscape');
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
-	$pdf->SetFont('helvetica', 'B', 11);
-	$pdf->Cell(0, 7, 'OPT PLUS FORM 1B: NUTRITIONAL STATUS SUMMARY', 0, 1, 'C');
+	$pdf->SetFont('helvetica', 'B', 10);
+	$pdf->Cell(0, 7, 'OPT PLUS FORM 1B: SUMMARY SHEET OF THE NUTRITIONAL STATUS OF 0-59 MONTH-OLD CHILDREN', 0, 1, 'C');
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'Automated consolidation from SukatKalusugan database | WFA > +2 SD is referred to WFL/H for weight-related classification.', 0, 1, 'C');
 	$pdf->Ln(2);
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
 	$summaryRows = admin_fetch_all(
 		"SELECT
-			c.sex,
-			CASE WHEN TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) < 24 THEN '0-23' ELSE '24-59' END AS age_band,
-			m.wfa_status, m.hfa_status, m.wfh_status
+			c.first_name, c.last_name, c.birthdate, c.sex, c.is_ip, c.has_disability,
+			m.wfa_status, m.hfa_status, m.wfh_status,
+			m.height_cm, m.weight_kg
 		 FROM children c
 		 INNER JOIN measurements m ON m.id = (
 			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
 			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
 		 )
-		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
-		   AND TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) BETWEEN 0 AND 59",
-		's' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
-		array_merge([$f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}",
+		str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge($f['scope_params'], $f['barangay_filter_params'])
 	);
 
-	$bucket = static fn(): array => [
-		'Boys' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
-		'Girls' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
-		'Total' => ['0-23' => 0, '24-59' => 0, 'Total' => 0],
+	$ageGroups = ['0-5' => [0, 5], '6-11' => [6, 11], '12-23' => [12, 23], '24-35' => [24, 35], '36-47' => [36, 47], '48-59' => [48, 59]];
+	$statusGroups = [
+		'WFA' => ['Normal' => 'Normal', 'MUW' => 'Underweight', 'SUW' => 'Severe Underweight', 'Refer to WFL/H' => 'Referred to WFL/H'],
+		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'Stunted / MSt', 'SSt' => 'Severely Stunted / SSt'],
+		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'Overweight', 'Ob' => 'Obese', 'MW' => 'Wasted / MAM', 'SW' => 'Wasted / SAM'],
 	];
-
-	$wfaSummary = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket()];
-	$hfaSummary = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
-	$wfhSummary = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
-
-	foreach ($summaryRows as $row) {
-		$sexLabel = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';
-		$ageBandKey = (string)$row['age_band'];
-
-		foreach ([['wfa_status', &$wfaSummary], ['hfa_status', &$hfaSummary], ['wfh_status', &$wfhSummary]] as [$field, &$ref]) {
-			$value = $row[$field] ?? null;
-			if ($value === null || !isset($ref[$value])) {
-				continue;
-			}
-			$ref[$value][$sexLabel][$ageBandKey]++;
-			$ref[$value][$sexLabel]['Total']++;
-			$ref[$value]['Total'][$ageBandKey]++;
-			$ref[$value]['Total']['Total']++;
+	$summary = [];
+	foreach ($statusGroups as $axis => $statuses) {
+		foreach ($statuses as $code => $label) {
+			$summary[$axis][$code] = ['Boys' => 0, 'Girls' => 0, 'Total' => 0, 'ages' => array_fill_keys(array_keys($ageGroups), 0), 'ip_boys' => 0, 'ip_girls' => 0];
 		}
-		unset($ref);
+	}
+	$totalAssessed = 0;
+	$disabilityCount = 0;
+	$ipCount = 0;
+	$anchor = $f['anchor_date'];
+	foreach ($summaryRows as $row) {
+		try {
+			$birthdate = new DateTimeImmutable((string)$row['birthdate']);
+			$age = $birthdate->diff($anchor);
+			$ageMonths = ($age->y * 12) + $age->m;
+		} catch (Exception) {
+			continue;
+		}
+		if ($ageMonths < 0 || $ageMonths > 59) {
+			continue;
+		}
+		$totalAssessed++;
+		$sex = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';
+		$ageGroup = null;
+		foreach ($ageGroups as $group => [$min, $max]) {
+			if ($ageMonths >= $min && $ageMonths <= $max) {
+				$ageGroup = $group;
+				break;
+			}
+		}
+		foreach ([['WFA', $row['wfa_status']], ['HFA', $row['hfa_status']], ['WFL/H', $row['wfh_status']]] as [$axis, $code]) {
+			if (isset($summary[$axis][$code])) {
+				$summary[$axis][$code][$sex]++;
+				$summary[$axis][$code]['Total']++;
+				$summary[$axis][$code]['ages'][$ageGroup]++;
+				if (!empty($row['is_ip'])) {
+					$summary[$axis][$code]['ip_' . strtolower($sex)]++;
+				}
+			}
+		}
+		if (!empty($row['has_disability'])) {
+			$disabilityCount++;
+		}
+		if (!empty($row['is_ip'])) {
+			$ipCount++;
+		}
 	}
 
-	foreach ([
-		'WEIGHT-FOR-AGE (WFA)' => $wfaSummary,
-		'HEIGHT-FOR-AGE (HFA)' => $hfaSummary,
-		'WEIGHT-FOR-LENGTH/HEIGHT (WFH)' => $wfhSummary,
-	] as $axisTitle => $summaryTable) {
-		$pdf->SetFont('helvetica', 'B', 9);
-		$pdf->Cell(0, 6, $axisTitle, 0, 1);
-		$pdf->Ln(1);
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell(0, 6, 'Coverage and prevalence information', 0, 1);
+	$pdf->SetFont('helvetica', '', 8);
+	$pdf->Cell(65, 5, 'Barangay:', 0, 0); $pdf->Cell(70, 5, $f['barangay_name'], 0, 0);
+	$pdf->Cell(65, 5, 'Municipality / Province:', 0, 0); $pdf->Cell(70, 5, 'City of San Fernando, Pampanga', 0, 1);
+	$pdf->Cell(65, 5, 'PSGC:', 0, 0); $pdf->Cell(70, 5, 'Not configured', 0, 0);
+	$pdf->Cell(65, 5, 'Reporting year:', 0, 0); $pdf->Cell(70, 5, (string)$f['year'], 0, 1);
+	$pdf->Cell(65, 5, 'Estimated population (0-59 months):', 0, 0); $pdf->Cell(70, 5, 'Not configured', 0, 0);
+	$pdf->Cell(65, 5, 'OPT Plus coverage:', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed . ' assessed', 0, 1);
+	$pdf->Cell(65, 5, 'Total children assessed (0-59 months):', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed, 0, 0);
+	$pdf->Cell(65, 5, 'Indigenous preschool children:', 0, 0); $pdf->Cell(70, 5, (string)$ipCount, 0, 1);
+	$pdf->Cell(65, 5, 'Children with disability:', 0, 0); $pdf->Cell(70, 5, (string)$disabilityCount, 0, 1);
+	$pdf->Ln(3);
 
-		$cols = ['Status', 'Boys 0-23', 'Boys 24-59', 'Boys Total', 'Girls 0-23', 'Girls 24-59', 'Girls Total', 'All Total'];
-		$widths = [30, 25, 25, 25, 25, 25, 25, 25];
-		pdf_table_header($pdf, $cols, $widths);
-
-		$i = 0;
-		foreach ($summaryTable as $statusLabel => $counts) {
-			pdf_data_row($pdf, [
-				$statusLabel,
-				(int)$counts['Boys']['0-23'],
-				(int)$counts['Boys']['24-59'],
-				(int)$counts['Boys']['Total'],
-				(int)$counts['Girls']['0-23'],
-				(int)$counts['Girls']['24-59'],
-				(int)$counts['Girls']['Total'],
-				(int)$counts['Total']['Total'],
-			], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
-			$i++;
+	$cols = ['Classification', 'Boys', 'Girls', 'Total', '0-5', '6-11', '12-23', '24-35', '36-47', '48-59', 'Birth-5 Total', 'Birth-5 %', '0-23 Total', '0-23 %', 'IP Boys', 'IP Girls', 'IP Total'];
+	$widths = [34, 9, 9, 9, 9, 9, 9, 9, 9, 9, 14, 12, 14, 12, 9, 9, 9];
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell(0, 6, 'NUTRITIONAL STATUS CONSOLIDATION TABLE', 0, 1);
+	pdf_table_header($pdf, $cols, $widths);
+	$rowIndex = 0;
+	foreach ($summary as $axis => $summaryTable) {
+		foreach ($summaryTable as $code => $counts) {
+			$birthToFive = $counts['Total'];
+			$zeroToTwentyThree = array_sum(array_slice($counts['ages'], 0, 3));
+			$ipTotal = $counts['ip_boys'] + $counts['ip_girls'];
+			$values = [$axis . ' - ' . $statusGroups[$axis][$code], $counts['Boys'], $counts['Girls'], $counts['Total']];
+			foreach (array_keys($ageGroups) as $group) {
+				$values[] = $counts['ages'][$group];
+			}
+			$values[] = $birthToFive;
+			$values[] = $totalAssessed > 0 ? number_format(($birthToFive / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $zeroToTwentyThree;
+			$values[] = $totalAssessed > 0 ? number_format(($zeroToTwentyThree / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $counts['ip_boys'];
+			$values[] = $counts['ip_girls'];
+			$values[] = $ipTotal;
+			pdf_data_row($pdf, $values, $widths, $rowIndex % 2 === 0, array_merge(['L'], array_fill(0, 16, 'C')));
+			$rowIndex++;
 		}
+	}
 
-		$pdf->Ln(6);
+	$pdf->SetFont('helvetica', 'B', 9);
+	$pdf->Cell(0, 6, 'Required nutrition and data-quality summaries', 0, 1);
+	$pdf->SetFont('helvetica', '', 8);
+	$qualityRowsSource = admin_fetch_all(
+		"SELECT c.first_name, c.last_name, c.birthdate, c.sex, c.local_area_id,
+			p.name AS parent_name, p.address AS parent_address,
+			m.height_cm, m.weight_kg
+		 FROM children c
+		 LEFT JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN measurements m ON m.id = (
+			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}",
+		str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge($f['scope_params'], $f['barangay_filter_params'])
+	);
+	$duplicateKeys = [];
+	$missingInformation = 0;
+	$noParentAddress = 0;
+	$noSex = 0;
+	$olderThan59 = 0;
+	$heightWithoutWeight = 0;
+	$weightWithoutHeight = 0;
+	foreach ($qualityRowsSource as $qualityRow) {
+		$key = strtolower(trim((string)$qualityRow['first_name'] . '|' . (string)$qualityRow['last_name'] . '|' . (string)$qualityRow['birthdate']));
+		$duplicateKeys[$key] = ($duplicateKeys[$key] ?? 0) + 1;
+		if (trim((string)$qualityRow['first_name']) === '' || trim((string)$qualityRow['last_name']) === '' || trim((string)$qualityRow['birthdate']) === '') {
+			$missingInformation++;
+		}
+		if (trim((string)$qualityRow['parent_name']) === '' || (int)($qualityRow['local_area_id'] ?? 0) === 0 && trim((string)$qualityRow['parent_address']) === '') {
+			$noParentAddress++;
+		}
+		if (trim((string)$qualityRow['sex']) === '') {
+			$noSex++;
+		}
+		try {
+			$qualityAge = (new DateTimeImmutable((string)$qualityRow['birthdate']))->diff($anchor);
+			if (($qualityAge->y * 12) + $qualityAge->m > 59) {
+				$olderThan59++;
+			}
+		} catch (Exception) {
+			$missingInformation++;
+		}
+		if ($qualityRow['height_cm'] !== null && $qualityRow['weight_kg'] === null) {
+			$heightWithoutWeight++;
+		}
+		if ($qualityRow['weight_kg'] !== null && $qualityRow['height_cm'] === null) {
+			$weightWithoutHeight++;
+		}
+	}
+	$repeatedChildren = count(array_filter($duplicateKeys, static fn($count) => $count > 1));
+	$qualityRows = [
+		['Total children assessed', $totalAssessed],
+		['Children with names and birthdate repeated', $repeatedChildren],
+		['Children with missing information', $missingInformation],
+		['Children with no parent/address', $noParentAddress],
+		['Children with no sex data', $noSex],
+		['Children older than 59 months', $olderThan59],
+		['Children with length/height but no weight', $heightWithoutWeight],
+		['Children with weight but no length/height', $weightWithoutHeight],
+	];
+	foreach ($qualityRows as [$label, $value]) {
+		$pdf->Cell(115, 5, $label, 1, 0, 'L');
+		$pdf->Cell(25, 5, (string)$value, 1, 1, 'C');
 	}
 
 	pdf_signature_block($pdf);
@@ -395,20 +615,165 @@ function pdf_generate_form1b(array $f): TCPDF {
 	return $pdf;
 }
 
+function pdf_generate_nutstatusbrgy(array $f): TCPDF {
+	$pdf = pdf_base('NutStatusBrgy - Barangay Nutritional Status Summary', 'Landscape');
+	$pdf->AddPage();
+	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
+	$pdf->SetFont('helvetica', 'B', 10);
+	$pdf->Cell(0, 7, 'NUTRITIONAL STATUS OF CHILDREN 0-23 AND 0-59 MONTHS OLD', 0, 1, 'C');
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'SEX-DISAGGREGATED SUMMARY TABLES FOR PRESENTATION | Region III - Central Luzon | Pampanga | City of San Fernando', 0, 1, 'C');
+	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
+
+	$rows = admin_fetch_all(
+		"SELECT c.birthdate, c.sex, c.parent_id, m.wfa_status, m.hfa_status, m.wfh_status
+		 FROM children c
+		 INNER JOIN measurements m ON m.id = (
+			SELECT m2.id FROM measurements m2
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}",
+		'ss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
+		array_merge([$f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
+	);
+
+	$definitions = [
+		'WFA' => ['Normal' => 'Normal', 'MUW' => 'Moderately Underweight', 'SUW' => 'Severely Underweight'],
+		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'Moderately Stunted', 'SSt' => 'Severely Stunted'],
+		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'Overweight', 'Ob' => 'Obese', 'MW' => 'Moderately Wasted / MAM', 'SW' => 'Severely Wasted / SAM'],
+	];
+	$summary = [];
+	$denominators = [];
+	foreach ($definitions as $axis => $statuses) {
+		foreach ($statuses as $code => $_label) {
+			$summary[$axis][$code] = ['0-23' => ['Boys' => 0, 'Girls' => 0], '0-59' => ['Boys' => 0, 'Girls' => 0]];
+		}
+		$denominators[$axis] = ['0-23' => 0, '0-59' => 0];
+	}
+	$affectedParents = ['0-23' => [], '0-59' => []];
+	foreach ($rows as $row) {
+		try {
+			$ageDiff = (new DateTimeImmutable((string)$row['birthdate']))->diff($f['anchor_date']);
+			$ageMonths = ($ageDiff->y * 12) + $ageDiff->m;
+		} catch (Exception) {
+			continue;
+		}
+		if ($ageMonths < 0 || $ageMonths > 59) continue;
+		$sex = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';
+		$groups = ['0-59'];
+		if ($ageMonths <= 23) $groups[] = '0-23';
+		foreach ([['WFA', $row['wfa_status']], ['HFA', $row['hfa_status']], ['WFL/H', $row['wfh_status']]] as [$axis, $status]) {
+			if ($status !== null && $status !== '') {
+				foreach ($groups as $group) {
+					$denominators[$axis][$group]++;
+					if (isset($summary[$axis][$status])) $summary[$axis][$status][$group][$sex]++;
+				}
+			}
+		}
+		$undernutrition = in_array($row['wfa_status'], ['MUW', 'SUW'], true) || in_array($row['hfa_status'], ['MSt', 'SSt'], true) || in_array($row['wfh_status'], ['MW', 'SW'], true);
+		if ($undernutrition) {
+			$affectedParents['0-59'][(int)$row['parent_id']] = true;
+			if ($ageMonths <= 23) $affectedParents['0-23'][(int)$row['parent_id']] = true;
+		}
+	}
+
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell(0, 5, 'Year: ' . $f['year'] . '    Barangay: ' . $f['barangay_name'] . '    Municipality/City: City of San Fernando    Province: Pampanga    PSGC: Not configured', 0, 1, 'C');
+	foreach ($summary as $axis => $statuses) {
+		$pdf->SetFont('helvetica', 'B', 9);
+		$pdf->Cell(0, 6, $axis === 'WFL/H' ? 'WEIGHT FOR LENGTH/HEIGHT' : ($axis === 'HFA' ? 'HEIGHT / LENGTH FOR AGE' : 'WEIGHT FOR AGE'), 0, 1);
+		$columns = ['Classification', 'Boys', 'Girls', 'Total', 'Prev', 'Boys', 'Girls', 'Total', 'Prev'];
+		$widths = [50, 18, 18, 18, 20, 18, 18, 18, 20];
+		pdf_table_header($pdf, $columns, $widths);
+		$i = 0;
+		foreach ($statuses as $code => $label) {
+			$earlyTotal = $summary[$axis][$code]['0-23']['Boys'] + $summary[$axis][$code]['0-23']['Girls'];
+			$allTotal = $summary[$axis][$code]['0-59']['Boys'] + $summary[$axis][$code]['0-59']['Girls'];
+			$earlyPrev = $denominators[$axis]['0-23'] > 0 ? number_format(($earlyTotal / $denominators[$axis]['0-23']) * 100, 2) . '%' : '0.00%';
+			$allPrev = $denominators[$axis]['0-59'] > 0 ? number_format(($allTotal / $denominators[$axis]['0-59']) * 100, 2) . '%' : '0.00%';
+			pdf_data_row($pdf, [$label, $summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev, $summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
+			$i++;
+		}
+		$pdf->Ln(3);
+	}
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell(105, 8, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN 0-59 MONTHS AFFECTED BY UNDERNUTRITION', 1, 0, 'C');
+	$pdf->Cell(25, 8, (string)count($affectedParents['0-59']), 1, 0, 'C');
+	$pdf->Cell(105, 8, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN 0-23 MONTHS AFFECTED BY UNDERNUTRITION', 1, 0, 'C');
+	$pdf->Cell(25, 8, (string)count($affectedParents['0-23']), 1, 1, 'C');
+	pdf_signature_block($pdf);
+
+	return $pdf;
+}
+
 function pdf_generate_form1c(array $f): TCPDF {
-	$pdf = pdf_base('OPT Plus Form 1C - Affected Children List', 'Landscape');
+	$pdf = pdf_base('OPT Plus Form 1C - Affected / At-Risk Children', 'Landscape');
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
-	$pdf->SetFont('helvetica', 'B', 11);
-	$pdf->Cell(0, 7, 'OPT PLUS FORM 1C: LIST OF AFFECTED / AT-RISK CHILDREN 0-59 MONTHS OLD', 0, 1, 'C');
-	$pdf->Ln(2);
+	$rows = admin_fetch_all(
+		"SELECT
+			c.first_name, c.middle_name, c.last_name, c.sex, c.birthdate,
+			la.area_name AS address, p.name AS parent_name,
+			lm.wfa_status, lm.hfa_status, lm.wfh_status,
+			TIMESTAMPDIFF(MONTH, c.birthdate, ?) AS age_months
+		 FROM children c
+		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN local_areas la ON la.id = c.local_area_id
+		 INNER JOIN measurements lm ON lm.id = (
+			SELECT m2.id FROM measurements m2
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
+		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
+		   AND (lm.wfa_status IN ('SUW','MUW') OR lm.hfa_status IN ('SSt','MSt') OR lm.wfh_status IN ('SW','MW','OW','Ob'))
+		 ORDER BY c.last_name ASC, c.first_name ASC, c.middle_name ASC",
+		'ss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
+		array_merge([$f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
+	);
+
+	$counts = ['MUW' => 0, 'SUW' => 0, 'MSt' => 0, 'SSt' => 0, 'MW/MAM' => 0, 'SW/SAM' => 0, 'OW' => 0, 'Ob' => 0, 'undernutrition' => 0, 'overweight' => 0];
+	foreach ($rows as $row) {
+		$wfaAffected = in_array($row['wfa_status'], ['MUW', 'SUW'], true);
+		$hfaAffected = in_array($row['hfa_status'], ['MSt', 'SSt'], true);
+		$wfhAffected = in_array($row['wfh_status'], ['MW', 'SW', 'OW', 'Ob'], true);
+		foreach ([['MUW', $row['wfa_status'] === 'MUW'], ['SUW', $row['wfa_status'] === 'SUW'], ['MSt', $row['hfa_status'] === 'MSt'], ['SSt', $row['hfa_status'] === 'SSt'], ['MW/MAM', $row['wfh_status'] === 'MW'], ['SW/SAM', $row['wfh_status'] === 'SW'], ['OW', $row['wfh_status'] === 'OW'], ['Ob', $row['wfh_status'] === 'Ob']] as [$key, $matches]) {
+			if ($matches) $counts[$key]++;
+		}
+		if ($wfaAffected || $hfaAffected || in_array($row['wfh_status'], ['MW', 'SW'], true)) $counts['undernutrition']++;
+		if (in_array($row['wfh_status'], ['OW', 'Ob'], true)) $counts['overweight']++;
+	}
+
+	$pdf->SetFont('helvetica', 'B', 10);
+	$pdf->Cell(0, 7, 'OPT PLUS FORM 1C: LIST OF AFFECTED / AT-RISK 0-59 MONTH-OLD CHILDREN', 0, 1, 'C');
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'Region III - Central Luzon | Province: Pampanga | Municipality/City: City of San Fernando', 0, 1, 'C');
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
-	$affectedCondition = "(lm.wfa_status IN ('SUW','MUW') OR lm.hfa_status IN ('SSt','MSt') OR lm.wfh_status IN ('SW','MW') OR lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))";
-	$rows = pdf_fetch_list($f, $affectedCondition, 0, 59);
+	$summary = 'Total affected/at-risk: ' . count($rows) . '    MUW: ' . $counts['MUW'] . '    SUW: ' . $counts['SUW'] . '    MSt: ' . $counts['MSt'] . '    SSt: ' . $counts['SSt'] . '    MW/MAM: ' . $counts['MW/MAM'] . '    SW/SAM: ' . $counts['SW/SAM'] . '    OW: ' . $counts['OW'] . '    Ob: ' . $counts['Ob'];
+	$pdf->SetFont('helvetica', 'B', 7);
+	$pdf->MultiCell(0, 6, $summary, 1, 'C', false, 1);
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->Cell(0, 5, 'Affected by undernutrition: ' . $counts['undernutrition'] . '    Overweight or obesity: ' . $counts['overweight'], 1, 1, 'C');
+	$pdf->Ln(2);
 
-	pdf_render_list_table($pdf, $rows, true);
+	$columns = ['Address / Purok / Local Area', 'Mother / Caregiver', 'Full Name of Child', 'Sex', 'Age in Months', 'WFA', 'HFA', 'WFL/H'];
+	$widths = [37, 36, 46, 13, 17, 29, 29, 30];
+	pdf_table_header($pdf, $columns, $widths);
+	foreach ($rows as $index => $row) {
+		if ($pdf->GetY() > 180) {
+			$pdf->AddPage();
+			pdf_table_header($pdf, $columns, $widths);
+		}
+		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
+		$wfa = $row['wfa_status'] === 'Refer to WFL/H' ? 'Use the WFL/H column' : (string)($row['wfa_status'] ?? 'Normal');
+		$hfa = (string)($row['hfa_status'] ?? 'Normal');
+		$wfh = (string)($row['wfh_status'] ?? 'Normal');
+		pdf_data_row($pdf, [(string)($row['address'] ?? ''), (string)($row['parent_name'] ?? ''), $fullName, (string)$row['sex'], (int)$row['age_months'], $wfa, $hfa, $wfh], $widths, $index % 2 === 0, ['L', 'L', 'L', 'C', 'C', 'C', 'C', 'C']);
+	}
+	pdf_signature_block($pdf);
 
 	return $pdf;
 }
@@ -422,7 +787,7 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 		'MSt_SSt' => ['title' => 'MONITORING LIST FOR MODERATELY OR SEVERELY STUNTED CHILDREN', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 		'OW_Ob' => ['title' => 'MONITORING LIST FOR OVERWEIGHT OR OBESE CHILDREN', 'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
 		'MUW' => ['title' => 'MONITORING LIST FOR MODERATELY UNDERWEIGHT CHILDREN', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status = 'MUW'", 'age_min' => 0, 'age_max' => 59],
-		'SUW_MSt_SSt' => ['title' => 'MONITORING LIST FOR SEVERELY UNDERWEIGHT + STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age', 'condition' => "(lm.wfa_status = 'SUW' AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
+		'MUW_SUW_MSt_SSt' => ['title' => 'MONITORING LIST FOR UNDERWEIGHT + STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age', 'condition' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt_MW_SW' => ['title' => 'MONITORING LIST FOR STUNTED + WASTED CHILDREN', 'axis' => 'Height-for-Age + Weight-for-Height', 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt_OW_Ob' => ['title' => 'MONITORING LIST FOR STUNTED + OVERWEIGHT/OBESE', 'axis' => 'Height-for-Age + Weight-for-Height', 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 	];

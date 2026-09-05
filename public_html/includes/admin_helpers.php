@@ -473,10 +473,11 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<img src="' . admin_e(app_url('/assets/img/logo/logo_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
     echo '<img src="' . admin_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
+    echo '<div class="admin-brand-text">';
+    echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
+    echo '<div class="admin-brand-sub">Admin console</div>';
     echo '</div>';
-    echo '<button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse title="Toggle sidebar">';
-    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
-    echo '</button>';
+    echo '</div>';
 
     echo '<nav class="admin-nav">';
     foreach (admin_grouped_nav_items() as $groupIndex => $group) {
@@ -559,7 +560,8 @@ function admin_layout_end(): void
     echo '</main>';
     echo '</div>';
     echo '</div>';
-    echo '<script src="' . admin_e(app_url('/assets/js/admin.js')) . '"></script>';
+    $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
+    echo '<script src="' . admin_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
     echo '</body>';
     echo '</html>';

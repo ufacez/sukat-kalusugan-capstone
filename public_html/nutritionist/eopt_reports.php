@@ -77,7 +77,7 @@ $listCodes = [
 	'MSt_SSt' => ['title' => 'List_MSt&SSt — Stunted', 'desc' => 'HFA below -2SD.', 'axis' => 'Height-for-Age', 'cond' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 	'OW_Ob' => ['title' => 'List_OW&Ob — Overweight/Obese', 'desc' => 'WFA OW or WFH OW/Ob.', 'axis' => 'WFA/WFH', 'cond' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
 	'MUW' => ['title' => 'List_MUW — Moderately Underweight', 'desc' => 'WFA status MUW.', 'axis' => 'Weight-for-Age', 'cond' => "lm.wfa_status = 'MUW'", 'age_min' => 0, 'age_max' => 59],
-	'SUW_MSt_SSt' => ['title' => 'List_SUW,MSt&SSt — Underweight+Stunted', 'desc' => 'SUW with MSt/SSt.', 'axis' => 'WFA + HFA', 'cond' => "(lm.wfa_status = 'SUW' AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
+	'MUW_SUW_MSt_SSt' => ['title' => 'List_MUW,SUW,MSt&SSt — Underweight+Stunted', 'desc' => 'MUW or SUW with MSt/SSt.', 'axis' => 'WFA + HFA', 'cond' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt_MW_SW' => ['title' => 'List_MSt,SSt,MW&SW — Stunted+Wasted', 'desc' => 'MSt/SSt with MW/SW.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt_OW_Ob' => ['title' => 'List_MSt,SSt,OW&Ob — Stunted+OW/Ob', 'desc' => 'MSt/SSt with OW/Ob.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 ];
@@ -179,7 +179,7 @@ foreach ($listCountRows as $cr) {
 	if (in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['MSt_SSt']++;
 	if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) $listCounts['OW_Ob']++;
 	if ($wfa === 'MUW') $listCounts['MUW']++;
-	if ($wfa === 'SUW' && in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['SUW_MSt_SSt']++;
+	if (in_array($wfa, ['MUW', 'SUW'], true) && in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['MUW_SUW_MSt_SSt']++;
 	if (in_array($hfa, ['MSt', 'SSt'], true) && in_array($wfh, ['MW', 'SW'], true)) $listCounts['MSt_SSt_MW_SW']++;
 	if (in_array($hfa, ['MSt', 'SSt'], true) && ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $listCounts['MSt_SSt_OW_Ob']++;
 }
@@ -209,7 +209,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-stat-label{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--admin-muted);margin-bottom:5px}
 .rp-stat-value{font-size:26px;font-weight:800;letter-spacing:-0.03em;color:var(--admin-text);line-height:1}
 .rp-stat-meta{font-size:11px;color:var(--admin-muted);margin-top:5px;font-weight:500}
-.rp-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.rp-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .rp-form-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:all 0.15s ease}
 .rp-form-card:hover{border-color:var(--admin-primary);box-shadow:0 4px 16px rgba(11,110,79,0.08)}
 .rp-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--admin-primary)}
@@ -253,7 +253,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-followup-pill .count{font-size:16px;font-weight:800}
 .rp-export-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rp-export-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px}
-@media(max-width:1200px){.rp-stat-grid{grid-template-columns:repeat(2,1fr)}.rp-form-grid{grid-template-columns:1fr}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}.rp-dqc-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:1200px){.rp-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}.rp-dqc-grid{grid-template-columns:repeat(2,1fr)}}
 @media(max-width:720px){.rp-stat-grid{grid-template-columns:1fr}.rp-monitor-grid{grid-template-columns:1fr}.rp-dqc-grid{grid-template-columns:1fr}.rp-chart-grid{grid-template-columns:1fr}}
 @media print{.nutritionist-sidebar,.nutritionist-topbar,.rp-filter-bar,.rp-tabs,.rp-form-actions,.rp-monitor-actions{display:none!important}.rp-panel{display:block!important}}
 </style>
@@ -376,9 +376,8 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				<div class="rp-form-desc">Master list of all measured children 0–59 months.</div>
 				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> records</span></div>
 				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e($tabUrl('monitoring')); ?>">View Lists</a>
 					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
 				</div>
 			</div>
 			<div class="rp-form-card">
@@ -386,9 +385,8 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				<div class="rp-form-desc">Consolidated nutritional status summary (WFA, HFA, WFH).</div>
 				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Summary</span></div>
 				<div class="rp-form-actions">
-					<a class="admin-btn-secondary" href="<?php echo nutritionist_e($tabUrl('analysis')); ?>">View</a>
 					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
 				</div>
 			</div>
 			<div class="rp-form-card">
@@ -397,7 +395,25 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span></div>
 				<div class="rp-form-actions">
 					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">PDF</a>
-					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+				</div>
+			</div>
+			<div class="rp-form-card">
+				<div class="rp-form-name">NutStatus</div>
+				<div class="rp-form-desc">Community-level child roster with sex, age, residence, and nutritional status details.</div>
+				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Summary</span></div>
+				<div class="rp-form-actions">
+					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus'])))); ?>">PDF</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+				</div>
+			</div>
+			<div class="rp-form-card">
+				<div class="rp-form-name">NutStatusBrgy</div>
+				<div class="rp-form-desc">Barangay-level sex-disaggregated nutritional status summary for presentations and monitoring.</div>
+				<div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 and 0–59 months</span></div>
+				<div class="rp-form-actions">
+					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
 				</div>
 			</div>
 		</div>
@@ -431,6 +447,17 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 					</div>
 				</div>
 			<?php endforeach; ?>
+		</div>
+		<div class="rp-section" style="margin-top:22px;">
+			<div class="rp-section-head"><div><div class="rp-section-title">Barangay Summary</div><div class="rp-section-sub">Sex-disaggregated NutStatusBrgy tables for 0–23 and 0–59 months.</div></div></div>
+			<div class="rp-form-card" style="max-width:520px;">
+				<div class="rp-form-name">NutStatusBrgy</div>
+				<div class="rp-form-desc">Automated WFA, HFA, and WFL/H summary with prevalence and caregiver totals.</div>
+				<div class="rp-form-actions">
+					<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a>
+					<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> Excel</a>
+				</div>
+			</div>
 		</div>
 	</div>
 </div>
@@ -639,6 +666,8 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook (.xlsx)</div>
 			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format.</div>
 			<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Download Excel Workbook</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatus Excel</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatusBrgy Excel</a>
 		</div>
 		<div class="rp-export-card">
 			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">Formal PDF Reports</div>
@@ -647,6 +676,8 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">Form 1A PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">Form 1B PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">Form 1C PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams))); ?>">NutStatus PDF</a>
+				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams))); ?>">NutStatusBrgy PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Summary PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query($filterParams))); ?>">Prevalence PDF</a>
 				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query($filterParams))); ?>">DQC PDF</a>

@@ -2,473 +2,213 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
-$user = nutritionist_require_access();
+start_secure_session();
+$actor = nutritionist_require_access();
 
-function nutritionist_calendar_redirect_params(): array
-{
-	$params = [];
-	$calMonth = $_SERVER['REQUEST_METHOD'] === 'POST'
-		? ($_POST['cal_month'] ?? '')
-		: ($_GET['cal_month'] ?? '');
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
+    nutritionist_require_write('settings.update');
+    $firstName = trim((string)($_POST['first_name'] ?? ''));
+    $lastName  = trim((string)($_POST['last_name'] ?? ''));
+    $name      = admin_combine_name($firstName, '', $lastName);
+    $email     = trim((string)($_POST['email'] ?? ''));
+    $phone     = trim((string)($_POST['phone'] ?? ''));
+    $address   = trim((string)($_POST['address'] ?? ''));
+    $oldPassword    = (string)($_POST['old_password'] ?? '');
+    $password       = (string)($_POST['password'] ?? '');
+    $passwordRepeat = (string)($_POST['password_repeat'] ?? '');
 
-	if ($calMonth !== '') {
-		$params['cal_month'] = (string)$calMonth;
-	}
+    if ($firstName === '' || !admin_is_valid_name_part($firstName, true)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid first name (letters only, at least 2 characters).', 'type' => 'error']);
+    }
+    if ($lastName === '' || !admin_is_valid_name_part($lastName, true)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid last name (letters only, at least 2 characters).', 'type' => 'error']);
+    }
+    if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+    }
+    if ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+    }
+    if ($address !== '' && strlen($address) > 255) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
+    }
 
-	return $params;
+    $current = admin_fetch_one('SELECT password_hash, email FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+
+    if ($current === null) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Your account could not be loaded.', 'type' => 'error']);
+    }
+
+    $wantsNewPassword = $password !== '' || $passwordRepeat !== '';
+    if ($wantsNewPassword) {
+        if ($oldPassword === '' || !password_verify($oldPassword, (string)$current['password_hash'])) {
+            admin_redirect('/nutritionist/settings.php', ['notice' => 'Old password is incorrect.', 'type' => 'error']);
+        }
+
+        if ($password === '' || $password !== $passwordRepeat) {
+            admin_redirect('/nutritionist/settings.php', ['notice' => 'New password and repeat do not match.', 'type' => 'error']);
+        }
+
+        if (strlen($password) < 8 || !preg_match('/[a-z]/', $password) || !preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[^A-Za-z0-9]/', $password)) {
+            admin_redirect('/nutritionist/settings.php', ['notice' => 'New password must be at least 8 characters and include upper, lower, number, and special characters.', 'type' => 'error']);
+        }
+    }
+
+    $sql    = 'UPDATE users SET name = ?, email = ?, phone = ?, address = ?';
+    $params = [$name, $email, $phone, $address !== '' ? $address : null];
+    $types  = 'ssss';
+
+    if ($wantsNewPassword) {
+        $sql .= ', password_hash = ?';
+        $params[] = password_hash($password, PASSWORD_DEFAULT);
+        $types .= 's';
+    }
+
+    $sql .= ' WHERE id = ?';
+    $params[] = (int)$actor['id'];
+    $types .= 'i';
+
+    $ok = admin_execute($sql, $types, $params);
+
+    if ($ok) {
+        $_SESSION['auth']['name']  = $name;
+        $_SESSION['auth']['email'] = $email;
+        $_SESSION['auth']['phone'] = $phone;
+        log_action((int)$actor['id'], 'UPDATE_OWN_ACCOUNT', 'info', 'Nutritionist updated their own account details');
+    }
+
+    admin_redirect('/nutritionist/settings.php', $ok
+        ? ['notice' => 'Account updated successfully.', 'type' => 'success']
+        : ['notice' => 'Account could not be updated. Check for a duplicate email.', 'type' => 'error']);
 }
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-	$formAction = (string)($_POST['action'] ?? 'update_profile');
-
-	if (in_array($formAction, ['create_event', 'update_event', 'delete_event'], true)) {
-		nutritionist_require_write('settings.update');
-	}
-
-	if ($formAction === 'update_profile') {
-		$name = trim((string)($_POST['name'] ?? ''));
-		$email = trim((string)($_POST['email'] ?? ''));
-		$phone = trim((string)($_POST['phone'] ?? ''));
-		$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
-		$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
-		$currentPassword = (string)($_POST['current_password'] ?? '');
-		$password = (string)($_POST['password'] ?? '');
-
-		if ($name === '' || $email === '') {
-			admin_redirect('/nutritionist/settings.php', ['notice' => 'Name and email are required.', 'type' => 'error']);
-		}
-
-		$current = admin_fetch_one('SELECT id, password_hash FROM users WHERE id = ? LIMIT 1', 'i', [(int)$user['id']]);
-
-		if ($current === null) {
-			admin_redirect('/nutritionist/settings.php', ['notice' => 'Profile could not be loaded.', 'type' => 'error']);
-		}
-
-		// Only setting a new password requires proving you know the current one —
-		// editing name/email/phone doesn't. This stops someone with a hijacked or
-		// left-open session from silently locking the real owner out.
-		if ($password !== '') {
-			if ($currentPassword === '' || !password_verify($currentPassword, (string)$current['password_hash'])) {
-				admin_redirect('/nutritionist/settings.php', ['notice' => 'Current password is incorrect.', 'type' => 'error']);
-			}
-		}
-
-		$params = [$name, $email, $phone, $barangayId, (int)$user['id']];
-		$sql = 'UPDATE users SET name = ?, email = ?, phone = ?, barangay_id = ?';
-		$types = 'sssii';
-
-		if ($password !== '') {
-			$sql .= ', password_hash = ?';
-			$types = 'sssisi';
-			$params = [$name, $email, $phone, $barangayId, password_hash($password, PASSWORD_DEFAULT), (int)$user['id']];
-		}
-
-		$sql .= ' WHERE id = ?';
-
-		$ok = admin_execute($sql, $types, $params);
-
-		if ($ok) {
-			$_SESSION['auth']['name'] = $name;
-			$_SESSION['auth']['email'] = $email;
-			$_SESSION['auth']['phone'] = $phone;
-			$_SESSION['auth']['barangay_id'] = $barangayId;
-			$barangayRow = $barangayId !== null ? admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayId]) : null;
-			$_SESSION['auth']['barangay'] = $barangayRow['name'] ?? null;
-		}
-
-		admin_redirect('/nutritionist/settings.php', $ok ? ['notice' => 'Profile updated successfully.'] : ['notice' => 'Profile could not be updated.', 'type' => 'error']);
-	}
-
-	$redirectParams = nutritionist_calendar_redirect_params();
-
-	if (in_array($formAction, ['create_event', 'update_event'], true)) {
-		$eventId = (int)($_POST['id'] ?? 0);
-		$eventType = (string)($_POST['event_type'] ?? '');
-		$title = trim((string)($_POST['title'] ?? ''));
-		$eventDate = trim((string)($_POST['event_date'] ?? ''));
-		$eventTime = trim((string)($_POST['event_time'] ?? ''));
-		$location = trim((string)($_POST['location'] ?? ''));
-		$notes = trim((string)($_POST['notes'] ?? ''));
-		$barangayId = $user['barangay_id'] ?? null;
-
-		if (!in_array($eventType, ['meeting', 'oplan_timbang'], true) || $title === '' || $eventDate === '') {
-			admin_redirect('/nutritionist/settings.php', $redirectParams + ['notice' => 'Event type, title, and date are required.', 'type' => 'error']);
-		}
-
-		$eventTimeValue = $eventTime !== '' ? $eventTime : null;
-		$locationValue = $location !== '' ? $location : null;
-		$notesValue = $notes !== '' ? $notes : null;
-
-		if ($formAction === 'create_event') {
-			$ok = admin_execute(
-				'INSERT INTO nutritionist_events (event_type, title, event_date, event_time, location, barangay_id, notes, nutritionist_id)
-				 VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-				'sssssisi',
-				[$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $barangayId, $notesValue, (int)$user['id']]
-			);
-
-			admin_redirect('/nutritionist/settings.php', $redirectParams + ($ok ? ['notice' => 'Event added to the calendar.'] : ['notice' => 'Event could not be added.', 'type' => 'error']));
-		}
-
-		if ($formAction === 'update_event' && $eventId > 0) {
-			$updateParams = [$eventType, $title, $eventDate, $eventTimeValue, $locationValue, $notesValue, $eventId];
-			$updateTypes = 'ssssssi';
-			$ownerClause = nutritionist_scope_fragment($user, 'barangay_id', $updateParams);
-			$updateTypes .= str_repeat('i', count($updateParams) - 7);
-
-			$ok = admin_execute(
-				"UPDATE nutritionist_events
-				 SET event_type = ?, title = ?, event_date = ?, event_time = ?, location = ?, notes = ?
-				 WHERE id = ? AND {$ownerClause}",
-				$updateTypes,
-				$updateParams
-			);
-
-			admin_redirect('/nutritionist/settings.php', $redirectParams + ($ok ? ['notice' => 'Event updated.'] : ['notice' => 'Event could not be updated.', 'type' => 'error']));
-		}
-
-		if ($formAction === 'update_event') {
-			admin_redirect('/nutritionist/settings.php', $redirectParams + ['notice' => 'Invalid event.', 'type' => 'error']);
-		}
-	}
-
-	if ($formAction === 'delete_event') {
-		$eventId = (int)($_POST['id'] ?? 0);
-
-		if ($eventId > 0) {
-			$deleteParams = [$eventId];
-			$ownerClause = nutritionist_scope_fragment($user, 'barangay_id', $deleteParams);
-			$deleteTypes = 'i' . str_repeat('i', count($deleteParams) - 1);
-
-			$ok = admin_execute("DELETE FROM nutritionist_events WHERE id = ? AND {$ownerClause}", $deleteTypes, $deleteParams);
-
-			admin_redirect('/nutritionist/settings.php', $redirectParams + ($ok ? ['notice' => 'Event removed.'] : ['notice' => 'Event could not be removed.', 'type' => 'error']));
-		}
-
-		admin_redirect('/nutritionist/settings.php', $redirectParams + ['notice' => 'Invalid event.', 'type' => 'error']);
-	}
-}
-
-$calMonthParam = (string)($_GET['cal_month'] ?? '');
-$calendarDate = DateTimeImmutable::createFromFormat('Y-m-d', $calMonthParam . '-01') ?: null;
-$today = new DateTimeImmutable('today');
-
-if ($calendarDate === false || $calendarDate === null || $calendarDate->format('Y-m') !== $calMonthParam) {
-	$calendarDate = $today->modify('first day of this month');
-	$calMonthParam = $calendarDate->format('Y-m');
+$myAccount = admin_fetch_one('SELECT name, email, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+$fullName = trim((string)($myAccount['name'] ?? ''));
+$nameParts = $fullName === '' ? ['', ''] : preg_split('/\s+/', $fullName);
+if (count($nameParts) === 1) {
+    $firstNameValue = $nameParts[0];
+    $lastNameValue  = '';
 } else {
-	$calendarDate = $calendarDate->modify('first day of this month');
+    $lastNameValue  = (string)array_pop($nameParts);
+    $firstNameValue = implode(' ', $nameParts);
 }
 
-$prevCalMonthLink = app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calendarDate->modify('-1 month')->format('Y-m')]) . '#calendar-management');
-$nextCalMonthLink = app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calendarDate->modify('+1 month')->format('Y-m')]) . '#calendar-management');
-$calMonthStart = $calendarDate->format('Y-m-d');
-$calMonthEnd = $calendarDate->modify('last day of this month')->format('Y-m-d');
-
-$calEventsParams = [$calMonthStart, $calMonthEnd];
-$calEventsScope = nutritionist_scope_fragment($user, 'ne.barangay_id', $calEventsParams);
-$calMonthEvents = admin_fetch_all(
-	"SELECT ne.id, ne.event_type, ne.title, ne.event_date, ne.event_time, ne.location, ne.notes, ne.nutritionist_id
-	 FROM nutritionist_events ne
-	 WHERE ne.event_date BETWEEN ? AND ? AND {$calEventsScope}
-	 ORDER BY ne.event_date ASC, ne.event_time ASC, ne.id ASC",
-	str_repeat('s', count($calEventsParams)),
-	$calEventsParams
-);
-
-$editingEventId = (int)($_GET['edit_event'] ?? 0);
-$editingEvent = null;
-
-if ($editingEventId > 0) {
-	$editingParams = [$editingEventId];
-	$editingScope = nutritionist_scope_fragment($user, 'ne.barangay_id', $editingParams);
-	$editingEvent = admin_fetch_one(
-		"SELECT ne.id, ne.event_type, ne.title, ne.event_date, ne.event_time, ne.location, ne.notes, ne.nutritionist_id
-		 FROM nutritionist_events ne
-		 WHERE ne.id = ? AND {$editingScope}
-		 LIMIT 1",
-		str_repeat('i', count($editingParams)),
-		$editingParams
-	);
-}
-
-$profile = admin_fetch_one(
-	'SELECT u.id, u.name, u.email, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
-	 FROM users u
-	 INNER JOIN roles r ON r.id = u.role_id
-	 LEFT JOIN barangays b ON b.id = u.barangay_id
-	 WHERE u.id = ?
-	 LIMIT 1',
-	'i',
-	[(int)$user['id']]
-);
-
-$barangays = admin_barangay_options();
+$avatarColor    = admin_avatar_color($fullName !== '' ? $fullName : ($actor['email'] ?? 'User'));
+$avatarInitials = $fullName !== '' ? admin_initials($fullName) : strtoupper(substr((string)($actor['email'] ?? 'U'), 0, 1));
+$storedAddress  = (string)($myAccount['address'] ?? '');
 
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
-
-nutritionist_layout_start('Settings', 'Manage your profile and account details.', 'settings', $actions);
+nutritionist_layout_start('Settings', 'Manage your account details.', 'settings', $actions);
 ?>
-<section class="admin-grid-cards">
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Account</div>
-				<div class="admin-card-value"><?php echo nutritionist_e(ucfirst((string)($profile['role_name'] ?? 'nutritionist'))); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend is-up">Signed-in staff profile</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-success">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Status</div>
-				<div class="admin-card-value"><?php echo nutritionist_e(ucfirst((string)($profile['status'] ?? 'active'))); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend is-up">Account access state</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Assigned Barangay</div>
-				<div class="admin-card-value"><?php echo nutritionist_e((string)($profile['barangay'] ?? 'All barangays')); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Scope for records and appointments</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Email</div>
-				<div class="admin-card-value"><?php echo nutritionist_e((string)($profile['email'] ?? '')); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Used for sign-in and alerts</span>
-				</div>
-			</div>
-		</div>
-	</article>
-</section>
+<form method="post" data-validate-form class="admin-settings-form">
+    <input type="hidden" name="update_account" value="1">
+    <div class="admin-flash is-error" data-validate-banner style="display:none;"></div>
 
-<section class="nutritionist-panel-grid is-balanced">
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Profile Information</div>
-		<form method="post" class="nutritionist-form-grid is-single">
-			<input type="hidden" name="action" value="update_profile">
-			<label class="admin-field">
-				<span>Full Name</span>
-				<input name="name" required value="<?php echo nutritionist_e((string)($profile['name'] ?? '')); ?>">
-			</label>
-			<label class="admin-field">
-				<span>Email Address</span>
-				<input type="email" name="email" required value="<?php echo nutritionist_e((string)($profile['email'] ?? '')); ?>">
-			</label>
-			<label class="admin-field">
-				<span>Phone Number</span>
-				<input name="phone" value="<?php echo nutritionist_e((string)($profile['phone'] ?? '')); ?>">
-			</label>
-			<label class="admin-field">
-				<span>Assigned Barangay</span>
-				<select name="barangay_id">
-					<option value="">-- All barangays --</option>
-					<?php foreach ($barangays as $barangay): ?>
-						<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($profile['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
-					<?php endforeach; ?>
-				</select>
-			</label>
-			<label class="admin-field">
-				<span>Current Password</span>
-				<input type="password" name="current_password" autocomplete="current-password" placeholder="Only needed if setting a new password below">
-			</label>
-			<label class="admin-field">
-				<span>New Password</span>
-				<input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
-			</label>
-			<div class="admin-field" style="align-content:end;">
-				<span>&nbsp;</span>
-				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save profile</button>
-			</div>
-		</form>
-	</article>
+    <div class="admin-settings-grid">
+        <section class="admin-section admin-settings-card">
+            <header class="admin-section-head">
+                <h2 class="admin-section-title">General Information</h2>
+            </header>
 
-	<article class="nutritionist-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Account Summary</div>
-		<div style="display:grid;gap:10px;">
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Role</span>
-				<strong><?php echo nutritionist_e(ucfirst((string)($profile['role_name'] ?? 'nutritionist'))); ?></strong>
-			</div>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Status</span>
-				<strong><?php echo nutritionist_e(ucfirst((string)($profile['status'] ?? 'active'))); ?></strong>
-			</div>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Staff ID</span>
-				<strong><?php echo (int)($profile['id'] ?? 0); ?></strong>
-			</div>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Security</span>
-				<strong>Use the shared login flow</strong>
-			</div>
-		</div>
-	</article>
-</section>
+            <div class="admin-settings-avatar">
+                <span class="admin-avatar admin-avatar--lg" style="background:<?php echo admin_e($avatarColor); ?>;">
+                    <?php echo admin_e($avatarInitials); ?>
+                </span>
+            </div>
 
-<section class="nutritionist-panel" id="calendar-management" style="margin-top:16px;">
-	<div class="nutritionist-toolbar" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;">Manage Calendar</h2>
-			<p class="admin-section-subtitle">Add, edit, or delete meetings and Oplan Timbang entries. The dashboard calendar is read-only.</p>
-		</div>
-		<div style="display:flex;align-items:center;gap:6px;">
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_left'); ?></a>
-			<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextCalMonthLink); ?>" style="min-height:24px;padding:0 8px;line-height:24px;"><?php echo admin_action_icon('chevron_right'); ?></a>
-		</div>
-	</div>
+            <h3 class="admin-settings-subhead">Basic Info</h3>
 
-	<?php
-	$calFirstWeekday = (int)$calendarDate->format('w');
-	$calDaysInMonth = (int)$calendarDate->format('t');
-	$calCells = array_merge(array_fill(0, $calFirstWeekday, null), range(1, $calDaysInMonth));
+            <div class="admin-form-grid">
+                <label class="admin-field">
+                    <span>First Name</span>
+                    <input id="account_first_name" name="first_name" required data-validate="name" data-label="First name" autocomplete="given-name" value="<?php echo admin_e($firstNameValue); ?>">
+                    <span class="admin-field-message"></span>
+                </label>
+                <label class="admin-field">
+                    <span>Last Name</span>
+                    <input id="account_last_name" name="last_name" required data-validate="name" data-label="Last name" autocomplete="family-name" value="<?php echo admin_e($lastNameValue); ?>">
+                    <span class="admin-field-message"></span>
+                </label>
 
-	while (count($calCells) % 7 !== 0) {
-		$calCells[] = null;
-	}
+                <label class="admin-field admin-field-wide">
+                    <span>Email</span>
+                    <input id="account_email" type="email" name="email" required data-validate="email" data-label="Email" autocomplete="email" value="<?php echo admin_e($myAccount['email'] ?? ''); ?>">
+                    <span class="admin-field-message"></span>
+                </label>
 
-	$calEntriesByDay = [];
+                <label class="admin-field">
+                    <span>Phone</span>
+                    <input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo admin_e($myAccount['phone'] ?? ''); ?>" placeholder="+1 (000) 000-0000">
+                    <span class="admin-field-message"></span>
+                </label>
+                <div class="admin-field admin-field-wide">
+                    <span>Address</span>
+                    <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="account_address">
+                        <label class="admin-field">
+                            <span>Province</span>
+                            <select data-psgc="province"><option value="">Loading provinces...</option></select>
+                        </label>
+                        <label class="admin-field">
+                            <span>City / Municipality</span>
+                            <select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
+                        </label>
+                        <label class="admin-field">
+                            <span>Barangay</span>
+                            <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
+                        </label>
+                    </div>
+                    <label class="admin-field" style="margin-top:10px;">
+                        <span>House no. / street</span>
+                        <input data-psgc="street" placeholder="143 Purok 6" value="">
+                    </label>
+                    <div class="admin-address-status" data-psgc-status></div>
+                    <label class="admin-field" style="margin-top:10px;">
+                        <span>Full address</span>
+                        <textarea id="account_address" name="address" maxlength="255" rows="2" placeholder="Auto-built from province / city / barangay / street"><?php echo admin_e($storedAddress); ?></textarea>
+                    </label>
+                </div>
+            </div>
+        </section>
 
-	foreach ($calMonthEvents as $eventRow) {
-		$eventDay = (int)(new DateTimeImmutable((string)$eventRow['event_date']))->format('j');
-		$calEntriesByDay[$eventDay][] = $eventRow['event_type'];
-	}
-	?>
-	<div class="nutritionist-calendar-grid" style="margin-bottom:4px;">
-		<?php foreach (['S', 'M', 'T', 'W', 'T', 'F', 'S'] as $dayLabel): ?>
-			<div style="text-align:center;font-size:10px;color:var(--admin-muted);padding:3px 0;font-weight:500;"><?php echo nutritionist_e($dayLabel); ?></div>
-		<?php endforeach; ?>
-	</div>
-	<div class="nutritionist-calendar-grid" style="margin-bottom:14px;">
-		<?php foreach ($calCells as $day): ?>
-			<?php if ($day === null): ?>
-				<div></div>
-			<?php else: ?>
-				<?php $isToday = $day === (int)$today->format('j') && $calendarDate->format('Y-m') === $today->format('Y-m'); ?>
-				<div class="nutritionist-calendar-day<?php echo $isToday ? ' is-today' : ''; ?>">
-					<div style="line-height:1;font-size:11px;font-weight:<?php echo $isToday ? 600 : 400; ?>;width:<?php echo $isToday ? 22 : 0; ?>px;height:<?php echo $isToday ? 22 : 0; ?>px;border-radius:<?php echo $isToday ? '50%' : '0'; ?>;display:flex;align-items:center;justify-content:center;<?php echo $isToday ? 'background:var(--admin-primary);color:#fff;' : 'color:var(--admin-text);'; ?>">
-						<?php echo (int)$day; ?>
-					</div>
-					<?php if (isset($calEntriesByDay[$day])): ?>
-						<div class="nutritionist-calendar-dots">
-							<?php foreach (array_slice($calEntriesByDay[$day], 0, 3) as $entryType): ?>
-								<div class="nutritionist-dot" style="background:<?php echo $isToday ? 'rgba(255,255,255,.8)' : nutritionist_e(nutritionist_calendar_color((string)$entryType)); ?>;"></div>
-							<?php endforeach; ?>
-						</div>
-					<?php endif; ?>
-				</div>
-			<?php endif; ?>
-		<?php endforeach; ?>
-	</div>
-	<div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;">
-		<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('meeting')); ?>"></span>Meeting</div>
-		<div class="nutritionist-legend-item"><span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color('oplan_timbang')); ?>"></span>Oplan Timbang</div>
-	</div>
+        <aside class="admin-section admin-settings-card admin-settings-card--narrow">
+            <header class="admin-section-head">
+                <h2 class="admin-section-title">Change password</h2>
+            </header>
 
-	<?php if ($calMonthEvents === []): ?>
-		<div class="admin-stat-note" style="margin-bottom:14px;">No meetings or Oplan Timbang sessions scheduled for <?php echo nutritionist_e($calendarDate->format('F Y')); ?> yet.</div>
-	<?php else: ?>
-		<div style="display:flex;flex-direction:column;gap:6px;margin-bottom:14px;">
-			<?php foreach ($calMonthEvents as $eventRow): ?>
-				<?php $eventDate = new DateTimeImmutable((string)$eventRow['event_date']); ?>
-				<div class="nutritionist-event-row" data-event-row="<?php echo (int)$eventRow['id']; ?>" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border:1px solid var(--admin-border);border-radius:8px;">
-					<div style="display:flex;align-items:center;gap:8px;min-width:0;">
-						<span class="nutritionist-dot" style="background:<?php echo nutritionist_e(nutritionist_calendar_color((string)$eventRow['event_type'])); ?>;flex-shrink:0;"></span>
-						<div style="min-width:0;">
-							<div style="font-weight:600;font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"><?php echo nutritionist_e((string)$eventRow['title']); ?></div>
-							<div class="admin-mini"><?php echo nutritionist_e(nutritionist_calendar_label((string)$eventRow['event_type'])); ?> · <?php echo nutritionist_e($eventDate->format('d M Y')); ?><?php echo $eventRow['event_time'] !== null ? ' · ' . nutritionist_e((new DateTimeImmutable('1970-01-01 ' . $eventRow['event_time']))->format('g:i A')) : ''; ?><?php echo $eventRow['location'] !== null && $eventRow['location'] !== '' ? ' · ' . nutritionist_e((string)$eventRow['location']) : ''; ?></div>
-						</div>
-					</div>
-					<div class="admin-actions">
-						<?php if (nutritionist_can_write('settings.update')): ?>
-						<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam, 'edit_event' => (int)$eventRow['id']]) . '#calendar-event-form')); ?>"><?php echo admin_action_icon('edit'); ?></a>
-						<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/settings.php')); ?>" onsubmit="return confirm('Remove this event?');" style="display:inline;">
-							<input type="hidden" name="action" value="delete_event">
-							<input type="hidden" name="id" value="<?php echo (int)$eventRow['id']; ?>">
-							<input type="hidden" name="cal_month" value="<?php echo nutritionist_e($calMonthParam); ?>">
-							<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-						</form>
-						<?php endif; ?>
-					</div>
-				</div>
-			<?php endforeach; ?>
-		</div>
-	<?php endif; ?>
+            <div class="admin-form-grid admin-form-grid--single">
+                <label class="admin-field">
+                    <span>Old password</span>
+                    <input id="account_old_password" type="password" name="old_password" autocomplete="current-password" placeholder="••••••••••">
+                    <span class="admin-field-message"></span>
+                </label>
+                <label class="admin-field">
+                    <span>New password</span>
+                    <input id="account_password" type="password" name="password" data-validate="password" data-label="New password" autocomplete="new-password" placeholder="Leave blank to keep current">
+                    <span class="admin-field-message"></span>
+                    <ul class="admin-pw-checklist" data-pw-checklist-for="account_password">
+                        <li data-pw-rule="length">At least 8 characters</li>
+                        <li data-pw-rule="upper">One uppercase letter</li>
+                        <li data-pw-rule="lower">One lowercase letter</li>
+                        <li data-pw-rule="number">One number</li>
+                        <li data-pw-rule="special">One special character</li>
+                    </ul>
+                    <div class="admin-pw-strength" data-pw-strength-for="account_password">
+                        <div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
+                        <div class="admin-pw-strength-label"></div>
+                    </div>
+                </label>
+                <label class="admin-field">
+                    <span>Repeat New password</span>
+                    <input id="account_password_repeat" type="password" name="password_repeat" data-validate="confirm-password" data-label="Repeat new password" data-match="account_password" autocomplete="new-password" placeholder="Confirm new password">
+                    <span class="admin-field-message"></span>
+                </label>
+            </div>
+        </aside>
+    </div>
 
-	<?php if (nutritionist_can_write('settings.update')): ?>
-	<?php if ($editingEvent !== null): ?>
-		<div class="admin-flash" style="margin-bottom:14px;background:#fff4df;color:#9a6510;border:1px solid #f0c675;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
-			<span>✏️ Editing <strong><?php echo nutritionist_e((string)$editingEvent['title']); ?></strong> — update the fields below, then click <strong>Update event</strong>.</span>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>"><?php echo admin_action_icon('cancel'); ?> Cancel edit</a>
-		</div>
-	<?php endif; ?>
-
-	<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/settings.php')); ?>" id="calendar-event-form" class="nutritionist-form-grid" style="<?php echo $editingEvent !== null ? 'border:2px solid var(--admin-primary);border-radius:12px;padding:14px;' : ''; ?>">
-		<input type="hidden" name="action" value="<?php echo $editingEvent !== null ? 'update_event' : 'create_event'; ?>">
-		<input type="hidden" name="id" value="<?php echo $editingEvent !== null ? (int)$editingEvent['id'] : ''; ?>">
-		<input type="hidden" name="cal_month" value="<?php echo nutritionist_e($calMonthParam); ?>">
-		<label class="admin-field">
-			<span>Event type</span>
-			<select name="event_type" required>
-				<option value="meeting" <?php echo ($editingEvent['event_type'] ?? '') === 'meeting' ? 'selected' : ''; ?>>Meeting</option>
-				<option value="oplan_timbang" <?php echo ($editingEvent['event_type'] ?? '') === 'oplan_timbang' ? 'selected' : ''; ?>>Oplan Timbang</option>
-			</select>
-		</label>
-		<label class="admin-field">
-			<span>Title</span>
-			<input name="title" required value="<?php echo nutritionist_e((string)($editingEvent['title'] ?? '')); ?>" placeholder="e.g. Barangay nutrition meeting">
-		</label>
-		<label class="admin-field">
-			<span>Date</span>
-			<input type="date" name="event_date" required value="<?php echo nutritionist_e((string)($editingEvent['event_date'] ?? '')); ?>">
-		</label>
-		<label class="admin-field">
-			<span>Time (optional)</span>
-			<input type="time" name="event_time" value="<?php echo nutritionist_e((string)substr((string)($editingEvent['event_time'] ?? ''), 0, 5)); ?>">
-		</label>
-		<label class="admin-field">
-			<span>Location (optional)</span>
-			<input name="location" value="<?php echo nutritionist_e((string)($editingEvent['location'] ?? '')); ?>" placeholder="e.g. Barangay hall">
-		</label>
-		<label class="admin-field">
-			<span>Notes (optional)</span>
-			<input name="notes" value="<?php echo nutritionist_e((string)($editingEvent['notes'] ?? '')); ?>">
-		</label>
-		<div class="admin-field" style="align-content:end;grid-column:1 / -1;display:flex;gap:8px;">
-			<button class="admin-btn" type="submit"><?php echo admin_action_icon('save') . ' ' . ($editingEvent !== null ? 'Update event' : 'Add to calendar'); ?></button>
-			<?php if ($editingEvent !== null): ?>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/settings.php?' . http_build_query(['cal_month' => $calMonthParam]) . '#calendar-management')); ?>"><?php echo admin_action_icon('cancel'); ?> Cancel edit</a>
-			<?php endif; ?>
-		</div>
-	</form>
-	<?php endif; ?>
-</section>
+    <div class="admin-settings-footer">
+        <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save All Changes</button>
+    </div>
+</form>
 <?php
 nutritionist_layout_end();

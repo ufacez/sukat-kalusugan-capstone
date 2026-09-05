@@ -389,16 +389,17 @@ $upcomingAppointments = array_values(array_filter(
 
 // WHO chart data — real computed from measurements for three axes
 $chartMonths = [];
-for ($offset = 7; $offset >= 0; $offset--) {
-	$month = $today->modify('-' . $offset . ' months');
+for ($offset = 5; $offset >= -6; $offset--) {
+	$month = $today->modify(($offset >= 0 ? '-' : '+') . abs($offset) . ' months');
 	$chartMonths[] = $month->format('M');
 }
 
 function buildChartData(array $measurements, string $statusField): array {
 	$months = [];
 	$today = new DateTimeImmutable('today');
-	for ($offset = 7; $offset >= 0; $offset--) {
-		$months[$today->modify('-' . $offset . ' months')->format('Y-m')] = 0;
+	for ($offset = 5; $offset >= -6; $offset--) {
+		$month = $today->modify(($offset >= 0 ? '-' : '+') . abs($offset) . ' months');
+		$months[$month->format('Y-m')] = 0;
 	}
 	// WFA gains a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2).
 	// HFA / WFL/H keep the three normal / moderate / severe series; the
@@ -524,7 +525,7 @@ if ($todayInCurrentMonth && isset($calendarEntries[(int)$today->format('j')])) {
 	}
 }
 $recentPage = max(1, (int)($_GET['rmp'] ?? 1));
-$recentPageSize = 5;
+$recentPageSize = 3;
 $recentTotal = count($measurements);
 $recentTotalPages = max(1, (int)ceil($recentTotal / $recentPageSize));
 if ($recentPage > $recentTotalPages) $recentPage = $recentTotalPages;
@@ -693,7 +694,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 		</div>
 
-		<div style="display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start;">
+		<div class="dashboard-who-grid">
 			<!-- Wave Chart -->
 			<div class="audit-chart-wrap">
 				<div class="audit-chart-header">
@@ -779,23 +780,20 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Obese</strong> <span class="stat-code">Ob</span></span></div>
 					<div class="stat-count" data-axis-count="wflh" data-axis-key="Ob"><?php echo (int)$axisPillCounts['wflh']['Ob']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['Ob'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
-			</div>
-		</div>
 
-		<!-- AI Insights — nested inside the WHO Growth Indicators panel -->
-		<div class="nutritionist-ai-insights-block" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--admin-border);">
-			<div class="nutritionist-toolbar" style="margin-bottom:8px;">
-				<h2 class="admin-section-title" style="margin:0;">AI Insights</h2>
+				<div class="nutritionist-ai-insights-block dashboard-ai-compact" id="ai-insights">
+					<div class="dashboard-ai-heading">
+						<span class="dashboard-ai-icon" aria-hidden="true"><?php echo admin_action_icon('lightbulb'); ?></span>
+						<span>AI Quick insights</span>
+					</div>
+					<ul class="nutritionist-ai-bullets">
+						<?php foreach (array_slice($aiBullets, 0, 2) as $bullet): ?>
+						<li class="nutritionist-ai-bullet"><?php echo $bullet; ?></li>
+						<?php endforeach; ?>
+					</ul>
+					<a class="dashboard-ai-link" href="#ai-insights">View AI insights →</a>
+				</div>
 			</div>
-			<ul class="nutritionist-ai-bullets" style="margin:0;padding:0;list-style:none;display:grid;gap:6px;">
-				<?php foreach ($aiBullets as $bullet): ?>
-				<li class="nutritionist-ai-bullet" style="background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:8px;padding:8px 10px 8px 12px;font-size:0.82rem;line-height:1.35;color:var(--admin-text);position:relative;">
-					<span style="position:absolute;top:8px;bottom:8px;left:0;width:3px;border-radius:3px;background:var(--admin-primary);opacity:0.65;"></span>
-					<?php echo $bullet; ?>
-				</li>
-				<?php endforeach; ?>
-			</ul>
-			<div class="nutritionist-ai-meta" style="margin-top:8px;font-size:0.72rem;color:var(--admin-muted);">AI-generated · Last updated <?php echo nutritionist_e($today->format('M d, H:i')); ?></div>
 		</div>
 	</article>
 
@@ -811,28 +809,26 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 		<?php
 		$todayStr = $today->format('Y-m-d');
-		$initIsoDay = $defaultCalendarDay ?? $todayStr;
+		$initIsoDay = $defaultCalendarDay ?? $calendarDate->format('Y-m-d');
 		$initDayNum = (int)(new DateTimeImmutable($initIsoDay))->format('j');
 		$initEntries = $calendarEntries[$initDayNum] ?? [];
+		$appointmentShown = false;
+		$initEntries = array_values(array_filter($initEntries, static function (array $entry) use (&$appointmentShown): bool {
+			if (($entry['type'] ?? '') !== 'appointment') return true;
+			if ($appointmentShown) return false;
+			$appointmentShown = true;
+			return true;
+		}));
 		$initEntries = array_slice($initEntries, 0, 3);
 		$initLabelDate = new DateTimeImmutable($initIsoDay);
 		$initLabel = $initLabelDate->format('l, F j, Y');
 		$isInitToday = $initIsoDay === $todayStr;
-		$scheduledCount = count($appointments) + count($monthEvents);
-		$hasAnyEntries = false;
-		foreach ($calendarEntries as $entries) {
-			if ($entries !== []) {
-				$hasAnyEntries = true;
-				break;
-			}
-		}
 		?>
 
 		<div class="sk-cal-wrap" data-sk-calendar data-sk-calendar-detail="dashboard-calendar-events" data-sk-calendar-default="<?php echo nutritionist_e($defaultCalendarDay ?? ''); ?>">
 			<?php echo nutritionist_render_calendar_grid($calendarDate, $calendarEntries, $today); ?>
 		</div>
 
-		<?php if ($hasAnyEntries): ?>
 		<div class="sk-cal-detail" id="dashboard-calendar-events" data-calendar-detail>
 			<div class="sk-cal-detail-head">
 				<div>
@@ -901,7 +897,6 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 			<a class="sk-cal-detail-link" data-calendar-detail-link href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?from=' . $initIsoDay . '&to=' . $initIsoDay)); ?>">View full calendar →</a>
 		</div>
-		<?php endif; ?>
 	</article>
 </section>
 
@@ -941,8 +936,8 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 							$bDate = (string)($b['measurement_date'] ?? '');
 							return strcmp($bDate, $aDate);
 						});
-						// Show every flagged child — no artificial cap.
-						$displayAtRisk = $sortedAtRisk;
+						// Keep the dashboard compact; the Children page contains the full list.
+						$displayAtRisk = array_slice($sortedAtRisk, 0, 3);
 						?>
 						<?php foreach ($displayAtRisk as $child): ?>
 						<div class="nutritionist-attention-row">
@@ -1337,7 +1332,8 @@ var chartDataEmbedded = {
 			months.forEach(function (m, i) {
 				var lbl = document.createElement('div');
 				lbl.className = 'audit-chart-x-label';
-				lbl.textContent = (i % 2 === 0 || i === months.length - 1) ? m : '';
+				var currentMonthIndex = Math.floor((months.length - 1) / 2);
+				lbl.textContent = (i % 2 === 0 || i === currentMonthIndex || i === months.length - 1) ? m : '';
 				xAxisEl.appendChild(lbl);
 			});
 		}

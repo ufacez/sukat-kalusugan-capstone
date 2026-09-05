@@ -136,10 +136,11 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<img src="' . parent_e(app_url('/assets/img/logo/logo_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
     echo '<img src="' . parent_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
+    echo '<div class="admin-brand-text">';
+    echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
+    echo '<div class="admin-brand-sub">Parent portal</div>';
     echo '</div>';
-    echo '<button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse title="Toggle sidebar">';
-    echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
-    echo '</button>';
+    echo '</div>';
 
     echo '<nav class="admin-nav">';
     foreach (parent_grouped_nav_items() as $groupIndex => $group) {

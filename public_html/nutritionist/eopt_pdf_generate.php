@@ -31,8 +31,18 @@ switch ($reportType) {
 		$filename = 'eopt-form1c-' . strtolower(str_replace(' ', '-', $f['period_label'])) . '-' . date('Y-m-d') . '.pdf';
 		break;
 
+	case 'nutstatus':
+		$pdf = pdf_generate_nutstatus($f);
+		$filename = 'nutstatus-' . strtolower(str_replace(' ', '-', $f['period_label'])) . '-' . date('Y-m-d') . '.pdf';
+		break;
+
+	case 'nutstatusbrgy':
+		$pdf = pdf_generate_nutstatusbrgy($f);
+		$filename = 'nutstatusbrgy-' . strtolower(str_replace(' ', '-', $f['period_label'])) . '-' . date('Y-m-d') . '.pdf';
+		break;
+
 	case 'list':
-		$validCodes = ['0-23', 'MUAC', 'MW', 'SW', 'MSt_SSt', 'OW_Ob', 'MUW', 'SUW_MSt_SSt', 'MSt_SSt_MW_SW', 'MSt_SSt_OW_Ob'];
+		$validCodes = ['0-23', 'MUAC', 'MW', 'SW', 'MSt_SSt', 'OW_Ob', 'MUW', 'MUW_SUW_MSt_SSt', 'MSt_SSt_MW_SW', 'MSt_SSt_OW_Ob'];
 		if (!in_array($listCode, $validCodes, true)) {
 			admin_redirect(app_url('/nutritionist/eopt_reports.php'), ['notice' => 'Invalid monitoring list code.', 'type' => 'error']);
 			exit;
