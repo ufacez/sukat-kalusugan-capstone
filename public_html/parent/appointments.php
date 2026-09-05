@@ -4,6 +4,28 @@ require_once __DIR__ . '/../includes/parent_helpers.php';
 
 $user = parent_require_access();
 
+$children = admin_fetch_all(
+	'SELECT id, first_name, last_name, child_code
+	 FROM children
+	 WHERE parent_id = ?
+	 ORDER BY last_name ASC, first_name ASC',
+	'i',
+	[(int)$user['id']]
+);
+
+$selectedChildId = (int)($_GET['child_id'] ?? 0);
+$selectedChild = null;
+foreach ($children as $child) {
+	if ((int)$child['id'] === $selectedChildId) {
+		$selectedChild = $child;
+		break;
+	}
+}
+if ($selectedChild === null && $children !== []) {
+	$selectedChild = $children[0];
+	$selectedChildId = (int)$selectedChild['id'];
+}
+
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$action = (string)($_POST['action'] ?? '');
 	$appointmentId = (int)($_POST['id'] ?? 0);
@@ -25,6 +47,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $appointments = admin_fetch_all(
 	'SELECT
 		a.id,
+		a.child_id,
 		a.scheduled_at,
 		a.status,
 		a.notes,
@@ -33,6 +56,7 @@ $appointments = admin_fetch_all(
 		c.first_name,
 		c.last_name,
 		c.child_code,
+		c.sex,
 		u.name AS nutritionist_name,
 		b.name AS nutritionist_barangay
 	 FROM appointments a
@@ -45,208 +69,261 @@ $appointments = admin_fetch_all(
 	[(int)$user['id']]
 );
 
-$pendingCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'pending'));
-$confirmedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'confirmed'));
-$completedCount = count(array_filter($appointments, static fn(array $appointment): bool => (string)$appointment['status'] === 'completed'));
+$now = new DateTimeImmutable();
+$upcoming = [];
+$past = [];
 
-$perPage = 5;
-$totalAppointments = count($appointments);
-$recentMode = !isset($_GET['page']);
-$totalPages = max(1, (int)ceil($totalAppointments / $perPage));
-$tablePage = max(1, (int)($_GET['page'] ?? 1));
-if ($tablePage > $totalPages) {
-	$tablePage = $totalPages;
+foreach ($appointments as $appt) {
+	$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
+	$isFuture = $dt > $now;
+	$status = (string)$appt['status'];
+	$isOpen = in_array($status, ['pending', 'confirmed'], true);
+
+	if ($isFuture && $isOpen) {
+		if ($selectedChildId === 0 || (int)$appt['child_id'] === $selectedChildId) $upcoming[] = $appt;
+	} else {
+		if ($selectedChildId === 0 || (int)$appt['child_id'] === $selectedChildId) $past[] = $appt;
+	}
 }
 
-if ($recentMode) {
-	$visibleAppointments = array_slice($appointments, 0, $perPage);
-	$tableStart = 0;
-	$tableEnd = count($visibleAppointments);
-} else {
-	$tableStart = ($tablePage - 1) * $perPage;
-	$tableEnd = min($tableStart + $perPage, $totalAppointments);
-	$visibleAppointments = array_slice($appointments, $tableStart, $perPage);
+usort($upcoming, static fn(array $a, array $b): int => strcmp((string)$a['scheduled_at'], (string)$b['scheduled_at']));
+usort($past, static fn(array $a, array $b): int => strcmp((string)$b['scheduled_at'], (string)$a['scheduled_at']));
+
+$nextAppointment = $upcoming[0] ?? null;
+
+$allJson = [];
+foreach ($appointments as $appt) {
+	$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
+	$allJson[(int)$appt['id']] = [
+		'id' => (int)$appt['id'],
+		'date' => $dt->format('F j, Y'),
+		'time' => $dt->format('g:i A'),
+		'type' => ucfirst((string)($appt['appointment_type'] ?? 'Regular')),
+		'child' => parent_e($appt['first_name'] . ' ' . $appt['last_name']),
+		'child_avatar' => strtoupper(substr((string)$appt['first_name'], 0, 1)),
+		'sex' => (string)$appt['sex'],
+		'location' => parent_e((string)($appt['location'] ?? 'Barangay Health Center')),
+		'nutritionist' => parent_e((string)($appt['nutritionist_name'] ?? 'Unassigned nutritionist')),
+		'barangay' => parent_e((string)($appt['nutritionist_barangay'] ?? '')),
+		'status' => ucfirst((string)$appt['status']),
+		'status_class' => parent_status_class((string)$appt['status']),
+		'notes' => parent_e((string)($appt['notes'] ?? '')),
+		'is_followup' => ($appt['appointment_type'] ?? 'regular') === 'followup',
+		'can_cancel' => ($appt['appointment_type'] ?? 'regular') !== 'followup'
+			&& !in_array((string)$appt['status'], ['completed', 'cancelled'], true),
+	];
 }
 
-$actions = '<a class="admin-btn" href="'
-	. parent_e(app_url('/parent/appointment_form.php'))
-	. '">' . admin_action_icon('calendar') . ' Request appointment</a>';
+$actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">Request appointment <span aria-hidden="true">&#8594;</span></a>';
 
-parent_layout_start('Appointments', 'Request follow-ups and manage your appointment schedule.', 'appointments', $actions);
+parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visits.', 'appointments', $actions);
 ?>
-<section class="admin-grid-cards">
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-danger">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Pending</div>
-				<div class="admin-card-value"><?php echo $pendingCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Waiting for nutritionist review</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-success">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Confirmed</div>
-				<div class="admin-card-value"><?php echo $confirmedCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Approved and scheduled</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-success">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Completed</div>
-				<div class="admin-card-value"><?php echo $completedCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Finished visits</span>
-				</div>
-			</div>
-		</div>
-	</article>
+
+<section class="parent-appointments-intro">
+	<button type="button" class="parent-appointment-child-card" data-appointment-child-open aria-haspopup="dialog" aria-controls="appointment-child-picker">
+		<span class="parent-child-avatar" aria-hidden="true"><?php echo $selectedChild !== null ? parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))) : '?'; ?></span>
+		<span class="parent-appointment-child-name"><?php echo $selectedChild !== null ? parent_e($selectedChild['first_name'] . ' ' . $selectedChild['last_name']) : 'All children'; ?></span>
+		<span class="parent-appointment-child-arrow" aria-hidden="true">&#9662;</span>
+	</button>
+	<div class="parent-appointment-tabs" role="tablist" aria-label="Appointment status">
+		<button type="button" class="is-active" data-appointment-tab="upcoming">Upcoming</button>
+		<button type="button" data-appointment-tab="past">Past</button>
+	</div>
 </section>
 
-<section class="parent-panel" style="margin-top:14px;">
-	<div class="parent-table-head" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;">Appointment Schedule</h2>
-			<p class="admin-section-subtitle"><?php echo $recentMode ? 'Showing the 5 most recent appointments.' : 'Recent appointment requests and their current status.'; ?></p>
+<div class="parent-child-picker" id="appointment-child-picker" role="dialog" aria-modal="true" aria-labelledby="appointment-child-picker-title" hidden>
+	<div class="parent-child-picker-backdrop" data-appointment-child-close></div>
+	<div class="parent-child-picker-sheet">
+		<div class="parent-child-picker-header"><div><h2 id="appointment-child-picker-title">Choose a child</h2><p>Show appointments for this child.</p></div><button type="button" class="parent-child-picker-close" data-appointment-child-close aria-label="Close child picker">&times;</button></div>
+		<div class="parent-child-picker-list">
+			<?php foreach ($children as $child): ?>
+				<a class="parent-child-option <?php echo (int)$child['id'] === $selectedChildId ? 'is-selected' : ''; ?>" href="<?php echo parent_e(app_url('/parent/appointments.php?child_id=' . (int)$child['id'])); ?>"><span class="parent-child-option-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span><span class="parent-child-option-copy"><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($child['child_code']); ?></small></span></a>
+			<?php endforeach; ?>
 		</div>
-		<input class="admin-search" data-admin-filter="#appointments-table" type="search" placeholder="Search appointments" style="min-width:250px;">
 	</div>
+</div>
 
-	<div class="parent-table-wrap">
-		<table class="parent-table" id="appointments-table" data-no-paginate>
-			<thead>
-				<tr>
-					<th style="width:140px;">Date &amp; time</th>
-					<th style="width:150px;">Child</th>
-					<th style="width:170px;">Nutritionist</th>
-					<th style="width:110px;">Status</th>
-					<th style="min-width:140px;">Notes</th>
-					<th style="width:110px;">Action</th>
-				</tr>
-			</thead>
-			<tbody>
-				<?php if ($visibleAppointments === []): ?>
-					<tr><td colspan="6" style="color:var(--admin-muted);">No appointments have been created yet.</td></tr>
-				<?php else: ?>
-					<?php foreach ($visibleAppointments as $appointment): ?>
-						<tr data-filter-text="<?php echo parent_e(strtolower($appointment['scheduled_at'] . ' ' . $appointment['first_name'] . ' ' . $appointment['last_name'] . ' ' . ($appointment['nutritionist_name'] ?? '') . ' ' . $appointment['status'])); ?>">
-							<td><?php echo parent_e((string)$appointment['scheduled_at']); ?></td>
-							<td>
-								<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e($appointment['first_name'] . ' ' . $appointment['last_name']); ?></div>
-								<div class="admin-mini"><?php echo parent_e((string)$appointment['child_code']); ?></div>
-							</td>
-						<td>
-							<div style="font-weight:700;color:var(--admin-text);"><?php echo parent_e((string)($appointment['nutritionist_name'] ?? 'Unassigned nutritionist')); ?></div>
-							<div class="admin-mini"><?php echo parent_e((string)($appointment['nutritionist_barangay'] ?? '')); ?></div>
-						</td>
-							<td><span class="admin-pill <?php echo parent_status_class((string)$appointment['status']); ?>"><?php echo parent_e(ucfirst((string)$appointment['status'])); ?></span></td>
-							<td style="color:var(--admin-muted);">
-								<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup'): ?>
-									<span class="admin-pill is-danger" style="margin-right:6px;">Auto follow-up · mandatory</span>
-								<?php endif; ?>
-								<?php echo parent_e((string)($appointment['notes'] ?? '')); ?>
-							</td>
-							<td>
-								<?php if (($appointment['appointment_type'] ?? 'regular') === 'followup' && !in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
-									<span class="admin-mini">Required re-measurement — cannot be cancelled</span>
-								<?php elseif (in_array((string)$appointment['status'], ['completed', 'cancelled'], true)): ?>
-									<span class="admin-mini">No action available</span>
-								<?php else: ?>
-									<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');" style="display:inline;">
-										<input type="hidden" name="action" value="cancel">
-										<input type="hidden" name="id" value="<?php echo (int)$appointment['id']; ?>">
-										<button class="admin-icon-btn admin-icon-btn-danger" title="Cancel" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-									</form>
-								<?php endif; ?>
-							</td>
-						</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</tbody>
-		</table>
+<div class="parent-appt-tab-panel is-active" data-appointment-panel="upcoming">
+<?php if ($nextAppointment !== null): ?>
+<?php
+	$dt = new DateTimeImmutable((string)$nextAppointment['scheduled_at']);
+	$statusClass = parent_status_class((string)$nextAppointment['status']);
+	$statusLabel = ucfirst((string)$nextAppointment['status']);
+?>
+<section class="parent-appt-upcoming" data-appointment-id="<?php echo (int)$nextAppointment['id']; ?>">
+	<div class="parent-appt-upcoming-body">
+		<div class="parent-appt-upcoming-label">Upcoming</div>
+		<div class="parent-appt-upcoming-date"><?php echo parent_e($dt->format('F j, Y')); ?></div>
+		<div class="parent-appt-upcoming-time"><?php echo parent_e($dt->format('g:i A')); ?></div>
+		<div class="parent-appt-upcoming-type"><?php echo parent_e(ucfirst((string)($nextAppointment['appointment_type'] ?? 'Regular'))); ?></div>
+		<div class="parent-appt-upcoming-child">
+			<?php echo parent_e($nextAppointment['first_name'] . ' ' . $nextAppointment['last_name']); ?>
+		</div>
+		<div class="parent-appt-upcoming-status">
+			<span class="admin-pill <?php echo $statusClass; ?>"><?php echo parent_e($statusLabel); ?></span>
+		</div>
 	</div>
+	<button type="button" class="admin-btn-secondary parent-appt-view-btn" data-appointment-id="<?php echo (int)$nextAppointment['id']; ?>">View Details</button>
+</section>
+<?php else: ?>
+	<div class="parent-appt-empty">No upcoming appointments yet.</div>
+<?php endif; ?>
+</div>
 
-	<?php if ($totalAppointments > $perPage): ?>
-		<div class="admin-table-pagination" style="margin-top:12px;">
-			<span class="admin-table-page-info">
-				<?php echo $recentMode
-					? 'Showing the 5 most recent of ' . $totalAppointments . ' appointments'
-					: 'Showing ' . ($tableStart + 1) . '–' . $tableEnd . ' of ' . $totalAppointments . ' appointments'; ?>
-			</span>
-			<div class="admin-table-pages">
-				<?php if ($recentMode): ?>
-					<a class="admin-table-page-btn" href="<?php echo parent_e(app_url('/parent/appointments.php?page=1')); ?>">View all</a>
-				<?php else: ?>
-					<?php
-					$linkFor = static function (int $p) use ($totalPages): string {
-						return app_url('/parent/appointments.php?page=' . max(1, min($p, $totalPages)));
-					};
-					?>
-					<button class="admin-table-page-btn" <?php echo $tablePage <= 1 ? 'disabled' : ''; ?> data-href="<?php echo parent_e($linkFor($tablePage - 1)); ?>">‹</button>
-					<?php
-					$pageNumbers = [];
-					if ($totalPages <= 7) {
-						$pageNumbers = range(1, $totalPages);
-					} else {
-						$pageNumbers = [1, 2, 3];
-						if ($tablePage > 4) {
-							$pageNumbers[] = '…';
-						}
-						if ($tablePage > 3 && $tablePage < $totalPages - 1) {
-							$pageNumbers[] = $tablePage;
-						}
-						if ($tablePage < $totalPages - 2) {
-							$pageNumbers[] = '…';
-						}
-						$pageNumbers[] = $totalPages - 1;
-						$pageNumbers[] = $totalPages;
-						$pageNumbers = array_values(array_unique($pageNumbers));
-					}
-					foreach ($pageNumbers as $pn):
-						if ($pn === '…'): ?>
-							<span class="admin-table-page-dots">…</span>
-						<?php else:
-							$cls = 'admin-table-page-btn' . ($pn === $tablePage ? ' is-active' : ''); ?>
-							<button class="<?php echo $cls; ?>" data-href="<?php echo parent_e($linkFor((int)$pn)); ?>"><?php echo (int)$pn; ?></button>
-						<?php endif;
-					endforeach; ?>
-					<button class="admin-table-page-btn" <?php echo $tablePage >= $totalPages ? 'disabled' : ''; ?> data-href="<?php echo parent_e($linkFor($tablePage + 1)); ?>">›</button>
-				<?php endif; ?>
+<div class="parent-appt-tab-panel" data-appointment-panel="past">
+<?php if (!empty($past)): ?>
+<div class="parent-appt-divider"><span>Past Appointments</span></div>
+
+<div class="parent-appt-list">
+	<?php foreach ($past as $appt):
+		$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
+		$statusClass = parent_status_class((string)$appt['status']);
+		$statusLabel = ucfirst((string)$appt['status']);
+		$isCompleted = (string)$appt['status'] === 'completed';
+	?>
+	<div class="parent-appt-row" data-appointment-id="<?php echo (int)$appt['id']; ?>">
+		<div class="parent-appt-row-icon <?php echo $isCompleted ? 'is-done' : ''; ?>">
+			<?php if ($isCompleted): ?>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+			<?php else: ?>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
+			<?php endif; ?>
+		</div>
+		<div class="parent-appt-row-info">
+			<div class="parent-appt-row-date"><?php echo parent_e($dt->format('F j, Y')); ?></div>
+			<div class="parent-appt-row-type"><?php echo parent_e(ucfirst((string)($appt['appointment_type'] ?? 'Regular'))); ?></div>
+			<div class="parent-appt-row-child"><?php echo parent_e($appt['first_name'] . ' ' . $appt['last_name']); ?></div>
+		</div>
+		<div class="parent-appt-row-status">
+			<span class="admin-pill <?php echo $statusClass; ?>"><?php echo parent_e($statusLabel); ?></span>
+		</div>
+	</div>
+	<?php endforeach; ?>
+</div>
+<?php else: ?>
+<div class="parent-appt-empty">No past appointments yet.</div>
+<?php endif; ?>
+</div>
+
+<div class="admin-modal-overlay" id="apptModal">
+	<div class="admin-modal" style="max-width:480px;">
+		<div class="admin-modal-head">
+			<h3>Appointment Details</h3>
+			<button class="admin-modal-close" id="apptModalClose" type="button">&times;</button>
+		</div>
+		<div class="appt-modal-body">
+			<div class="appt-modal-header">
+				<div class="appt-modal-date" id="modalDate"></div>
+				<div class="appt-modal-time" id="modalTime"></div>
+			</div>
+			<div class="appt-modal-type" id="modalType"></div>
+			<div class="appt-modal-rows">
+				<div class="appt-modal-row">
+					<span class="appt-modal-label">Child</span>
+					<span class="appt-modal-value" id="modalChild"></span>
+				</div>
+				<div class="appt-modal-row">
+					<span class="appt-modal-label">Location</span>
+					<span class="appt-modal-value" id="modalLocation"></span>
+				</div>
+				<div class="appt-modal-row">
+					<span class="appt-modal-label">Nutritionist</span>
+					<span class="appt-modal-value" id="modalNutritionist"></span>
+				</div>
+				<div class="appt-modal-row" id="modalBarangayRow">
+					<span class="appt-modal-label">Barangay</span>
+					<span class="appt-modal-value" id="modalBarangay"></span>
+				</div>
+				<div class="appt-modal-row">
+					<span class="appt-modal-label">Status</span>
+					<span class="appt-modal-value"><span class="admin-pill" id="modalStatus"></span></span>
+				</div>
+			</div>
+			<div class="appt-modal-notes" id="modalNotesSection">
+				<div class="appt-modal-notes-label">Appointment Notes</div>
+				<p class="appt-modal-notes-text" id="modalNotes"></p>
+			</div>
+			<div class="appt-modal-cancel" id="modalCancelSection">
+				<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');">
+					<input type="hidden" name="action" value="cancel">
+					<input type="hidden" name="id" id="modalCancelId">
+					<button class="admin-btn-secondary appt-modal-cancel-btn" type="submit">Cancel Appointment</button>
+				</form>
 			</div>
 		</div>
-	<?php endif; ?>
-</section>
+	</div>
+</div>
 
 <script>
 (function () {
-	document.querySelectorAll('.admin-table-pagination .admin-table-page-btn[data-href]').forEach(function (btn) {
-		btn.addEventListener('click', function (e) {
-			if (this.disabled) {
-				e.preventDefault();
-				return;
-			}
-			var href = this.getAttribute('data-href');
-			if (href) {
-				window.location.href = href;
-			}
+	var childPicker = document.getElementById('appointment-child-picker');
+	var childOpen = document.querySelector('[data-appointment-child-open]');
+	if (childPicker && childOpen) {
+		var closePicker = function () { childPicker.hidden = true; document.body.classList.remove('parent-picker-open'); childOpen.focus(); };
+		childOpen.addEventListener('click', function () { childPicker.hidden = false; document.body.classList.add('parent-picker-open'); });
+		childPicker.querySelectorAll('[data-appointment-child-close]').forEach(function (button) { button.addEventListener('click', closePicker); });
+		document.addEventListener('keydown', function (event) { if (!childPicker.hidden && event.key === 'Escape') closePicker(); });
+	}
+
+	var appointmentTabs = document.querySelectorAll('[data-appointment-tab]');
+	var appointmentPanels = document.querySelectorAll('[data-appointment-panel]');
+	appointmentTabs.forEach(function (tab) {
+		tab.addEventListener('click', function () {
+			var target = tab.getAttribute('data-appointment-tab');
+			appointmentTabs.forEach(function (item) { item.classList.toggle('is-active', item === tab); });
+			appointmentPanels.forEach(function (panel) { panel.classList.toggle('is-active', panel.getAttribute('data-appointment-panel') === target); });
 		});
 	});
+
+	var data = <?php echo json_encode($allJson); ?>;
+	var overlay = document.getElementById('apptModal');
+	var closeBtn = document.getElementById('apptModalClose');
+
+	function openModal(id) {
+		var a = data[id];
+		if (!a) return;
+		document.getElementById('modalDate').textContent = a.date;
+		document.getElementById('modalTime').textContent = a.time;
+		document.getElementById('modalType').textContent = a.type;
+		document.getElementById('modalChild').textContent = a.child;
+		document.getElementById('modalLocation').textContent = a.location;
+		document.getElementById('modalNutritionist').textContent = a.nutritionist;
+		var barangayRow = document.getElementById('modalBarangayRow');
+		var barangayEl = document.getElementById('modalBarangay');
+		if (a.barangay) { barangayRow.style.display = ''; barangayEl.textContent = a.barangay; }
+		else { barangayRow.style.display = 'none'; }
+		document.getElementById('modalStatus').textContent = a.status;
+		document.getElementById('modalStatus').className = 'admin-pill ' + a.status_class;
+		var notesSection = document.getElementById('modalNotesSection');
+		var notesEl = document.getElementById('modalNotes');
+		if (a.notes) { notesSection.style.display = ''; notesEl.textContent = a.notes; }
+		else { notesSection.style.display = 'none'; }
+		var cancelSection = document.getElementById('modalCancelSection');
+		if (a.can_cancel) {
+			cancelSection.style.display = '';
+			document.getElementById('modalCancelId').value = a.id;
+		} else {
+			cancelSection.style.display = 'none';
+		}
+		overlay.classList.add('is-open');
+		document.body.style.overflow = 'hidden';
+	}
+
+	function closeModal() {
+		overlay.classList.remove('is-open');
+		document.body.style.overflow = '';
+	}
+
+	document.querySelectorAll('[data-appointment-id]').forEach(function (el) {
+		el.addEventListener('click', function (e) {
+			if (e.target.closest('form') || e.target.closest('button[type="submit"]')) return;
+			openModal(parseInt(this.getAttribute('data-appointment-id'), 10));
+		});
+	});
+
+	if (closeBtn) closeBtn.addEventListener('click', closeModal);
+	if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) closeModal(); });
+	document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeModal(); });
 })();
 </script>
 

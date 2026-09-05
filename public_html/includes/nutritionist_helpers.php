@@ -53,6 +53,7 @@ function nutritionist_grouped_nav_items(): array
             'items' => [
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php'), 'icon' => 'calendar'],
                 ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php'), 'icon' => 'document'],
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];

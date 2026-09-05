@@ -1,3 +1,57 @@
+/* Greeting banner */
+.parent-page .parent-greeting {
+  padding: 20px 24px;
+  margin-bottom: 14px;
+}
+
+.parent-page .parent-greeting h2 {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  margin: 0 0 4px;
+}
+
+.parent-page .parent-greeting p {
+  font-size: 0.88rem;
+  color: var(--admin-muted);
+  margin: 0;
+}
+
+/* Keep every parent-page heading aligned with the dashboard greeting. */
+.parent-page .admin-pageheader,
+.parent-page .parent-greeting {
+  align-items: flex-start;
+  padding: 20px 10px;
+}
+
+.parent-page .admin-pageheader-left h1,
+.parent-page .parent-greeting h2 {
+  margin: 0 0 4px;
+  color: var(--admin-text);
+  font-size: 1.35rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.parent-page .admin-pageheader-left p,
+.parent-page .parent-greeting p {
+  margin: 0;
+  color: var(--admin-muted);
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+@media (max-width: 760px) {
+  .parent-page .admin-pageheader,
+  .parent-page .parent-greeting {
+    padding: 16px 10px;
+  }
+
+  .parent-page .admin-pageheader-actions {
+    margin-top: 10px;
+  }
+}
+
 /* Legacy stat grid — delegates to admin-card system */
 .parent-page .parent-stat-grid {
   display: grid;
@@ -19,12 +73,6 @@
   letter-spacing: 0.06em;
   color: var(--admin-muted);
   font-weight: 600;
-}
-
-.parent-page .parent-panel-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: 14px;
 }
 
 .parent-page .parent-panel,
@@ -163,24 +211,14 @@
   flex-wrap: wrap;
 }
 
-.parent-page .parent-card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px;
-}
-
 @media (max-width: 1100px) {
-  .parent-page .parent-stat-grid,
-  .parent-page .parent-panel-grid,
-  .parent-page .parent-card-grid {
+  .parent-page .parent-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 760px) {
   .parent-page .parent-stat-grid,
-  .parent-page .parent-panel-grid,
-  .parent-page .parent-card-grid,
   .parent-page .parent-form-grid {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -208,4 +246,1999 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Parent dashboard: keep the primary reading visible without a wide table. */
+.parent-page .parent-welcome {
+  margin: 2px 0 14px;
+  padding: 0 2px;
+}
+
+.parent-page .parent-welcome h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: clamp(1.35rem, 4vw, 1.8rem);
+  line-height: 1.15;
+}
+
+.parent-page .parent-welcome p {
+  margin: 5px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.88rem;
+}
+
+.parent-page .parent-welcome .parent-kicker {
+  margin: 0 0 2px;
+  color: var(--admin-primary);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-child-switcher,
+.parent-page .parent-assessment-panel,
+.parent-page .parent-growth-panel,
+.parent-page .parent-appointment-panel,
+.parent-page .parent-empty-state {
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(22, 90, 72, 0.07);
+}
+
+.parent-page .parent-child-switcher {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-child-avatar {
+  display: grid;
+  flex: 0 0 48px;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-child-switcher-copy {
+  min-width: 0;
+  flex: 1;
+}
+
+.parent-page .parent-child-switcher label,
+.parent-page .parent-icon-label {
+  display: block;
+  color: var(--admin-text);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  text-transform: uppercase;
+}
+
+.parent-page .parent-child-switcher select {
+  width: min(100%, 230px);
+  margin-top: 3px;
+  padding: 7px 28px 7px 10px;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-child-name-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.parent-page .parent-child-arrow {
+  color: var(--admin-primary);
+  font-size: 1.55rem;
+  line-height: 0.7;
+}
+
+.parent-page .parent-child-switcher p,
+.parent-page .parent-panel-heading p,
+.parent-page .parent-appointment-panel p {
+  margin: 3px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+
+.parent-page .parent-active-dot {
+  align-self: flex-start;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--admin-pill-success-bg);
+  color: var(--admin-primary);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-assessment-panel,
+.parent-page .parent-growth-panel,
+.parent-page .parent-appointment-panel {
+  margin-top: 12px;
+  padding: 15px;
+  background: var(--admin-surface);
+}
+
+.parent-page .parent-panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.parent-page .parent-panel-heading > a,
+.parent-page .parent-appointment-panel > a {
+  color: #087d63;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.parent-page .parent-calendar-mark {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-primary);
+  font-size: 1.3rem;
+  font-weight: 300;
+}
+
+.parent-page .parent-chart-tabs {
+  display: inline-flex;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-chart-tabs button {
+  border: 0;
+  border-radius: 7px;
+  padding: 7px 11px;
+  background: transparent;
+  color: var(--admin-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parent-page .parent-chart-tabs button.is-active {
+  background: var(--admin-surface);
+  color: var(--admin-primary);
+  box-shadow: 0 1px 4px rgba(15, 40, 30, 0.12);
+}
+
+.parent-page .parent-chart-tabs button span {
+  font-weight: 500;
+  opacity: 0.75;
+}
+
+.parent-page .parent-growth-chart {
+  display: none;
+  position: relative;
+  margin-top: 15px;
+  padding: 8px 0 0;
+}
+
+.parent-page .parent-growth-chart.is-visible { display: block; }
+
+.parent-page .parent-growth-chart svg {
+  display: block;
+  width: 100%;
+  height: 160px;
+  overflow: visible;
+}
+
+.parent-page .parent-chart-gridline {
+  fill: none;
+  stroke: var(--admin-border);
+  stroke-dasharray: 3 5;
+  stroke-width: 1;
+  opacity: 0.65;
+}
+
+.parent-page .parent-chart-line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3;
+}
+
+.parent-page .parent-chart-line.is-weight,
+.parent-page .parent-chart-dot.is-weight { stroke: var(--admin-primary); fill: var(--admin-primary); }
+.parent-page .parent-chart-line.is-height { stroke: #2196dc; }
+.parent-page .parent-chart-dot.is-height { stroke: #2196dc; fill: #2196dc; }
+.parent-page .parent-chart-dot { stroke: var(--admin-surface); stroke-width: 2; }
+
+.parent-page .parent-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 4px 27px 0;
+  color: var(--admin-muted);
+  font-size: 0.66rem;
+}
+
+.parent-page .parent-appointment-panel {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-appointment-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  font-size: 1.25rem;
+}
+
+.parent-page .parent-appointment-panel strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--admin-text);
+  font-size: 0.82rem;
+}
+
+.parent-page .parent-empty-state {
+  padding: 22px;
+  background: var(--admin-surface);
+}
+
+.parent-page.parent-dashboard .admin-pageheader {
+  display: none;
+}
+
+.parent-page .parent-empty-state h2 { margin: 0; font-size: 1.05rem; }
+.parent-page .parent-empty-state p { color: var(--admin-muted); font-size: 0.84rem; }
+.parent-page .parent-empty-chart { margin-top: 15px; color: var(--admin-muted); font-size: 0.8rem; }
+
+@media (max-width: 520px) {
+  .parent-page .parent-appointment-panel { grid-template-columns: auto 1fr; }
+  .parent-page .parent-appointment-panel > a { grid-column: 2; }
+}
+
+/* ---------------------------------------------------------------------------
+ * Modern wave-UI parent dashboard
+ * Mirrors the audit_logs / nutritionist dashboard pattern: light stat cards,
+ * two-column hero (latest assessment + follow-up), and a Catmull-Rom wave
+ * growth chart with hover tooltip. All colors come from the existing
+ * system design tokens (--admin-primary, --admin-danger, --admin-valid,
+ * --admin-accent, etc.) so the parent portal matches the rest of the app.
+ * ------------------------------------------------------------------------- */
+.parent-page .parent-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.parent-page .parent-stat-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 18px 20px;
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.15s ease;
+}
+
+.parent-page .parent-stat-card:hover {
+  transform: translateY(-1px);
+  border-color: rgba(11, 110, 79, 0.2);
+  box-shadow: 0 4px 16px rgba(11, 110, 79, 0.06);
+}
+
+.parent-page .parent-stat-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.parent-page .parent-stat-icon-wrap {
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.parent-page .parent-stat-icon-wrap.is-primary {
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+}
+.parent-page .parent-stat-icon-wrap.is-accent {
+  background: var(--admin-pill-warn-bg);
+  color: var(--admin-pill-warn-text);
+}
+.parent-page .parent-stat-icon-wrap.is-danger {
+  background: var(--admin-pill-danger-bg);
+  color: var(--admin-danger);
+}
+.parent-page .parent-stat-icon-wrap.is-valid {
+  background: var(--admin-pill-success-bg);
+  color: var(--admin-valid);
+}
+.parent-page .parent-stat-icon-wrap svg {
+  width: 22px;
+  height: 22px;
+  stroke-width: 1.5;
+}
+
+.parent-page .parent-stat-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--admin-muted);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.parent-page .parent-stat-value {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.parent-page .parent-stat-meta {
+  margin-top: 6px;
+  font-size: 0.73rem;
+  color: var(--admin-muted);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.parent-page .parent-stat-meta .highlight { color: var(--admin-text); font-weight: 600; }
+.parent-page .parent-stat-meta.is-danger .highlight { color: var(--admin-danger); }
+
+@media (max-width: 760px) {
+  .parent-page .parent-stat-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Section eyebrow label used on the hero cards. */
+.parent-page .parent-panel-eyebrow {
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 800;
+  margin-bottom: 4px;
+  color: var(--admin-primary);
+}
+
+.parent-page .parent-panel-sub {
+  margin: 2px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.parent-page .parent-panel-sub strong {
+  color: var(--admin-text);
+}
+
+/* ------------------------------------------------------------------
+ * Child card grid — simple clickable cards for children list
+ * ------------------------------------------------------------------ */
+.parent-page .parent-child-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.parent-page .parent-child-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 116px;
+  padding: 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
+}
+.parent-page .parent-child-card:hover {
+  border-color: var(--admin-primary);
+  box-shadow: 0 8px 22px rgba(11, 110, 79, 0.12);
+  transform: translateY(-1px);
+}
+.parent-page .parent-child-card:focus-visible {
+  outline: 3px solid var(--admin-primary-soft);
+  outline-offset: 3px;
+  border-color: var(--admin-primary);
+}
+
+.parent-page .parent-child-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.parent-page .parent-child-card-info {
+  min-width: 0;
+}
+.parent-page .parent-child-card-name {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--admin-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.parent-page .parent-child-card-sub {
+  font-size: 0.72rem;
+  color: var(--admin-muted);
+}
+
+.parent-page .parent-child-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--admin-border);
+}
+.parent-page .parent-child-card-reading {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--admin-text);
+}
+
+.parent-page #childModal {
+  display: none;
+  background: rgba(5, 24, 16, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.parent-page #apptModal {
+  display: none;
+  background: rgba(5, 24, 16, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.parent-page #apptModal.is-open { display: flex; }
+
+.parent-page #apptModal .admin-modal {
+  max-width: 480px;
+  max-height: min(720px, calc(100vh - 32px));
+  border-radius: 18px;
+}
+
+@media (max-width: 520px) {
+  .parent-page #apptModal { padding: 16px; }
+  .parent-page #apptModal .admin-modal { max-height: 82vh; border-radius: 16px; }
+}
+
+.parent-page #childModal.is-open {
+  display: flex;
+}
+
+.parent-page #allMeasurementsModal {
+  display: none;
+  background: rgba(5, 24, 16, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.parent-page #allMeasurementsModal.is-open {
+  display: flex;
+}
+
+.parent-page #allMeasurementsModal .admin-modal {
+  max-width: 600px;
+  max-height: min(720px, calc(100vh - 32px));
+  border-radius: 18px;
+}
+
+.parent-page #childModal .admin-modal {
+  max-width: 500px;
+  max-height: min(720px, calc(100vh - 32px));
+  border-radius: 18px;
+}
+
+.parent-page #childModal .admin-modal-head {
+  padding: 16px 18px;
+}
+
+.parent-page #childModal .admin-modal-close {
+  width: 34px;
+  height: 34px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page #childModal .admin-modal-head #modalStatus {
+  margin-left: auto;
+  margin-right: 8px;
+  padding: 4px 8px;
+  font-size: 0.66rem;
+}
+
+.parent-page .parent-child-modal-body {
+  padding: 0 20px;
+}
+
+.parent-page .parent-child-modal-tabs {
+  display: flex;
+  gap: 3px;
+  padding: 8px 20px 0;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+}
+
+.parent-page .parent-child-modal-tabs button {
+  flex: 1;
+  padding: 9px 8px 10px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--admin-muted);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.parent-page .parent-child-modal-tabs button.is-active {
+  border-bottom-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+
+.parent-page .parent-modal-panel { display: none; }
+.parent-page .parent-modal-panel.is-active { display: block; }
+
+.parent-page .parent-modal-section {
+  padding: 15px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.parent-page .parent-modal-section h4 {
+  margin: 0 0 10px;
+  color: var(--admin-primary);
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.parent-page .parent-modal-details {
+  display: grid;
+  gap: 8px;
+}
+
+.parent-page .parent-modal-details > div,
+.parent-page .parent-modal-history-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+  align-items: center;
+  gap: 10px;
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+
+.parent-page .parent-modal-details strong {
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.parent-page .parent-growth-pill-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.parent-page .parent-growth-pill-grid > div {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-growth-pill-grid .modal-growth-pill {
+  max-width: none;
+  width: fit-content;
+  text-align: left;
+}
+
+.parent-page .parent-modal-section-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.parent-page .parent-modal-section-heading > span {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+}
+
+.parent-page .parent-modal-history {
+  display: grid;
+  gap: 8px;
+}
+
+.parent-page .parent-modal-history-row {
+  grid-template-columns: 1fr auto auto auto;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.7rem;
+}
+
+.parent-page .parent-modal-history-row strong {
+  color: var(--admin-text);
+  font-size: 0.7rem;
+}
+
+.parent-page .parent-modal-history-row .admin-pill {
+  padding: 3px 6px;
+  font-size: 0.62rem;
+}
+
+.parent-page .parent-modal-history-empty {
+  color: var(--admin-muted);
+  font-size: 0.76rem;
+}
+
+.parent-page .parent-child-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--admin-border);
+}
+
+@media (max-width: 520px) {
+  .parent-page .parent-child-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .parent-page .parent-child-card {
+    min-height: 104px;
+  }
+
+  .parent-page #childModal {
+    align-items: center;
+    padding: 16px;
+  }
+
+  .parent-page #allMeasurementsModal {
+    padding: 16px;
+  }
+
+  .parent-page #allMeasurementsModal .admin-modal {
+    max-height: 76vh;
+    border-radius: 16px;
+  }
+
+  .parent-page #childModal .admin-modal {
+    max-height: 76vh;
+    border-radius: 16px;
+  }
+
+  .parent-page #childModal .admin-modal-head {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--admin-surface);
+  }
+
+  .parent-page #childModal .admin-modal > div[style*="padding:16px"] {
+    padding: 12px 16px !important;
+  }
+
+  .parent-page #childModal .admin-modal > div[style*="padding:12px"] {
+    padding: 10px 16px !important;
+  }
+
+  .parent-page .parent-child-modal-body { padding: 0 16px; }
+  .parent-page .parent-child-modal-tabs { padding: 6px 16px 0; }
+  .parent-page .parent-growth-pill-grid { grid-template-columns: 1fr; }
+  .parent-page .parent-modal-history-row { grid-template-columns: 1fr auto; }
+  .parent-page .parent-modal-history-row .admin-pill { grid-column: 2; grid-row: 1 / span 2; }
+  .parent-page .parent-child-modal-actions { padding: 10px 16px; }
+}
+
+.parent-page .modal-growth-pill {
+  max-width: 62%;
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  line-height: 1.15;
+  text-align: right;
+}
+.parent-page .parent-child-card-reading--empty {
+  color: var(--admin-muted);
+  font-weight: 400;
+}
+
+/* ------------------------------------------------------------------
+ * Growth Overview — weight/height summary + change deltas
+ * ------------------------------------------------------------------ */
+.parent-page .parent-growth-overview {
+  gap: 14px;
+  margin-top: 14px;
+  padding: 18px;
+}
+.parent-page .parent-growth-values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 2px;
+  padding: 15px 14px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+}
+.parent-page .parent-growth-val {
+  flex: 1;
+  text-align: center;
+}
+.parent-page .parent-growth-val-label {
+  margin-bottom: 5px;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.parent-page .parent-growth-val-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1;
+}
+.parent-page .parent-growth-val-num small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+}
+.parent-page .parent-growth-change {
+  margin-top: 4px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.parent-page .parent-growth-change.is-up { color: var(--admin-primary); }
+.parent-page .parent-growth-change.is-down { color: var(--admin-danger, #ef4444); }
+.parent-page .parent-growth-divider {
+  width: 1px;
+  height: 32px;
+  background: var(--admin-border);
+  flex-shrink: 0;
+}
+.parent-page .parent-growth-last {
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+  margin: 0;
+  padding: 2px 2px 0;
+  margin-top: 10px;
+  line-height: 1.25;
+  text-align: center;
+}
+.parent-page .parent-growth-last strong {
+  color: var(--admin-text);
+}
+
+/* ------------------------------------------------------------------
+ * Recent Measurements — compact list inside a panel
+ * ------------------------------------------------------------------ */
+.parent-page .parent-recent-panel {
+  gap: 10px;
+  margin-top: 14px;
+  padding: 18px;
+}
+.parent-page .parent-recent-list {
+  display: grid;
+  gap: 0;
+}
+.parent-page .parent-recent-row {
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto auto auto;
+  gap: 8px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--admin-border);
+  font-size: 0.82rem;
+  color: var(--admin-text);
+}
+.parent-page .parent-recent-row:last-child {
+  border-bottom: none;
+}
+.parent-page .parent-recent-date {
+  font-weight: 700;
+}
+.parent-page .parent-recent-weight,
+.parent-page .parent-recent-height {
+  text-align: right;
+  font-weight: 600;
+}
+.parent-page .parent-recent-status {
+  justify-self: end;
+  padding: 3px 7px;
+  font-size: 0.64rem;
+}
+
+.parent-page #viewAllBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-primary);
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.parent-page #viewAllBtn:hover,
+.parent-page #viewAllBtn:focus-visible {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+  outline: none;
+}
+
+@media (max-width: 520px) {
+  .parent-page .parent-recent-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .parent-page .parent-recent-weight,
+  .parent-page .parent-recent-height,
+  .parent-page .parent-recent-status {
+    grid-row: 2;
+  }
+
+  .parent-page .parent-recent-height { grid-column: 2; }
+  .parent-page .parent-recent-status { grid-column: 1; justify-self: start; }
+}
+
+/* ------------------------------------------------------------------
+ * Latest Update — simple status message
+ * ------------------------------------------------------------------ */
+.parent-page .parent-latest-update {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  font-size: 0.84rem;
+  color: var(--admin-muted);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+}
+.parent-page .parent-latest-icon {
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.parent-page .parent-latest-update strong {
+  color: var(--admin-text);
+}
+
+/* ------------------------------------------------------------------
+ * Appointments — upcoming card, past rows, divider
+ * ------------------------------------------------------------------ */
+.parent-page .parent-appt-upcoming {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.04);
+}
+.parent-page .parent-appt-upcoming-icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--admin-primary);
+  color: #fff;
+  flex-shrink: 0;
+}
+.parent-page .parent-appt-upcoming-body {
+  flex: 1;
+  min-width: 0;
+}
+.parent-page .parent-appt-upcoming-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--admin-primary);
+  margin-bottom: 4px;
+}
+.parent-page .parent-appt-upcoming-date {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1.2;
+}
+.parent-page .parent-appt-upcoming-time {
+  font-size: 0.85rem;
+  color: var(--admin-muted);
+  margin-top: 2px;
+}
+.parent-page .parent-appt-upcoming-type {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  margin-top: 10px;
+}
+.parent-page .parent-appt-upcoming-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--admin-text);
+  margin-top: 6px;
+}
+
+.parent-page .parent-appt-modal-child-row {
+  align-items: center;
+  padding: 10px 12px !important;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-appt-modal-child {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 9px;
+  min-width: 0;
+}
+
+.parent-page #apptModal .parent-appt-modal-child .parent-child-avatar {
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  font-size: 0.82rem;
+}
+
+.parent-page .parent-appt-modal-child strong {
+  overflow: hidden;
+  color: var(--admin-text);
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.parent-page .parent-appt-upcoming-status {
+  margin-top: 8px;
+}
+.parent-page .parent-appt-view-btn {
+  align-self: center;
+  flex-shrink: 0;
+}
+
+/* Divider: Past Appointments */
+.parent-page .parent-appt-divider {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 20px 0 14px;
+  color: var(--admin-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.parent-page .parent-appt-divider::before,
+.parent-page .parent-appt-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--admin-border);
+}
+
+/* Past appointment rows */
+.parent-page .parent-appt-list {
+  display: grid;
+  gap: 8px;
+}
+.parent-page .parent-appt-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.parent-page .parent-appt-row:hover {
+  border-color: var(--admin-primary);
+}
+.parent-page .parent-appt-row-icon {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  flex-shrink: 0;
+}
+.parent-page .parent-appt-row-icon.is-done {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.parent-page .parent-appt-row-info {
+  flex: 1;
+  min-width: 0;
+}
+.parent-page .parent-appt-row-date {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--admin-text);
+}
+.parent-page .parent-appt-row-type {
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+}
+.parent-page .parent-appt-row-child {
+  font-size: 0.78rem;
+  color: var(--admin-muted);
+}
+.parent-page .parent-appt-row-status {
+  flex-shrink: 0;
+}
+
+.parent-page .parent-appt-empty {
+  text-align: center;
+  padding: 24px;
+  color: var(--admin-muted);
+  font-size: 0.85rem;
+}
+
+.parent-page .parent-appointment-child-picker {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.parent-page .parent-appointment-child-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--admin-border);
+  border-radius: 11px;
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parent-page .parent-appointment-child-option:hover,
+.parent-page .parent-appointment-child-option.is-selected {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+}
+
+.parent-page .parent-appointment-child-option > span:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.parent-page .parent-appointment-child-option strong,
+.parent-page .parent-appointment-child-option small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parent-page .parent-appointment-child-option strong { font-size: 0.76rem; }
+.parent-page .parent-appointment-child-option small { color: var(--admin-muted); font-size: 0.66rem; }
+
+@media (max-width: 520px) {
+  .parent-page .parent-appointment-child-picker { grid-template-columns: 1fr; }
+  .parent-page .parent-appt-upcoming { flex-wrap: wrap; padding: 14px; gap: 11px; }
+  .parent-page .parent-appt-view-btn { width: 100%; }
+  .parent-page .parent-appt-row { align-items: flex-start; padding: 12px; }
+  .parent-page .parent-appt-row-status { margin-left: auto; }
+}
+
+@media (max-width: 760px) {
+  .parent-page .admin-topbar-left {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .parent-page .admin-topbar-right { max-width: 132px; }
+
+  .parent-page .admin-breadcrumb.is-long {
+    min-width: 0;
+    flex: 1 1 auto;
+    flex-wrap: nowrap;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+
+  .parent-page .admin-breadcrumb.is-long .admin-breadcrumb-group,
+  .parent-page .admin-breadcrumb.is-long .admin-breadcrumb-page {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .parent-page .admin-breadcrumb.is-long .admin-breadcrumb-group {
+    max-width: 78px;
+  }
+
+  .parent-page .admin-breadcrumb.is-long .admin-breadcrumb-page.is-active {
+    max-width: 112px;
+  }
+}
+
+.parent-page .parent-appointments-intro {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 14px;
+  padding: 4px 2px;
+}
+
+.parent-page .parent-appointment-child-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  box-shadow: 0 4px 12px rgba(11, 110, 79, 0.06);
+  color: var(--admin-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parent-page .parent-appointment-child-card .parent-child-avatar {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  font-size: 0.8rem;
+}
+
+.parent-page .parent-appointment-child-card:hover,
+.parent-page .parent-appointment-child-card:focus-visible {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+  outline: none;
+}
+
+.parent-page .parent-appointment-child-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parent-page .parent-appointment-child-arrow {
+  color: var(--admin-primary);
+  font-size: 0.85rem;
+}
+
+/* ── Appointment Details Modal ────────────────────────────── */
+
+.parent-page #apptModal .admin-modal-head {
+  padding: 16px 20px;
+}
+
+.parent-page #apptModal .admin-modal-head h3 {
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.appt-modal-body {
+  padding: 0 20px 20px;
+}
+
+.appt-modal-header {
+  padding: 14px 0 12px;
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: 14px;
+}
+
+.appt-modal-date {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--admin-text);
+  line-height: 1.3;
+}
+
+.appt-modal-time {
+  font-size: 0.85rem;
+  color: var(--admin-muted);
+  margin-top: 2px;
+}
+
+.appt-modal-type {
+  display: inline-block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+  background: var(--admin-primary-bg, rgba(59, 130, 246, 0.08));
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+
+.appt-modal-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.appt-modal-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+
+.appt-modal-row:last-child {
+  border-bottom: none;
+}
+
+.appt-modal-label {
+  font-size: 0.8rem;
+  color: var(--admin-muted);
+  flex-shrink: 0;
+}
+
+.appt-modal-value {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--admin-text);
+  text-align: right;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.appt-modal-notes {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.appt-modal-notes-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+
+.appt-modal-notes-text {
+  font-size: 0.85rem;
+  color: var(--admin-text);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.appt-modal-cancel {
+  margin-top: 16px;
+}
+
+.appt-modal-cancel-btn {
+  width: 100%;
+  color: var(--admin-danger, #ef4444) !important;
+  border-color: var(--admin-danger, #ef4444) !important;
+}
+
+/* Keep the AI launcher out of the appointment details flow. */
+.parent-page.parent-appointments .chatbot-launcher,
+.parent-page.parent-appointments .chatbot-panel {
+  display: none !important;
+}
+
+.parent-page .parent-appointments-intro h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 1.35rem;
+}
+
+.parent-page .parent-appointments-intro p {
+  margin: 0 0 8px;
+  color: var(--admin-muted);
+  font-size: 0.84rem;
+}
+
+.parent-page .parent-appointments-intro label {
+  color: var(--admin-text);
+  font-size: 0.74rem;
+  font-weight: 800;
+}
+
+.parent-page .parent-appointments-intro select { width: 100%; }
+
+.parent-page .parent-appointment-tabs {
+  display: flex;
+  gap: 4px;
+  margin-top: 12px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-appointment-tabs button {
+  flex: 1;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--admin-muted);
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.parent-page .parent-appointment-tabs button.is-active {
+  background: var(--admin-surface);
+  color: var(--admin-primary);
+  box-shadow: 0 1px 4px rgba(0,0,0,.1);
+}
+
+.parent-page .parent-appt-tab-panel { display: none; }
+.parent-page .parent-appt-tab-panel.is-active { display: block; }
+
+.parent-page .parent-appt-upcoming {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  box-shadow: var(--admin-shadow);
+}
+
+.parent-page .parent-appt-view-btn { white-space: nowrap; }
+
+@media (max-width: 520px) {
+  .parent-page .parent-appt-upcoming { grid-template-columns: 1fr; }
+  .parent-page .parent-appt-view-btn { grid-column: auto; width: 100%; }
+}
+
+/* Child avatar / name banner that sits inside the "Latest assessment" panel.
+ * Tells the parent which child is currently selected when there is more
+ * than one child linked to the account. */
+.parent-page .parent-child-banner {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--admin-surface-alt);
+  margin-top: 12px;
+}
+
+.parent-page .parent-child-info {
+  min-width: 0;
+}
+
+.parent-page .parent-child-name {
+  color: var(--admin-text);
+  font-size: 0.96rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.parent-page .parent-child-sub {
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.parent-page .parent-child-select-form select {
+  padding: 7px 26px 7px 10px;
+  border-radius: 9px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.parent-page .parent-mini {
+  color: var(--admin-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Follow-up appointment card on the right side of the hero row. */
+.parent-page .parent-followup {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 12px;
+  align-items: start;
+  margin-top: 12px;
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-followup-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.parent-page .parent-followup-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.parent-page .parent-followup-when {
+  color: var(--admin-text);
+  font-size: 0.86rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.parent-page .parent-followup-child {
+  color: var(--admin-text);
+  font-size: 0.78rem;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.parent-page .parent-followup-meta {
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 500;
+  margin-top: 2px;
+}
+
+.parent-page .parent-followup-pills {
+  margin-top: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.parent-page .parent-followup-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--admin-primary);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+/* Growth-progress wave chart. Mirrors audit_logs / nutritionist pattern. */
+.parent-page .parent-growth-panel { padding: 18px; }
+
+/* Chart tab switcher */
+.parent-page .parent-chart-tabs {
+  display: inline-flex;
+  gap: 3px;
+  background: var(--admin-border);
+  border-radius: 10px;
+  padding: 3px;
+}
+.parent-page .parent-chart-tab {
+  padding: 5px 14px;
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  color: var(--admin-muted);
+  transition: background 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.parent-page .parent-chart-tab:hover {
+  color: var(--admin-text);
+}
+.parent-page .parent-chart-tab.is-active {
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  box-shadow: var(--admin-shadow-sm, 0 1px 3px rgba(0,0,0,0.08));
+}
+
+/* ------------------------------------------------------------------
+ * Assessment card — standalone compact card for latest readings
+ * ------------------------------------------------------------------ */
+.parent-page .parent-assessment-card {
+  min-width: 0;
+  padding: 18px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  box-shadow: var(--admin-shadow);
+}
+
+.parent-page .parent-dashboard-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.parent-page .parent-profile-card {
+  min-width: 0;
+  padding: 18px;
+  background: var(--admin-surface);
+}
+
+.parent-page .parent-profile-card .parent-child-banner {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.parent-page .parent-child-trigger {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.parent-page .parent-child-trigger:focus-visible {
+  outline: 3px solid var(--admin-primary-soft);
+  outline-offset: 5px;
+  border-radius: 12px;
+}
+
+.parent-page .parent-child-trigger .parent-child-banner {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
+.parent-page .parent-child-chevron {
+  color: var(--admin-primary);
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.parent-page .parent-child-trigger-hint {
+  margin-top: 12px;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+}
+
+.parent-page .parent-child-name-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.parent-page .parent-child-status {
+  padding: 5px 11px;
+  font-size: 0.76rem;
+  line-height: 1.1;
+}
+
+.parent-page .parent-assessment-card .parent-panel-heading {
+  margin-bottom: 14px;
+}
+
+.parent-page .parent-child-select-form {
+  display: grid;
+  gap: 5px;
+  margin-top: 18px;
+}
+
+.parent-page .parent-child-select-form label {
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.parent-page .parent-child-select-form select {
+  width: 100%;
+  min-height: 38px;
+}
+
+.parent-page .parent-child-picker[hidden] { display: none; }
+
+.parent-page .parent-child-picker {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+}
+
+.parent-page .parent-child-picker-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 24, 16, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.parent-page .parent-child-picker-sheet {
+  position: relative;
+  width: min(100%, 470px);
+  max-height: min(680px, calc(100vh - 36px));
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--admin-border);
+  border-radius: 18px;
+  background: var(--admin-surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.parent-page .parent-child-picker-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.parent-page .parent-child-picker-header h2 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 1.1rem;
+}
+
+.parent-page .parent-child-picker-header p {
+  margin: 4px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.78rem;
+}
+
+.parent-page .parent-child-picker-close {
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--admin-border);
+  border-radius: 9px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text);
+  font-size: 1.3rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.parent-page .parent-child-picker-list {
+  display: grid;
+  gap: 9px;
+}
+
+.parent-page .parent-child-option {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 13px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text);
+  text-decoration: none;
+  transition: border-color .15s ease, background .15s ease, transform .15s ease;
+}
+
+.parent-page .parent-child-option:hover,
+.parent-page .parent-child-option:focus-visible,
+.parent-page .parent-child-option.is-selected {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary-soft);
+}
+
+.parent-page .parent-child-option:hover { transform: translateY(-1px); }
+
+.parent-page .parent-child-option-avatar {
+  display: grid;
+  width: 42px;
+  height: 42px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  font-weight: 800;
+}
+
+.parent-page .parent-child-option-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.parent-page .parent-child-option-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+}
+
+.parent-page .parent-child-option-copy small {
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+}
+
+.parent-page .parent-child-option-status {
+  font-size: 0.64rem;
+  white-space: nowrap;
+}
+
+.parent-page .parent-assessment-values {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-top: 4px;
+  padding: 16px 14px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  text-align: center;
+}
+
+.parent-page .parent-assessment-value {
+  display: grid;
+  grid-template-columns: auto auto;
+  align-items: baseline;
+  column-gap: 4px;
+}
+
+.parent-page .parent-assessment-value-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  line-height: 1;
+}
+
+.parent-page .parent-assessment-value-unit {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  text-transform: uppercase;
+}
+
+.parent-page .parent-assessment-value-label {
+  grid-column: 1 / -1;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.parent-page .parent-assessment-divider {
+  width: 1px;
+  height: 24px;
+  background: var(--admin-border);
+  flex-shrink: 0;
+}
+
+.parent-page.parent-picker-open { overflow: hidden; }
+
+.parent-page .parent-assessment-footer {
+  display: flex;
+  align-items: center;
+}
+
+.parent-page .parent-chart-legend {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.parent-page .parent-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: var(--admin-muted);
+}
+
+.parent-page .parent-legend-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.parent-page .parent-legend-dot.is-weight {
+  background: var(--admin-primary);
+}
+.parent-page .parent-legend-dot.is-height {
+  background: var(--admin-accent);
+}
+
+.parent-page .parent-chart-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--admin-primary);
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: var(--admin-primary-soft);
+}
+.parent-page .parent-chart-badge-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+  animation: pulse-dot 2s infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.parent-page .parent-chart-body {
+  position: relative;
+  margin-top: 6px;
+}
+
+.parent-page .parent-chart-canvas {
+  display: block;
+  width: 100%;
+  height: 260px;
+  cursor: crosshair;
+}
+
+.parent-page .parent-chart-tooltip {
+  position: absolute;
+  pointer-events: none;
+  background: var(--admin-text);
+  color: var(--admin-surface);
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  white-space: nowrap;
+  transform: translate(-50%, 0);
+  opacity: 0;
+  transition: opacity 0.12s;
+  z-index: 10;
+  line-height: 1.5;
+  max-width: 300px;
+}
+.parent-page .parent-chart-tooltip::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: var(--admin-text);
+}
+
+.parent-page .parent-chart-y-axis {
+  position: absolute;
+  left: 2px;
+  top: 6px;
+  bottom: 28px;
+  width: 32px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.parent-page .parent-chart-y-label {
+  font-size: 0.66rem;
+  color: var(--admin-muted);
+  font-family: "Inter", monospace;
+  text-align: right;
+}
+
+.parent-page .parent-chart-x-axis {
+  display: flex;
+  justify-content: space-between;
+  padding: 4px 16px 0 44px;
+}
+
+.parent-page .parent-chart-x-label {
+  font-size: 0.66rem;
+  color: var(--admin-muted);
+  font-family: "Inter", monospace;
+}
+
+/* Recent-measurements table sits underneath the growth chart and reuses
+ * the system table / pill styles already declared in admin.css. */
+.parent-page .parent-table-wrap {
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  overflow: auto;
+}
+
+.parent-page .parent-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+}
+
+.parent-page .parent-table th,
+.parent-page .parent-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--admin-border);
+  text-align: left;
+}
+
+.parent-page .parent-table thead {
+  background: var(--admin-surface-alt);
+}
+
+.parent-page .parent-table th {
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.parent-page .parent-table tr:last-child td {
+  border-bottom: none;
+}
+
+@media (max-width: 760px) {
+  .parent-page .parent-table { min-width: 520px; }
+  .parent-page .parent-dashboard-top { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 520px) {
+  .parent-page .parent-child-banner { grid-template-columns: auto 1fr; }
+  .parent-page .parent-child-status { grid-column: 1 / -1; }
+  .parent-page .parent-followup { grid-template-columns: auto 1fr; }
 }

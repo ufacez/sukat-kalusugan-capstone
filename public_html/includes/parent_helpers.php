@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/admin_helpers.php';
+require_once __DIR__ . '/who_calculator.php';
 
 function parent_e(string $value): string
 {
@@ -33,6 +34,12 @@ function parent_grouped_nav_items(): array
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php'), 'icon' => 'children'],
                 ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php'), 'icon' => 'linechart'],
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php'), 'icon' => 'calendar'],
+            ],
+        ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -94,6 +101,70 @@ function parent_build_breadcrumb(string $activeSection, array $groupedNav, ?stri
     return ['group' => '', 'page' => $activeSection];
 }
 
+/**
+ * Classify a single WHO axis status into a {label, level, axis, full} tuple.
+ * Mirrors the helper in nutritionist/dashboard.php so the parent portal can
+ * render the same combined status pills for each measurement.
+ * WFA: any WAZ > +2 is a "REF" pill (DOH eOPT Plus rule: read WFL/H instead).
+ * HFA: "Tall" is its own label so the operator can spot it without folding
+ *      it back into "Normal".
+ * WFL/H: handles Overweight / Obese / Moderately Wasted / Severely Wasted.
+ */
+function parent_classify_axis_status(string $axis, string $raw): array {
+    $s = strtolower(trim($raw));
+    if ($s === '' || $s === 'normal' || $s === 'n') {
+        return ['label' => 'N', 'full' => 'Normal', 'level' => 'normal', 'axis' => $axis];
+    }
+    // Severe bucket
+    if ($s === 'suw') return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
+    if ($s === 'sst') return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
+    if ($s === 'sw')  return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+    if ($s === 'ob')  return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
+    // Moderate bucket
+    if ($s === 'muw') return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
+    if ($s === 'mst') return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
+    if ($s === 'mw')  return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+    if ($s === 'ow')  return ['label' => 'OW',  'full' => 'Overweight',             'level' => 'moderate', 'axis' => 'wflh'];
+    if ($s === 'tall' || $s === 't') {
+        return ['label' => 'Tall', 'full' => 'Tall', 'level' => 'normal', 'axis' => 'hfa'];
+    }
+    if (str_contains($s, 'refer')) {
+        return ['label' => 'REF', 'full' => 'Use WFL/H column', 'level' => 'refer', 'axis' => 'wfa'];
+    }
+    if (str_contains($s, 'severe')) {
+        if (str_contains($s, 'underweight')) return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
+        if (str_contains($s, 'stunted'))      return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
+        if (str_contains($s, 'wasted'))       return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+        if (str_contains($s, 'obese'))        return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
+        return ['label' => 'S', 'full' => 'Severe', 'level' => 'severe', 'axis' => $axis];
+    }
+    if (str_contains($s, 'moderate')) {
+        if (str_contains($s, 'underweight')) return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
+        if (str_contains($s, 'stunted'))      return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
+        if (str_contains($s, 'wasted'))       return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+        return ['label' => 'M', 'full' => 'Moderate', 'level' => 'moderate', 'axis' => $axis];
+    }
+    if (str_contains($s, 'overweight')) return ['label' => 'OW', 'full' => 'Overweight', 'level' => 'moderate', 'axis' => 'wflh'];
+    if (str_contains($s, 'obese'))      return ['label' => 'Ob', 'full' => 'Obese',       'level' => 'severe',   'axis' => 'wflh'];
+    return ['label' => '?', 'full' => 'Unknown', 'level' => 'normal', 'axis' => $axis];
+}
+
+/**
+ * Return a list of combined status pills for a child/measurement row.
+ * Combines the WFA / HFA / WFLH axes so parents see every flag at a glance
+ * (e.g. "Ob + OW" or "SUW + SSt + MW"). Normal readings are excluded so the
+ * list is not cluttered.
+ */
+function parent_combined_status_pills(?string $wfa, ?string $hfa, ?string $wfh): array {
+    $pills = [];
+    foreach (['wfa' => $wfa, 'hfa' => $hfa, 'wflh' => $wfh] as $axis => $value) {
+        $c = parent_classify_axis_status($axis, (string)$value);
+        if ($c['level'] === 'normal') continue;
+        $pills[] = $c;
+    }
+    return $pills;
+}
+
 function parent_layout_start(string $title, string $subtitle, string $activeSection, string $actionsHtml = '', ?string $breadcrumbExtra = null): void
 {
     $currentUser = parent_require_access();
@@ -127,7 +198,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '})();';
     echo '</script>';
     echo '</head>';
-    echo '<body class="admin-page parent-page">';
+    echo '<body class="admin-page parent-page parent-' . parent_e($activeSection) . '">';
     echo '<div class="admin-shell">';
     echo '<aside class="admin-sidebar" data-admin-sidebar>';
 
@@ -172,7 +243,8 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
     echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
     echo '</button>';
-    echo '<nav class="admin-breadcrumb">';
+    $breadcrumbIsLong = !empty($breadcrumb['extra']);
+    echo '<nav class="admin-breadcrumb' . ($breadcrumbIsLong ? ' is-long' : '') . '">';
     $hasGroup = ($breadcrumb['group'] ?? '') !== '';
     $hasExtra = isset($breadcrumb['extra']) && $breadcrumb['extra'] !== '';
     if ($hasGroup) {

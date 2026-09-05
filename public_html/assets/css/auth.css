@@ -339,13 +339,13 @@
 }
 
 [data-theme="dark"] .toggle-password {
-  background: #1c2b23;
+  background: transparent;
   color: #2ec57a;
-  border-color: #2a3d32;
+  border-color: transparent;
 }
 
 [data-theme="dark"] .toggle-password:hover {
-  background: #243529;
+  background: rgba(46, 197, 122, 0.12);
   color: #5ce09a;
 }
 
@@ -360,28 +360,36 @@
 }
 
 .password-field {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.65rem;
-  align-items: center;
+  position: relative;
+  display: block;
+}
+
+.password-field input {
+  width: 100%;
+  padding-right: 3.5rem !important;
 }
 
 .toggle-password {
-  height: 100%;
-  padding: 0.7rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: #f5faf7;
+  position: absolute;
+  top: 50%;
+  right: 0.5rem;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
   color: var(--primary-strong);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
+  transform: translateY(-50%);
   transition: background 200ms ease, color 200ms ease;
 }
 
 .toggle-password:hover {
-  background: #e6f0eb;
+  background: var(--primary-soft, #e6f0eb);
   color: #0b6e4f;
 }
 
@@ -408,6 +416,52 @@
   gap: 1rem;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.auth-page .checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.auth-page .checkbox input {
+  width: 17px;
+  height: 17px;
+  margin: 0;
+  border: 1px solid var(--primary-strong);
+  border-radius: 4px;
+  background: transparent;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.auth-page .checkbox input:focus-visible {
+  outline: 3px solid rgba(46, 197, 122, 0.22);
+  outline-offset: 2px;
+}
+
+.auth-page .checkbox input:checked {
+  background-color: var(--primary-strong);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='white' stroke-width='2.2'%3E%3Cpath d='m3 8 3 3 7-7'/%3E%3C/svg%3E");
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 12px;
+}
+
+[data-theme="dark"] .auth-page .checkbox {
+  color: #a8beb0;
+}
+
+[data-theme="dark"] .auth-page .checkbox input {
+  border-color: #2ec57a;
+  background: transparent;
+}
+
+[data-theme="dark"] .auth-page .checkbox input:checked {
+  background-color: #2ec57a;
 }
 
 .form-message {
@@ -654,7 +708,7 @@
   }
 
   .password-field {
-    grid-template-columns: 1fr;
+    display: block;
   }
 
   .auth-footer-row {

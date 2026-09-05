@@ -20,7 +20,7 @@ if (!defined('LOGIN_MAX_FAILED_ATTEMPTS')) {
 }
 
 if (!defined('LOGIN_LOCKOUT_WINDOW_MINUTES')) {
-    define('LOGIN_LOCKOUT_WINDOW_MINUTES', 15);
+    define('LOGIN_LOCKOUT_WINDOW_MINUTES', 5);
 }
 
 /**

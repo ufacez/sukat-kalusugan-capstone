@@ -31,7 +31,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css?v=2">
+    <link rel="stylesheet" href="../assets/css/auth.css?v=5">
     <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){

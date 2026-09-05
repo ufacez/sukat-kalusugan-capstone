@@ -148,6 +148,7 @@ function admin_grouped_nav_items(): array
             'label' => 'Configuration',
             'items' => [
                 ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php'), 'icon' => 'roles_permissions'],
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/admin/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];

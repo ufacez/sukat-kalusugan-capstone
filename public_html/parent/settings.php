@@ -4,40 +4,63 @@ require_once __DIR__ . '/../includes/parent_helpers.php';
 
 $user = parent_require_access();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-	$name = trim((string)($_POST['name'] ?? ''));
-	$email = trim((string)($_POST['email'] ?? ''));
-	$phone = trim((string)($_POST['phone'] ?? ''));
-	$address = trim((string)($_POST['address'] ?? ''));
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
+	$firstName = trim((string)($_POST['first_name'] ?? ''));
+	$lastName  = trim((string)($_POST['last_name'] ?? ''));
+	$name      = admin_combine_name($firstName, '', $lastName);
+	$email     = trim((string)($_POST['email'] ?? ''));
+	$phone     = trim((string)($_POST['phone'] ?? ''));
+	$address   = trim((string)($_POST['address'] ?? ''));
 	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
-	$currentPassword = (string)($_POST['current_password'] ?? '');
-	$password = (string)($_POST['password'] ?? '');
-	$allowedTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
+	$oldPassword    = (string)($_POST['old_password'] ?? '');
+	$password       = (string)($_POST['password'] ?? '');
+	$passwordRepeat = (string)($_POST['password_repeat'] ?? '');
 
-	if ($name === '' || $email === '') {
-		admin_redirect('/parent/settings.php', ['notice' => 'Name and email are required.', 'type' => 'error']);
+	if ($firstName === '' || !admin_is_valid_name_part($firstName, true)) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid first name (letters only, at least 2 characters).', 'type' => 'error']);
+	}
+	if ($lastName === '' || !admin_is_valid_name_part($lastName, true)) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid last name (letters only, at least 2 characters).', 'type' => 'error']);
+	}
+	if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+	}
+	if ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+	}
+	if ($address !== '' && strlen($address) > 255) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
 	}
 
+	$allowedTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 	if (!in_array($parentType, $allowedTypes, true)) {
 		$parentType = 'Guardian';
 	}
 
-	// Only setting a new password requires proving you know the current one —
-	// editing name/email/phone doesn't. This stops someone with a hijacked or
-	// left-open session from silently locking the real owner out.
-	if ($password !== '') {
-		$current = admin_fetch_one('SELECT password_hash FROM parents WHERE id = ? LIMIT 1', 'i', [(int)$user['id']]);
+	$current = admin_fetch_one('SELECT password_hash FROM parents WHERE id = ? LIMIT 1', 'i', [(int)$user['id']]);
 
-		if ($current === null || $currentPassword === '' || !password_verify($currentPassword, (string)$current['password_hash'])) {
+	if ($current === null) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Your account could not be loaded.', 'type' => 'error']);
+	}
+
+	$wantsNewPassword = $password !== '' || $passwordRepeat !== '';
+	if ($wantsNewPassword) {
+		if ($oldPassword === '' || !password_verify($oldPassword, (string)$current['password_hash'])) {
 			admin_redirect('/parent/settings.php', ['notice' => 'Current password is incorrect.', 'type' => 'error']);
+		}
+		if ($password !== $passwordRepeat) {
+			admin_redirect('/parent/settings.php', ['notice' => 'New password and repeat do not match.', 'type' => 'error']);
+		}
+		if (strlen($password) < 8 || !preg_match('/[a-z]/', $password) || !preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[^A-Za-z0-9]/', $password)) {
+			admin_redirect('/parent/settings.php', ['notice' => 'New password must be at least 8 characters and include upper, lower, number, and special characters.', 'type' => 'error']);
 		}
 	}
 
 	$sql = 'UPDATE parents SET name = ?, email = ?, phone = ?, address = ?, parent_type = ?';
-	$params = [$name, $email, $phone, $address, $parentType];
+	$params = [$name, $email, $phone, $address !== '' ? $address : null, $parentType];
 	$types = 'sssss';
 
-	if ($password !== '') {
+	if ($wantsNewPassword) {
 		$sql .= ', password_hash = ?';
 		$params[] = password_hash($password, PASSWORD_DEFAULT);
 		$types .= 's';
@@ -54,16 +77,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$_SESSION['auth']['email'] = $email;
 		$_SESSION['auth']['phone'] = $phone;
 		$_SESSION['auth']['address'] = $address;
+		$_SESSION['auth']['parent_type'] = $parentType;
 	}
 
-	admin_redirect('/parent/settings.php', $ok ? ['notice' => 'Profile updated successfully.'] : ['notice' => 'Profile could not be updated.', 'type' => 'error']);
+	admin_redirect('/parent/settings.php', $ok ? ['notice' => 'Account updated successfully.', 'type' => 'success'] : ['notice' => 'Account could not be updated. Check for a duplicate email.', 'type' => 'error']);
 }
 
 $profile = admin_fetch_one(
-	'SELECT p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.status, p.created_at,
-	        p.local_area_id, la.area_name AS local_area, la.area_type
+	'SELECT p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.status, p.created_at
 	 FROM parents p
-	 LEFT JOIN local_areas la ON la.id = p.local_area_id
 	 WHERE p.id = ?
 	 LIMIT 1',
 	'i',
@@ -74,149 +96,124 @@ if ($profile === null) {
 	deny_access('Parent profile could not be loaded.', 404);
 }
 
-$childCount = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ?', 'i', [(int)$user['id']]);
-$appointmentCount = admin_scalar('SELECT COUNT(*) FROM appointments WHERE parent_id = ?', 'i', [(int)$user['id']]);
+$fullName = trim((string)($profile['name'] ?? ''));
+$nameParts = $fullName === '' ? ['', ''] : preg_split('/\s+/', $fullName);
+if (count($nameParts) === 1) {
+	$firstNameValue = $nameParts[0];
+	$lastNameValue  = '';
+} else {
+	$lastNameValue  = (string)array_pop($nameParts);
+	$firstNameValue = implode(' ', $nameParts);
+}
+
+$avatarColor    = admin_avatar_color($fullName !== '' ? $fullName : ($profile['email'] ?? 'Parent'));
+$avatarInitials = $fullName !== '' ? admin_initials($fullName) : strtoupper(substr((string)($profile['email'] ?? 'P'), 0, 1));
+$storedAddress  = (string)($profile['address'] ?? '');
 
 $actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
 
-parent_layout_start('Settings', 'Update your profile, contact details, and login password.', 'settings', $actions);
+parent_layout_start('Settings', 'Manage your account details.', 'settings', $actions);
 ?>
-<section class="admin-grid-cards">
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-success">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Parent type</div>
-				<div class="admin-card-value"><?php echo parent_e((string)($profile['parent_type'] ?? 'Guardian')); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Household role stored in the parent record</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Children linked</div>
-				<div class="admin-card-value"><?php echo $childCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Child records under this account</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Appointments</div>
-				<div class="admin-card-value"><?php echo $appointmentCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Past and upcoming visits</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-success">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Account status</div>
-				<div class="admin-card-value"><?php echo parent_e(ucfirst((string)($profile['status'] ?? 'active'))); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Login availability for this portal</span>
-				</div>
-			</div>
-		</div>
-	</article>
-</section>
+<form method="post" data-validate-form class="admin-settings-form">
+	<input type="hidden" name="update_account" value="1">
+	<div class="admin-flash is-error" data-validate-banner style="display:none;"></div>
 
-<section class="parent-panel-grid" style="margin-top:14px;">
-	<article class="parent-panel">
-		<div class="parent-form-head" style="margin-bottom:12px;">
-			<div>
-				<h2 class="admin-section-title" style="margin-bottom:2px;">Profile Information</h2>
-				<p class="admin-section-subtitle">Edit the contact details stored in your parent account.</p>
-			</div>
-		</div>
+	<div class="admin-settings-grid">
+		<!-- ── LEFT: General Information ─────────────────────────── -->
+		<section class="admin-section admin-settings-card">
+			<header class="admin-section-head">
+				<h2 class="admin-section-title">General Information</h2>
+			</header>
 
-		<form method="post" class="parent-form-grid is-single">
-			<label class="admin-field">
-				<span>Full Name</span>
-				<input name="name" required value="<?php echo parent_e((string)($profile['name'] ?? '')); ?>">
-			</label>
-			<label class="admin-field">
-				<span>Email Address</span>
-				<input type="email" name="email" required value="<?php echo parent_e((string)($profile['email'] ?? '')); ?>">
-			</label>
-			<label class="admin-field">
-				<span>Parent Type</span>
-				<select name="parent_type">
-					<?php foreach (['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'] as $type): ?>
-						<option value="<?php echo parent_e($type); ?>" <?php echo (($profile['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo parent_e($type); ?></option>
-					<?php endforeach; ?>
-				</select>
-			</label>
-			<label class="admin-field">
-				<span>Phone Number</span>
-				<input name="phone" value="<?php echo parent_e((string)($profile['phone'] ?? '')); ?>" placeholder="0917...">
-			</label>
-			<label class="admin-field">
-				<span>Home Address</span>
-				<input name="address" value="<?php echo parent_e((string)($profile['address'] ?? '')); ?>" placeholder="House no. / street">
-			</label>
-			<label class="admin-field">
-				<span>Current Password</span>
-				<input type="password" name="current_password" autocomplete="current-password" placeholder="Only needed if setting a new password below">
-			</label>
-			<label class="admin-field">
-				<span>New Password</span>
-				<input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
-			</label>
-			<div class="admin-field" style="align-content:end;grid-column:1 / -1;">
-				<span>&nbsp;</span>
-				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save profile</button>
+			<div class="admin-settings-avatar">
+				<span class="admin-avatar admin-avatar--lg" style="background:<?php echo parent_e($avatarColor); ?>;">
+					<?php echo parent_e($avatarInitials); ?>
+				</span>
 			</div>
-		</form>
-	</article>
 
-	<article class="parent-panel">
-		<div class="admin-section-title" style="margin-bottom:12px;">Account Summary</div>
-		<div style="display:grid;gap:10px;">
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Member since</span>
-				<strong><?php echo parent_e((string)($profile['created_at'] ?? 'n/a')); ?></strong>
+			<h3 class="admin-settings-subhead">Basic Info</h3>
+
+			<div class="admin-form-grid">
+				<label class="admin-field">
+					<span>First Name</span>
+					<input id="account_first_name" name="first_name" required data-validate="name" data-label="First name" autocomplete="given-name" value="<?php echo parent_e($firstNameValue); ?>">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Last Name</span>
+					<input id="account_last_name" name="last_name" required data-validate="name" data-label="Last name" autocomplete="family-name" value="<?php echo parent_e($lastNameValue); ?>">
+					<span class="admin-field-message"></span>
+				</label>
+
+				<label class="admin-field admin-field-wide">
+					<span>Email</span>
+					<input id="account_email" type="email" name="email" required data-validate="email" data-label="Email" autocomplete="email" value="<?php echo parent_e((string)($profile['email'] ?? '')); ?>">
+					<span class="admin-field-message"></span>
+				</label>
+
+				<label class="admin-field">
+					<span>Phone</span>
+					<input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo parent_e((string)($profile['phone'] ?? '')); ?>" placeholder="09171234567">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Parent Type</span>
+					<select name="parent_type">
+						<?php foreach (['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'] as $type): ?>
+							<option value="<?php echo parent_e($type); ?>" <?php echo (($profile['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo parent_e($type); ?></option>
+						<?php endforeach; ?>
+					</select>
+				</label>
+				<div class="admin-field admin-field-wide">
+					<span>Address</span>
+					<label class="admin-field" style="margin-top:6px;">
+						<span>Full address</span>
+						<textarea id="account_address" name="address" maxlength="255" rows="2" placeholder="House no. / street, barangay, city"><?php echo parent_e($storedAddress); ?></textarea>
+					</label>
+				</div>
 			</div>
-			<?php if (!empty($profile['local_area'])): ?>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Local Area</span>
-				<strong><?php echo parent_e(ucfirst((string)($profile['area_type'] ?? '')) . ': ' . $profile['local_area']); ?></strong>
+		</section>
+
+		<!-- ── RIGHT: Change password ────────────────────────────── -->
+		<aside class="admin-section admin-settings-card admin-settings-card--narrow">
+			<header class="admin-section-head">
+				<h2 class="admin-section-title">Change password</h2>
+			</header>
+
+			<div class="admin-form-grid admin-form-grid--single">
+				<label class="admin-field">
+					<span>Old password</span>
+					<input id="account_old_password" type="password" name="old_password" autocomplete="current-password" placeholder="••••••••••">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>New password</span>
+					<input id="account_password" type="password" name="password" data-validate="password" data-label="New password" autocomplete="new-password" placeholder="Leave blank to keep current">
+					<span class="admin-field-message"></span>
+					<ul class="admin-pw-checklist" data-pw-checklist-for="account_password">
+						<li data-pw-rule="length">At least 8 characters</li>
+						<li data-pw-rule="upper">One uppercase letter</li>
+						<li data-pw-rule="lower">One lowercase letter</li>
+						<li data-pw-rule="number">One number</li>
+						<li data-pw-rule="special">One special character</li>
+					</ul>
+					<div class="admin-pw-strength" data-pw-strength-for="account_password">
+						<div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
+						<div class="admin-pw-strength-label"></div>
+					</div>
+				</label>
+				<label class="admin-field">
+					<span>Repeat New password</span>
+					<input id="account_password_repeat" type="password" name="password_repeat" data-validate="confirm-password" data-label="Repeat new password" data-match="account_password" autocomplete="new-password" placeholder="Confirm new password">
+					<span class="admin-field-message"></span>
+				</label>
 			</div>
-			<?php endif; ?>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Parent type</span>
-				<strong><?php echo parent_e((string)($profile['parent_type'] ?? 'Guardian')); ?></strong>
-			</div>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Children linked</span>
-				<strong><?php echo $childCount; ?></strong>
-			</div>
-			<div class="admin-list-item" style="padding:10px 0;">
-				<span class="admin-mini">Appointments</span>
-				<strong><?php echo $appointmentCount; ?></strong>
-			</div>
-		</div>
-	</article>
-</section>
+		</aside>
+	</div>
+
+	<div class="admin-settings-footer">
+		<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save All Changes</button>
+	</div>
+</form>
 <?php
 parent_layout_end();
-
