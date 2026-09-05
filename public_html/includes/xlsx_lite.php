@@ -354,6 +354,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 		$sheetXmlParts['xl/worksheets/sheet' . $sheetNumber . '.xml'] =
 			'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
 			'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
+			'<sheetPr><tabColor rgb="FF000000"/></sheetPr>' .
 			'<sheetFormatPr defaultRowHeight="15"/>' .
 			xlsx_lite_sheet_body_xml($spec, $sharedStrings) .
 			'</worksheet>';
@@ -494,7 +495,7 @@ function xlsx_lite_style_index(string $key): int
 function xlsx_lite_styles_xml(): string
 {
 	$fontsXml =
-		'<font><sz val="11"/><color theme="1"/><name val="Calibri"/></font>' .
+		'<font><sz val="11"/><color rgb="FF000000"/><name val="Calibri"/></font>' .
 		'<font><b/><sz val="14"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' .
 		'<font><b/><sz val="11"/><color rgb="FF1F3864"/><name val="Calibri"/></font>' .
 		'<font><i/><sz val="9"/><color rgb="FF595959"/><name val="Calibri"/></font>';
@@ -528,7 +529,9 @@ function xlsx_lite_styles_xml(): string
 		}
 
 		$cellXfsXml .= '<xf numFmtId="0" fontId="' . $style['font'] . '" fillId="' . $style['fill'] . '" borderId="' . $style['border'] . '" xfId="0"'
-			. (($style['font'] || $style['fill'] || $style['border']) ? ' applyFont="1" applyFill="1" applyBorder="1"' : '')
+			. ($style['font'] ? ' applyFont="1"' : '')
+			. ($style['fill'] ? ' applyFill="1"' : '')
+			. ($style['border'] ? ' applyBorder="1"' : '')
 			. ($applyAlignment ? ' applyAlignment="1"' : '')
 			. '>' . $alignment . '</xf>';
 	}

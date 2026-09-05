@@ -426,9 +426,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 					<div class="admin-card-label">Total Appointments</div>
 					<div class="admin-card-value"><?php echo $totalAll; ?></div>
 					<div class="admin-card-meta">
-						<span class="appt-stat-trend-line is-up">
-							<?php echo admin_action_icon('trend_up'); ?> <?php echo max(0, $upcoming7); ?> scheduled next 7 days
-						</span>
+						<span class="appt-stat-trend-line">All records</span>
 					</div>
 				</div>
 			</div>
