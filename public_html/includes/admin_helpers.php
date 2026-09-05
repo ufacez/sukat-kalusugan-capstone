@@ -20,7 +20,6 @@ function admin_nav_items(): array
         ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php')],
         ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php')],
         ['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php')],
-        ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/admin/settings.php')],
     ];
 }
 
@@ -148,7 +147,6 @@ function admin_grouped_nav_items(): array
             'label' => 'Configuration',
             'items' => [
                 ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php'), 'icon' => 'roles_permissions'],
-                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/admin/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -414,6 +412,10 @@ function admin_flash_message(): ?array
 
 function admin_build_breadcrumb(string $activeSection, array $groupedNav, ?string $breadcrumbExtra = null): array
 {
+    if ($activeSection === 'settings') {
+        return ['group' => '', 'page' => 'Settings'];
+    }
+
     foreach ($groupedNav as $group) {
         foreach ($group['items'] as $item) {
             if ($item['key'] === $activeSection) {

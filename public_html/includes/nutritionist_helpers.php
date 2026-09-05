@@ -19,7 +19,6 @@ function nutritionist_nav_items(): array
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
-        ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php')],
     ];
 }
 
@@ -53,7 +52,6 @@ function nutritionist_grouped_nav_items(): array
             'items' => [
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php'), 'icon' => 'calendar'],
                 ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php'), 'icon' => 'document'],
-                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -132,6 +130,10 @@ function nutritionist_can_write(string $permissionCode = ''): bool
 
 function nutritionist_build_breadcrumb(string $activeSection, array $groupedNav, ?string $breadcrumbExtra = null): array
 {
+    if ($activeSection === 'settings') {
+        return ['group' => '', 'page' => 'Settings'];
+    }
+
     foreach ($groupedNav as $group) {
         foreach ($group['items'] as $item) {
             if ($item['key'] === $activeSection) {

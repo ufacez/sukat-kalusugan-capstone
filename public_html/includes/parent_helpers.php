@@ -15,7 +15,6 @@ function parent_nav_items(): array
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php')],
         ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php')],
-        ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php')],
     ];
 }
 
@@ -34,12 +33,6 @@ function parent_grouped_nav_items(): array
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php'), 'icon' => 'children'],
                 ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php'), 'icon' => 'linechart'],
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php'), 'icon' => 'calendar'],
-            ],
-        ],
-        [
-            'label' => 'Account',
-            'items' => [
-                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -81,6 +74,10 @@ function parent_status_class(?string $status): string
 
 function parent_build_breadcrumb(string $activeSection, array $groupedNav, ?string $breadcrumbExtra = null): array
 {
+    if ($activeSection === 'settings') {
+        return ['group' => '', 'page' => 'Settings'];
+    }
+
     foreach ($groupedNav as $group) {
         foreach ($group['items'] as $item) {
             if ($item['key'] === $activeSection) {
