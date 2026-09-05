@@ -131,7 +131,8 @@ nutritionist_layout_start(
 	$isEdit ? 'Edit Appointment' : 'Schedule Appointment',
 	$isEdit ? 'Update the date, location, status, or notes for this visit.' : 'Create a new follow-up visit for a child in your scope.',
 	'appointments',
-	$actions
+	$actions,
+	$isEdit ? 'Edit Appointment' : 'New Appointment'
 );
 ?>
 <section class="nutritionist-panel">

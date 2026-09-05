@@ -29,7 +29,7 @@ $children = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/children.php')) . '">' . admin_action_icon('back') . ' Active children</a>';
 
-admin_layout_start('Archived Children', 'Restore or permanently delete archived child profiles.', 'children', $actions);
+admin_layout_start('Archived Children', 'Restore or permanently delete archived child profiles.', 'children', $actions, 'Archived');
 ?>
 
 <?php if ($deleteId > 0): ?>

@@ -169,7 +169,8 @@ admin_layout_start(
     $editChild !== null ? 'Edit Child' : 'Add Child',
     $editChild !== null ? 'Update the child profile.' : 'Create a new child record.',
     'children',
-    $actions
+    $actions,
+    $editChild !== null ? 'Edit Child' : 'Add Child'
 );
 ?>
 <section class="admin-section">

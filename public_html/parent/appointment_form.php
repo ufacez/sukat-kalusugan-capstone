@@ -84,7 +84,7 @@ $actions = '<a class="admin-btn-secondary" href="'
 	. parent_e(app_url('/parent/appointments.php'))
 	. '">' . admin_action_icon('back') . ' Appointments</a>';
 
-parent_layout_start('Request Appointment', 'Submit a follow-up request for any linked child.', 'appointments', $actions);
+parent_layout_start('Request Appointment', 'Submit a follow-up request for any linked child.', 'appointments', $actions, 'Request Appointment');
 ?>
 <section class="parent-panel">
 	<div class="parent-form-head" style="margin-bottom:12px;">

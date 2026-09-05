@@ -46,7 +46,8 @@ admin_layout_start(
     'Edit User',
     'Update account details and role assignment.',
     'users',
-    $actions
+    $actions,
+    'Edit User'
 );
 ?>
 <section class="admin-section">

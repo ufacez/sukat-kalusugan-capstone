@@ -74,7 +74,7 @@ $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/sensors.php'))
     . '">' . admin_action_icon('back') . ' Sensors</a>';
 
-admin_layout_start('Edit Device', 'Update location, assignment, status, and calibration offsets.', 'sensors', $actions);
+admin_layout_start('Edit Device', 'Update location, assignment, status, and calibration offsets.', 'sensors', $actions, 'Edit Device');
 ?>
 <section class="admin-section">
     <div class="admin-section-head">

@@ -38,7 +38,8 @@ admin_layout_start(
     $editingBarangay ? 'Edit Barangay' : 'Add Barangay',
     $editingBarangay ? 'Update the barangay record used across children, parents, nutritionists, and kiosks.' : 'Create a new barangay backed by the barangays table.',
     'barangays',
-    $actions
+    $actions,
+    $editingBarangay ? 'Edit Barangay' : 'Add Barangay'
 );
 ?>
 <section class="admin-section">

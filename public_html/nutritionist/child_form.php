@@ -394,7 +394,8 @@ nutritionist_layout_start(
         ? 'Update the child profile and care assignment.'
         : 'Create a new child record backed by the children table.',
     'children',
-    $actions
+    $actions,
+    $editChild !== null ? 'Edit Child' : 'Add Child'
 );
 
 ?>

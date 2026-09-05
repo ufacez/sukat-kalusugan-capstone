@@ -45,7 +45,8 @@ admin_layout_start(
     'Local Areas — ' . $barangay['name'],
     'Manage puroks, sitios, subdivisions, and other local areas within this barangay.',
     'barangays',
-    $actions
+    $actions,
+    'Local Areas'
 );
 
 $flash = admin_flash_message();

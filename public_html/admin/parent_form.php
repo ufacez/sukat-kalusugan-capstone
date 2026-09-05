@@ -39,7 +39,8 @@ admin_layout_start(
     $editingParent ? 'Edit Parent' : 'Add Parent',
     $editingParent ? 'Update this parent account.' : 'Create a new guardian record.',
     'parents',
-    $actions
+    $actions,
+    $editingParent ? 'Edit Parent' : 'Add Parent'
 );
 ?>
 <section class="admin-section">

@@ -79,7 +79,8 @@ parent_layout_start(
     'Edit Child',
     'Update basic information for ' . $editChild['child_code'] . '.',
     'children',
-    $actions
+    $actions,
+    'Edit Child'
 );
 ?>
 <section class="admin-section">

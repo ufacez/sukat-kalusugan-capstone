@@ -266,7 +266,8 @@ nutritionist_layout_start(
 	$editingParent ? 'Edit Parent' : 'Add Parent',
 	$editingParent ? 'Update this parent account.' : 'Create a new guardian record for linked child accounts.',
 	'parents',
-	$actions
+	$actions,
+	$editingParent ? 'Edit Parent' : 'Add Parent'
 );
 ?>
 <section class="nutritionist-panel">

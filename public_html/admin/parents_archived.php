@@ -29,7 +29,7 @@ $parents = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parents.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
 
-admin_layout_start('Archived Parents', 'Restore or permanently delete archived parent accounts.', 'parents', $actions);
+admin_layout_start('Archived Parents', 'Restore or permanently delete archived parent accounts.', 'parents', $actions, 'Archived');
 ?>
 
 <?php if ($deleteId > 0): ?>

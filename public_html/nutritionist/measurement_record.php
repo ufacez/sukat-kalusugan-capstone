@@ -82,7 +82,8 @@ nutritionist_layout_start(
     'New measurement',
     'Select a child, capture weight and height (with sensor or manual entry), and save the WHO assessment.',
     'measurements',
-    $actions
+    $actions,
+    'New measurement'
 );
 ?>
 <style>

@@ -18,7 +18,7 @@ $users = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('back') . ' Active users</a>';
 
-admin_layout_start('Archived Users', 'Restore or permanently delete archived staff accounts.', 'users', $actions);
+admin_layout_start('Archived Users', 'Restore or permanently delete archived staff accounts.', 'users', $actions, 'Archived');
 ?>
 
 <?php if ($deleteId > 0): ?>

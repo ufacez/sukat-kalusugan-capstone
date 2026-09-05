@@ -129,26 +129,36 @@ function nutritionist_can_write(string $permissionCode = ''): bool
     return true;
 }
 
-function nutritionist_build_breadcrumb(string $activeSection, array $groupedNav): array
+function nutritionist_build_breadcrumb(string $activeSection, array $groupedNav, ?string $breadcrumbExtra = null): array
 {
     foreach ($groupedNav as $group) {
         foreach ($group['items'] as $item) {
             if ($item['key'] === $activeSection) {
+                if ($breadcrumbExtra !== null && $breadcrumbExtra !== '') {
+                    return [
+                        'group' => $group['label'],
+                        'page' => $item['label'],
+                        'extra' => $breadcrumbExtra,
+                    ];
+                }
                 return ['group' => $group['label'], 'page' => $item['label']];
             }
         }
     }
+    if ($breadcrumbExtra !== null && $breadcrumbExtra !== '') {
+        return ['group' => '', 'page' => $activeSection, 'extra' => $breadcrumbExtra];
+    }
     return ['group' => '', 'page' => $activeSection];
 }
 
-function nutritionist_layout_start(string $title, string $subtitle, string $activeSection, string $actionsHtml = ''): void
+function nutritionist_layout_start(string $title, string $subtitle, string $activeSection, string $actionsHtml = '', ?string $breadcrumbExtra = null): void
 {
     $currentUser = nutritionist_require_access();
     $userName = $currentUser['name'] ?? 'Nutritionist';
     $userRole = $currentUser['role'] ?? 'nutritionist';
     $flash = admin_flash_message();
     $logoutUrl = app_url('/api/auth/logout.php');
-    $breadcrumb = nutritionist_build_breadcrumb($activeSection, nutritionist_grouped_nav_items());
+    $breadcrumb = nutritionist_build_breadcrumb($activeSection, nutritionist_grouped_nav_items(), $breadcrumbExtra);
 
     echo '<!doctype html>';
     echo '<html lang="en">';
@@ -183,10 +193,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<img src="' . nutritionist_e(app_url('/assets/img/logo/logo_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-light">';
     echo '<img src="' . nutritionist_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
-    echo '<div class="admin-brand-text">';
-    echo '<div class="admin-brand-name">Sukat Kalusugan</div>';
-    echo '<div class="admin-brand-sub">Nutritionist console</div>';
-    echo '</div>';
     echo '</div>';
     echo '<button type="button" class="admin-sidebar-collapse" data-admin-sidebar-collapse title="Toggle sidebar">';
     echo '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>';
@@ -211,10 +217,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '</nav>';
 
     echo '<div class="admin-sidebar-footer">';
-    echo '<div class="admin-session-card">';
-    echo '<div class="admin-session-role">' . nutritionist_e(ucfirst($userRole)) . '</div>';
-    echo '<div class="admin-session-name">' . nutritionist_e($userName) . '</div>';
-    echo '</div>';
     echo '<a class="admin-logout" href="' . nutritionist_e($logoutUrl) . '">' . admin_action_icon('logout') . ' Sign out</a>';
     echo '</div>';
 
@@ -227,11 +229,19 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
     echo '</button>';
     echo '<nav class="admin-breadcrumb">';
-    if ($breadcrumb['group'] !== '') {
+    $hasGroup = ($breadcrumb['group'] ?? '') !== '';
+    $hasExtra = isset($breadcrumb['extra']) && $breadcrumb['extra'] !== '';
+    if ($hasGroup) {
         echo '<span class="admin-breadcrumb-group">' . nutritionist_e($breadcrumb['group']) . '</span>';
         echo '<span class="admin-breadcrumb-sep" aria-hidden="true">&#8250;</span>';
     }
-    echo '<span class="admin-breadcrumb-page is-active">' . nutritionist_e($breadcrumb['page']) . '</span>';
+    if ($hasExtra) {
+        echo '<span class="admin-breadcrumb-page">' . nutritionist_e($breadcrumb['page']) . '</span>';
+        echo '<span class="admin-breadcrumb-sep" aria-hidden="true">&#8250;</span>';
+        echo '<span class="admin-breadcrumb-page is-active">' . nutritionist_e($breadcrumb['extra']) . '</span>';
+    } else {
+        echo '<span class="admin-breadcrumb-page is-active">' . nutritionist_e($breadcrumb['page']) . '</span>';
+    }
     echo '</nav>';
     echo '</div>';
     echo '<div class="admin-topbar-right">';
@@ -244,7 +254,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<span class="admin-topbar-role">' . nutritionist_e(ucfirst($userRole)) . '</span>';
     echo '</div>';
     echo '</div>';
-    echo '<span class="admin-topbar-profile-chevron" aria-hidden="true">&#8964;</span>';
     echo '</div>';
     echo '</header>';
 
@@ -256,7 +265,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<main class="admin-content">';
     echo '<div class="admin-pageheader">';
     echo '<div class="admin-pageheader-left">';
-    echo '<p class="admin-kicker">Nutritionist Panel</p>';
     echo '<h1>' . nutritionist_e($title) . '</h1>';
     echo '<p>' . nutritionist_e($subtitle) . '</p>';
     echo '</div>';

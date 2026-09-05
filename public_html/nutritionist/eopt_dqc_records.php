@@ -162,7 +162,7 @@ switch ($issue) {
 
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e($backUrl) . '">Back to Reports</a>';
 
-nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_reports', $actions);
+nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_reports', $actions, 'DQC: ' . $issueTitle);
 ?>
 
 <section class="nutritionist-panel" style="margin-bottom:20px;">
