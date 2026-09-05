@@ -147,15 +147,13 @@ function pdf_scope_and_filter(): array {
 	$barangayFilterParams = [];
 	$barangayName = 'All barangays within scope';
 
-	if ($barangayFilter > 0) {
-		$barangayFilterSql = ' AND c.barangay_id = ?';
-		$barangayFilterParams[] = $barangayFilter;
-		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayFilter]);
+	if ($user['barangay_id'] ?? 0 > 0) {
+		$brgyRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [(int)$user['barangay_id']]);
 		$barangayName = (string)($brgyRow['name'] ?? '');
 	}
 
 	try {
-		$anchorDate = new DateTimeImmutable(sprintf('%04d-%02d-t', $year, $view === 'monthly' ? $month : $checkupMonth));
+		$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $view === 'monthly' ? $month : $checkupMonth)))->modify('last day of this month');
 	} catch (Exception) {
 		$anchorDate = new DateTimeImmutable('today');
 	}
@@ -185,18 +183,19 @@ function pdf_scope_and_filter(): array {
 }
 
 function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ageMax = 59): array {
-	$params = array_merge([$f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']]);
-	$types = 's' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's';
+	$params = array_merge($f['scope_params'], [$f['anchor_param']]);
+	$types = str_repeat('i', count($f['scope_params'])) . 's';
 
 	return admin_fetch_all(
 		"SELECT
 			c.id, c.child_code, c.first_name, c.middle_name, c.last_name,
-			c.sex, c.birthdate, c.purok AS address,
+			c.sex, c.birthdate, la.area_name AS address,
 			bg.name AS barangay, p.name AS parent_name,
 			lm.measurement_date, lm.height_cm, lm.weight_kg,
 			lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.is_flagged
 		 FROM children c
 		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN local_areas la ON la.id = c.local_area_id
 		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
@@ -204,7 +203,7 @@ function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ag
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
-		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
+		 WHERE {$f['scope']}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$ageMin} AND {$ageMax}
 		   AND {$conditionSql}
 		 ORDER BY c.last_name ASC, c.first_name ASC",

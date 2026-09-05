@@ -56,15 +56,13 @@ $barangayFilter = (int)($_GET['barangay_id'] ?? 0);
 $scopeParams = [];
 $scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
 
+$userBarangayId = (int)($user['barangay_id'] ?? 0);
 $barangayFilterSql = '';
 $barangayFilterParams = [];
 $barangayName = 'All barangays';
 
-if ($barangayFilter > 0) {
-	$barangayFilterSql = ' AND c.barangay_id = ?';
-	$barangayFilterParams[] = $barangayFilter;
-
-	$barangayRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$barangayFilter]);
+if ($userBarangayId > 0) {
+	$barangayRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [$userBarangayId]);
 	$barangayName = (string)($barangayRow['name'] ?? '');
 }
 
@@ -74,8 +72,9 @@ if ($barangayFilter > 0) {
  | reporting month (monthly view) or check-up round month (quarterly).
  |--------------------------------------------------------------------------
  */
+$anchorMonth = $view === 'monthly' ? $month : $checkupMonth;
 try {
-	$anchorDate = new DateTimeImmutable(sprintf('%04d-%02d-t', $year, $view === 'monthly' ? $month : $checkupMonth));
+	$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $anchorMonth)))->modify('last day of this month');
 } catch (Exception) {
 	$anchorDate = new DateTimeImmutable('today');
 }
@@ -98,18 +97,13 @@ $periodLabel = $view === 'monthly'
 function eopt_fetch_list(
 	string $scope,
 	array $scopeParams,
-	string $barangayFilterSql,
-	array $barangayFilterParams,
 	string $conditionSql,
 	string $anchorParam,
 	int $ageMin = 0,
 	int $ageMax = 59
 ): array {
-	// The anchor date appears TWICE in the statement — once in the SELECT
-	// age snapshot and once in the WHERE band filter — so it leads and
-	// trails the parameter list (both as strings).
-	$params = array_merge([$anchorParam], $scopeParams, $barangayFilterParams, [$anchorParam]);
-	$types = 's' . str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's';
+	$params = array_merge([$anchorParam, $anchorParam], $scopeParams, [$anchorParam]);
+	$types = 'ss' . str_repeat('i', count($scopeParams)) . 's';
 
 	return admin_fetch_all(
 		"SELECT
@@ -120,7 +114,7 @@ function eopt_fetch_list(
 			c.last_name,
 			c.sex,
 			c.birthdate,
-			c.purok,
+			la.area_name AS address,
 			bg.name AS barangay,
 			p.name AS parent_name,
 			lm.id AS measurement_id,
@@ -135,6 +129,7 @@ function eopt_fetch_list(
 			lm.is_flagged
 		 FROM children c
 		 INNER JOIN parents p ON p.id = c.parent_id
+		 LEFT JOIN local_areas la ON la.id = c.local_area_id
 		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		 INNER JOIN measurements lm ON lm.id = (
 			SELECT m2.id FROM measurements m2
@@ -142,7 +137,7 @@ function eopt_fetch_list(
 			ORDER BY m2.measurement_date DESC, m2.id DESC
 			LIMIT 1
 		 )
-		 WHERE {$scope}{$barangayFilterSql}
+		 WHERE {$scope}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$ageMin} AND {$ageMax}
 		   AND {$conditionSql}
 		 ORDER BY c.last_name ASC, c.first_name ASC",
@@ -165,15 +160,15 @@ $listsSpec = [
 	['code' => 'SW', 'sheet' => 'List_SW', 'title' => 'SEVERELY WASTED', 'axis' => 'Weight-for-Height',
 	 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 	['code' => 'MSt_SSt', 'sheet' => 'List_MSt_SSt', 'title' => 'MODERATELY OR SEVERELY STUNTED', 'axis' => 'Height-for-Age',
-	 'condition' => "lm.hfa_status IN ('St','SSt')", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 	['code' => 'OW_Ob', 'sheet' => 'List_OW_Ob', 'title' => 'OVERWEIGHT OR OBESE', 'axis' => 'Weight-for-Age / Weight-for-Height',
 	 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 	['code' => 'MUW_SUW_MSt_SSt', 'sheet' => 'List_MUW_SUW_MSt_SSt', 'title' => 'MODERATELY/SEVERELY UNDERWEIGHT + MODERATELY/SEVERELY STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age',
-	 'condition' => "(lm.wfa_status IN ('UW','SUW') AND lm.hfa_status IN ('St','SSt'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 	['code' => 'MSt_SSt_MW_SW', 'sheet' => 'List_MSt_SSt_MW_SW', 'title' => 'MODERATELY/SEVERELY STUNTED + MODERATELY/SEVERELY WASTED', 'axis' => 'Height-for-Age + Weight-for-Height',
-	 'condition' => "(lm.hfa_status IN ('St','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 	['code' => 'MSt_SSt_OW_Ob', 'sheet' => 'List_MSt_SSt_OW_Ob', 'title' => 'MODERATELY/SEVERELY STUNTED + OVERWEIGHT OR OBESE', 'axis' => 'Height-for-Age + Weight-for-Height',
-	 'condition' => "(lm.hfa_status IN ('St','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
 ];
 
 /*
@@ -216,10 +211,10 @@ $summaryRows = admin_fetch_all(
 		ORDER BY m2.measurement_date DESC, m2.id DESC
 		LIMIT 1
 	 )
-	 WHERE {$scope}{$barangayFilterSql}
+	 WHERE {$scope}
 	   AND TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) BETWEEN 0 AND 59",
-	's' . str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
-	array_merge([$anchorParam], $scopeParams, $barangayFilterParams, [$anchorParam])
+	's' . str_repeat('i', count($scopeParams)) . 's',
+	array_merge([$anchorParam], $scopeParams, [$anchorParam])
 );
 
 $bucket = static fn(): array => [
@@ -317,8 +312,6 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	$rows = eopt_fetch_list(
 		$scope,
 		$scopeParams,
-		$barangayFilterSql,
-		$barangayFilterParams,
 		$spec['condition'],
 		$anchorParam,
 		$spec['age_min'] ?? 0,
@@ -385,7 +378,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 
 		$dataRow = [
 			['v' => $seq + 1, 's' => 'cell_center'],
-			['v' => (string)($row['purok'] ?? ''), 's' => 'cell'],
+			['v' => (string)($row['address'] ?? ''), 's' => 'cell'],
 			['v' => (string)$row['parent_name'], 's' => 'cell'],
 			['v' => $fullName, 's' => 'cell'],
 			['v' => (string)$row['sex'], 's' => 'cell_center'],

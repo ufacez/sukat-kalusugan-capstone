@@ -245,8 +245,8 @@ function xlsx_lite_column_ref_to_index(string $ref): int
 
 /**
  * Writes a single-sheet .xlsx file made of a header row followed by data
- * rows. All values are written as inline strings so no shared-strings table
- * is needed, which keeps the writer side short.
+ * rows. All string values go into a shared strings table for maximum
+ * Excel compatibility.
  *
  * Thin wrapper over xlsx_lite_write_workbook() — kept for the WHO reference
  * import/export screens which predate the styled multi-sheet writer used by
@@ -336,6 +336,8 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 		return false;
 	}
 
+	$sharedStrings = [];
+
 	$contentTypeOverrides = '';
 	$workbookSheets = '';
 	$workbookRels = '';
@@ -353,7 +355,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 			'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
 			'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
 			'<sheetFormatPr defaultRowHeight="15"/>' .
-			xlsx_lite_sheet_body_xml($spec) .
+			xlsx_lite_sheet_body_xml($spec, $sharedStrings) .
 			'</worksheet>';
 	}
 
@@ -366,6 +368,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 		'<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' .
 		$contentTypeOverrides .
 		'<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' .
+		'<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>' .
 		'</Types>'
 	);
 
@@ -381,6 +384,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 		'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' .
 		$workbookRels .
 		'<Relationship Id="rId' . (count($sheets) + 1) . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' .
+		'<Relationship Id="rId' . (count($sheets) + 2) . '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>' .
 		'</Relationships>'
 	);
 
@@ -393,6 +397,18 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 
 	$zip->addFromString('xl/styles.xml', xlsx_lite_styles_xml());
 
+	// Build and write shared strings table.
+	$ssCount = count($sharedStrings);
+	$ssXml = '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
+		'<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="' . $ssCount . '" uniqueCount="' . $ssCount . '">';
+
+	foreach ($sharedStrings as $str) {
+		$ssXml .= '<si><t xml:space="preserve">' . htmlspecialchars($str, ENT_XML1) . '</t></si>';
+	}
+
+	$ssXml .= '</sst>';
+	$zip->addFromString('xl/sharedStrings.xml', $ssXml);
+
 	// Write sheet XML parts last.
 	foreach ($sheetXmlParts as $partName => $xmlContent) {
 		$zip->addFromString($partName, $xmlContent);
@@ -404,7 +420,7 @@ function xlsx_lite_write_workbook(string $path, array $sheets): bool
 }
 
 /** Builds the <cols>, <sheetData> and <mergeCells> payload of one worksheet. */
-function xlsx_lite_sheet_body_xml(array $spec): string
+function xlsx_lite_sheet_body_xml(array $spec, array &$sharedStrings): string
 {
 	$xml = '';
 
@@ -439,10 +455,11 @@ function xlsx_lite_sheet_body_xml(array $spec): string
 			} else {
 				$stringValue = (string)$value;
 
-				if ($stringValue !== '' && !isset($cell['text']) && is_numeric($stringValue)) {
+				if ($stringValue !== '' && is_numeric($stringValue)) {
 					$xml .= '<c r="' . $cellRef . '" s="' . $styleIndex . '"><v>' . htmlspecialchars($stringValue, ENT_XML1) . '</v></c>';
 				} else {
-					$xml .= '<c r="' . $cellRef . '" s="' . $styleIndex . '" t="inlineStr"><is><t xml:space="preserve">' . htmlspecialchars($stringValue, ENT_XML1) . '</t></is></c>';
+					$ssIndex = xlsx_lite_shared_string_index($sharedStrings, $stringValue);
+					$xml .= '<c r="' . $cellRef . '" s="' . $styleIndex . '" t="s"><v>' . $ssIndex . '</v></c>';
 				}
 			}
 		}
@@ -525,6 +542,19 @@ function xlsx_lite_styles_xml(): string
 		'<cellXfs count="' . count(XLSX_LITE_STYLES) . '">' . $cellXfsXml . '</cellXfs>' .
 		'<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' .
 		'</styleSheet>';
+}
+
+function xlsx_lite_shared_string_index(array &$sharedStrings, string $value): int
+{
+	$existing = array_search($value, $sharedStrings, true);
+
+	if ($existing !== false) {
+		return (int)$existing;
+	}
+
+	$sharedStrings[] = $value;
+
+	return count($sharedStrings) - 1;
 }
 
 function xlsx_lite_index_to_column_ref(int $index): string

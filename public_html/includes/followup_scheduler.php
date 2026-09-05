@@ -106,9 +106,9 @@ function followup_abnormal_codes(?string $wfa, ?string $hfa, ?string $wfh): arra
 	foreach (['wfa' => $wfa, 'hfa' => $hfa, 'wfh' => $wfh] as $axis => $value) {
 		$value = (string)$value;
 
-		if ($axis === 'wfa' && in_array($value, ['SUW', 'UW', 'MUW'], true)) {
+		if ($axis === 'wfa' && in_array($value, ['SUW', 'MUW'], true)) {
 			$codes[] = $value;
-		} elseif ($axis === 'hfa' && in_array($value, ['SSt', 'St', 'MSt'], true)) {
+		} elseif ($axis === 'hfa' && in_array($value, ['SSt', 'MSt'], true)) {
 			$codes[] = $value;
 		} elseif ($axis === 'wfh' && in_array($value, ['SW', 'MW', 'OW', 'Ob'], true)) {
 			$codes[] = $value;
