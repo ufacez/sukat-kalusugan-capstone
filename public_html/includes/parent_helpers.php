@@ -72,12 +72,26 @@ function parent_status_class(?string $status): string
     };
 }
 
+function parent_build_breadcrumb(string $activeSection, array $groupedNav): array
+{
+    foreach ($groupedNav as $group) {
+        foreach ($group['items'] as $item) {
+            if ($item['key'] === $activeSection) {
+                return ['group' => $group['label'], 'page' => $item['label']];
+            }
+        }
+    }
+    return ['group' => '', 'page' => $activeSection];
+}
+
 function parent_layout_start(string $title, string $subtitle, string $activeSection, string $actionsHtml = ''): void
 {
     $currentUser = parent_require_access();
     $flash = admin_flash_message();
     $logoutUrl = app_url('/api/auth/logout.php');
     $userName = $currentUser['name'] ?? 'Parent';
+    $userRole = $currentUser['role'] ?? 'parent';
+    $breadcrumb = parent_build_breadcrumb($activeSection, parent_grouped_nav_items());
 
     echo '<!doctype html>';
     echo '<html lang="en">';
@@ -155,19 +169,25 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
     echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
     echo '</button>';
-    echo '<div class="admin-pagehead">';
-    echo '<p class="admin-kicker">Parent Portal</p>';
-    echo '<h1>' . parent_e($title) . '</h1>';
-    echo '<p>' . parent_e($subtitle) . '</p>';
-    echo '</div>';
+    echo '<nav class="admin-breadcrumb">';
+    if ($breadcrumb['group'] !== '') {
+        echo '<span class="admin-breadcrumb-group">' . parent_e($breadcrumb['group']) . '</span>';
+        echo '<span class="admin-breadcrumb-sep" aria-hidden="true">&#8250;</span>';
+    }
+    echo '<span class="admin-breadcrumb-page is-active">' . parent_e($breadcrumb['page']) . '</span>';
+    echo '</nav>';
     echo '</div>';
     echo '<div class="admin-topbar-right">';
-    echo '<div class="admin-topbar-actions">' . $actionsHtml . '</div>';
     echo admin_topbar_theme_toggle();
     echo '<a href="' . parent_e(app_url('/parent/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
+    echo '<div class="admin-topbar-profile-text">';
+    echo '<span class="admin-topbar-name">' . parent_e($userName) . '</span>';
+    echo '<span class="admin-topbar-role">' . parent_e(ucfirst($userRole)) . '</span>';
     echo '</div>';
+    echo '</div>';
+    echo '<span class="admin-topbar-profile-chevron" aria-hidden="true">&#8964;</span>';
     echo '</div>';
     echo '</header>';
 
@@ -177,6 +197,16 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     }
 
     echo '<main class="admin-content">';
+    echo '<div class="admin-pageheader">';
+    echo '<div class="admin-pageheader-left">';
+    echo '<p class="admin-kicker">Parent Portal</p>';
+    echo '<h1>' . parent_e($title) . '</h1>';
+    echo '<p>' . parent_e($subtitle) . '</p>';
+    echo '</div>';
+    if ($actionsHtml !== '') {
+        echo '<div class="admin-pageheader-actions">' . $actionsHtml . '</div>';
+    }
+    echo '</div>';
 }
 
 function parent_layout_end(): void

@@ -4,6 +4,8 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/followup_scheduler.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 
+ob_start();
+
 $user = nutritionist_require_access();
 
 /**
@@ -464,6 +466,8 @@ if ($isSingleList) {
 		: sprintf('quarterly-%02d%04d', $checkupMonth, $year);
 	$downloadName = 'eopt-report-' . $downloadSlug . '-' . date('Y-m-d') . '.xlsx';
 }
+
+ob_end_clean();
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $downloadName . '"');

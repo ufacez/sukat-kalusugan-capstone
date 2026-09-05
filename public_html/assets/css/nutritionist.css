@@ -1,7 +1,3 @@
-.nutritionist-page .admin-topbar {
-  align-items: center;
-}
-
 /* Legacy stat grid — delegates to admin-card system */
 .nutritionist-page .nutritionist-stat-grid {
   display: grid;
@@ -253,7 +249,7 @@
     grid-column: 1;
   }
 
-  .nutritionist-page .admin-topbar-actions {
+  .nutritionist-page .admin-pageheader-actions {
     width: 100%;
   }
 
@@ -274,10 +270,6 @@
 
   .nutritionist-page .nutritionist-patient-table {
     min-width: 800px;
-  }
-
-  .nutritionist-page .admin-pagehead h1 {
-    font-size: 1.4rem;
   }
 
   .nutritionist-page .nutritionist-toolbar {
@@ -337,7 +329,7 @@
 }
 
 /* File icon next to WHO Reference title */
-.who-ref-layout .admin-pagehead h1::before {
+.who-ref-layout .admin-pageheader-left h1::before {
   content: '';
   display: inline-block;
   width: 28px;

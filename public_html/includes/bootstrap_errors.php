@@ -10,7 +10,7 @@
 
 $appEnv = defined('APP_ENV') ? APP_ENV : 'development';
 
-if ($appEnv === 'production') {
+if ($appEnv === 'development') {
     // Never show raw errors/warnings/stack traces to visitors in production —
     // they can leak file paths, SQL, and other internals.
     error_reporting(E_ALL);

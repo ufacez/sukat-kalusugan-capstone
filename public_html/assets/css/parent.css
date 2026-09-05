@@ -1,7 +1,3 @@
-.parent-page .admin-topbar {
-  align-items: center;
-}
-
 /* Legacy stat grid — delegates to admin-card system */
 .parent-page .parent-stat-grid {
   display: grid;
@@ -189,7 +185,7 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .parent-page .admin-topbar-actions {
+  .parent-page .admin-pageheader-actions {
     width: 100%;
   }
 
@@ -206,10 +202,6 @@
 
   .parent-page .parent-table th {
     font-size: 0.68rem;
-  }
-
-  .parent-page .admin-pagehead h1 {
-    font-size: 1.4rem;
   }
 
   .parent-page .parent-toolbar {
