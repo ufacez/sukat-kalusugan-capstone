@@ -751,7 +751,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 		</div>
 	</div>
 
-	<div class="appt-table-wrap">
+	<div class="appt-table-wrap admin-table-wrap admin-table-wrap--with-pagination">
 		<table class="nutritionist-table" id="all-appointments-table" data-no-paginate>
 			<thead>
 				<tr>
@@ -824,52 +824,52 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 				<?php endforeach; ?>
 			</tbody>
 		</table>
-	</div>
 
-	<div class="admin-table-pagination">
-		<span class="admin-table-page-info">
-			Showing <?php echo $displayTotal > 0 ? ($tableStart + 1) : 0; ?>–<?php echo $tableEnd; ?> of <?php echo $displayTotal; ?> appointments
-		</span>
-		<div class="admin-table-pages">
-			<?php
-			$queryBase = array_filter([
-				'status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId > 0 ? $filterChildId : null,
-				'from' => $filterFrom, 'to' => $filterTo, 'q' => $tableSearch,
-			], static fn($v) => $v !== null && $v !== '');
-			$linkFor = static function (int $p) use ($queryBase): string {
-				$params = $queryBase;
-				if ($p > 1) {
-					$params['page'] = $p;
-				} elseif (isset($params['page'])) {
-					unset($params['page']);
-				}
-				return app_url('/nutritionist/appointments.php' . (empty($params) ? '' : '?' . http_build_query($params)));
-			};
-			?>
-			<button class="admin-table-page-btn" <?php echo $tablePage <= 1 ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage - 1)); ?>">‹</button>
-			<?php
-			$pageNumbers = [];
-			if ($totalPages <= 7) {
-				$pageNumbers = range(1, $totalPages);
-			} else {
-				$pageNumbers = [1, 2, 3];
-				if ($tablePage > 4) $pageNumbers[] = '…';
-				if ($tablePage > 3 && $tablePage < $totalPages - 1) $pageNumbers[] = $tablePage;
-				if ($tablePage < $totalPages - 2) $pageNumbers[] = '…';
-				$pageNumbers[] = $totalPages - 1;
-				$pageNumbers[] = $totalPages;
-				$pageNumbers = array_values(array_unique($pageNumbers));
-			}
-			foreach ($pageNumbers as $pn) {
-				if ($pn === '…') {
-					echo '<span class="admin-table-page-dots">…</span>';
+		<div class="admin-table-pagination">
+			<span class="admin-table-page-info">
+				Showing <?php echo $displayTotal > 0 ? ($tableStart + 1) : 0; ?>–<?php echo $tableEnd; ?> of <?php echo $displayTotal; ?> appointments
+			</span>
+			<div class="admin-table-pages">
+				<?php
+				$queryBase = array_filter([
+					'status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId > 0 ? $filterChildId : null,
+					'from' => $filterFrom, 'to' => $filterTo, 'q' => $tableSearch,
+				], static fn($v) => $v !== null && $v !== '');
+				$linkFor = static function (int $p) use ($queryBase): string {
+					$params = $queryBase;
+					if ($p > 1) {
+						$params['page'] = $p;
+					} elseif (isset($params['page'])) {
+						unset($params['page']);
+					}
+					return app_url('/nutritionist/appointments.php' . (empty($params) ? '' : '?' . http_build_query($params)));
+				};
+				?>
+				<button class="admin-table-page-btn" <?php echo $tablePage <= 1 ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage - 1)); ?>">‹</button>
+				<?php
+				$pageNumbers = [];
+				if ($totalPages <= 7) {
+					$pageNumbers = range(1, $totalPages);
 				} else {
-					$cls = 'admin-table-page-btn' . ($pn === $tablePage ? ' is-active' : '');
-					echo '<button class="' . $cls . '" data-href="' . nutritionist_e($linkFor((int)$pn)) . '">' . (int)$pn . '</button>';
+					$pageNumbers = [1, 2, 3];
+					if ($tablePage > 4) $pageNumbers[] = '…';
+					if ($tablePage > 3 && $tablePage < $totalPages - 1) $pageNumbers[] = $tablePage;
+					if ($tablePage < $totalPages - 2) $pageNumbers[] = '…';
+					$pageNumbers[] = $totalPages - 1;
+					$pageNumbers[] = $totalPages;
+					$pageNumbers = array_values(array_unique($pageNumbers));
 				}
-			}
-			?>
-			<button class="admin-table-page-btn" <?php echo $tablePage >= $totalPages ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage + 1)); ?>">›</button>
+				foreach ($pageNumbers as $pn) {
+					if ($pn === '…') {
+						echo '<span class="admin-table-page-dots">…</span>';
+					} else {
+						$cls = 'admin-table-page-btn' . ($pn === $tablePage ? ' is-active' : '');
+						echo '<button class="' . $cls . '" data-href="' . nutritionist_e($linkFor((int)$pn)) . '">' . (int)$pn . '</button>';
+					}
+				}
+				?>
+				<button class="admin-table-page-btn" <?php echo $tablePage >= $totalPages ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage + 1)); ?>">›</button>
+			</div>
 		</div>
 	</div>
 </section>

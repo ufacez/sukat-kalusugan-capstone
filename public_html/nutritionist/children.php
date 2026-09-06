@@ -194,6 +194,19 @@ nutritionist_layout_start(
 .cc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0;width:120px}
 .cc-row .value{font-weight:600;color:var(--admin-text);text-align:right;flex:1;min-width:0;word-break:break-word}
 .cc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+
+@media (max-width: 560px) {
+  .children-toolbar{flex-direction:column;align-items:stretch}
+  .children-toolbar .admin-search{min-width:0;flex:1}
+  .children-toolbar .admin-select{min-width:0;max-width:100%;width:100%}
+  .cc-modal{max-width:calc(100vw - 16px);max-height:85vh}
+  .cc-row{flex-direction:column;gap:4px}
+  .cc-row .label{width:auto;flex-shrink:0}
+  .cc-row .value{text-align:left}
+  .cc-head{padding:14px 16px}
+  .cc-body{padding:14px 16px}
+  .cc-foot{padding:12px 16px}
+}
 </style>
 
 <section class="nutritionist-panel">

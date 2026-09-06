@@ -19,6 +19,7 @@ function nutritionist_nav_items(): array
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
+        ['key' => 'ai_assistant', 'label' => 'AI Assistant', 'href' => app_url('/nutritionist/ai_assistant.php')],
     ];
 }
 
@@ -52,6 +53,12 @@ function nutritionist_grouped_nav_items(): array
             'items' => [
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php'), 'icon' => 'calendar'],
                 ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php'), 'icon' => 'document'],
+            ],
+        ],
+        [
+            'label' => 'Tools',
+            'items' => [
+                ['key' => 'ai_assistant', 'label' => 'AI Assistant', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
     ];
@@ -179,7 +186,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css?v=' . $nutritionistCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . nutritionist_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
 
-    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/chatbot.css')) . '">';
     echo '<script>';
     echo '(function(){';
     echo 'var t=localStorage.getItem("theme");';
@@ -234,7 +240,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<button class="admin-sidebar-toggle" type="button" data-admin-sidebar-toggle aria-label="Toggle navigation" aria-expanded="false">';
     echo '<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>';
     echo '</button>';
-    echo '<nav class="admin-breadcrumb">';
+    echo '<nav class="admin-breadcrumb" data-admin-breadcrumb>';
     $hasGroup = ($breadcrumb['group'] ?? '') !== '';
     $hasExtra = isset($breadcrumb['extra']) && $breadcrumb['extra'] !== '';
     if ($hasGroup) {
@@ -290,10 +296,6 @@ function nutritionist_layout_end(): void
     $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
-
-    $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'staff'];
-    echo '<script>window.CHATBOT_CONFIG = ' . json_encode($chatbotConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';
-    echo '<script src="' . nutritionist_e(app_url('/assets/js/chatbot_widget.js')) . '"></script>';
 
     echo '</body>';
     echo '</html>';

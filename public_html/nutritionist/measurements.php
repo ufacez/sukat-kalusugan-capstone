@@ -74,9 +74,9 @@ $children = admin_fetch_all(
             WHEN lm.whz > 2 THEN 'Overweight'
             ELSE 'Normal'
         END) AS nutritional_status,
-        COALESCE(lm.wfa_status, CASE WHEN lm.waz < -3 THEN 'SUW' WHEN lm.waz < -2 THEN 'MUW' WHEN lm.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END) AS wfa_status,
-        COALESCE(lm.hfa_status, CASE WHEN lm.haz < -3 THEN 'SSt' WHEN lm.haz < -2 THEN 'MSt' WHEN lm.haz > 2 THEN 'Tall' ELSE 'Normal' END) AS hfa_status,
-        COALESCE(lm.wfh_status, CASE WHEN lm.whz < -3 THEN 'SW' WHEN lm.whz < -2 THEN 'MW' WHEN lm.whz > 3 THEN 'Ob' WHEN lm.whz > 2 THEN 'OW' ELSE 'Normal' END) AS wfh_status
+        CASE WHEN lm.waz < -3 THEN 'SUW' WHEN lm.waz < -2 THEN 'MUW' WHEN lm.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END AS wfa_status,
+        CASE WHEN lm.haz < -3 THEN 'SSt' WHEN lm.haz < -2 THEN 'MSt' WHEN lm.haz > 2 THEN 'Tall' ELSE 'Normal' END AS hfa_status,
+        CASE WHEN lm.whz < -3 THEN 'SW' WHEN lm.whz < -2 THEN 'MW' WHEN lm.whz > 3 THEN 'Ob' WHEN lm.whz > 2 THEN 'OW' ELSE 'Normal' END AS wfh_status
      FROM children c
      INNER JOIN parents p ON p.id = c.parent_id
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -121,9 +121,9 @@ $historyRows = admin_fetch_all(
             WHEN m.whz > 2 THEN 'Overweight'
             ELSE 'Normal'
         END) AS nutritional_status,
-        COALESCE(m.wfa_status, CASE WHEN m.waz < -3 THEN 'SUW' WHEN m.waz < -2 THEN 'MUW' WHEN m.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END) AS wfa_status,
-        COALESCE(m.hfa_status, CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END) AS hfa_status,
-        COALESCE(m.wfh_status, CASE WHEN m.whz < -3 THEN 'SW' WHEN m.whz < -2 THEN 'MW' WHEN m.whz > 3 THEN 'Ob' WHEN m.whz > 2 THEN 'OW' ELSE 'Normal' END) AS wfh_status,
+        CASE WHEN m.waz < -3 THEN 'SUW' WHEN m.waz < -2 THEN 'MUW' WHEN m.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END AS wfa_status,
+        CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END AS hfa_status,
+        CASE WHEN m.whz < -3 THEN 'SW' WHEN m.whz < -2 THEN 'MW' WHEN m.whz > 3 THEN 'Ob' WHEN m.whz > 2 THEN 'OW' ELSE 'Normal' END AS wfh_status,
         m.source_type,
         m.is_flagged
      FROM measurements m
@@ -299,6 +299,18 @@ nutritionist_layout_start(
 .mc-foot .right{display:flex;gap:8px;flex-wrap:wrap}
 
 .mc-empty{text-align:center;color:var(--admin-muted);font-size:12px;padding:18px;background:var(--admin-surface-alt);border-radius:10px;border:1px dashed var(--admin-border)}
+
+@media (max-width: 560px) {
+  .measurements-toolbar{flex-direction:column;align-items:stretch}
+  .measurements-toolbar .admin-search{min-width:0;flex:1}
+  .measurements-toolbar .admin-select{min-width:0;max-width:100%;width:100%}
+  .mc-modal{max-width:calc(100vw - 16px);max-height:85vh}
+  .mc-vitals{grid-template-columns:1fr 1fr}
+  .mc-assessment{grid-template-columns:1fr}
+  .mc-head{padding:14px 16px}
+  .mc-body{padding:14px 16px}
+  .mc-foot{padding:12px 16px}
+}
 </style>
 
 <section class="measurements-stats">

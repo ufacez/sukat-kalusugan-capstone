@@ -89,7 +89,7 @@ function rp_render_table(string $key, string $label, array $rows, int $currentPa
         </div>
     </div>
 
-    <div class="admin-table-wrap" style="overflow:visible;">
+    <div class="admin-table-wrap admin-table-wrap--with-pagination">
         <table class="admin-table" id="<?php echo admin_e($key); ?>-table">
             <thead>
                 <tr>
@@ -140,33 +140,33 @@ function rp_render_table(string $key, string $label, array $rows, int $currentPa
                 <?php endif; ?>
             </tbody>
         </table>
-    </div>
 
-    <?php if ($totalPages > 1): ?>
-    <div class="admin-pagination">
-        <span class="admin-pagination-status">Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
-        <div class="admin-pagination-actions">
-            <?php
-            $baseParam = $key === 'admin' ? 'admin_page' : 'nutri_page';
-            $params = $_GET;
-            unset($params[$baseParam]);
-            $qs = http_build_query($params);
-            $prefix = $qs ? $qs . '&' : '';
-            ?>
-            <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage - 1)); ?>" <?php echo $currentPage <= 1 ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
-            </a>
-            <div class="admin-pagination-numbers">
-                <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                    <a class="admin-page-num<?php echo $i === $currentPage ? ' is-active' : ''; ?>" href="?<?php echo admin_e($prefix . $baseParam . '=' . $i); ?>"><?php echo $i; ?></a>
-                <?php endfor; ?>
+        <?php if ($totalPages > 1): ?>
+        <div class="admin-pagination">
+            <span class="admin-pagination-status">Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
+            <div class="admin-pagination-actions">
+                <?php
+                $baseParam = $key === 'admin' ? 'admin_page' : 'nutri_page';
+                $params = $_GET;
+                unset($params[$baseParam]);
+                $qs = http_build_query($params);
+                $prefix = $qs ? $qs . '&' : '';
+                ?>
+                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage - 1)); ?>" <?php echo $currentPage <= 1 ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+                </a>
+                <div class="admin-pagination-numbers">
+                    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
+                        <a class="admin-page-num<?php echo $i === $currentPage ? ' is-active' : ''; ?>" href="?<?php echo admin_e($prefix . $baseParam . '=' . $i); ?>"><?php echo $i; ?></a>
+                    <?php endfor; ?>
+                </div>
+                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage + 1)); ?>" <?php echo $currentPage >= $totalPages ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+                </a>
             </div>
-            <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage + 1)); ?>" <?php echo $currentPage >= $totalPages ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
-            </a>
         </div>
+        <?php endif; ?>
     </div>
-    <?php endif; ?>
 </section>
 <?php
 }

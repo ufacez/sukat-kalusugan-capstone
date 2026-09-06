@@ -55,9 +55,9 @@ $summaryRows = admin_fetch_all(
 	"SELECT
 		c.sex,
 		CASE WHEN TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) < 24 THEN '0-23' ELSE '24-59' END AS age_band,
-		m.wfa_status,
-		m.hfa_status,
-		m.wfh_status
+		CASE WHEN m.waz < -3 THEN 'SUW' WHEN m.waz < -2 THEN 'MUW' WHEN m.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END AS wfa_status,
+		CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END AS hfa_status,
+		CASE WHEN m.whz < -3 THEN 'SW' WHEN m.whz < -2 THEN 'MW' WHEN m.whz > 3 THEN 'Ob' WHEN m.whz > 2 THEN 'OW' ELSE 'Normal' END AS wfh_status
 	 FROM children c
 	 INNER JOIN measurements m ON m.id = (
 		SELECT m2.id FROM measurements m2

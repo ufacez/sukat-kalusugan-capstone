@@ -560,7 +560,7 @@
   border: 1px solid var(--admin-border);
   border-radius: 14px;
   box-shadow: var(--admin-shadow);
-  overflow: hidden;
+  overflow: visible;
 }
 
 .who-ref-table-header {
@@ -642,7 +642,10 @@
 
 /* --- Table --- */
 .who-ref-table-wrap {
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  -webkit-overflow-scrolling: touch;
 }
 
 .who-ref-table {
@@ -781,6 +784,35 @@
   padding: 12px 22px;
   border-top: 1px solid var(--admin-border);
   flex-wrap: wrap;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .who-ref-table-wrap,
+  .admin-page .who-ref-table-wrap {
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    border-radius: 12px;
+  }
+
+  .nutritionist-page .who-ref-pagination,
+  .admin-page .who-ref-pagination {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .nutritionist-page .who-ref-page-info,
+  .admin-page .who-ref-page-info {
+    text-align: center;
+  }
+
+  .nutritionist-page .who-ref-page-btns,
+  .admin-page .who-ref-page-btns {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
 }
 
 .who-ref-page-info {
@@ -2759,7 +2791,7 @@
 .who-prev-chart-wrap {
   position: relative;
   width: 100%;
-  height: 300px;
+  height: clamp(220px, 50vw, 300px);
 }
 .who-prev-chart-wrap canvas {
   width: 100% !important;
@@ -2787,6 +2819,8 @@
   line-height: 1.55;
   box-shadow: 0 8px 24px rgba(0,0,0,0.18);
   border: 1px solid rgba(255,255,255,0.08);
+  max-width: min(320px, calc(100vw - 32px));
+  overflow-wrap: break-word;
 }
 .who-chart-tooltip::after {
   content: '';
@@ -2858,19 +2892,20 @@
   .who-age-sex-row {
     grid-template-columns: 1fr;
   }
+}
 
-  @media (max-width: 980px) {
-    .dashboard-who-grid {
-      grid-template-columns: minmax(0, 1fr) 250px;
-    }
-  }
-
-  @media (max-width: 760px) {
-    .dashboard-who-grid {
-      grid-template-columns: minmax(0, 1fr);
-    }
+@media (max-width: 980px) {
+  .dashboard-who-grid {
+    grid-template-columns: minmax(0, 1fr) 250px;
   }
 }
+
+@media (max-width: 760px) {
+  .dashboard-who-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 @media (max-width: 760px) {
   .who-filters-bar {
     flex-direction: column;
@@ -2892,6 +2927,14 @@
   .who-sex-block {
     flex-direction: column;
     align-items: center;
+  }
+  /* Date range inputs stack vertically so they don't exceed the container. */
+  .who-date-range {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .who-date-sep {
+    display: none;
   }
 }
 
@@ -3518,20 +3561,40 @@
 
 @media (max-width: 960px) {
   .admin-spotmap-filters {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: end;
+  }
+  .admin-spotmap-filter {
+    min-width: 0;
   }
   .admin-spotmap-filter-date {
-    flex-direction: column;
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto minmax(0, 1fr);
     align-items: stretch;
+  }
+  .admin-spotmap-filter-date .admin-spotmap-filter-label {
+    grid-column: 1 / -1;
+    width: auto;
   }
   .admin-spotmap-filter-date .admin-spotmap-filter-input {
     width: 100%;
   }
+  .admin-spotmap-clear-btn {
+    grid-column: 2;
+    justify-self: end;
+    margin-left: 0;
+  }
   .admin-spotmap-panel {
-    position: fixed;
-    right: -100%;
+    position: static;
     width: 100%;
-    max-width: 360px;
+    max-width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 12px;
+    border: 1px solid var(--admin-border);
+    border-radius: 14px;
   }
   .admin-spotmap-form-row {
     flex-direction: column;
@@ -4544,4 +4607,283 @@
 [data-theme="dark"] .sk-cal-day.is-selected {
   background: var(--admin-primary);
   color: #fff;
+}
+
+/* ============================================================================
+ *  NUTRITIONIST-SPECIFIC RESPONSIVE LAYER
+ * ----------------------------------------------------------------------------
+ *  The shared responsive rules in admin.css already target
+ *  `body.nutritionist-page` for most of the layout work. This block adds
+ *  nutritionist-only patches: who-ref-* grid, child measurement modal,
+ *  prevalence x-axis labels, the table wraps used by appointments and
+ *  recent-measurements, and the chatbot widget.
+ * ========================================================================== */
+
+/* --- who-ref tabs scroll horizontally on small screens --- */
+@media (max-width: 720px) {
+  .nutritionist-page .who-ref-tabs-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    gap: 0;
+  }
+  .nutritionist-page .who-ref-main-tab {
+    flex-shrink: 0;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+  }
+}
+
+/* --- Prevalence charts: x-axis labels are crowded on small screens --- */
+.nutritionist-page .wa-prevalence-wrap,
+.nutritionist-page .wa-chart,
+.admin-page .wa-prevalence-wrap,
+.admin-page .wa-chart {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.nutritionist-page .wa-chart canvas,
+.admin-page .wa-chart canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .wa-prevalence-wrap,
+  .admin-page .wa-prevalence-wrap {
+    padding: 4px 0;
+  }
+  /* Slightly taller so the x-axis labels don't crowd the bars. */
+  .nutritionist-page .wa-chart,
+  .admin-page .wa-chart {
+    min-height: 220px;
+  }
+  /* Tooltip wraps text on small screens so it doesn't overflow the chart. */
+  .who-chart-tooltip {
+    white-space: normal;
+    max-width: calc(100vw - 32px);
+    font-size: 10px;
+  }
+}
+
+/* --- The view-measurement modal in children.php --- */
+.nutritionist-page .vm-measurement-grid,
+.admin-page .vm-measurement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.nutritionist-page .vm-measurement-cell,
+.admin-page .vm-measurement-cell {
+  min-width: 0;
+  word-break: break-word;
+}
+
+.nutritionist-page .vm-measurement-cell strong,
+.admin-page .vm-measurement-cell strong {
+  display: block;
+  word-break: break-all;
+  max-width: 100%;
+}
+
+@media (max-width: 560px) {
+  .nutritionist-page .vm-measurement-grid,
+  .admin-page .vm-measurement-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .nutritionist-page .vm-measurement-cell strong,
+  .admin-page .vm-measurement-cell strong {
+    font-size: 0.82rem;
+  }
+}
+
+/* --- WHO reference table & filter bar --- */
+.nutritionist-page .who-ref-filters,
+.admin-page .who-ref-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.nutritionist-page .who-ref-filter-group,
+.admin-page .who-ref-filter-group {
+  flex: 1 1 140px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.nutritionist-page .who-ref-filter-group .who-ref-select,
+.admin-page .who-ref-filter-group .who-ref-select,
+.nutritionist-page .who-ref-filter-group select,
+.admin-page .who-ref-filter-group select {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .who-ref-table-header,
+  .admin-page .who-ref-table-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 10px;
+    padding: 12px 14px;
+  }
+
+  .nutritionist-page .who-ref-table-title,
+  .admin-page .who-ref-table-title {
+    white-space: normal;
+  }
+
+  .nutritionist-page .who-ref-filters,
+  .admin-page .who-ref-filters {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: stretch;
+    gap: 8px;
+  }
+  .nutritionist-page .who-ref-filter-group,
+  .admin-page .who-ref-filter-group {
+    flex: none;
+    min-width: 0;
+    width: 100%;
+  }
+  .nutritionist-page .who-ref-select,
+  .admin-page .who-ref-select,
+  .nutritionist-page .who-ref-toggle-group,
+  .admin-page .who-ref-toggle-group {
+    width: 100%;
+    min-width: 0;
+  }
+  .nutritionist-page .who-ref-toggle,
+  .admin-page .who-ref-toggle {
+    flex: 1 1 50%;
+    text-align: center;
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+}
+
+/* --- Recent measurements table (nutritionist dashboard widget) --- */
+.nutritionist-page .nutritionist-recent-table,
+.admin-page .nutritionist-recent-table {
+  min-width: 560px;
+  width: 100%;
+}
+
+/* --- Appointments table --- */
+.nutritionist-page .appt-table-wrap,
+.admin-page .appt-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .appt-table-wrap table th,
+  .nutritionist-page .appt-table-wrap table td,
+  .admin-page .appt-table-wrap table th,
+  .admin-page .appt-table-wrap table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .nutritionist-page .appt-table-wrap,
+  .admin-page .appt-table-wrap {
+    border-radius: 14px;
+  }
+  .nutritionist-page .appt-table-wrap table,
+  .admin-page .appt-table-wrap table {
+    min-width: 700px;
+  }
+  /* Appointment filter form stacks vertically on mobile. */
+  .nutritionist-page .appt-filter-form .appt-field-row,
+  .admin-page .appt-filter-form .appt-field-row {
+    flex-direction: column;
+    gap: 6px;
+  }
+  .nutritionist-page .appt-field-sep,
+  .admin-page .appt-field-sep {
+    display: none;
+  }
+}
+
+/* --- Risk map filter layout (centered / single column) --- */
+.nutritionist-page .riskmap-filters,
+.admin-page .riskmap-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.nutritionist-page .riskmap-filters .admin-field,
+.nutritionist-page .riskmap-filters .admin-search,
+.nutritionist-page .riskmap-filters select,
+.nutritionist-page .riskmap-filters input,
+.admin-page .riskmap-filters .admin-field,
+.admin-page .riskmap-filters .admin-search,
+.admin-page .riskmap-filters select,
+.admin-page .riskmap-filters input {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .riskmap-filters,
+  .admin-page .riskmap-filters {
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: stretch;
+  }
+  .nutritionist-page .riskmap-filters .admin-field,
+  .nutritionist-page .riskmap-filters .admin-search,
+  .nutritionist-page .riskmap-filters select,
+  .nutritionist-page .riskmap-filters input,
+  .admin-page .riskmap-filters .admin-field,
+  .admin-page .riskmap-filters .admin-search,
+  .admin-page .riskmap-filters select,
+  .admin-page .riskmap-filters input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
+/* --- Children.php list: when the table is too wide it should scroll --- */
+.nutritionist-page .nutritionist-table-wrap,
+.admin-page .nutritionist-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+/* --- Stat card text never overflows the card on mobile --- */
+.nutritionist-page .admin-card-value,
+.admin-page .admin-card-value {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.1;
+}
+
+/* --- Chatbot widget: never blocks the bottom of the page on mobile --- */
+.nutritionist-page #chatbot-bubble,
+.admin-page #chatbot-bubble {
+  bottom: max(12px, env(safe-area-inset-bottom));
+  right: max(12px, env(safe-area-inset-right));
 }

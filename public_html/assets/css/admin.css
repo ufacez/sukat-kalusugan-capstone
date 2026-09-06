@@ -2412,6 +2412,1015 @@
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
 }
 
+/* ============================================================================
+ *  GLOBAL RESPONSIVE LAYER
+ * ----------------------------------------------------------------------------
+ *  This block is the single source of truth for the admin & nutritionist UI's
+ *  mobile behavior. The previous layout was a handful of hand-tuned
+ *  breakpoints (920/720/480 px) that left obvious gaps on in-between phones.
+ *  The rules below use a fluid container-driven ladder (1100 / 880 / 720 / 560
+ *  / 420 px) and `clamp()` for type and padding so the layout adapts to every
+ *  viewport size, not just a few custom ones.
+ *
+ *  SCOPE: Everything below is scoped to `body.admin-page` and
+ *  `body.nutritionist-page` (both share these classes) so the kiosk, parent
+ *  portal, and login pages are intentionally excluded.
+ * ========================================================================== */
+body.admin-page,
+body.nutritionist-page {
+  /* Global base sizes that scale fluidly between phone and desktop. */
+  --admin-pageheader-h1-min: 1.05rem;
+  --admin-pageheader-h1-mid: 1.4rem;
+  --admin-pageheader-h1-max: 2.2rem;
+  --admin-section-padding-min: 12px;
+  --admin-section-padding-max: 22px;
+  --admin-card-padding-min: 12px;
+  --admin-card-padding-max: 22px;
+  --admin-table-cell-padding-min: 8px;
+  --admin-table-cell-padding-max: 14px;
+  --admin-topbar-padding-min: 6px;
+  --admin-topbar-padding-max: 18px;
+}
+
+/* ---- Always-on, viewport-agnostic fixes (no media query) ---- */
+body.admin-page input[type="checkbox"],
+body.admin-page input[type="radio"],
+body.nutritionist-page input[type="checkbox"],
+body.nutritionist-page input[type="radio"],
+.admin-field input[type="checkbox"],
+.admin-field input[type="radio"],
+.checkbox input,
+.admin-field-checkbox input[type="checkbox"] {
+  accent-color: var(--admin-primary);
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+/* Native <select> arrow + checkbox color follow the theme color so they
+ * never look like the browser default white box. */
+body.admin-page select,
+body.nutritionist-page select {
+  accent-color: var(--admin-primary);
+}
+
+/* ---- Tables: horizontal scroll wrapper that keeps pagination glued ----
+ * The wrapper owns the scroll, the table sets a min-width so columns don't
+ * squash, and the pagination footer (if present) is rendered inside the
+ * same wrapper via `.admin-table-wrap--with-pagination`. Result: the user
+ * can scroll the rows AND see "Page 1 of N" without the footer falling
+ * off-screen. */
+.admin-table-wrap,
+.nutritionist-table-wrap,
+.who-ref-table-wrap {
+  overflow-x: auto;
+  overflow-y: visible;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+  position: relative;
+  max-width: 100%;
+}
+
+.admin-table-wrap::after,
+.nutritionist-table-wrap::after,
+.who-ref-table-wrap::after {
+  content: "";
+  position: sticky;
+  top: 0;
+  right: 0;
+  width: 16px;
+  height: 100%;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--admin-surface) 80%
+  );
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.admin-table-wrap:hover::after,
+.nutritionist-table-wrap:hover::after,
+.who-ref-table-wrap:hover::after,
+.admin-table-wrap:focus-within::after,
+.nutritionist-table-wrap:focus-within::after {
+  opacity: 0.6;
+}
+
+/* Variant: pagination lives INSIDE the wrapper so the user never loses
+ * track of which page they're on while scrolling rows. */
+.admin-table-wrap--with-pagination {
+  display: flex;
+  flex-direction: column;
+}
+
+.admin-table-wrap--with-pagination > .admin-table,
+.admin-table-wrap--with-pagination > .nutritionist-table {
+  flex: 1 1 auto;
+}
+
+.admin-table-wrap--with-pagination > .admin-pagination,
+.admin-table-wrap--with-pagination > .admin-table-pagination,
+.admin-table-wrap--with-pagination > .admin-pagination-footer,
+.admin-table-wrap--with-pagination > div[role="navigation"] {
+  position: static;
+  background: var(--admin-surface);
+  border-top: 1px solid var(--admin-border);
+  padding: 10px 12px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ---- ANY pagination / table-pagination inside ANY table wrap is sticky -- */
+.admin-table-wrap > .admin-pagination,
+.admin-table-wrap > .admin-table-pagination,
+.admin-table-wrap > .admin-pagination-footer,
+.nutritionist-table-wrap > .admin-pagination,
+.nutritionist-table-wrap > .admin-table-pagination,
+.who-ref-table-wrap > .admin-pagination,
+.who-ref-table-wrap > .admin-table-pagination {
+  position: static;
+  background: var(--admin-surface);
+  border-top: 1px solid var(--admin-border);
+  padding: 10px 12px;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  .admin-table-pagination,
+  .admin-pagination-footer {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+
+  .admin-table-pagination .admin-table-page-info,
+  .admin-pagination-footer .admin-pagination-status {
+    text-align: center;
+  }
+
+  .admin-table-pagination .admin-table-pages,
+  .admin-pagination-footer .admin-pagination-actions {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+}
+
+/* ---- Breadcrumb: truncate inner text on small viewports ----
+ * `data-admin-breadcrumb` is the JS hook. The `.is-truncated` class is
+ * added/removed by admin.js based on the viewport width breakpoint. */
+.admin-breadcrumb {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.admin-breadcrumb.is-truncated .admin-breadcrumb-group,
+.admin-breadcrumb.is-truncated .admin-breadcrumb-page {
+  max-width: 5.5ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+/* ---- Topbar: keep the three control icons (toggle / theme / settings)
+ *      on the LEFT of the breadcrumb so the breadcrumb truncates rather
+ *      than pushing the icons below it. */
+.admin-topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.admin-topbar-left .admin-breadcrumb {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* ---- Chart canvas: fluid height + responsive re-init hook ---- */
+canvas[data-fluid-chart] {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
+/* ============================================================================
+ *  RESPONSIVE LADDER
+ * ----------------------------------------------------------------------------
+ *  Five media-query tiers cover every common phone/tablet size. Each tier
+ *  reduces padding, font sizes, and grid columns fluidly. Between tiers the
+ *  layout interpolates via clamp() (see the section above for the token
+ *  definitions).
+ * ========================================================================== */
+
+/* Tier 1: small tablets / large phones (<= 1100px) */
+@media (max-width: 1100px) {
+  body.admin-page .admin-grid-cards,
+  body.admin-page .admin-grid-3,
+  body.admin-page .admin-grid-6,
+  body.admin-page .admin-settings-grid,
+  body.nutritionist-page .nutritionist-stat-grid,
+  body.nutritionist-page .nutritionist-panel-grid,
+  body.nutritionist-page .nutritionist-panel-grid.is-balanced {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  body.admin-page .admin-dashboard-maprow,
+  body.admin-page .admin-riskmap-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Tier 2: tablets in portrait / large phones (<= 880px) */
+@media (max-width: 880px) {
+  body.admin-page .admin-form-grid,
+  body.admin-page .admin-pw-checklist,
+  body.admin-page .admin-address-picker,
+  body.admin-page .admin-csfp-picker,
+  body.admin-page .admin-field-row,
+  body.nutritionist-page .nutritionist-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body.admin-page .admin-pageheader {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  body.admin-page .admin-pageheader-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+}
+
+/* Tier 3: phones in landscape / large portrait (<= 720px) */
+@media (max-width: 720px) {
+  body.admin-page,
+  body.nutritionist-page {
+    --admin-pageheader-h1-min: 1.15rem;
+    --admin-section-padding-min: 12px;
+    --admin-card-padding-min: 12px;
+    --admin-topbar-padding-min: 6px;
+  }
+
+  body.admin-page .admin-main,
+  body.nutritionist-page .nutritionist-main,
+  body.nutritionist-page .admin-main {
+    padding: 12px 12px 24px;
+  }
+
+  body.admin-page .admin-section,
+  body.nutritionist-page .admin-section {
+    padding: 14px;
+  }
+
+  body.admin-page .admin-card {
+    padding: 14px;
+  }
+
+  body.admin-page .admin-grid-cards,
+  body.admin-page .admin-grid-3,
+  body.admin-page .admin-grid-6,
+  body.admin-page .admin-form-grid,
+  body.admin-page .admin-pw-checklist,
+  body.admin-page .admin-address-picker,
+  body.admin-page .admin-csfp-picker,
+  body.admin-page .admin-panel-grid,
+  body.nutritionist-page .nutritionist-stat-grid,
+  body.nutritionist-page .nutritionist-panel-grid,
+  body.nutritionist-page .nutritionist-panel-grid.is-balanced,
+  body.nutritionist-page .nutritionist-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body.admin-page .admin-pageheader-left h1 {
+    font-size: 1.25rem;
+    line-height: 1.2;
+  }
+  body.admin-page .admin-pageheader-left p {
+    font-size: 0.82rem;
+  }
+
+  body.admin-page .admin-pageheader-actions {
+    width: 100%;
+    max-width: 100%;
+  }
+  body.admin-page .admin-pageheader-actions .admin-btn,
+  body.admin-page .admin-pageheader-actions .admin-btn-secondary,
+  body.admin-page .admin-pageheader-actions .admin-btn-danger {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 0.82rem;
+    padding: 0 10px;
+    min-height: 38px;
+  }
+
+  /* Topbar: never wrap — icons stay inline with breadcrumb, not below it. */
+  body.admin-page .admin-topbar,
+  body.nutritionist-page .admin-topbar {
+    flex-wrap: nowrap;
+    overflow: hidden;
+  }
+  body.admin-page .admin-topbar-right,
+  body.nutritionist-page .admin-topbar-right {
+    flex-shrink: 0;
+  }
+
+  body.admin-page .admin-toolbar,
+  body.nutritionist-page .nutritionist-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  body.admin-page .admin-search {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+
+  /* Tables: keep the table inside the scroll wrapper, never let the
+   * page itself scroll horizontally. */
+  body.admin-page .admin-table,
+  body.admin-page .admin-table-wrap > table {
+    min-width: 560px;
+  }
+  body.admin-page .admin-table th,
+  body.admin-page .admin-table td {
+    padding: 10px 10px;
+    font-size: 0.82rem;
+    white-space: nowrap;
+  }
+  body.admin-page .admin-table th {
+    font-size: 0.7rem;
+  }
+
+  body.admin-page .admin-pagination {
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  body.admin-page .admin-pagination-status {
+    font-size: 0.75rem;
+    text-align: center;
+  }
+  body.admin-page .admin-pagination-actions {
+    width: 100%;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 3px;
+  }
+  body.admin-page .admin-page-num {
+    min-width: 30px;
+    height: 30px;
+    font-size: 0.78rem;
+  }
+
+  /* Card values shrink so 4-up stat rows still fit on a single line. */
+  body.admin-page .admin-card-value {
+    font-size: 1.35rem;
+  }
+  body.admin-page .admin-card-value--text {
+    font-size: 1.1rem;
+  }
+
+  /* Risk map: filters collapse to single column, canvas resizes. */
+  body.admin-page .admin-riskmap-canvas {
+    height: 320px;
+  }
+  body.admin-page .admin-riskmap-canvas-v2 {
+    height: clamp(260px, 50vw, 420px);
+  }
+}
+
+/* Tier 4: typical phones in portrait (<= 560px) */
+@media (max-width: 560px) {
+  body.admin-page .admin-main,
+  body.nutritionist-page .admin-main {
+    padding: 10px 10px 22px;
+  }
+
+  body.admin-page .admin-section,
+  body.nutritionist-page .admin-section {
+    padding: 12px;
+  }
+
+  body.admin-page .admin-card {
+    padding: 12px;
+  }
+
+  body.admin-page .admin-topbar {
+    padding: 6px 10px;
+    gap: 6px;
+  }
+
+  body.admin-page .admin-pageheader-left h1 {
+    font-size: 1.1rem;
+  }
+
+  body.admin-page .admin-pageheader-left p {
+    font-size: 0.78rem;
+  }
+
+  body.admin-page .admin-card-value {
+    font-size: 1.2rem;
+  }
+
+  body.admin-page .admin-card-icon {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+  }
+  body.admin-page .admin-card-icon svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  body.admin-page .admin-table th,
+  body.admin-page .admin-table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+  }
+
+  body.admin-page .admin-page-num {
+    min-width: 28px;
+    height: 28px;
+    font-size: 0.74rem;
+  }
+
+  /* Modals: leave a 12px gutter instead of the desktop 20px. */
+  body.admin-page .admin-modal-overlay {
+    padding: 12px;
+  }
+
+  /* Hide the long profile name on phones — keep the avatar only. */
+  body.admin-page .admin-topbar-profile-text {
+    max-width: 100px;
+  }
+}
+
+/* Tier 5: small phones in portrait (<= 420px) */
+@media (max-width: 420px) {
+  body.admin-page .admin-main,
+  body.nutritionist-page .admin-main {
+    padding: 8px 8px 20px;
+  }
+
+  body.admin-page .admin-section,
+  body.admin-page .admin-card {
+    padding: 10px;
+  }
+
+  body.admin-page .admin-topbar {
+    padding: 5px 8px;
+  }
+
+  body.admin-page .admin-topbar-name,
+  body.admin-page .admin-topbar-role {
+    display: none;
+  }
+
+  body.admin-page .admin-pageheader-left h1 {
+    font-size: 1rem;
+  }
+
+  body.admin-page .admin-pageheader-left p {
+    font-size: 0.72rem;
+  }
+
+  body.admin-page .admin-pageheader-actions .admin-btn,
+  body.admin-page .admin-pageheader-actions .admin-btn-secondary,
+  body.admin-page .admin-pageheader-actions .admin-btn-danger {
+    font-size: 0.78rem;
+    padding: 0 8px;
+  }
+
+  body.admin-page .admin-card-value {
+    font-size: 1.05rem;
+  }
+
+  body.admin-page .admin-card-value--text {
+    font-size: 0.95rem;
+  }
+
+  body.admin-page .admin-card-label {
+    font-size: 0.62rem;
+  }
+
+  body.admin-page .admin-pagination {
+    padding: 8px;
+  }
+  body.admin-page .admin-pagination-status {
+    font-size: 0.7rem;
+  }
+  body.admin-page .admin-pagination-actions {
+    gap: 2px;
+  }
+  body.admin-page .admin-page-num {
+    min-width: 26px;
+    height: 26px;
+    font-size: 0.7rem;
+    padding: 0 4px;
+  }
+  body.admin-page .admin-icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+
+  body.admin-page .admin-flash {
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    font-size: 0.78rem;
+  }
+
+  body.admin-page .admin-topbar-theme-toggle,
+  body.admin-page .admin-topbar-settings {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+  }
+  body.admin-page .admin-topbar-theme-toggle svg,
+  body.admin-page .admin-topbar-settings svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  /* Breadcrumb: aggressively truncate on small phones — only active page
+   * is fully visible, earlier crumbs collapse to ~4 characters. */
+  body.admin-page .admin-breadcrumb-group,
+  body.admin-page .admin-breadcrumb-page,
+  body.nutritionist-page .admin-breadcrumb-group,
+  body.nutritionist-page .admin-breadcrumb-page {
+    max-width: 4.5ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  body.admin-page .admin-breadcrumb-sep,
+  body.nutritionist-page .admin-breadcrumb-sep {
+    margin: 0 2px;
+  }
+}
+
+/* Tier 6: very small phones in portrait (<= 360px) */
+@media (max-width: 360px) {
+  body.admin-page .admin-topbar-profile-text {
+    display: none;
+  }
+  body.admin-page .admin-topbar-name,
+  body.admin-page .admin-topbar-role {
+    display: none;
+  }
+  body.admin-page .admin-pageheader-left h1 {
+    font-size: 0.95rem;
+  }
+  body.admin-page .admin-section-title {
+    font-size: 0.95rem;
+  }
+  body.admin-page .admin-kicker {
+    font-size: 0.6rem;
+  }
+}
+
+/* ---- Touch device tweaks (44x44 hit targets) ---- */
+@media (max-width: 920px) and (hover: none) {
+  body.admin-page .admin-btn,
+  body.admin-page .admin-btn-secondary,
+  body.admin-page .admin-btn-danger,
+  body.admin-page .admin-icon-btn,
+  body.admin-page .admin-sidebar a,
+  body.admin-page .admin-sidebar button,
+  body.admin-page .admin-pagination .admin-icon-btn,
+  body.nutritionist-page .admin-btn,
+  body.nutritionist-page .admin-btn-secondary,
+  body.nutritionist-page .nutritionist-chip {
+    min-height: 40px;
+  }
+}
+
+/* ============================================================================
+ *  PAGE-SPECIFIC FIXES (mobile)
+ * ----------------------------------------------------------------------------
+ *  These patches target layouts that need more than a global rule can give
+ *  them, e.g. the admin/nutritionist tables, the risk map, the modals, the
+ *  audit log chart, and the WHO reference tabs.
+ * ========================================================================== */
+
+/* --- Roles & Permissions: per-table wrap keeps pagination with the rows --- */
+body.admin-page .rp-tables {
+  display: grid;
+  gap: 16px;
+}
+
+body.admin-page .rp-tables .admin-table-wrap {
+  display: flex;
+  flex-direction: column;
+  overflow-x: auto;
+}
+
+body.admin-page .rp-tables .admin-table-wrap > .admin-table,
+body.admin-page .rp-tables .admin-table-wrap > table {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.admin-page .rp-tables .admin-pagination,
+body.admin-page .rp-tables .admin-pagination-footer {
+  position: sticky;
+  bottom: 0;
+  background: var(--admin-surface);
+  border-top: 1px solid var(--admin-border);
+  z-index: 1;
+  margin: 0;
+  padding: 8px 10px;
+  flex-shrink: 0;
+}
+
+@media (max-width: 720px) {
+  body.admin-page .rp-tables .admin-pagination-numbers {
+    gap: 2px;
+  }
+  body.admin-page .rp-tables .admin-page-num {
+    min-width: 26px;
+    height: 26px;
+    font-size: 0.72rem;
+  }
+}
+
+/* --- Audit log chart: fluid height + axis reflows --- */
+body.admin-page .audit-chart-canvas,
+body.nutritionist-page .audit-chart-canvas {
+  height: clamp(180px, 32vw, 280px);
+  width: 100% !important;
+}
+
+body.admin-page .audit-chart-y-axis {
+  width: 24px;
+}
+
+body.admin-page .audit-chart-x-axis {
+  padding: 2px 24px 0 24px;
+  flex-wrap: wrap;
+  gap: 2px 6px;
+  justify-content: space-between;
+  font-size: 0.6rem;
+}
+
+body.admin-page .audit-stats-row {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (max-width: 420px) {
+  body.admin-page .audit-stats-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  body.admin-page .audit-stat {
+    padding: 10px 12px;
+  }
+  body.admin-page .audit-stat-value {
+    font-size: 1.1rem;
+  }
+}
+
+/* --- Risk map: filter bar centered, single column on mobile --- */
+body.admin-page .admin-riskmap-filters {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+body.admin-page .admin-riskmap-filters .admin-field,
+body.admin-page .admin-riskmap-filters .admin-search,
+body.admin-page .admin-riskmap-filters select,
+body.admin-page .admin-riskmap-filters input {
+  flex: 1 1 160px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  body.admin-page .admin-riskmap-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.admin-page .admin-riskmap-filters .admin-field,
+  body.admin-page .admin-riskmap-filters .admin-search,
+  body.admin-page .admin-riskmap-filters select,
+  body.admin-page .admin-riskmap-filters input {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
+/* Risk-map spot info panel: drop below the map and make it scrollable so
+ * long child lists don't push the map off-screen. */
+body.admin-page .admin-spotmap-sidebar,
+body.admin-page .admin-riskmap-sidebar {
+  max-height: none;
+  position: static;
+  overflow: visible;
+}
+
+body.admin-page .admin-spotmap-panel {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+@media (max-width: 960px) {
+  body.admin-page .admin-spotmap-panel,
+  body.nutritionist-page .admin-spotmap-panel {
+    position: static;
+    width: 100%;
+    max-width: 100%;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 12px;
+  }
+  body.admin-page .admin-spotmap-sidebar,
+  body.nutritionist-page .admin-spotmap-sidebar {
+    position: static;
+    width: 100%;
+  }
+}
+
+/* --- Who Reference: tabs scroll horizontally, sidebar drops below --- */
+body.nutritionist-page .who-ref-tabs-row,
+body.admin-page .who-ref-tabs-row {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  gap: 0;
+  padding-bottom: 0;
+}
+
+body.nutritionist-page .who-ref-main-tab,
+body.admin-page .who-ref-main-tab {
+  flex-shrink: 0;
+}
+
+body.nutritionist-page .who-ref-unified-card,
+body.admin-page .who-ref-unified-card {
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+}
+
+body.nutritionist-page .who-ref-unified-divider,
+body.admin-page .who-ref-unified-divider {
+  width: 100%;
+  height: 1px;
+}
+
+body.nutritionist-page .who-ref-class-grid,
+body.admin-page .who-ref-class-grid {
+  grid-template-columns: 1fr;
+}
+
+body.nutritionist-page .who-ref-main-grid,
+body.admin-page .who-ref-main-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+body.nutritionist-page .who-ref-table-header,
+body.admin-page .who-ref-table-header {
+  flex-direction: column;
+  align-items: stretch;
+}
+
+body.nutritionist-page .who-ref-filters,
+body.admin-page .who-ref-filters {
+  width: 100%;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+body.nutritionist-page .who-ref-filter-group,
+body.admin-page .who-ref-filter-group {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+body.nutritionist-page .who-ref-table,
+body.admin-page .who-ref-table {
+  min-width: 760px;
+}
+
+body.nutritionist-page .who-ref-table th,
+body.nutritionist-page .who-ref-table td,
+body.admin-page .who-ref-table th,
+body.admin-page .who-ref-table td {
+  padding: 8px 8px;
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+@media (min-width: 721px) {
+  body.nutritionist-page .who-ref-class-grid,
+  body.admin-page .who-ref-class-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1100px) {
+  body.nutritionist-page .who-ref-class-grid,
+  body.admin-page .who-ref-class-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* --- WHO Analysis: filters stay in their container, x-axis doesn't crowd --- */
+body.nutritionist-page .wa-filters,
+body.admin-page .wa-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+body.nutritionist-page .wa-filter,
+body.admin-page .wa-filter {
+  flex: 1 1 140px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+body.nutritionist-page .wa-filter input,
+body.nutritionist-page .wa-filter select,
+body.admin-page .wa-filter input,
+body.admin-page .wa-filter select {
+  width: 100%;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  body.nutritionist-page .wa-filters,
+  body.admin-page .wa-filters {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  body.nutritionist-page .wa-filter,
+  body.admin-page .wa-filter {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+}
+
+/* Charts inside the WHO analysis use the same fluid-chart rules. */
+body.nutritionist-page .wa-chart canvas,
+body.admin-page .wa-chart canvas {
+  display: block;
+  width: 100% !important;
+  height: auto !important;
+  max-width: 100%;
+}
+
+@media (max-width: 720px) {
+  body.nutritionist-page .wa-chart,
+  body.admin-page .wa-chart {
+    height: clamp(180px, 40vw, 320px);
+  }
+}
+
+/* --- Modals: never wider than the viewport, scroll inside --- */
+body.admin-page .admin-modal,
+body.nutritionist-page .admin-modal {
+  max-width: min(560px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+
+body.admin-page .admin-modal-head,
+body.nutritionist-page .admin-modal-head {
+  padding: 14px 16px;
+}
+
+body.admin-page .admin-modal-head h3,
+body.nutritionist-page .admin-modal-head h3 {
+  font-size: 0.95rem;
+}
+
+/* --- The view-measurement modal in children.php has long numbers; cap
+ * the cells so they don't blow past the modal. --- */
+body.admin-page .vm-measurement-grid,
+body.nutritionist-page .vm-measurement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+body.admin-page .vm-measurement-cell,
+body.nutritionist-page .vm-measurement-cell {
+  min-width: 0;
+  word-break: break-word;
+}
+
+body.admin-page .vm-measurement-cell strong,
+body.nutritionist-page .vm-measurement-cell strong {
+  font-size: 0.95rem;
+  word-break: break-all;
+  display: inline-block;
+  max-width: 100%;
+}
+
+/* On small phones, force 2-column grid so numbers don't exceed modal. */
+@media (max-width: 560px) {
+  body.admin-page .vm-measurement-grid,
+  body.nutritionist-page .vm-measurement-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  body.admin-page .vm-measurement-cell strong,
+  body.nutritionist-page .vm-measurement-cell strong {
+    font-size: 0.82rem;
+  }
+}
+
+/* --- Pagination control always visible at the bottom of the table wrap --- */
+body.admin-page .admin-pagination--mini {
+  margin: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--admin-border);
+  padding: 8px 10px;
+  position: sticky;
+  bottom: 0;
+  background: var(--admin-surface);
+  z-index: 1;
+}
+
+/* --- Recent measurements: fluid table, scroll inside --- */
+body.nutritionist-page .nutritionist-recent-table,
+body.admin-page .nutritionist-recent-table {
+  min-width: 600px;
+}
+
+/* --- Appointments: ensure the table wrap is scrollable --- */
+body.nutritionist-page .appointments-table-wrap,
+body.admin-page .appointments-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+  border-radius: 18px;
+  border: 1px solid var(--admin-border);
+}
+
+body.nutritionist-page .appointments-table,
+body.admin-page .appointments-table {
+  min-width: 640px;
+}
+
+@media (max-width: 720px) {
+  body.nutritionist-page .appointments-table th,
+  body.nutritionist-page .appointments-table td,
+  body.admin-page .appointments-table th,
+  body.admin-page .appointments-table td {
+    padding: 8px 8px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}
+
+/* --- User management: search + Add user stay in their own row --- */
+@media (max-width: 720px) {
+  body.admin-page .admin-section-head {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+  body.admin-page .admin-section-head .admin-toolbar {
+    width: 100%;
+  }
+}
+
+/* --- Breadcrumb on tiny screens: only the icon, breadcrumb gets a
+ *      tooltip via title attribute. --- */
+@media (max-width: 420px) {
+  body.admin-page .admin-breadcrumb-group,
+  body.admin-page .admin-breadcrumb-page {
+    max-width: 4ch;
+  }
+}
+
+/* ---- Dark theme checkbox tweak ---- */
+[data-theme="dark"] body.admin-page input[type="checkbox"],
+[data-theme="dark"] body.nutritionist-page input[type="checkbox"],
+[data-theme="dark"] .admin-field input[type="checkbox"] {
+  filter: brightness(1.05);
+}
+
+
 /* Single-column variant of the form grid for the right-hand password
  * card, so each field takes the full card width. */
 .admin-form-grid--single {
@@ -2436,8 +3445,23 @@
 /* Responsive: collapse to a single column on narrower screens so the
  * password card doesn't squeeze the name fields. */
 @media (max-width: 880px) {
-  .admin-settings-grid {
+  body.admin-page .admin-settings-grid,
+  body.nutritionist-page .admin-settings-grid,
+  body.parent-page .admin-settings-grid {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-settings-card .admin-form-grid,
+  .admin-settings-card .admin-address-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-settings-card .admin-field,
+  .admin-settings-card input,
+  .admin-settings-card select,
+  .admin-settings-card textarea {
+    min-width: 0;
+    max-width: 100%;
   }
 
   .admin-settings-footer {

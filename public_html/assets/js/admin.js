@@ -358,4 +358,113 @@
       form.requestSubmit();
     });
   });
+
+  /* ============================================================================
+   *  RESPONSIVE HELPERS
+   * ----------------------------------------------------------------------------
+   *  Three small behaviors that keep the layout fluid on every phone size:
+   *
+   *  1) BREADCRUMB TRUNCATION
+   *     On viewports below the configured breakpoint (default 720 px) the
+   *     crumb text shrinks to its first 4 chars + `…` so the icons to
+   *     its right stay visible. The full text is preserved on the element
+   *     as a `data-breadcrumb-full` attribute and reused as a tooltip.
+   *
+   *  2) TOPBAR ICON ORDER
+   *     On small viewports the breadcrumb gets `flex: 0 1 auto` and the
+   *     topbar profile text gets hidden. CSS handles the visual swap;
+   *     this code only adds the data attribute the CSS uses.
+   *
+   *  3) FLUID CHART RE-INIT
+   *     Every <canvas data-fluid-chart> exposes its `initChart(data)`
+   *     function via `window['chart_' + id]`. A ResizeObserver re-runs
+   *     init whenever the canvas's parent changes width (orientation,
+   *     window resize, sidebar toggle, etc.).
+   * ========================================================================== */
+
+  // ---- 1) Breadcrumb truncation ----
+  const BREADCRUMB_TRUNCATE_AT = 720; // px
+  const breadcrumb = document.querySelector("[data-admin-breadcrumb]");
+  if (breadcrumb) {
+    const crumbs = breadcrumb.querySelectorAll(".admin-breadcrumb-group, .admin-breadcrumb-page");
+    crumbs.forEach((crumb) => {
+      const text = (crumb.textContent || "").trim();
+      if (!text) return;
+      if (!crumb.hasAttribute("data-breadcrumb-full")) {
+        crumb.setAttribute("data-breadcrumb-full", text);
+        crumb.setAttribute("title", text);
+      }
+    });
+    const truncateCrumbs = () => {
+      const shouldTruncate = window.innerWidth < BREADCRUMB_TRUNCATE_AT;
+      if (shouldTruncate) {
+        breadcrumb.classList.add("is-truncated");
+        crumbs.forEach((crumb) => {
+          const full = crumb.getAttribute("data-breadcrumb-full") || "";
+          if (full.length > 4) {
+            crumb.textContent = full.slice(0, 4) + "…";
+          }
+        });
+      } else {
+        breadcrumb.classList.remove("is-truncated");
+        crumbs.forEach((crumb) => {
+          const full = crumb.getAttribute("data-breadcrumb-full") || "";
+          if (full) crumb.textContent = full;
+        });
+      }
+    };
+    truncateCrumbs();
+    let resizeRaf = null;
+    window.addEventListener("resize", () => {
+      if (resizeRaf) cancelAnimationFrame(resizeRaf);
+      resizeRaf = requestAnimationFrame(truncateCrumbs);
+    });
+  }
+
+  // ---- 2) Topbar icon order: no JS needed, but mark a hook ----
+  const topbar = document.querySelector(".admin-topbar");
+  if (topbar) {
+    topbar.setAttribute("data-admin-topbar", "");
+  }
+
+  // ---- 3) Fluid chart re-init via ResizeObserver ----
+  const fluidCharts = document.querySelectorAll("canvas[data-fluid-chart]");
+  if (fluidCharts.length > 0 && typeof ResizeObserver === "function") {
+    const observers = new WeakMap();
+    fluidCharts.forEach((canvas) => {
+      const initName = canvas.getAttribute("data-init-fn");
+      const id = canvas.id;
+      if (!initName && !id) return;
+      // Convention: <canvas data-fluid-chart id="auditWaveChart" data-init-fn="auditInit">
+      // OR rely on window['chart_' + id] for the legacy audit page.
+      const handler = () => {
+        try {
+          if (initName && typeof window !== "undefined" && typeof window[initName] === "function") {
+            window[initName]();
+            return;
+          }
+          if (id) {
+            const w = window["chart_" + id];
+            if (typeof w === "function") {
+              w();
+              return;
+            }
+            const legacy = window["init_" + id];
+            if (typeof legacy === "function") {
+              legacy();
+            }
+          }
+        } catch (err) {
+          // Silent: chart re-init failures should never break the page.
+        }
+      };
+      const ro = new ResizeObserver(() => {
+        // Debounce per-frame so rapid resize events coalesce.
+        if (canvas._roRaf) cancelAnimationFrame(canvas._roRaf);
+        canvas._roRaf = requestAnimationFrame(handler);
+      });
+      ro.observe(canvas.parentElement || canvas);
+      observers.set(canvas, ro);
+    });
+  }
 })();

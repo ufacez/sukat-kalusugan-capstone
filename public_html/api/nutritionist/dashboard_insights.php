@@ -105,14 +105,16 @@ $trendSql = "SELECT
 
 $trendRows = admin_fetch_all($trendSql, $scopeTypes3, $params3);
 
-// HFA breakdown for the last 30 days.
+// HFA breakdown for the last 30 days. Derive the classification from the
+// stored haz z-score so the breakdown stays in sync with the canonical
+// `classify_hfa_status()` thresholds.
 $hfaRows = admin_fetch_all(
-    "SELECT COALESCE(hfa_status, 'Normal') AS hfa, COUNT(*) AS cnt
+    "SELECT CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END AS hfa, COUNT(*) AS cnt
      FROM measurements m
      INNER JOIN children c ON c.id = m.child_id
      WHERE m.measurement_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
        AND {$scopeSql3}
-     GROUP BY hfa_status",
+     GROUP BY CASE WHEN m.haz < -3 THEN 'SSt' WHEN m.haz < -2 THEN 'MSt' WHEN m.haz > 2 THEN 'Tall' ELSE 'Normal' END",
     $scopeTypes3,
     $params3
 );

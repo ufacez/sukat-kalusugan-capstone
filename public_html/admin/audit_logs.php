@@ -76,7 +76,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-legend-item{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:500;color:var(--admin-muted)}
 .audit-legend-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .audit-chart-body{position:relative}
-.audit-chart-canvas{width:100%;height:260px;cursor:crosshair}
+.audit-chart-canvas{width:100%;height:clamp(200px,40vw,280px);cursor:crosshair}
 .audit-chart-y-axis{position:absolute;left:2px;top:0;bottom:0;width:28px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
 .audit-chart-y-label{font-size:8px;color:var(--admin-muted);font-family:Inter,monospace;text-align:right}
 .audit-chart-x-axis{display:flex;justify-content:space-between;padding:2px 30px 0 30px}
@@ -225,7 +225,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
             </div>
         </div>
         <div class="audit-chart-body">
-            <canvas id="auditWaveChart" class="audit-chart-canvas"></canvas>
+            <canvas id="auditWaveChart" class="audit-chart-canvas" data-fluid-chart data-init-fn="auditChartRedraw"></canvas>
             <div class="audit-chart-y-axis" id="audit-y-axis"></div>
             <div class="audit-chart-tooltip" id="audit-tooltip"></div>
         </div>
@@ -510,7 +510,14 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         ctx = canvas.getContext('2d');
         dpr = window.devicePixelRatio || 1;
         var rect = canvas.parentElement.getBoundingClientRect();
-        W = rect.width; H = 260;
+        // The height is now driven by CSS (clamp(180px, 32vw, 260px)) so the
+        // chart adapts to every viewport size. Read the actual rendered
+        // height back from the canvas style so a 360px phone gets a 180px
+        // chart and a 1024px tablet gets the full 260px.
+        W = rect.width;
+        var cssH = window.getComputedStyle(canvas).height;
+        var parsedH = parseInt(cssH, 10);
+        H = (parsedH > 0) ? parsedH : 260;
         canvas.width = W*dpr; canvas.height = H*dpr;
         canvas.style.width = W+'px'; canvas.style.height = H+'px';
         ctx.scale(dpr,dpr);
@@ -635,13 +642,27 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         });
 
         window.addEventListener('resize', function(){
-            var rect = canvas.parentElement.getBoundingClientRect();
-            W = rect.width;
-            canvas.width=W*dpr; canvas.style.width=W+'px';
-            cW = W-padL-padR;
-            drawAll();
+            auditChartRedraw();
         });
     }
+
+    // Exposed to the global window so the admin.js ResizeObserver (and any
+    // explicit redraw calls) can re-render the chart at the current
+    // viewport's actual width and CSS-driven height.
+    function auditChartRedraw(){
+        if(!canvas) return;
+        var rect = canvas.parentElement.getBoundingClientRect();
+        W = rect.width;
+        var cssH = window.getComputedStyle(canvas).height;
+        var parsedH = parseInt(cssH, 10);
+        H = (parsedH > 0) ? parsedH : 260;
+        canvas.width = W*dpr; canvas.height = H*dpr;
+        canvas.style.width = W+'px'; canvas.style.height = H+'px';
+        cW = W - padL - padR;
+        cH = H - padT - padB;
+        drawAll();
+    }
+    window.auditChartRedraw = auditChartRedraw;
 
     function renderInsights(result){
         var panel = document.getElementById('audit-ai-panel');

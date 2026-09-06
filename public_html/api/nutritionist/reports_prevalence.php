@@ -63,7 +63,10 @@ $latestJoin = " INNER JOIN measurements lm ON lm.id = (
 
 $allChildren = admin_fetch_all(
 	"SELECT c.id, c.sex, c.birthdate,
-		lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.weight_kg, lm.height_cm
+		lm.waz, lm.haz, lm.whz, lm.weight_kg, lm.height_cm,
+		CASE WHEN lm.waz < -3 THEN 'SUW' WHEN lm.waz < -2 THEN 'MUW' WHEN lm.waz > 2 THEN 'Refer to WFL/H' ELSE 'Normal' END AS wfa_status,
+		CASE WHEN lm.haz < -3 THEN 'SSt' WHEN lm.haz < -2 THEN 'MSt' WHEN lm.haz > 2 THEN 'Tall' ELSE 'Normal' END AS hfa_status,
+		CASE WHEN lm.whz < -3 THEN 'SW' WHEN lm.whz < -2 THEN 'MW' WHEN lm.whz > 3 THEN 'Ob' WHEN lm.whz > 2 THEN 'OW' ELSE 'Normal' END AS wfh_status
 	 FROM children c
 	 {$latestJoin}
 	 WHERE {$scope}{$barangayFilterSql}
