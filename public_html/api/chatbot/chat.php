@@ -79,6 +79,9 @@ mysqli_stmt_close($stmt);
 $child       = null;
 $measurement = null;
 $history     = [];
+$appointments = [];
+$barangay    = null;
+$followup    = null;
 
 if ($childId <= 0) {
     $scopeCondition = '';
@@ -132,6 +135,16 @@ if ($childId !== null && $childId > 0) {
 
     if ($child !== null) {
 
+        // Load barangay info
+        if (!empty($child['barangay_id'])) {
+            $sql = 'SELECT id, name, city_municipality FROM barangays WHERE id = ?';
+            $stmt = mysqli_prepare($db, $sql);
+            mysqli_stmt_bind_param($stmt, 'i', $child['barangay_id']);
+            mysqli_stmt_execute($stmt);
+            $barangay = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
+            mysqli_stmt_close($stmt);
+        }
+
         // Load latest measurement
         $sql = 'SELECT * FROM measurements
                 WHERE child_id = ?
@@ -143,13 +156,13 @@ if ($childId !== null && $childId > 0) {
         $measurement = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
         mysqli_stmt_close($stmt);
 
-        // Load previous measurements
+        // Load previous measurements (up to 10 for better trend analysis)
         $sql = 'SELECT measurement_date, height_cm, weight_kg,
                        nutritional_status, wfa_status, hfa_status, wfh_status
                 FROM measurements
                 WHERE child_id = ?
                 ORDER BY measurement_date DESC, id DESC
-                LIMIT 1 OFFSET 1';
+                LIMIT 9 OFFSET 1';
         $stmt = mysqli_prepare($db, $sql);
         mysqli_stmt_bind_param($stmt, 'i', $childId);
         mysqli_stmt_execute($stmt);
@@ -158,6 +171,41 @@ if ($childId !== null && $childId > 0) {
             $history[] = $hRow;
         }
         mysqli_stmt_close($stmt);
+        
+        // Load appointment history (last 5 appointments)
+        // Only use columns guaranteed to exist in schema.sql:
+        // scheduled_at, status, notes (appointment_type, intervention_type
+        // and other extended columns are NOT in the baseline appointments table)
+        $sql = 'SELECT scheduled_at, status, notes
+                FROM appointments
+                WHERE child_id = ?
+                ORDER BY scheduled_at DESC
+                LIMIT 5';
+        $stmt = mysqli_prepare($db, $sql);
+        if ($stmt !== false) {
+            mysqli_stmt_bind_param($stmt, 'i', $childId);
+            mysqli_stmt_execute($stmt);
+            $apptResult = mysqli_stmt_get_result($stmt);
+            if ($apptResult !== false) {
+                while ($apptRow = mysqli_fetch_assoc($apptResult)) {
+                    $appointments[] = $apptRow;
+                }
+            }
+            mysqli_stmt_close($stmt);
+        }
+        
+        // Load follow-up status if followup_scheduler is available
+        // Use @ to suppress any include errors, and wrap in try-catch-like logic
+        $followup = null;
+        if (file_exists(__DIR__ . '/../../includes/followup_scheduler.php')) {
+            @include_once __DIR__ . '/../../includes/followup_scheduler.php';
+            if (function_exists('followup_fetch_visits')) {
+                $followupResult = @followup_fetch_visits($childId, date('Y-m-d'), date('Y-m-d', strtotime('+30 days')), 1);
+                if (!empty($followupResult) && is_array($followupResult)) {
+                    $followup = $followupResult[0];
+                }
+            }
+        }
     }
 }
 
@@ -196,10 +244,17 @@ foreach ($chatHistory as $idx => $hMsg) {
 /* -----------------------------------------------------------------------
  * Call the AI
  * ----------------------------------------------------------------------- */
-if ($childId > 0) {
-    $contextBlock = chatbot_build_enhanced_context($child, $measurement, $history);
+if ($childId > 0 && $child !== null) {
+    $contextBlock = @chatbot_build_enhanced_context($child, $measurement, $history, $appointments, $barangay, $followup);
 }
-$llmResult    = chatbot_call_llm_enhanced($contextBlock, $message, $llmHistory);
+
+try {
+    $llmResult = @chatbot_call_llm_enhanced($contextBlock, $message, $llmHistory);
+} catch (Throwable $e) {
+    $llmResult = ['ok' => false, 'reply' => null, 'error' => 'AI service unavailable: ' . $e->getMessage()];
+}
+
+error_log('chat.php LLM result ok=' . ($llmResult['ok'] ? 'true' : 'false') . ' error=' . ($llmResult['error'] ?? 'none') . ' contextLen=' . strlen($contextBlock));
 
 if (!$llmResult['ok']) {
     // Save error as system message

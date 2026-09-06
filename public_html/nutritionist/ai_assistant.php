@@ -15,7 +15,7 @@ $apiBase = app_url('/api/chatbot');
 
 nutritionist_layout_start(
     'AI Assistant',
-    'Child growth analysis & nutrition knowledge assistant',
+    '',
     'ai_assistant'
 );
 ?>
@@ -31,10 +31,12 @@ nutritionist_layout_start(
                 <h3>Assistant context</h3>
                 <button type="button" class="ai-context-close" id="aiContextClose" aria-label="Close child context panel">&times;</button>
             </div>
-            <label class="ai-child-select-label" for="aiChildSelect">Child</label>
-            <select class="ai-child-select" id="aiChildSelect">
-                <option value="">General nutrition assistant</option>
-            </select>
+            <label class="ai-child-select-label">Child</label>
+            <button type="button" class="ai-child-picker-btn" id="aiChildPickerBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                <span id="aiChildPickerLabel">General nutrition assistant</span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
+            </button>
         </div>
 
         <div class="ai-child-detail" id="aiChildDetail" style="display:none;">
@@ -112,6 +114,32 @@ nutritionist_layout_start(
     </main>
 </div>
 
+<!-- ===== CHILD PICKER MODAL ===== -->
+<div class="ai-modal-overlay" id="aiChildModal" role="dialog" aria-modal="true" aria-label="Select a child" hidden>
+    <div class="ai-modal">
+        <div class="ai-modal-header">
+            <h3>Select a child</h3>
+            <button type="button" class="ai-modal-close" id="aiChildModalClose" aria-label="Close">&times;</button>
+        </div>
+        <div class="ai-modal-search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+            <input type="text" id="aiChildSearch" placeholder="Search by name or code..." autocomplete="off">
+        </div>
+        <div class="ai-modal-list" id="aiChildModalList"></div>
+        <div class="ai-modal-footer">
+            <button type="button" class="ai-modal-page-btn" id="aiChildModalPrev" disabled>&lsaquo; Prev</button>
+            <span id="aiChildModalPage">Page 1</span>
+            <button type="button" class="ai-modal-page-btn" id="aiChildModalNext" disabled>Next &rsaquo;</button>
+        </div>
+        <div class="ai-modal-general">
+            <button type="button" class="ai-modal-general-btn" id="aiGeneralModeBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                General nutrition assistant
+            </button>
+        </div>
+    </div>
+</div>
+
 <script>
 (function() {
     'use strict';
@@ -139,19 +167,21 @@ nutritionist_layout_start(
         conversationRequestToken: 0,
         pendingMessage: null,
         childDetail: null,
+        childModalPage: 1,
+        childModalPageSize: 20,
+        childSearch: '',
     };
 
     // --- DOM refs ---
     const dom = {
         sidebar:      $('#aiSidebar'),
-        childSelect:  $('#aiChildSelect'),
         childDetail:  $('#aiChildDetail'),
         contextOpen:  $('#aiContextOpen'),
         contextClose: $('#aiContextClose'),
         contextMenu:  $('#aiContextMenu'),
         sessionList:  $('#aiSessionList'),
         sessionCount: $('#aiSessionCount'),
-        sessionPage:  $('#aiSessionPage'),
+        sessionPageEl:  $('#aiSessionPage'),
         sessionPrev:  $('#aiSessionPrev'),
         sessionNext:  $('#aiSessionNext'),
         archiveBtn:   $('#aiArchiveBtn'),
@@ -167,6 +197,16 @@ nutritionist_layout_start(
         detailScores: $('#aiDetailScores'),
         detailStatus: $('#aiDetailStatus'),
         detailDate:   $('#aiDetailDate'),
+        childPickerBtn:  $('#aiChildPickerBtn'),
+        childPickerLabel: $('#aiChildPickerLabel'),
+        childModal:       $('#aiChildModal'),
+        childModalClose:  $('#aiChildModalClose'),
+        childModalList:   $('#aiChildModalList'),
+        childModalSearch: $('#aiChildSearch'),
+        childModalPage:   $('#aiChildModalPage'),
+        childModalPrev:   $('#aiChildModalPrev'),
+        childModalNext:   $('#aiChildModalNext'),
+        generalModeBtn:   $('#aiGeneralModeBtn'),
     };
 
 
@@ -180,15 +220,106 @@ nutritionist_layout_start(
             .then(res => {
                 if (!res.success) return;
                 state.children = res.data.children || [];
-                dom.childSelect.innerHTML = '<option value="">Select a child...</option>';
-                state.children.forEach(child => {
-                    const option = document.createElement('option');
-                    option.value = child.id;
-                    option.textContent = child.name + (child.child_code ? ' (' + child.child_code + ')' : '');
-                    dom.childSelect.appendChild(option);
-                });
             })
             .catch(() => {});
+    }
+
+    /* ================================================================
+     * CHILD PICKER MODAL
+     * ================================================================ */
+
+    function openChildModal() {
+        state.childModalPage = 1;
+        state.childSearch = '';
+        dom.childModalSearch.value = '';
+        renderChildModal();
+        dom.childModal.removeAttribute('hidden');
+        document.body.style.overflow = 'hidden';
+        dom.childModalSearch.focus();
+    }
+
+    function closeChildModal() {
+        dom.childModal.setAttribute('hidden', '');
+        document.body.style.overflow = '';
+    }
+
+    function renderChildModal() {
+        const q = state.childSearch.toLowerCase().trim();
+        const filtered = state.children.filter(c => {
+            if (!q) return true;
+            return (c.name || '').toLowerCase().includes(q)
+                || (c.child_code || '').toLowerCase().includes(q);
+        });
+
+        const pageSize = state.childModalPageSize;
+        const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+        state.childModalPage = Math.min(state.childModalPage, totalPages);
+        const start = (state.childModalPage - 1) * pageSize;
+        const page = filtered.slice(start, start + pageSize);
+
+        dom.childModalPage.textContent = 'Page ' + state.childModalPage + ' of ' + totalPages;
+        dom.childModalPrev.disabled = state.childModalPage <= 1;
+        dom.childModalNext.disabled = state.childModalPage >= totalPages;
+
+        if (page.length === 0) {
+            dom.childModalList.innerHTML = '<div class="ai-modal-empty">No children found</div>';
+            return;
+        }
+
+        dom.childModalList.innerHTML = page.map(child => {
+            const active = Number(child.id) === state.selectedChildId ? ' is-active' : '';
+            const initials = (child.name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
+            const sexLabel = child.sex ? (child.sex === 'M' ? 'Male' : 'Female') : '';
+            const ageLabel = child.birthdate ? computeAge(child.birthdate) : '';
+            const metaParts = [sexLabel, ageLabel].filter(Boolean);
+            const metaStr = metaParts.join(' · ');
+            return `<button type="button" class="ai-modal-item${active}" data-child-id="${child.id}">
+                <div class="ai-modal-avatar">${esc(initials)}</div>
+                <div class="ai-modal-item-info">
+                    <div class="ai-modal-item-name">${esc(child.name)}</div>
+                    <div class="ai-modal-item-meta">${esc(metaStr)}${child.child_code ? ' · ' + esc(child.child_code) : ''}</div>
+                </div>
+            </button>`;
+        }).join('');
+
+        $$('.ai-modal-item', dom.childModalList).forEach(item => {
+            item.addEventListener('click', () => {
+                const childId = Number(item.dataset.childId);
+                closeChildModal();
+                selectChildFromModal(childId);
+            });
+        });
+    }
+
+    function selectChildFromModal(childId) {
+        if (state.sending) return;
+        state.selectedChildId = childId;
+        state.conversationId = null;
+
+        // Update picker label
+        if (childId) {
+            const child = state.children.find(c => c.id === childId);
+            dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
+            loadChildDetail(childId);
+            dom.chatTitle.textContent = child ? child.name : 'AI Assistant';
+            dom.chatSubtitle.textContent = child.child_code || '';
+        }
+
+        dom.messages.innerHTML = '';
+        createConversation(childId);
+    }
+
+    function selectGeneralFromModal() {
+        closeChildModal();
+        if (state.sending) return;
+        state.selectedChildId = null;
+        state.conversationId = null;
+        dom.childPickerLabel.textContent = 'General nutrition assistant';
+        dom.childDetail.style.display = 'none';
+        dom.chatTitle.textContent = 'General nutrition assistant';
+        dom.chatSubtitle.textContent = 'Ask about eOPT, measurements, trends, or growth monitoring';
+        dom.messages.innerHTML = '';
+        createConversation(null);
     }
 
     function loadSessions() {
@@ -211,7 +342,7 @@ nutritionist_layout_start(
         const pageSessions = state.sessions.slice(start, start + pageSize);
 
         dom.sessionCount.textContent = String(state.sessions.length);
-        dom.sessionPage.textContent = 'Page ' + state.sessionPage + ' of ' + totalPages;
+        dom.sessionPageEl.textContent = 'Page ' + state.sessionPage + ' of ' + totalPages;
         dom.sessionPrev.disabled = state.sessionPage <= 1;
         dom.sessionNext.disabled = state.sessionPage >= totalPages;
 
@@ -239,52 +370,16 @@ nutritionist_layout_start(
      * CHILD SELECTION
      * ================================================================ */
 
-    function selectChild(childId) {
-        if (state.sending) return;
-        state.selectedChildId = childId;
-        state.conversationId = null;
-
-        dom.childSelect.value = String(childId);
-
-        // Load child detail
-        loadChildDetail(childId);
-
-        // Update header
-        const child = state.children.find(c => c.id === childId);
-        if (child) {
-            dom.chatTitle.textContent = child.name;
-            dom.chatSubtitle.textContent = child.child_code || '';
-        }
-
-        // Clear messages, start fresh
-        dom.messages.innerHTML = '';
-        dom.emptyState = null;
-
-        // Create a new conversation
-        createConversation(childId);
-    }
-
-    function selectGeneral() {
-        if (state.sending) return;
-        state.selectedChildId = null;
-        state.conversationId = null;
-        dom.childSelect.value = '';
-        dom.childDetail.style.display = 'none';
-        dom.chatTitle.textContent = 'General nutrition assistant';
-        dom.chatSubtitle.textContent = 'Ask about eOPT, measurements, trends, or growth monitoring';
-        dom.messages.innerHTML = '';
-        createConversation(null);
-    }
-
     function revealContextPanel() {
-        $('.ai-layout').classList.add('is-context-open');
-        dom.contextMenu.setAttribute('aria-expanded', 'true');
-        dom.childSelect.focus();
+        openChildModal();
     }
 
     function hideContextPanel() {
         $('.ai-layout').classList.remove('is-context-open');
         dom.contextMenu.setAttribute('aria-expanded', 'false');
+        if (!dom.childModal.hasAttribute('hidden')) {
+            closeChildModal();
+        }
     }
 
     function toggleContextPanel() {
@@ -306,12 +401,21 @@ nutritionist_layout_start(
 
         state.conversationId = sessionId;
         state.selectedChildId = session.child_id ? Number(session.child_id) : null;
-        dom.childSelect.value = state.selectedChildId ? String(state.selectedChildId) : '';
+
+        // Update picker label
         if (state.selectedChildId) {
+            const child = state.children.find(c => c.id === state.selectedChildId);
+            dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
             loadChildDetail(state.selectedChildId);
+            dom.chatTitle.textContent = child ? child.name : 'AI Assistant';
+            dom.chatSubtitle.textContent = child ? (child.child_code || '') : '';
+        } else {
+            dom.childPickerLabel.textContent = 'General nutrition assistant';
+            dom.childDetail.style.display = 'none';
+            dom.chatTitle.textContent = 'AI Assistant';
+            dom.chatSubtitle.textContent = 'Conversation history';
         }
-        dom.chatTitle.textContent = session.child_name || 'AI Assistant';
-        dom.chatSubtitle.textContent = session.title || 'Conversation history';
+
         dom.messages.innerHTML = '<div class="ai-session-loading">Loading conversation...</div>';
         renderSessions();
 
@@ -566,7 +670,11 @@ nutritionist_layout_start(
         if (state.selectedChildId) {
             createConversation(state.selectedChildId);
         } else {
-            selectGeneral();
+            dom.childPickerLabel.textContent = 'General nutrition assistant';
+            dom.childDetail.style.display = 'none';
+            dom.chatTitle.textContent = 'General nutrition assistant';
+            dom.chatSubtitle.textContent = 'Ask about eOPT, measurements, trends, or growth monitoring';
+            createConversation(null);
         }
     }
 
@@ -644,18 +752,47 @@ nutritionist_layout_start(
         return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
     }
 
+    function computeAge(birthdate) {
+        if (!birthdate) return '';
+        const birth = new Date(birthdate);
+        const today = new Date();
+        let years = today.getFullYear() - birth.getFullYear();
+        let months = today.getMonth() - birth.getMonth();
+        if (months < 0) { years--; months += 12; }
+        if (today.getDate() < birth.getDate()) { months--; if (months < 0) { years--; months += 12; } }
+        if (years >= 1) {
+            return years + 'y ' + months + 'm';
+        } else if (months >= 1) {
+            return months + ' months';
+        } else {
+            const days = Math.floor((today - birth) / (1000 * 60 * 60 * 24));
+            return days + ' days';
+        }
+    }
+
     /* ================================================================
      * EVENT LISTENERS
      * ================================================================ */
 
-    dom.childSelect.addEventListener('change', () => {
-        const childId = Number(dom.childSelect.value || 0);
-        if (childId > 0) {
-            selectChild(childId);
-        } else {
-            selectGeneral();
-        }
+    dom.childPickerBtn.addEventListener('click', openChildModal);
+    dom.childModalClose.addEventListener('click', closeChildModal);
+    dom.childModal.addEventListener('click', (e) => {
+        if (e.target === dom.childModal) closeChildModal();
     });
+    dom.childModalSearch.addEventListener('input', () => {
+        state.childSearch = dom.childModalSearch.value;
+        state.childModalPage = 1;
+        renderChildModal();
+    });
+    dom.childModalPrev.addEventListener('click', () => {
+        state.childModalPage--;
+        renderChildModal();
+    });
+    dom.childModalNext.addEventListener('click', () => {
+        state.childModalPage++;
+        renderChildModal();
+    });
+    dom.generalModeBtn.addEventListener('click', selectGeneralFromModal);
 
     dom.contextOpen.addEventListener('click', revealContextPanel);
     dom.contextClose.addEventListener('click', hideContextPanel);

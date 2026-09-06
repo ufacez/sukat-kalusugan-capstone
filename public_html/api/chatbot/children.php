@@ -44,7 +44,9 @@ if ($userType === 'parent') {
             id,
             child_code,
             first_name,
-            last_name
+            last_name,
+            sex,
+            birthdate
          FROM children
          WHERE parent_id = ?
          ORDER BY first_name ASC, last_name ASC',
@@ -81,7 +83,9 @@ if ($userType === 'parent') {
                 c.id,
                 c.child_code,
                 c.first_name,
-                c.last_name
+                c.last_name,
+                c.sex,
+                c.birthdate
              FROM children c
              WHERE (c.first_name LIKE ?
                  OR c.last_name LIKE ?
@@ -100,12 +104,14 @@ if ($userType === 'parent') {
                 c.id,
                 c.child_code,
                 c.first_name,
-                c.last_name
+                c.last_name,
+                c.sex,
+                c.birthdate
              FROM children c
              WHERE 1=1
                 ' . $scopeCondition . '
              ORDER BY c.first_name ASC, c.last_name ASC
-             LIMIT 50',
+             LIMIT 200',
             str_repeat('i', count($scopeParams)),
             $scopeParams
         );
@@ -146,6 +152,8 @@ foreach ($children as $child) {
         'id' => (int)($child['id'] ?? 0),
         'child_code' => (string)($child['child_code'] ?? ''),
         'name' => $name !== '' ? $name : 'Unnamed child',
+        'sex' => (string)($child['sex'] ?? ''),
+        'birthdate' => (string)($child['birthdate'] ?? ''),
     ];
 }
 
