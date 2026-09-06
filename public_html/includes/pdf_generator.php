@@ -25,13 +25,6 @@ function pdf_base(string $title, string $orientation = 'Portrait'): TCPDF {
 }
 
 function pdf_header_block(TCPDF $pdf, int $year, string $periodLabel, string $barangayName): void {
-	$pdf->SetFont('helvetica', 'B', 11);
-	$pdf->Cell(0, 6, 'Republic of the Philippines', 0, 1, 'C');
-	$pdf->SetFont('helvetica', '', 9);
-	$pdf->Cell(0, 5, 'Department of Health', 0, 1, 'C');
-	$pdf->Cell(0, 5, 'National Nutrition Council', 0, 1, 'C');
-	$pdf->Ln(4);
-
 	$pdf->SetFont('helvetica', 'B', 12);
 	$pdf->Cell(0, 7, 'OPERATION TIMBANG (OPT) PLUS -- ' . $year, 0, 1, 'C');
 	$pdf->Ln(3);
@@ -79,7 +72,7 @@ function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = fa
 		$pdf->SetFillColor(255, 255, 255);
 	}
 
-	$maxH = 6;
+	$maxH = 5;
 	for ($i = 0; $i < count($values); $i++) {
 		$align = $aligns[$i] ?? 'L';
 		$pdf->Cell($widths[$i], $maxH, (string)$values[$i], 1, 0, $align, true);
@@ -220,7 +213,7 @@ function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ag
 
 function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = false): void {
 	$cols = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
-	$widths = [10, 22, 28, 40, 12, 18, 16, 16, 12, 12, 12];
+	$widths = [12, 28, 32, 50, 14, 20, 18, 18, 14, 14, 14];
 
 	if ($showCategory) {
 		$cols[] = 'Category';
@@ -232,7 +225,7 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 
 	$count = 0;
 	foreach ($rows as $i => $row) {
-		if ($pdf->GetY() > 260) {
+		if ($pdf->GetY() > 270) {
 			$pdf->AddPage();
 			pdf_table_header($pdf, $cols, $widths);
 		}
@@ -296,8 +289,8 @@ function pdf_generate_form1a(array $f): TCPDF {
 		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
 		 ORDER BY c.last_name ASC, c.first_name ASC, c.middle_name ASC",
-		'ssss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
+		'sss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
+		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
 	);
 
 	$cols = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date of Measurement', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nutritional Status (WFL/H)', 'Disability'];
@@ -372,8 +365,8 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 		 WHERE {$f['scope']}{$f['barangay_filter_sql']}
 		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
 		 ORDER BY c.last_name ASC, c.first_name ASC",
-		'ssss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'])
+		'sss' . str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])) . 's',
+		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
 	);
 
 	$columns = [
@@ -429,8 +422,6 @@ function pdf_generate_form1b(array $f): TCPDF {
 
 	$pdf->SetFont('helvetica', 'B', 10);
 	$pdf->Cell(0, 7, 'OPT PLUS FORM 1B: SUMMARY SHEET OF THE NUTRITIONAL STATUS OF 0-59 MONTH-OLD CHILDREN', 0, 1, 'C');
-	$pdf->SetFont('helvetica', '', 7);
-	$pdf->Cell(0, 5, 'Automated consolidation from SukatKalusugan database | WFA > +2 SD is referred to WFL/H for weight-related classification.', 0, 1, 'C');
 	$pdf->Ln(2);
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
@@ -508,12 +499,10 @@ function pdf_generate_form1b(array $f): TCPDF {
 	$pdf->SetFont('helvetica', '', 8);
 	$pdf->Cell(65, 5, 'Barangay:', 0, 0); $pdf->Cell(70, 5, $f['barangay_name'], 0, 0);
 	$pdf->Cell(65, 5, 'Municipality / Province:', 0, 0); $pdf->Cell(70, 5, 'City of San Fernando, Pampanga', 0, 1);
-	$pdf->Cell(65, 5, 'PSGC:', 0, 0); $pdf->Cell(70, 5, 'Not configured', 0, 0);
-	$pdf->Cell(65, 5, 'Reporting year:', 0, 0); $pdf->Cell(70, 5, (string)$f['year'], 0, 1);
-	$pdf->Cell(65, 5, 'Estimated population (0-59 months):', 0, 0); $pdf->Cell(70, 5, 'Not configured', 0, 0);
+	$pdf->Cell(65, 5, 'Reporting year:', 0, 0); $pdf->Cell(70, 5, (string)$f['year'], 0, 0);
 	$pdf->Cell(65, 5, 'OPT Plus coverage:', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed . ' assessed', 0, 1);
-	$pdf->Cell(65, 5, 'Total children assessed (0-59 months):', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed, 0, 0);
-	$pdf->Cell(65, 5, 'Indigenous preschool children:', 0, 0); $pdf->Cell(70, 5, (string)$ipCount, 0, 1);
+	$pdf->Cell(65, 5, 'Total children assessed:', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed, 0, 0);
+	$pdf->Cell(65, 5, 'Indigenous children:', 0, 0); $pdf->Cell(70, 5, (string)$ipCount, 0, 1);
 	$pdf->Cell(65, 5, 'Children with disability:', 0, 0); $pdf->Cell(70, 5, (string)$disabilityCount, 0, 1);
 	$pdf->Ln(3);
 
@@ -799,7 +788,6 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	}
 
 	$pdf = pdf_base($spec['title'], 'Landscape');
-	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
 	$pdf->SetFont('helvetica', 'B', 10);

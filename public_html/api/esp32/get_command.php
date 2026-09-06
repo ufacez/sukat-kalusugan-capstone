@@ -186,8 +186,7 @@ mysqli_stmt_close(
 
 if (
     is_array($sessionRow) &&
-    !empty($sessionRow['expires_at']) &&
-    strtotime($sessionRow['expires_at']) <= time()
+    !empty($sessionRow['expires_at'])
 ) {
 
     $expiredSessionId =
@@ -204,7 +203,8 @@ if (
            AND status IN (
                 \'START_REQUESTED\',
                 \'MEASURING\'
-           )'
+           )
+           AND expires_at <= NOW()'
     );
 
     if ($expireStmt !== false) {
@@ -499,6 +499,13 @@ if (
 // =====================================================
 // IDLE
 // =====================================================
+//
+// Reaches here only when no active session was found, or
+// when an expired session was just updated to ERROR above.
+// The commit below persists that expiry change; when no
+// session existed the transaction is empty and the commit
+// is a harmless no-op.
+//
 
 mysqli_commit(
     $conn

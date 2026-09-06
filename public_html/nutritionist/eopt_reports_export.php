@@ -449,10 +449,9 @@ if ($isForm1B) {
 		$output[] = array_map(static fn($value) => ['v' => $value, 's' => $style], $values);
 	};
 	$addForm1bRow($form1bOutput, ['OPT PLUS FORM 1B: SUMMARY SHEET OF NUTRITIONAL STATUS', '', '', '', '', '', '', '', '', '', ''], 'title');
-	$addForm1bRow($form1bOutput, ['Barangay:', $barangayName, '', 'Municipality:', 'City of San Fernando', '', 'Province:', 'Pampanga', '', 'PSGC:', 'Not configured'], 'label');
-	$addForm1bRow($form1bOutput, ['Reporting year:', $year, '', 'Period:', $periodLabel, '', 'Total assessed:', $totalAssessed, '', 'Children with disability:', $disabilityCount], 'label');
-	$addForm1bRow($form1bOutput, ['PSGC:', 'Not configured', '', 'Estimated population 0-59 mo:', 'Not configured', '', 'OPT Plus coverage:', $totalAssessed . ' assessed', '', 'IP children:', $ipCount], 'label');
-	$addForm1bRow($form1bOutput, ['Coverage: 0-59 months', '', '', 'Prevalence denominator:', $totalAssessed, '', 'WFA > +2 SD:', 'Use WFL/H indicator', '', '', ''], 'label');
+	$addForm1bRow($form1bOutput, ['Barangay:', $barangayName, '', 'Municipality:', 'City of San Fernando', '', 'Province:', 'Pampanga', '', '', ''], 'label');
+	$addForm1bRow($form1bOutput, ['Reporting year:', $year, '', 'Period:', $periodLabel, '', 'Total assessed:', $totalAssessed, '', 'OPT Plus coverage:', $totalAssessed . ' assessed'], 'label');
+	$addForm1bRow($form1bOutput, ['IP children:', $ipCount, '', 'Children with disability:', $disabilityCount, '', 'Coverage:', '0-59 months', '', '', ''], 'label');
 	$addForm1bRow($form1bOutput, array_fill(0, 11, ''));
 
 	$summaryHeaders = ['Classification', 'Boys', 'Girls', 'Total', '0-5', '6-11', '12-23', '24-35', '36-47', '48-59', 'Birth-5 Total', 'Birth-5 %', '0-23 Total', '0-23 %', 'IP Boys', 'IP Girls', 'IP Total'];
@@ -758,48 +757,24 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	$totalCols = count($listColumns);
 	$outRows = [];
 
-	$titleLines = $isForm1A
-		? [
-			'OPT PLUS FORM 1A - PRE-PRINTED LIST OF PRESCHOOL CHILDREN',
-			'BARANGAY: ' . strtoupper($barangayName),
-			'CITY: CITY OF SAN FERNANDO',
-			'PROVINCE: PAMPANGA',
-			'YEAR OF LAST OPT PLUS: ' . $year,
-			'NOTE: Add the names and details of new or previously unlisted children at the end of this list.',
-		]
-		: [
-			'BARANGAY: ' . strtoupper($barangayName),
-			'MUNICIPALITY: _______________',
-			'PROVINCE: _______________',
-			'YEAR: ' . $year,
-			'# OF CHILDREN: ' . count($rows),
-			'NOTE: ' . ($spec['is_infant'] ? 'Every child <24 months is weighed monthly.' . PHP_EOL . 'PRINTING INSTRUCTIONS: _______________' : 'PRINTING INSTRUCTIONS: _______________'),
-		];
+	$titleText = $isForm1A
+		? 'OPT PLUS FORM 1A - PRE-PRINTED LIST OF PRESCHOOL CHILDREN — ' . strtoupper($barangayName) . ' — ' . $year
+		: strtoupper($spec['title']) . ' — ' . strtoupper($barangayName) . ' — ' . $year;
 
-	$mergeRow = $totalCols - 1;
-	$mergeRange = 'A' . ($outRows ? count($outRows) + 1 : '1') . ':' . 'Z' . ($outRows ? count($outRows) + 1 : '1');
-
-	foreach ($titleLines as $lineIdx => $lineText) {
-		$styleKey = ['org', 'org', 'org', 'title', 'subtitle'][$lineIdx];
-		$rowCells = [];
-
-		for ($c = 0; $c < $totalCols; $c++) {
-			$rowCells[] = ['v' => $c === 0 ? $lineText : '', 's' => $styleKey];
-		}
-
-		$outRows[] = $rowCells;
+	$titleRow = [];
+	for ($c = 0; $c < $totalCols; $c++) {
+		$titleRow[] = ['v' => $c === 0 ? $titleText : '', 's' => 'title'];
 	}
+	$outRows[] = $titleRow;
 
-	$outRows[] = array_map(static fn($v) => ['v' => $v], array_fill(0, $totalCols, ''));
-
+	$periodText = $view === 'monthly' ? $monthsList[$month] . ' ' . $year : $roundsList[$checkupMonth] . ' ' . $year;
+	$metaRow = [];
 	$metaTexts = [
 		'Barangay: ' . $barangayName,
-		'Period: ' . ($view === 'monthly' ? $monthsList[$month] . ' ' . $year : $roundsList[$checkupMonth] . ' ' . $year),
+		'Period: ' . $periodText,
 		'Axis: ' . $spec['axis'],
 		'Generated: ' . date('F j, Y'),
 	];
-
-	$metaRow = [];
 	foreach ($metaTexts as $metaText) {
 		$metaRow[] = ['v' => $metaText, 's' => 'label'];
 		for ($pad = 0; $pad < 3; $pad++) {
@@ -810,8 +785,6 @@ foreach ($activeSpecs as $listIndex => $spec) {
 		array_pop($metaRow);
 	}
 	$outRows[] = $metaRow;
-
-	$outRows[] = array_map(static fn($v) => ['v' => $v], array_fill(0, $totalCols, ''));
 
 	$headerRow = [];
 	foreach ($listColumns as $columnTitle) {
@@ -898,7 +871,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	}
 	$merges = array_map(
 		fn($r) => "A{$r}:{$lastCol}{$r}",
-		range(1, 7)
+		range(1, 2)
 	);
 
 	$sheets[] = [

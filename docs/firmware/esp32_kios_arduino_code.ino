@@ -5,6 +5,8 @@
 #include <math.h>
 #include <WiFiManager.h>
 #include <Preferences.h>
+// DISABLE AsyncTCP debug spam (HTTP/1 protocol lines in Serial Monitor)
+#define TCP_DEBUG(...)
 #include <AsyncTCP.h>
 #include <ESPAsyncWebServer.h>
 #include "soc/soc.h"
@@ -433,7 +435,7 @@ String httpPutJson(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(300);
+  http.setTimeout(3000);
 
   http.addHeader(
     "Content-Type",
@@ -869,8 +871,12 @@ bool pollSessionState(
 
   if (!success) {
 
+    // HTTP failed (WiFi blip, server slow, etc). Do NOT
+    // overwrite shouldProcess — if it was already true from
+    // a previous successful poll or a WebSocket command, we
+    // must not lose it. Just report "couldn't poll" and let
+    // the caller decide.
     stillValid = true;
-    shouldProcess = false;
 
     return false;
   }
@@ -1211,21 +1217,23 @@ void runMeasurement(
   // ===================================================
   // INITIAL FIREBASE
   // ===================================================
+  //
+  // Fire-and-forget: Firebase is a live-mirror, not a
+  // gate. If it is unreachable or slow, the measurement
+  // MUST still proceed. skipSessionCheck avoids the extra
+  // HTTP round-trip to get_command.php, and we ignore the
+  // return value so a Firebase failure never aborts.
+  //
 
-  if (
-    !safeFirebaseUpdate(
-      sessionId,
-      "MEASURING",
-      -1,
-      -1
-    )
-  ) {
-
-    measuring = false;
-    currentSessionId = 0;
-
-    return;
-  }
+  safeFirebaseUpdate(
+    sessionId,
+    "MEASURING",
+    -1,
+    -1,
+    false,
+    false,
+    true
+  );
 
   Serial.println();
   Serial.println(
