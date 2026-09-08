@@ -360,7 +360,7 @@ String httpGet(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(1500);
+  http.setTimeout(5000);
   http.addHeader("X-Device-Key", DEVICE_KEY);
 
   httpCode = http.GET();
@@ -395,7 +395,7 @@ String httpPostForm(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(3000);
+  http.setTimeout(10000);
 
   http.addHeader(
     "Content-Type",
@@ -435,7 +435,7 @@ String httpPutJson(
   HTTPClient http;
 
   http.begin(url);
-  http.setTimeout(3000);
+  http.setTimeout(10000);
 
   http.addHeader(
     "Content-Type",

@@ -185,6 +185,7 @@ foreach ($monitoringList as $entry) {
 $calendarEntries = [];
 foreach ($monitoringList as $entry) {
 	if (empty($entry['next_due'])) continue;
+	if (($entry['status'] ?? '') === 'completed') continue;
 	try { $dueDt = new DateTimeImmutable($entry['next_due']); } catch (Exception) { continue; }
 	if ((int)$dueDt->format('Y') !== $calendarYear || (int)$dueDt->format('n') !== $calendarMonth) continue;
 	$dayKey = (int)$dueDt->format('j');

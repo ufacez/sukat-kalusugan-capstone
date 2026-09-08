@@ -132,10 +132,10 @@ $measurements = admin_fetch_all(
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 INNER JOIN (
-		SELECT child_id, MAX(measurement_date) AS latest_date
+		SELECT child_id, MAX(id) AS latest_id
 		FROM measurements
 		GROUP BY child_id
-	 ) latest ON latest.latest_date = m.measurement_date AND latest.child_id = m.child_id
+	 ) latest ON latest.latest_id = m.id
 	 WHERE {$measurementsScope}
 	   AND c.status = 'active'
 	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
@@ -455,6 +455,9 @@ foreach ($appointments as $appointment) {
 	}
 	$day = (int)$date->format('j');
 	$status = (string)($appointment['status'] ?? 'pending');
+	if (in_array($status, ['completed', 'cancelled'], true)) {
+		continue;
+	}
 	$isOverdue = in_array($status, ['pending', 'confirmed'], true)
 		&& $date->format('Y-m-d') < $today->format('Y-m-d');
 	$effectiveStatus = $isOverdue ? 'overdue' : $status;
