@@ -11,6 +11,8 @@ $user = nutritionist_require_access();
 $localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 10;
+$validTabs = ['active', 'graduated'];
+$tab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'active';
 
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
@@ -27,7 +29,11 @@ if ($localAreaFilter > 0) {
 $where[] = 'c.status = ?';
 $types .= 's';
 $filterParams[] = 'active';
-$where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
+if ($tab === 'graduated') {
+    $where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) >= 60';
+} else {
+    $where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
+}
 $whereSql = implode(' AND ', $where);
 
 /*
@@ -84,6 +90,22 @@ $offset = ($page - 1) * $perPage;
 $pageChildren = array_slice($children, $offset, $perPage);
 
 /*
+ * Count children for each tab (badge numbers).
+ */
+$countActiveRows = admin_fetch_all(
+    "SELECT COUNT(*) AS cnt FROM children c WHERE c.status = 'active' AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59 AND {$childrenScope}",
+    str_repeat('i', count($childrenParams)),
+    $childrenParams
+);
+$countActive = (int)(($countActiveRows[0]['cnt'] ?? 0));
+$countGraduatedRows = admin_fetch_all(
+    "SELECT COUNT(*) AS cnt FROM children c WHERE c.status = 'active' AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) >= 60 AND {$childrenScope}",
+    str_repeat('i', count($childrenParams)),
+    $childrenParams
+);
+$countGraduated = (int)(($countGraduatedRows[0]['cnt'] ?? 0));
+
+/*
  * Local area list for the filter dropdown. The list is restricted to
  * the user's barangay scope so a Dela Paz Norte nutritionist can only
  * filter to local areas inside Dela Paz Norte.
@@ -102,7 +124,9 @@ $localAreaList = admin_fetch_all(
 
 function nutritionist_children_url(array $params): string
 {
+    global $tab;
     $base = app_url('/nutritionist/children.php');
+    $params['tab'] = $params['tab'] ?? $tab;
     $merged = array_filter($params, static fn($v) => $v !== '' && $v !== null);
     return $merged === [] ? $base : $base . '?' . http_build_query($merged);
 }
@@ -150,6 +174,11 @@ nutritionist_layout_start(
 );
 ?>
 <style>
+.rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 14px}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
+.rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
+.rp-tab span{font-size:11px;opacity:.6}
 .children-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .children-toolbar .admin-search{flex:1;min-width:220px}
 .children-toolbar .admin-select{min-width:200px;max-width:260px}
@@ -251,6 +280,11 @@ nutritionist_layout_start(
         </select>
     </div>
 
+    <div class="rp-tabs">
+        <a class="rp-tab <?php echo $tab === 'active' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['page' => 1])); ?>">Active (0–59 mo) <span>(<?php echo (int)$countActive; ?>)</span></a>
+        <a class="rp-tab <?php echo $tab === 'graduated' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['tab' => 'graduated', 'page' => 1])); ?>">Graduated (60+ mo) <span>(<?php echo (int)$countGraduated; ?>)</span></a>
+    </div>
+
     <div class="nutritionist-table-wrap">
         <table class="nutritionist-table children-table" id="children-table">
             <thead>
@@ -269,12 +303,15 @@ nutritionist_layout_start(
                 <?php if ($pageChildren === []): ?>
                     <tr><td colspan="8">
                         <div class="children-empty">
-                            <?php if ($totalAll === 0): ?>
+                            <?php if ($totalAll === 0 && $tab === 'active'): ?>
                                 <div class="empty-title">No children registered yet</div>
                                 <div class="empty-sub">Your scope doesn't have any registered children. Once children are added, they will appear in this list.</div>
                                 <?php if (nutritionist_can_write('children.create')): ?>
                                     <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
                                 <?php endif; ?>
+                            <?php elseif ($tab === 'graduated'): ?>
+                                <div class="empty-title">No graduated children</div>
+                                <div class="empty-sub">No children in your scope have reached 60+ months of age yet.</div>
                             <?php else: ?>
                                 <div class="empty-title">No children in this view</div>
                                 <div class="empty-sub">Your current local area filter doesn't include any of the <?php echo (int)$totalAll; ?> children in your scope. Clear the filter to see all of them.</div>

@@ -108,7 +108,7 @@ try {
     }
 
     // ── Verify child exists ──────────────────────────────────────
-    $childStmt = mysqli_prepare($conn, 'SELECT id, child_code, first_name, last_name FROM children WHERE id = ? LIMIT 1');
+    $childStmt = mysqli_prepare($conn, 'SELECT id, child_code, first_name, last_name FROM children WHERE id = ? AND status = \'active\' LIMIT 1');
     if ($childStmt === false) throw new RuntimeException('Unable to prepare child lookup.');
     mysqli_stmt_bind_param($childStmt, 'i', $childId);
     mysqli_stmt_execute($childStmt);

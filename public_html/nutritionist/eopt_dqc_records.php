@@ -10,7 +10,7 @@ $year = (int)($_GET['year'] ?? date('Y'));
 $barangayFilter = (int)($_GET['barangay_id'] ?? 0);
 
 $scopeParams = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams) . ' AND c.status = \'active\'';
 
 $barangayFilterSql = '';
 $barangayFilterParams = [];

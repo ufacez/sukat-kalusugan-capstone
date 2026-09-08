@@ -3173,6 +3173,46 @@
       return false;
     }
 
+    // ============================================================
+    // DUE-DATE PRE-CHECK
+    // ============================================================
+    try {
+      const dueCheckUrl =
+        data?.endpoints?.checkDue ||
+        "../api/kiosk/check_due.php";
+      const dueCheckResp = await fetch(
+        dueCheckUrl + "?child_id=" + encodeURIComponent(child.id),
+        {
+          method: "GET",
+          headers: { Accept: "application/json" },
+          cache: "no-store"
+        }
+      );
+      const dueCheckJson = await dueCheckResp
+        .json()
+        .catch(() => ({}));
+      if (
+        dueCheckResp.ok &&
+        dueCheckJson?.success === true &&
+        dueCheckJson?.data?.is_due === false
+      ) {
+        const nextDue =
+          dueCheckJson?.data?.next_due || "unknown";
+        pushFeed(
+          "Hindi pa due",
+          "Ang bata ay hindi pa scheduled para sa measurement ngayon. Next scheduled: " + nextDue + ". Gamitin ang Override Measurement sa nutritionist portal kung kailangan.",
+          "error"
+        );
+        state.submitting = false;
+        state.startRequestInProgress = false;
+        syncStartButtonState();
+        return false;
+      }
+    } catch (_err) {
+      // If the due-check endpoint is unreachable, proceed
+      // (the backend start_measurement.php will still block)
+    }
+
     if (
       state.startRequestInProgress
     ) {

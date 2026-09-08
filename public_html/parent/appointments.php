@@ -70,26 +70,22 @@ $appointments = admin_fetch_all(
 );
 
 $now = new DateTimeImmutable();
-$upcoming = [];
+$myRequests = [];
 $past = [];
 
 foreach ($appointments as $appt) {
-	$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
-	$isFuture = $dt > $now;
 	$status = (string)$appt['status'];
-	$isOpen = in_array($status, ['pending', 'confirmed'], true);
+	$isPast = in_array($status, ['completed', 'cancelled'], true);
 
-	if ($isFuture && $isOpen) {
-		if ($selectedChildId === 0 || (int)$appt['child_id'] === $selectedChildId) $upcoming[] = $appt;
-	} else {
+	if ($isPast) {
 		if ($selectedChildId === 0 || (int)$appt['child_id'] === $selectedChildId) $past[] = $appt;
+	} else {
+		if ($selectedChildId === 0 || (int)$appt['child_id'] === $selectedChildId) $myRequests[] = $appt;
 	}
 }
 
-usort($upcoming, static fn(array $a, array $b): int => strcmp((string)$a['scheduled_at'], (string)$b['scheduled_at']));
+usort($myRequests, static fn(array $a, array $b): int => strcmp((string)$a['scheduled_at'], (string)$b['scheduled_at']));
 usort($past, static fn(array $a, array $b): int => strcmp((string)$b['scheduled_at'], (string)$a['scheduled_at']));
-
-$nextAppointment = $upcoming[0] ?? null;
 
 $allJson = [];
 foreach ($appointments as $appt) {
@@ -114,7 +110,7 @@ foreach ($appointments as $appt) {
 	];
 }
 
-$actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">Request appointment <span aria-hidden="true">&#8594;</span></a>';
+$actions = '<a class="admin-btn" href="' . parent_e(app_url('/parent/appointment_form.php')) . '">' . admin_action_icon('add') . ' Request appointment</a>';
 
 parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visits.', 'appointments', $actions);
 ?>
@@ -126,7 +122,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		<span class="parent-appointment-child-arrow" aria-hidden="true">&#9662;</span>
 	</button>
 	<div class="parent-appointment-tabs" role="tablist" aria-label="Appointment status">
-		<button type="button" class="is-active" data-appointment-tab="upcoming">Upcoming</button>
+		<button type="button" class="is-active" data-appointment-tab="upcoming">My Requests</button>
 		<button type="button" data-appointment-tab="past">Past</button>
 	</div>
 </section>
@@ -144,29 +140,37 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 </div>
 
 <div class="parent-appt-tab-panel is-active" data-appointment-panel="upcoming">
-<?php if ($nextAppointment !== null): ?>
-<?php
-	$dt = new DateTimeImmutable((string)$nextAppointment['scheduled_at']);
-	$statusClass = parent_status_class((string)$nextAppointment['status']);
-	$statusLabel = ucfirst((string)$nextAppointment['status']);
-?>
-<section class="parent-appt-upcoming" data-appointment-id="<?php echo (int)$nextAppointment['id']; ?>">
-	<div class="parent-appt-upcoming-body">
-		<div class="parent-appt-upcoming-label">Upcoming</div>
-		<div class="parent-appt-upcoming-date"><?php echo parent_e($dt->format('F j, Y')); ?></div>
-		<div class="parent-appt-upcoming-time"><?php echo parent_e($dt->format('g:i A')); ?></div>
-		<div class="parent-appt-upcoming-type"><?php echo parent_e(ucfirst((string)($nextAppointment['appointment_type'] ?? 'Regular'))); ?></div>
-		<div class="parent-appt-upcoming-child">
-			<?php echo parent_e($nextAppointment['first_name'] . ' ' . $nextAppointment['last_name']); ?>
+<?php if (!empty($myRequests)): ?>
+<div class="parent-appt-list">
+	<?php foreach ($myRequests as $appt):
+		$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
+		$statusClass = parent_status_class((string)$appt['status']);
+		$statusLabel = ucfirst((string)$appt['status']);
+		$status = (string)$appt['status'];
+	?>
+	<div class="parent-appt-row" data-appointment-id="<?php echo (int)$appt['id']; ?>">
+		<div class="parent-appt-row-icon <?php echo $status === 'confirmed' ? 'is-done' : ''; ?>">
+			<?php if ($status === 'confirmed'): ?>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+			<?php elseif ($status === 'cancelled'): ?>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+			<?php else: ?>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
+			<?php endif; ?>
 		</div>
-		<div class="parent-appt-upcoming-status">
+		<div class="parent-appt-row-info">
+			<div class="parent-appt-row-date"><?php echo parent_e($dt->format('F j, Y')); ?> · <?php echo parent_e($dt->format('g:i A')); ?></div>
+			<div class="parent-appt-row-type"><?php echo parent_e(ucfirst((string)($appt['appointment_type'] ?? 'Regular'))); ?></div>
+			<div class="parent-appt-row-child"><?php echo parent_e($appt['first_name'] . ' ' . $appt['last_name']); ?></div>
+		</div>
+		<div class="parent-appt-row-status">
 			<span class="admin-pill <?php echo $statusClass; ?>"><?php echo parent_e($statusLabel); ?></span>
 		</div>
 	</div>
-	<button type="button" class="admin-btn-secondary parent-appt-view-btn" data-appointment-id="<?php echo (int)$nextAppointment['id']; ?>">View Details</button>
-</section>
+	<?php endforeach; ?>
+</div>
 <?php else: ?>
-	<div class="parent-appt-empty">No upcoming appointments yet.</div>
+	<div class="parent-appt-empty">No requests yet. Tap "Request appointment" to get started.</div>
 <?php endif; ?>
 </div>
 

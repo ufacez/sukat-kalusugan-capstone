@@ -54,7 +54,7 @@ $sql = "SELECT
 	ORDER BY m.measurement_date DESC, m.id DESC
 	LIMIT 1
  )
- WHERE {$scopeBarangay}";
+ WHERE {$scopeBarangay} AND c.status = 'active'";
 
 $types  = str_repeat('i', count($barangayParams));
 $params = $barangayParams;

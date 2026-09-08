@@ -74,6 +74,7 @@ if ($userType === 'parent') {
         'SELECT id, first_name, last_name, sex, birthdate, parent_id
          FROM children
          WHERE id = ? AND parent_id = ?
+         AND status = \'active\'
          LIMIT 1',
         'ii',
         [$childId, (int)$user['id']]
@@ -94,6 +95,7 @@ if ($userType === 'parent') {
         'SELECT c.id, c.first_name, c.last_name, c.sex, c.birthdate, c.parent_id
          FROM children c
          WHERE c.id = ?
+             AND c.status = \'active\'
             ' . $scopeCondition . '
          LIMIT 1',
         str_repeat('i', count($scopeParams)),

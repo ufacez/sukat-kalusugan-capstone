@@ -339,8 +339,7 @@ function nutritionist_calendar_color(string $entryType): string
 {
     return match ($entryType) {
         'appointment' => '#E03131',
-        'meeting' => '#4a9fd5',
-        'oplan_timbang' => 'var(--admin-primary)',
+        'parent_request' => '#2563EB',
         default => '#94a3b8',
     };
 }
@@ -349,8 +348,7 @@ function nutritionist_calendar_label(string $entryType): string
 {
     return match ($entryType) {
         'appointment' => 'Appointment',
-        'meeting' => 'Meeting',
-        'oplan_timbang' => 'Oplan Timbang',
+        'parent_request' => 'Parent Request',
         default => ucfirst($entryType),
     };
 }
@@ -363,9 +361,7 @@ function nutritionist_calendar_label(string $entryType): string
 function nutritionist_calendar_legend(): array
 {
     return [
-        ['type' => 'appointment',    'label' => 'Appointment',    'color' => '#E03131'],
-        ['type' => 'meeting',        'label' => 'Meeting',        'color' => '#4a9fd5'],
-        ['type' => 'oplan_timbang',  'label' => 'Oplan Timbang',  'color' => '#16a34a'],
+        ['type' => 'appointment', 'label' => 'Appointment', 'color' => '#E03131'],
     ];
 }
 
@@ -436,13 +432,13 @@ function nutritionist_render_calendar_grid(
         $dotsHtml = '';
         if ($hasEntries) {
             $dotEntries = [];
-            $seenDotTypes = [];
+            $seenTypes = [];
             foreach ($dayEntries as $entry) {
                 $type = (string)($entry['type'] ?? 'appointment');
-                if (isset($seenDotTypes[$type])) {
+                if (isset($seenTypes[$type])) {
                     continue;
                 }
-                $seenDotTypes[$type] = true;
+                $seenTypes[$type] = true;
                 $dotEntries[] = $entry;
                 if (count($dotEntries) === 3) {
                     break;

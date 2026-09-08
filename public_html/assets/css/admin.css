@@ -2882,7 +2882,9 @@ canvas[data-fluid-chart] {
   }
 
   body.admin-page .admin-topbar-name,
-  body.admin-page .admin-topbar-role {
+  body.admin-page .admin-topbar-role,
+  body.parent-page .admin-topbar-name,
+  body.parent-page .admin-topbar-role {
     display: none;
   }
 
@@ -2970,11 +2972,14 @@ canvas[data-fluid-chart] {
 
 /* Tier 6: very small phones in portrait (<= 360px) */
 @media (max-width: 360px) {
-  body.admin-page .admin-topbar-profile-text {
+  body.admin-page .admin-topbar-profile-text,
+  body.parent-page .admin-topbar-profile-text {
     display: none;
   }
   body.admin-page .admin-topbar-name,
-  body.admin-page .admin-topbar-role {
+  body.admin-page .admin-topbar-role,
+  body.parent-page .admin-topbar-name,
+  body.parent-page .admin-topbar-role {
     display: none;
   }
   body.admin-page .admin-pageheader-left h1 {

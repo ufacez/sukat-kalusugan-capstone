@@ -9,6 +9,7 @@ $children = admin_fetch_all(
 	'SELECT id, child_code, first_name, last_name, birthdate, sex
 	 FROM children
 	 WHERE parent_id = ?
+	 AND status = \'active\'
 	 ORDER BY last_name ASC, first_name ASC',
 	'i',
 	[(int)$user['id']]

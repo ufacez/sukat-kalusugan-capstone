@@ -1296,8 +1296,8 @@
   flex-shrink: 0;
 }
 .parent-page .parent-appt-row-icon.is-done {
-  background: #dcfce7;
-  color: #16a34a;
+  background: var(--admin-pill-success-bg);
+  color: var(--admin-primary);
 }
 .parent-page .parent-appt-row-info {
   flex: 1;

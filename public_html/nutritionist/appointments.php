@@ -5,44 +5,22 @@ require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 $user = nutritionist_require_access();
 
+// ── POST handlers ──
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$action = (string)($_POST['action'] ?? '');
 	$appointmentId = (int)($_POST['id'] ?? 0);
 
-	if ($action === 'sync_followups') {
-		nutritionist_require_write();
-		$result = followup_sync_for_scope($user);
-		admin_redirect('/nutritionist/appointments.php', ['notice' => sprintf(
-			'EOPT follow-ups synced — %d generated, %d auto-completed.',
-			(int)$result['generated'],
-			(int)$result['completed']
-		)]);
-	}
-
 	if ($action === 'complete_followup' && $appointmentId > 0) {
-
 		nutritionist_require_write();
 
 		$appointment = admin_fetch_one(
-			"SELECT
-				a.id,
-				a.child_id,
-				a.scheduled_at,
-				lm.measurement_date AS last_measured,
-				c.first_name,
-				c.last_name
+			"SELECT a.id, a.child_id, a.scheduled_at, lm.measurement_date AS last_measured, c.first_name, c.last_name
 			 FROM appointments a
 			 INNER JOIN children c ON c.id = a.child_id
 			 LEFT JOIN measurements lm ON lm.id = (
-				SELECT m.id FROM measurements m
-				WHERE m.child_id = a.child_id
-				ORDER BY m.measurement_date DESC, m.id DESC
-				LIMIT 1
+				SELECT m.id FROM measurements m WHERE m.child_id = a.child_id ORDER BY m.measurement_date DESC, m.id DESC LIMIT 1
 			 )
-			 WHERE a.id = ?
-			   AND a.appointment_type = 'followup'
-			   AND a.status IN ('pending', 'confirmed')
-			 LIMIT 1",
+			 WHERE a.id = ? AND a.appointment_type = 'followup' AND a.status IN ('pending', 'confirmed') LIMIT 1",
 			'i',
 			[$appointmentId]
 		);
@@ -52,9 +30,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		}
 
 		try {
-			$satisfiedFrom = (new DateTimeImmutable((string)$appointment['scheduled_at']))
-				->setTime(0, 0)
-				->modify('-' . FOLLOWUP_GRACE_DAYS . ' days');
+			$satisfiedFrom = (new DateTimeImmutable((string)$appointment['scheduled_at']))->setTime(0, 0)->modify('-' . FOLLOWUP_GRACE_DAYS . ' days');
 		} catch (Exception) {
 			$satisfiedFrom = new DateTimeImmutable('today');
 		}
@@ -68,13 +44,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			]);
 		}
 
-		$ok = admin_execute(
-			"UPDATE appointments
-			 SET status = 'completed'
-			 WHERE id = ? AND status IN ('pending', 'confirmed')",
-			'i',
-			[$appointmentId]
-		);
+		$ok = admin_execute("UPDATE appointments SET status = 'completed' WHERE id = ? AND status IN ('pending', 'confirmed')", 'i', [$appointmentId]);
 
 		log_action(
 			(int)$user['id'],
@@ -84,911 +54,401 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		);
 
 		followup_sync_for_scope($user);
-
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Re-measurement verified — follow-up completed and next cycle scheduled.'] : ['notice' => 'Follow-up could not be updated.', 'type' => 'error']);
 	}
 
-	if ($action === 'update_status' && $appointmentId > 0) {
-
+	if ($action === 'confirm_request' && $appointmentId > 0) {
 		nutritionist_require_write();
-
-		$type = (string)(admin_fetch_one(
-			'SELECT appointment_type FROM appointments WHERE id = ? LIMIT 1',
+		$ok = admin_execute(
+			"UPDATE appointments SET status = 'confirmed' WHERE id = ? AND created_by = 'parent' AND status = 'pending'",
 			'i',
 			[$appointmentId]
-		)['appointment_type'] ?? 'regular');
-
-		if ($type === 'followup') {
-			admin_redirect('/nutritionist/appointments.php', [
-				'notice' => 'Automatic follow-ups cannot be re-statused manually — verify the mandatory re-measurement instead.',
-				'type' => 'error',
-			]);
-		}
-
-		$status = (string)($_POST['status'] ?? 'pending');
-
-		if (!in_array($status, ['pending', 'confirmed', 'completed', 'cancelled'], true)) {
-			$status = 'pending';
-		}
-
-		$ok = admin_execute('UPDATE appointments SET status = ? WHERE id = ?', 'si', [$status, $appointmentId]);
-		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment updated.'] : ['notice' => 'Appointment could not be updated.', 'type' => 'error']);
+		);
+		admin_redirect('/nutritionist/appointments.php?tab=open_requests', $ok ? ['notice' => 'Appointment confirmed.'] : ['notice' => 'Could not confirm appointment.', 'type' => 'error']);
 	}
 
-	if ($action === 'delete' && $appointmentId > 0) {
-
+	if ($action === 'cancel_request' && $appointmentId > 0) {
 		nutritionist_require_write();
-
-		$type = (string)(admin_fetch_one(
-			'SELECT appointment_type FROM appointments WHERE id = ? LIMIT 1',
+		$ok = admin_execute(
+			"UPDATE appointments SET status = 'cancelled' WHERE id = ? AND created_by = 'parent' AND status = 'pending'",
 			'i',
 			[$appointmentId]
-		)['appointment_type'] ?? 'regular');
+		);
+		admin_redirect('/nutritionist/appointments.php?tab=open_requests', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Could not cancel appointment.', 'type' => 'error']);
+	}
 
-		if ($type === 'followup') {
-			log_action((int)$user['id'], 'FOLLOWUP_DELETE_BLOCKED', 'warning', sprintf('Attempted deletion of mandatory follow-up #%d was blocked.', $appointmentId));
-			admin_redirect('/nutritionist/appointments.php', ['notice' => 'Automatic follow-ups are MANDATORY and cannot be deleted.', 'type' => 'error']);
-		}
-
-		$ok = admin_execute('DELETE FROM appointments WHERE id = ?', 'i', [$appointmentId]);
-		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment removed.'] : ['notice' => 'Appointment could not be removed.', 'type' => 'error']);
+	if ($action === 'complete_request' && $appointmentId > 0) {
+		nutritionist_require_write();
+		$ok = admin_execute(
+			"UPDATE appointments SET status = 'completed' WHERE id = ? AND created_by = 'parent' AND status = 'confirmed'",
+			'i',
+			[$appointmentId]
+		);
+		admin_redirect('/nutritionist/appointments.php?tab=open_requests', $ok ? ['notice' => 'Appointment marked as completed.'] : ['notice' => 'Could not complete appointment.', 'type' => 'error']);
 	}
 }
 
-$syncResult = followup_sync_for_scope($user);
+$monitoringList = followup_fetch_monitoring_list($user);
 
-$params = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
-$appointments = admin_fetch_all(
-	"SELECT
-		a.id,
-		a.scheduled_at,
-		a.status,
-		a.notes,
-		a.appointment_type,
-		a.followup_track,
-		a.followup_category,
-		a.location,
-		c.id AS child_id,
-		c.child_code,
-		c.first_name,
-		c.last_name,
-		bg.name AS barangay,
-		p.name AS parent_name,
-		p.phone AS parent_phone,
-		u.name AS nutritionist_name
+// ── Parent-created appointments (pending + confirmed) ──
+$openReqParams = [(int)$user['id']];
+$allParentAppts = admin_fetch_all(
+	"SELECT a.id, a.scheduled_at, a.notes, a.location, a.created_at, a.status AS appt_status,
+		c.id AS child_id, c.first_name, c.last_name, c.child_code, c.birthdate, c.sex,
+		bg.name AS barangay_name,
+		p.name AS parent_name, p.phone AS parent_phone
 	 FROM appointments a
 	 INNER JOIN children c ON c.id = a.child_id
-	 INNER JOIN parents p ON p.id = a.parent_id
-	 INNER JOIN users u ON u.id = a.nutritionist_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
-	 WHERE {$scope}
-	   AND c.status = 'active'
-	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
+	 LEFT JOIN parents p ON p.id = a.parent_id
+	 WHERE a.nutritionist_id = ? AND a.status IN ('pending', 'confirmed') AND a.created_by = 'parent'
 	 ORDER BY a.scheduled_at ASC, a.id ASC",
-	str_repeat('i', count($params)),
-	$params
+	'i',
+	$openReqParams
 );
+// Pending only for the Open Requests table
+$openRequestRows = $allParentAppts;
 
 $today = new DateTimeImmutable('today');
 $now = new DateTimeImmutable('now');
-$weekStart = $now->modify('Monday this week')->setTime(0, 0);
-$weekEnd = $weekStart->modify('+7 days');
-$tomorrowStart = $now->modify('+1 day')->setTime(0, 0);
-$tomorrowEnd = $tomorrowStart->modify('+1 day');
-$monthStart = $now->modify('first day of this month')->setTime(0, 0);
-$monthEnd = $monthStart->modify('+1 month');
 
-$regularAppointments = [];
-$followUpAppointments = [];
-$upcomingList = [];
-$displayAppointments = [];
-$calendarMonthMap = [];
-
-$totalAll = count($appointments);
-$openAll = 0;
-$upcoming7 = 0;
-$completedThisMonth = 0;
-$thisWeekCount = 0;
-$tomorrowCount = 0;
-$followUpOverdue = 0;
-$followUpOpen = 0;
-$followUpCompleted = 0;
-
-$filterStatus = (string)($_GET['status'] ?? '');
-$filterChildId = (int)($_GET['child'] ?? 0);
-$filterFrom = (string)($_GET['from'] ?? '');
-$filterTo = (string)($_GET['to'] ?? '');
-$filterType = (string)($_GET['type'] ?? '');
-$tableSearch = trim((string)($_GET['q'] ?? ''));
-$tablePage = max(1, (int)($_GET['page'] ?? 1));
+// ── Tab / pagination ──
+$validTabs = ['open_requests', 'monthly_young', 'monthly_old', 'quarterly'];
+$activeTab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'open_requests';
+$page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 5;
-$activeTab = in_array(($_GET['tab'] ?? ''), ['open', 'all'], true) ? ($_GET['tab'] ?? '') : 'open';
 
+// ── Calendar ──
 $monthParam = (string)($_GET['m'] ?? $now->format('Y-m'));
-try {
-	$monthAnchor = new DateTimeImmutable($monthParam . '-01');
-} catch (Exception) {
-	$monthAnchor = $now->modify('first day of this month');
-}
+try { $monthAnchor = new DateTimeImmutable($monthParam . '-01'); } catch (Exception) { $monthAnchor = $now->modify('first day of this month'); }
 $calendarYear = (int)$monthAnchor->format('Y');
 $calendarMonth = (int)$monthAnchor->format('n');
 $monthLabel = $monthAnchor->format('F Y');
 $prevMonth = $monthAnchor->modify('-1 month')->format('Y-m');
 $nextMonth = $monthAnchor->modify('+1 month')->format('Y-m');
 
-foreach ($appointments as &$appointment) {
-	$type = (string)($appointment['appointment_type'] ?? 'regular');
-	$status = (string)$appointment['status'];
+// ── Split monitoring list into 3 groups ──
+$groupYoung = [];   // Monthly, 0–23 months
+$groupOld = [];     // Monthly, 24–60 months (abnormal)
+$groupQuarterly = []; // Quarterly, 24–60 months (normal)
 
-	try {
-		$scheduledAt = new DateTimeImmutable((string)$appointment['scheduled_at']);
-	} catch (Exception) {
-		continue;
-	}
-
-	$appointment['scheduled_dt'] = $scheduledAt;
-	$appointment['location'] = trim((string)($appointment['location'] ?? '')) !== '' ? trim((string)$appointment['location']) : 'Barangay Health Center';
-
-	if ($type === 'followup') {
-		$isOverdue = false;
-		if (in_array($status, ['pending', 'confirmed'], true)) {
-			$isOverdue = $scheduledAt < $today;
-		}
-		$appointment['is_overdue'] = $isOverdue;
-
-		if ($isOverdue) {
-			$followUpOverdue++;
-		}
-		if (in_array($status, ['pending', 'confirmed'], true)) {
-			$followUpOpen++;
-		}
-		if ($status === 'completed') {
-			$followUpCompleted++;
-		}
-
-		$followUpAppointments[] = $appointment;
-	} else {
-		$regularAppointments[] = $appointment;
-		if (in_array($status, ['pending', 'confirmed'], true)) {
-			$openAll++;
-			if ($scheduledAt >= $now && $scheduledAt < $now->modify('+7 days')) {
-				$upcoming7++;
-			}
-			if ($scheduledAt >= $weekStart && $scheduledAt < $weekEnd) {
-				$thisWeekCount++;
-			}
-			if ($scheduledAt >= $tomorrowStart && $scheduledAt < $tomorrowEnd) {
-				$tomorrowCount++;
-			}
-		}
-		if ($status === 'completed' && $scheduledAt >= $monthStart && $scheduledAt < $monthEnd) {
-			$completedThisMonth++;
-		}
-	}
-
-	if (in_array($status, ['pending', 'confirmed'], true) && $scheduledAt >= $now) {
-		$upcomingList[] = $appointment;
-	}
-
-	if ((int)$scheduledAt->format('Y') === $calendarYear && (int)$scheduledAt->format('n') === $calendarMonth) {
-		$dayKey = (int)$scheduledAt->format('j');
-		if (!isset($calendarMonthMap[$dayKey])) {
-			$calendarMonthMap[$dayKey] = ['pending' => 0, 'confirmed' => 0, 'completed' => 0, 'cancelled' => 0, 'overdue' => 0];
-		}
-		$isOpen = in_array($status, ['pending', 'confirmed'], true);
-		if ($isOpen && $scheduledAt < $today) {
-			$calendarMonthMap[$dayKey]['overdue']++;
-		} elseif (isset($calendarMonthMap[$dayKey][$status])) {
-			$calendarMonthMap[$dayKey][$status]++;
-		}
+foreach ($monitoringList as $entry) {
+	$track = $entry['schedule_type'] ?? '';
+	$age = $entry['age_months'] ?? 0;
+	if ($track === 'monthly' && $age <= 23) {
+		$groupYoung[] = $entry;
+	} elseif ($track === 'monthly' && $age >= 24) {
+		$groupOld[] = $entry;
+	} elseif ($track === 'quarterly') {
+		$groupQuarterly[] = $entry;
 	}
 }
-unset($appointment);
 
+// ── Sort each group: overdue first, then due today, then upcoming ──
+$sortFn = function ($a, $b) {
+	$so = ['overdue' => 0, 'due_today' => 1, 'due_soon' => 2, 'special_monitoring' => 3, 'upcoming' => 4, 'completed' => 5];
+	$sa = $so[$a['status']] ?? 4;
+	$sb = $so[$b['status']] ?? 4;
+	if ($sa !== $sb) return $sa <=> $sb;
+	return $a['next_due'] <=> $b['next_due'];
+};
+usort($groupYoung, $sortFn);
+usort($groupOld, $sortFn);
+usort($groupQuarterly, $sortFn);
+
+// ── Active group + stats ──
+$allGroups = ['open_requests' => $openRequestRows, 'monthly_young' => $groupYoung, 'monthly_old' => $groupOld, 'quarterly' => $groupQuarterly];
+$activeGroup = $allGroups[$activeTab];
+$totalRows = count($activeGroup);
+$totalPages = max(1, (int)ceil($totalRows / $perPage));
+if ($page > $totalPages) $page = $totalPages;
+$offset = ($page - 1) * $perPage;
+$pageRows = array_slice($activeGroup, $offset, $perPage);
+
+$countOpenRequests = count($openRequestRows);
+
+$countDueToday = 0;
+$countOverdue = 0;
+$countUpcoming = 0;
+$countCompleted = 0;
+foreach ($monitoringList as $entry) {
+	match ($entry['status']) {
+		'due_today' => $countDueToday++,
+		'overdue' => $countOverdue++,
+		'upcoming', 'due_soon' => $countUpcoming++,
+		'completed' => $countCompleted++,
+		default => null,
+	};
+}
+
+// ── Calendar entries ──
 $calendarEntries = [];
-$calendarAppointmentsByDay = [];
-foreach ($appointments as $appointment) {
-	$dayKey = (int)$appointment['scheduled_dt']->format('j');
-	if ((int)$appointment['scheduled_dt']->format('Y') !== $calendarYear
-		|| (int)$appointment['scheduled_dt']->format('n') !== $calendarMonth) {
-		continue;
-	}
-	$apptStatus = (string)$appointment['status'];
-	$isOverdue = in_array($apptStatus, ['pending', 'confirmed'], true)
-		&& $appointment['scheduled_dt'] < $today;
-	$effectiveStatus = $isOverdue ? 'overdue' : $apptStatus;
-	$calendarEntries[$dayKey][] = [
-		'type' => 'appointment',
-		'color' => nutritionist_calendar_color('appointment'),
-		'title' => $appointment['first_name'] . ' ' . $appointment['last_name']
-			. ' (' . (($appointment['appointment_type'] ?? 'regular') === 'followup' ? 'Follow-up' : 'Appointment') . ')',
-		'time' => $appointment['scheduled_dt']->format('g:i A'),
-		'id' => (int)$appointment['id'],
-		'location' => (string)$appointment['location'],
-		'status' => $effectiveStatus,
-	];
-	$calendarAppointmentsByDay[$dayKey][] = $appointment;
+foreach ($monitoringList as $entry) {
+	if (empty($entry['next_due'])) continue;
+	try { $dueDt = new DateTimeImmutable($entry['next_due']); } catch (Exception) { continue; }
+	if ((int)$dueDt->format('Y') !== $calendarYear || (int)$dueDt->format('n') !== $calendarMonth) continue;
+	$dayKey = (int)$dueDt->format('j');
+	$label = match ($entry['status']) { 'overdue' => 'Overdue', 'due_today' => 'Due Today', 'completed' => 'Completed', 'special_monitoring' => 'Special', default => 'Upcoming' };
+	$calendarEntries[$dayKey][] = ['type' => 'appointment', 'color' => nutritionist_calendar_color('appointment'), 'title' => $entry['first_name'] . ' ' . $entry['last_name'] . ' (' . $label . ')', 'time' => '', 'id' => $entry['id'], 'location' => $entry['barangay_name'] ?? '', 'status' => $entry['status']];
 }
-
+// Add parent-requested appointments to calendar (blue = pending, green = confirmed)
+foreach ($allParentAppts as $req) {
+	try { $reqDt = new DateTimeImmutable($req['scheduled_at']); } catch (Exception) { continue; }
+	if ((int)$reqDt->format('Y') !== $calendarYear || (int)$reqDt->format('n') !== $calendarMonth) continue;
+	$dayKey = (int)$reqDt->format('j');
+	$reqTime = $reqDt->format('g:i A');
+	$isConfirmed = $req['appt_status'] === 'confirmed';
+	$calColor = $isConfirmed ? '#16a34a' : nutritionist_calendar_color('parent_request');
+	$calLabel = $isConfirmed ? 'Confirmed' : 'Parent Request';
+	$calendarEntries[$dayKey][] = ['type' => 'parent_request', 'color' => $calColor, 'title' => $req['first_name'] . ' ' . $req['last_name'] . ' (' . $calLabel . ')', 'time' => $reqTime, 'id' => $req['id'], 'location' => $req['barangay_name'] ?? '', 'status' => $req['appt_status']];
+}
 ksort($calendarEntries);
 
-$todayDayNum = (int)$today->format('j');
-$isCurrentMonthCalendar = ((int)$today->format('Y') === $calendarYear && (int)$today->format('n') === $calendarMonth);
-$defaultCalendarDay = null;
-if ($isCurrentMonthCalendar && isset($calendarEntries[$todayDayNum])) {
-	$defaultCalendarDay = $today->format('Y-m-d');
-} else {
-	foreach ($calendarEntries as $dayKey => $entries) {
-		if ($entries !== []) {
-			$defaultCalendarDay = $monthAnchor->setDate($calendarYear, $calendarMonth, $dayKey)->format('Y-m-d');
-			break;
-		}
-	}
-}
+$actions = '';
 
-usort($upcomingList, static function (array $a, array $b): int {
-	return $a['scheduled_dt'] <=> $b['scheduled_dt'];
-});
-$upcomingList = array_slice($upcomingList, 0, 5);
-
-foreach ($appointments as $appointment) {
-	$status = (string)$appointment['status'];
-	$childId = (int)$appointment['child_id'];
-
-	if ($filterStatus !== '' && $status !== $filterStatus) {
-		continue;
-	}
-	if ($filterType !== '') {
-		$type = (string)($appointment['appointment_type'] ?? 'regular');
-		$typeMatches = match ($filterType) {
-			'followup' => $type === 'followup',
-			'regular' => in_array($type, ['regular', 'consultation'], true),
-			default => true,
-		};
-		if (!$typeMatches) continue;
-	}
-	if ($filterChildId > 0 && $childId !== $filterChildId) {
-		continue;
-	}
-	if ($filterFrom !== '') {
-		try {
-			$fromDt = new DateTimeImmutable($filterFrom);
-			if ($appointment['scheduled_dt'] < $fromDt) {
-				continue;
-			}
-		} catch (Exception) {
-		}
-	}
-	if ($filterTo !== '') {
-		try {
-			$toDt = (new DateTimeImmutable($filterTo))->modify('+1 day');
-			if ($appointment['scheduled_dt'] >= $toDt) {
-				continue;
-			}
-		} catch (Exception) {
-		}
-	}
-	if ($tableSearch !== '') {
-		$haystack = strtolower(
-			$appointment['first_name'] . ' ' .
-			$appointment['last_name'] . ' ' .
-			$appointment['parent_name'] . ' ' .
-			$appointment['child_code'] . ' ' .
-			$appointment['status'] . ' ' .
-			$appointment['location'] . ' ' .
-			$appointment['barangay']
-		);
-		if (strpos($haystack, strtolower($tableSearch)) === false) {
-			continue;
-		}
-	}
-
-	$displayAppointments[] = $appointment;
-}
-
-$displayTotal = count($displayAppointments);
-$totalPages = max(1, (int)ceil($displayTotal / $perPage));
-if ($tablePage > $totalPages) {
-	$tablePage = $totalPages;
-}
-$tableStart = ($tablePage - 1) * $perPage;
-$tableEnd = min($tableStart + $perPage, $displayTotal);
-$tableRows = array_slice($displayAppointments, $tableStart, $perPage);
-
-$childFilterParams = [];
-$childFilterScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childFilterParams);
-$filterChildren = admin_fetch_all(
-	"SELECT c.id, c.first_name, c.last_name
-	 FROM children c
-	 WHERE {$childFilterScope}
-	 ORDER BY c.last_name ASC, c.first_name ASC",
-	str_repeat('i', count($childFilterParams)),
-	$childFilterParams
-);
-
-$actions = (nutritionist_can_write()
-	? '<a class="admin-btn admin-btn-primary" style="background:var(--admin-primary);border-color:var(--admin-primary);color:#fff;" href="' . nutritionist_e(app_url('/nutritionist/appointment_form.php')) . '">' . admin_action_icon('add') . ' New Appointment</a>'
-	. '<form method="post" action="' . nutritionist_e(app_url('/nutritionist/appointments.php')) . '" style="display:inline;">'
-	. '<input type="hidden" name="action" value="sync_followups">'
-	. '<button class="admin-btn-secondary" type="submit">' . admin_action_icon('sync') . ' Sync EOPT</button>'
-	. '</form>'
-	: '');
-
-nutritionist_layout_start('Appointments', 'Manage and track nutrition consultations and follow-up visits.', 'appointments', $actions);
+nutritionist_layout_start('Appointments', 'Track children due for reweighing and monitor follow-up schedules.', 'appointments', $actions);
 ?>
+
 <style>
-/* === Appointment v2 — local overrides only === */
-.appt-stat-row { margin-bottom: 18px; }
-.appt-stat-row .admin-grid-cards { margin: 0; }
-.appt-stat-trend-line { display:flex; align-items:center; gap:4px; font-size:11px; font-weight:600; }
-.appt-stat-trend-line .ic { width:12px; height:12px; }
-.appt-stat-trend-line.is-up   { color: #16a34a; }
-.appt-stat-trend-line.is-warn { color: #d97706; }
-.appt-stat-trend-line.is-danger { color: #dc2626; }
+.rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 18px}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
+.rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
+.rp-tab span{font-size:11px;opacity:.6}
+.appt-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px;margin-bottom:18px}
+.appt-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px}
+.appt-card-title{font-size:14px;font-weight:700;color:var(--admin-text);margin:0}
+.appt-card-sub{font-size:12px;color:var(--admin-muted);margin-top:2px}
+.appt-pill{display:inline-block;padding:2px 8px;border-radius:6px;font-size:10px;font-weight:600;line-height:1.6}
+.appt-pill.due{background:rgba(217,119,6,.12);color:#d97706}
+.appt-pill.overdue{background:rgba(220,38,38,.12);color:#dc2626}
+.appt-pill.upcoming{background:rgba(22,163,74,.12);color:#16a34a}
+.appt-pill.completed{background:rgba(37,99,235,.12);color:#2563eb}
+.appt-pill.special{background:rgba(124,58,237,.12);color:#7c3aed}
+.appt-table{width:100%;border-collapse:collapse;font-size:12px}
+.appt-table th{text-align:left;padding:8px 10px;border-bottom:2px solid var(--admin-border);color:var(--admin-muted);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+.appt-table td{padding:8px 10px;border-bottom:1px solid var(--admin-border);vertical-align:middle}
+.appt-table tr:hover td{background:var(--admin-surface-alt)}
+.appt-pagination{display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:12px;color:var(--admin-muted)}
+.sk-cal-day-more{font-size:9px;color:var(--admin-muted);line-height:1.3}
 </style>
 
-<section class="appt-stat-row">
+<!-- ============ STAT CARDS ============ -->
+<section style="margin-bottom:18px;">
 	<div class="admin-grid-cards">
 		<article class="admin-card">
 			<div class="admin-card-row">
-				<div class="admin-card-icon" style="background:rgba(59,130,246,.12);color:#2563eb;">
-					<?php echo admin_action_icon('calendar'); ?>
-				</div>
+				<div class="admin-card-icon" style="background:rgba(217,119,6,.12);color:#d97706;"><?php echo admin_action_icon('bell'); ?></div>
 				<div class="admin-card-content">
-					<div class="admin-card-label">Total Appointments</div>
-					<div class="admin-card-value"><?php echo $totalAll; ?></div>
-					<div class="admin-card-meta">
-						<span class="appt-stat-trend-line">All records</span>
-					</div>
+					<div class="admin-card-label">Due Today</div>
+					<div class="admin-card-value" style="<?php echo $countDueToday > 0 ? 'color:#d97706;' : ''; ?>"><?php echo $countDueToday; ?></div>
 				</div>
 			</div>
 		</article>
 		<article class="admin-card">
 			<div class="admin-card-row">
-				<div class="admin-card-icon" style="background:rgba(14,165,233,.12);color:#0284c7;">
-					<?php echo admin_action_icon('bell'); ?>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Upcoming</div>
-					<div class="admin-card-value"><?php echo $upcoming7; ?></div>
-					<div class="admin-card-meta">
-						<span class="appt-stat-trend-line">Next 7 days</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-success">
-					<?php echo admin_action_icon('verify'); ?>
-				</div>
-				<div class="admin-card-content">
-					<div class="admin-card-label">Completed</div>
-					<div class="admin-card-value"><?php echo $completedThisMonth; ?></div>
-					<div class="admin-card-meta">
-						<span class="appt-stat-trend-line">This month</span>
-					</div>
-				</div>
-			</div>
-		</article>
-		<article class="admin-card">
-			<div class="admin-card-row">
-				<div class="admin-card-icon is-danger">
-					<?php echo admin_action_icon('cancel'); ?>
-				</div>
+				<div class="admin-card-icon is-danger"><?php echo admin_action_icon('cancel'); ?></div>
 				<div class="admin-card-content">
 					<div class="admin-card-label">Overdue</div>
-					<div class="admin-card-value" style="<?php echo $followUpOverdue > 0 ? 'color:#dc2626;' : ''; ?>"><?php echo $followUpOverdue; ?></div>
-					<div class="admin-card-meta">
-						<span class="appt-stat-trend-line is-danger">Needs follow-up</span>
-					</div>
+					<div class="admin-card-value" style="<?php echo $countOverdue > 0 ? 'color:#dc2626;' : ''; ?>"><?php echo $countOverdue; ?></div>
+				</div>
+			</div>
+		</article>
+		<article class="admin-card">
+			<div class="admin-card-row">
+				<div class="admin-card-icon" style="background:rgba(22,163,74,.12);color:#16a34a;"><?php echo admin_action_icon('calendar'); ?></div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Upcoming</div>
+					<div class="admin-card-value"><?php echo $countUpcoming; ?></div>
+				</div>
+			</div>
+		</article>
+		<article class="admin-card">
+			<div class="admin-card-row">
+				<div class="admin-card-icon is-success"><?php echo admin_action_icon('verify'); ?></div>
+				<div class="admin-card-content">
+					<div class="admin-card-label">Completed</div>
+					<div class="admin-card-value"><?php echo $countCompleted; ?></div>
 				</div>
 			</div>
 		</article>
 	</div>
 </section>
 
-<?php if ($syncResult['generated'] > 0 || $syncResult['completed'] > 0 || ($syncResult['recategorized'] ?? 0) > 0): ?>
-	<div class="admin-flash">
-		EOPT scheduler: <?php echo (int)$syncResult['generated']; ?> follow-up(s) generated · <?php echo (int)$syncResult['completed']; ?> cycle(s) auto-completed<?php echo ((int)($syncResult['recategorized'] ?? 0)) > 0 ? ' · ' . (int)$syncResult['recategorized'] . ' reclassified' : ''; ?>.
-	</div>
+<!-- ============ TABS ============ -->
+<div class="rp-tabs">
+	<a class="rp-tab <?php echo $activeTab === 'open_requests' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=open_requests')); ?>">Open Requests <span>(<?php echo $countOpenRequests; ?>)</span></a>
+	<a class="rp-tab <?php echo $activeTab === 'monthly_young' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=monthly_young')); ?>">Monthly (0–23) <span>(<?php echo count($groupYoung); ?>)</span></a>
+	<a class="rp-tab <?php echo $activeTab === 'monthly_old' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=monthly_old')); ?>">Monthly (24–60) <span>(<?php echo count($groupOld); ?>)</span></a>
+	<a class="rp-tab <?php echo $activeTab === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=quarterly')); ?>">Quarterly <span>(<?php echo count($groupQuarterly); ?>)</span></a>
+</div>
+
+<!-- ============ TABLE ============ -->
+<?php if ($activeTab !== 'open_requests'): ?>
+<div class="appt-card">
 <?php endif; ?>
-
-<div class="appt-main">
-
-	<!-- ============ CALENDAR ============ -->
-	<section class="appt-card appt-card-cal">
-		<div class="appt-card-head">
-			<h3 class="appt-card-title"><?php echo nutritionist_e($monthLabel); ?></h3>
-			<div class="appt-cal-nav">
-				<a class="appt-cal-nav-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?m=' . $prevMonth)); ?>" aria-label="Previous month"><?php echo admin_action_icon('chevron_left'); ?></a>
-				<a class="appt-cal-nav-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?m=' . $nextMonth)); ?>" aria-label="Next month"><?php echo admin_action_icon('chevron_right'); ?></a>
-			</div>
-		</div>
-		<div class="appt-cal-weekdays">
-			<?php foreach (['Sun','Mon','Tue','Wed','Thu','Fri','Sat'] as $wk): ?>
-				<span><?php echo $wk; ?></span>
-			<?php endforeach; ?>
-		</div>
-		<div class="sk-cal-wrap" data-sk-calendar data-sk-calendar-detail="appt-cal-detail" data-sk-calendar-default="<?php echo nutritionist_e($defaultCalendarDay ?? ''); ?>">
-			<?php echo nutritionist_render_calendar_grid($monthAnchor, $calendarEntries, $today); ?>
-		</div>
-
-		<div class="sk-cal-detail" id="appt-cal-detail" data-calendar-detail>
-			<?php
-			$hasAnyApptDay = false;
-			foreach ($calendarEntries as $entries) {
-				if ($entries !== []) { $hasAnyApptDay = true; break; }
-			}
-			$initIsoDay = $defaultCalendarDay;
-			$initEntries = [];
-			if ($initIsoDay !== null) {
-				$initDayNum = (int)(new DateTimeImmutable($initIsoDay))->format('j');
-				$initEntries = $calendarEntries[$initDayNum] ?? [];
-				$initEntries = array_slice($initEntries, 0, 3);
-			}
-			$initLabel = $initIsoDay !== null
-				? (new DateTimeImmutable($initIsoDay))->format('l, F j, Y')
-				: $monthAnchor->format('F Y');
-			?>
-			<div class="sk-cal-detail-head">
-				<div>
-					<div class="sk-cal-detail-title" data-calendar-detail-title>
-						<?php echo nutritionist_e($initLabel); ?>
-						<?php if ($initIsoDay === $today->format('Y-m-d')): ?>
-							<span class="sk-cal-detail-today">Today</span>
-						<?php endif; ?>
-					</div>
-					<div class="sk-cal-detail-sub" data-calendar-detail-sub>
-						<?php echo count($initEntries); ?> event<?php echo count($initEntries) !== 1 ? 's' : ''; ?>
-					</div>
-				</div>
-			</div>
-			<div class="sk-cal-event-list is-compact" data-calendar-detail-list>
-				<?php if (!$hasAnyApptDay): ?>
-					<div class="sk-cal-detail-empty" data-calendar-detail-empty>
-						No appointments in <?php echo nutritionist_e($monthLabel); ?>.
-					</div>
-				<?php else: ?>
-					<?php foreach ($initEntries as $te):
-						$teTime = $te['time'] ?? null;
-						$teLabel = nutritionist_calendar_label((string)$te['type']);
-						$teColor = (string)($te['color'] ?? nutritionist_calendar_color((string)$te['type']));
-						$teStatus = (string)($te['status'] ?? '');
-						$hasStatus = in_array($teStatus, ['overdue', 'cancelled', 'completed'], true);
-						$teLoc = (string)($te['location'] ?? '');
-						$teId = isset($te['id']) ? (int)$te['id'] : 0;
-					?>
-					<div class="sk-cal-event" data-entry-type="<?php echo nutritionist_e((string)$te['type']); ?>">
-						<div class="sk-cal-event-head">
-							<span class="sk-cal-event-dot" style="background:<?php echo nutritionist_e($teColor); ?>;"></span>
-							<span class="sk-cal-event-type"><?php echo nutritionist_e($teLabel); ?></span>
-							<?php if ($hasStatus): ?>
-								<span class="sk-cal-event-status is-<?php echo nutritionist_e($teStatus); ?>"><?php echo nutritionist_e(ucfirst($teStatus)); ?></span>
-							<?php endif; ?>
-						</div>
-						<div class="sk-cal-event-body">
-							<?php if ($teTime !== null): ?>
-								<div class="sk-cal-event-time"><?php echo nutritionist_e($teTime); ?></div>
-							<?php endif; ?>
-							<div class="sk-cal-event-title"><?php echo nutritionist_e((string)$te['title']); ?></div>
-							<?php if ($teLoc !== ''): ?>
-								<div class="sk-cal-event-loc">
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
-									<span><?php echo nutritionist_e($teLoc); ?></span>
-								</div>
-							<?php endif; ?>
-						</div>
-						<?php if ($teId > 0): ?>
-							<a class="sk-cal-event-action" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_form.php?id=' . $teId)); ?>">Open →</a>
-						<?php endif; ?>
-					</div>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</div>
-
-			<a class="sk-cal-detail-link" data-calendar-detail-link href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php' . ($initIsoDay !== null ? '?from=' . $initIsoDay . '&to=' . $initIsoDay : ''))); ?>">View all appointments on this day →</a>
-		</div>
-	</section>
-
-	<!-- ============ UPCOMING LIST ============ -->
-	<section class="appt-card appt-card-upcoming">
-		<div class="appt-card-head">
-			<h3 class="appt-card-title">Upcoming Appointments</h3>
-			<a class="appt-card-link" href="#all-appointments">View All</a>
-		</div>
-		<?php if (empty($upcomingList)): ?>
-			<div class="appt-empty">No upcoming appointments. Schedule a new visit to populate this list.</div>
-		<?php else: ?>
-			<ul class="appt-upcoming-list">
-				<?php foreach ($upcomingList as $appt):
-					$dt = $appt['scheduled_dt'];
-					$fullName = $appt['first_name'] . ' ' . $appt['last_name'];
-					$initials = admin_initials($fullName);
-					$avatarBg = admin_avatar_color($fullName);
-					$typeLabel = $appt['appointment_type'] === 'followup' ? 'Follow-up Visit' : 'Nutrition Consultation';
-					$timeRange = $dt->format('g:i A');
-					try {
-						$endDt = $dt->modify('+1 hour');
-						$timeRange = $dt->format('g:i A') . ' – ' . $endDt->format('g:i A');
-					} catch (Exception) {
-					}
-					?>
-					<li class="appt-upcoming-row">
-						<div class="appt-date-badge">
-							<span class="appt-date-month"><?php echo strtoupper($dt->format('M')); ?></span>
-							<span class="appt-date-day"><?php echo $dt->format('d'); ?></span>
-							<span class="appt-date-weekday"><?php echo $dt->format('D'); ?></span>
-						</div>
-						<div class="appt-upcoming-avatar" style="background:<?php echo $avatarBg; ?>"><?php echo nutritionist_e($initials); ?></div>
-						<div class="appt-upcoming-meta">
-							<div class="appt-upcoming-name"><?php echo nutritionist_e($fullName); ?></div>
-							<div class="appt-upcoming-sub">
-								<span class="appt-upcoming-type"><?php echo nutritionist_e($typeLabel); ?></span>
-								<span class="appt-upcoming-time"><?php echo nutritionist_e($timeRange); ?></span>
-							</div>
-							<div class="appt-upcoming-loc">
-								<?php echo admin_action_icon('location'); ?>
-								<span><?php echo nutritionist_e((string)$appt['location']); ?></span>
-							</div>
-						</div>
-						<div class="appt-upcoming-right">
-							<span class="admin-pill <?php echo nutritionist_status_class((string)$appt['status']); ?>"><?php echo nutritionist_e(ucfirst((string)$appt['status'])); ?></span>
-							<a class="appt-upcoming-link" href="#appt-<?php echo (int)$appt['id']; ?>" aria-label="View details"><?php echo admin_action_icon('chevron_right'); ?></a>
-						</div>
-					</li>
-				<?php endforeach; ?>
-			</ul>
-		<?php endif; ?>
-	</section>
-
-	<!-- ============ FILTERS / QUICK STATS ============ -->
-	<aside class="appt-side">
-
-		<section class="appt-card">
-			<div class="appt-card-head">
-				<h3 class="appt-card-title">
-					<?php echo admin_action_icon('funnel'); ?>
-					<span>Filters</span>
-				</h3>
-				<a class="appt-card-link" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">Reset</a>
-			</div>
-			<form method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" class="appt-filter-form">
-				<label class="appt-field">
-					<span>Date Range</span>
-					<div class="appt-field-row">
-						<input type="date" name="from" value="<?php echo nutritionist_e($filterFrom); ?>" class="appt-input" placeholder="From">
-						<span class="appt-field-sep">–</span>
-						<input type="date" name="to" value="<?php echo nutritionist_e($filterTo); ?>" class="appt-input" placeholder="To">
-					</div>
-				</label>
-				<label class="appt-field">
-					<span>Child</span>
-					<select name="child" class="appt-input">
-						<option value="">All Children</option>
-						<?php foreach ($filterChildren as $child): ?>
-							<option value="<?php echo (int)$child['id']; ?>" <?php echo $filterChildId === (int)$child['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</label>
-				<label class="appt-field">
-					<span>Status</span>
-					<select name="status" class="appt-input">
-						<option value="">All Status</option>
-						<?php foreach (['pending', 'confirmed', 'completed', 'cancelled'] as $st): ?>
-							<option value="<?php echo $st; ?>" <?php echo $filterStatus === $st ? 'selected' : ''; ?>><?php echo ucfirst($st); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</label>
-				<input type="hidden" name="q" value="<?php echo nutritionist_e($tableSearch); ?>">
-				<button type="submit" class="appt-btn-primary">Apply Filters</button>
-			</form>
-			<div class="appt-presets">
-				<span class="appt-presets-label">Quick presets:</span>
-				<a class="appt-preset-chip" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?from=' . $now->format('Y-m-d') . '&to=' . $now->modify('+7 days')->format('Y-m-d'))); ?>">Next 7 days</a>
-				<a class="appt-preset-chip" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?from=' . $monthStart->format('Y-m-d') . '&to=' . $monthEnd->modify('-1 day')->format('Y-m-d'))); ?>">This month</a>
-			</div>
-		</section>
-
-		<section class="appt-card">
-			<div class="appt-card-head">
-				<h3 class="appt-card-title">Quick Stats</h3>
-			</div>
-			<div class="appt-quickstats">
-				<div class="appt-quick-tile">
-					<div class="appt-quick-icon" style="background:rgba(59,130,246,.12);color:#2563eb;"><?php echo admin_action_icon('calendar'); ?></div>
-					<div class="appt-quick-meta">
-						<div class="appt-quick-label">This Week</div>
-						<div class="appt-quick-value"><?php echo $thisWeekCount; ?></div>
-						<div class="appt-quick-sub">appointments</div>
-					</div>
-				</div>
-				<div class="appt-quick-tile">
-					<div class="appt-quick-icon" style="background:rgba(14,165,233,.12);color:#0284c7;"><?php echo admin_action_icon('bell'); ?></div>
-					<div class="appt-quick-meta">
-						<div class="appt-quick-label">Tomorrow</div>
-						<div class="appt-quick-value"><?php echo $tomorrowCount; ?></div>
-						<div class="appt-quick-sub">appointments</div>
-					</div>
-				</div>
-				<div class="appt-quick-tile">
-					<div class="appt-quick-icon" style="background:rgba(34,197,94,.12);color:#16a34a;"><?php echo admin_action_icon('verify'); ?></div>
-					<div class="appt-quick-meta">
-						<div class="appt-quick-label">This Month</div>
-						<div class="appt-quick-value"><?php echo $completedThisMonth; ?></div>
-						<div class="appt-quick-sub">completed</div>
-					</div>
-				</div>
-			</div>
-		</section>
-
-	</aside>
-</div>
-
-<!-- ============ APPOINTMENT TABS ============ -->
-<div class="rp-tabs" style="margin:18px 0;">
-	<a class="rp-tab <?php echo $activeTab === 'open' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=open')); ?>">Open Follow-ups <span style="opacity:.7;">(<?php echo $followUpOpen; ?>)</span></a>
-	<a class="rp-tab <?php echo $activeTab === 'all' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=all')); ?>">All Appointments</a>
-</div>
-
-<?php if ($activeTab === 'open'): ?>
-<!-- ============ OPEN FOLLOW-UPS ============ -->
-<section class="appt-card appt-table-card" id="open-followups">
+	<?php
+	$tabLabels = ['open_requests' => 'Open Requests (Parent-Requested)', 'monthly_young' => 'Monthly Monitoring (0–23 months)', 'monthly_old' => 'Monthly Monitoring (24–60 months, with problems)', 'quarterly' => 'Quarterly Monitoring (24–60 months, normal)'];
+	$tabSubs = ['open_requests' => 'Appointments requested by parents awaiting your confirmation', 'monthly_young' => 'Infants and toddlers on mandatory monthly reweighing', 'monthly_old' => 'Older children with abnormal WHO indicators on monthly schedule', 'quarterly' => 'Normal older children on quarterly re-check schedule'];
+	?>
 	<div class="appt-card-head">
 		<div>
-			<h3 class="appt-card-title">Open Follow-ups</h3>
-			<p class="appt-card-sub"><?php echo $followUpOpen; ?> pending or confirmed follow-up visit<?php echo $followUpOpen !== 1 ? 's' : ''; ?><?php echo $followUpOverdue > 0 ? ' — <span style="color:#dc2626;font-weight:600;">' . $followUpOverdue . ' overdue</span>' : ''; ?></p>
+			<h3 class="appt-card-title"><?php echo $tabLabels[$activeTab]; ?></h3>
+			<p class="appt-card-sub"><?php echo $tabSubs[$activeTab]; ?></p>
 		</div>
 	</div>
-	<div class="appt-table-wrap admin-table-wrap">
-		<table class="nutritionist-table" data-no-paginate style="min-width:800px;">
+
+	<?php if (empty($pageRows)): ?>
+		<div style="text-align:center;padding:24px;color:var(--admin-muted);"><?php echo $activeTab === 'open_requests' ? 'No pending parent requests.' : 'No children in this group.'; ?></div>
+	<?php else: ?>
+	<div style="overflow-x:auto;">
+		<table class="appt-table">
 			<thead>
 				<tr>
-					<th style="width:150px;">Child</th>
-					<th style="width:100px;">Category</th>
-					<th style="width:100px;">Track</th>
-					<th style="width:160px;">Scheduled</th>
-					<th style="width:100px;">Status</th>
-					<th style="width:80px;">Actions</th>
+					<?php if ($activeTab === 'open_requests'): ?>
+						<th style="width:150px;">Child</th>
+						<th style="width:120px;">Parent</th>
+						<th style="width:110px;">Barangay</th>
+						<th style="width:120px;">Requested</th>
+						<th style="width:150px;">Notes</th>
+						<th style="width:80px;">Status</th>
+						<th style="width:100px;">Actions</th>
+					<?php else: ?>
+						<th style="width:150px;">Child</th>
+						<th style="width:55px;">Age</th>
+						<th style="width:110px;">Barangay</th>
+						<th style="width:100px;">Last Measured</th>
+						<th style="width:100px;">Next Due</th>
+						<th style="width:90px;">Status</th>
+						<th style="width:80px;">Actions</th>
+					<?php endif; ?>
 				</tr>
 			</thead>
 			<tbody>
-				<?php
-				$openFollowups = array_filter($followUpAppointments, static function (array $a): bool {
-					return in_array($a['status'], ['pending', 'confirmed'], true);
-				});
-				usort($openFollowups, static function (array $a, array $b): int {
-					return $a['scheduled_dt'] <=> $b['scheduled_dt'];
-				});
-				if ($openFollowups === []): ?>
-					<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--admin-muted);">No open follow-ups. All children have been measured or no follow-ups are scheduled.</td></tr>
-				<?php else: ?>
-					<?php foreach ($openFollowups as $fu):
-						$isOd = $fu['is_overdue'] ?? false;
-						$trackLabel = ucfirst((string)($fu['followup_track'] ?? ''));
-						$catLabel = (string)($fu['followup_category'] ?? '');
-						$scheduledLabel = $fu['scheduled_dt']->format('M d, Y');
-						if ($fu['scheduled_dt'] instanceof DateTimeImmutable) {
-							$daysUntil = (int)$now->diff($fu['scheduled_dt'])->format('%r%a');
-							if ($isOd) {
-								$scheduledLabel .= ' <span style="color:#dc2626;font-weight:600;">(overdue)</span>';
-							} elseif ($daysUntil <= 7 && $daysUntil >= 0) {
-								$scheduledLabel .= ' <span style="color:#d97706;">(in ' . $daysUntil . 'd)</span>';
-							}
-						}
-					?>
-					<tr>
-						<td>
-							<strong><?php echo nutritionist_e($fu['first_name'] . ' ' . $fu['last_name']); ?></strong>
-							<div style="font-size:11px;color:var(--admin-muted);"><?php echo nutritionist_e($fu['child_code'] ?? ''); ?></div>
-						</td>
-						<td><?php echo nutritionist_e($catLabel); ?></td>
-						<td><?php echo nutritionist_e($trackLabel); ?></td>
-						<td><?php echo $scheduledLabel; ?></td>
-						<td>
-							<?php if ($fu['status'] === 'pending'): ?>
-								<span style="color:#d97706;font-weight:600;">Pending</span>
+				<?php if ($activeTab === 'open_requests'):
+					foreach ($pageRows as $req):
+						$fullName = $req['first_name'] . ' ' . $req['last_name'];
+						$reqDate = date('M j, g:i A', strtotime($req['scheduled_at']));
+						$notes = $req['notes'] ? '<span style="color:var(--admin-text);">' . nutritionist_e($req['notes']) . '</span>' : '<span style="color:var(--admin-muted);font-style:italic;">None</span>';
+						$reqStatus = $req['appt_status'] ?? 'pending';
+						$reqPillClass = $reqStatus === 'confirmed' ? 'upcoming' : 'due';
+						$reqPillLabel = $reqStatus === 'confirmed' ? 'Confirmed' : 'Pending';
+				?>
+				<tr>
+					<td>
+						<strong><?php echo nutritionist_e($fullName); ?></strong>
+						<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($req['child_code']); ?></div>
+					</td>
+					<td>
+						<?php echo nutritionist_e($req['parent_name'] ?? '—'); ?>
+						<?php if ($req['parent_phone']): ?>
+							<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($req['parent_phone']); ?></div>
+						<?php endif; ?>
+					</td>
+					<td><?php echo nutritionist_e($req['barangay_name'] ?? ''); ?></td>
+					<td>
+						<strong style="color:#2563eb;"><?php echo $reqDate; ?></strong>
+					</td>
+					<td><div style="max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo $notes; ?></div></td>
+					<td><span class="appt-pill <?php echo $reqPillClass; ?>"><?php echo $reqPillLabel; ?></span></td>
+					<td>
+						<div style="display:flex;gap:4px;">
+							<?php if ($reqStatus === 'pending'): ?>
+							<form method="post" style="display:inline;">
+								<input type="hidden" name="action" value="confirm_request">
+								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
+								<button type="submit" class="admin-btn" title="Confirm">Confirm</button>
+							</form>
+							<form method="post" style="display:inline;">
+								<input type="hidden" name="action" value="cancel_request">
+								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
+								<button type="submit" class="admin-btn-danger" title="Cancel">Cancel</button>
+							</form>
 							<?php else: ?>
-								<span style="color:#059669;font-weight:600;">Confirmed</span>
+							<form method="post" style="display:inline;">
+								<input type="hidden" name="action" value="complete_request">
+								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
+								<button type="submit" class="admin-btn" title="Mark completed">&#10003; Done</button>
+							</form>
 							<?php endif; ?>
-						</td>
-						<td>
-							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_view.php?id=' . $fu['id'])); ?>" style="font-size:11px;padding:3px 8px;">View</a>
-						</td>
-					</tr>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</tbody>
-		</table>
-	</div>
-</section>
-<?php endif; ?>
-
-<?php if ($activeTab === 'all'): ?>
-<!-- ============ ALL APPOINTMENTS TABLE ============ -->
-<section class="appt-card appt-table-card" id="all-appointments">
-	<div class="appt-card-head">
-		<div>
-			<h3 class="appt-card-title">All Appointments</h3>
-			<p class="appt-card-sub"><?php echo $displayTotal; ?> matching result<?php echo $displayTotal !== 1 ? 's' : ''; ?><?php echo ($filterStatus || $filterType || $filterChildId || $filterFrom || $filterTo || $tableSearch) ? ' (filtered)' : ''; ?></p>
-		</div>
-		<div class="appt-table-tools">
-			<form id="appointment-search-form" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" class="appt-search-form">
-				<?php if ($filterStatus !== ''): ?><input type="hidden" name="status" value="<?php echo nutritionist_e($filterStatus); ?>"><?php endif; ?>
-				<?php if ($filterChildId > 0): ?><input type="hidden" name="child" value="<?php echo $filterChildId; ?>"><?php endif; ?>
-				<?php if ($filterFrom !== ''): ?><input type="hidden" name="from" value="<?php echo nutritionist_e($filterFrom); ?>"><?php endif; ?>
-				<?php if ($filterTo !== ''): ?><input type="hidden" name="to" value="<?php echo nutritionist_e($filterTo); ?>"><?php endif; ?>
-				<?php echo admin_action_icon('search'); ?>
-				<input type="search" name="q" value="<?php echo nutritionist_e($tableSearch); ?>" placeholder="Search by child name, parent, or appointment type…" class="appt-search-input">
-				<?php if ($tableSearch !== ''): ?>
-					<a class="appt-search-clear" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php' . (($filterStatus || $filterType || $filterChildId || $filterFrom || $filterTo) ? '?' . http_build_query(array_filter(['status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId ?: null, 'from' => $filterFrom, 'to' => $filterTo])) : ''))); ?>" title="Clear search">×</a>
-				<?php endif; ?>
-			</form>
-			<select name="type" class="appt-type-filter" aria-label="Filter by appointment type" form="appointment-search-form" onchange="document.getElementById('appointment-search-form').requestSubmit()">
-				<option value="">All Types</option>
-				<option value="followup" <?php echo $filterType === 'followup' ? 'selected' : ''; ?>>Follow-up Visit</option>
-				<option value="regular" <?php echo $filterType === 'regular' ? 'selected' : ''; ?>>Nutrition Consultation</option>
-			</select>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?export=xlsx' . http_build_query(array_filter(['status' => $filterStatus, 'type' => $filterType]), '', '&'))); ?>" title="Export to Excel"><?php echo admin_action_icon('export'); ?> Export</a>
-		</div>
-	</div>
-
-	<div class="appt-table-wrap admin-table-wrap admin-table-wrap--with-pagination">
-		<table class="nutritionist-table" id="all-appointments-table" data-no-paginate>
-			<thead>
-				<tr>
-					<th style="width:140px;">Date &amp; Time</th>
-					<th style="width:160px;">Child</th>
-					<th style="width:160px;">Parent</th>
-					<th style="width:170px;">Appointment Type</th>
-					<th style="width:160px;">Location</th>
-					<th style="width:110px;">Status</th>
-					<th style="width:130px;">Actions</th>
+						</div>
+					</td>
 				</tr>
-			</thead>
-			<tbody>
-				<?php if (empty($tableRows)): ?>
-					<tr><td colspan="7" class="appt-empty-row">No appointments match the current filters.</td></tr>
-				<?php endif; ?>
-				<?php foreach ($tableRows as $appt):
-					$dt = $appt['scheduled_dt'];
-					$isFollowup = $appt['appointment_type'] === 'followup';
-					$typeLabel = $isFollowup ? 'Follow-up Visit' : 'Nutrition Consultation';
-					if ($isFollowup) {
-						$trackLabel = !empty($appt['followup_track']) ? ucfirst((string)$appt['followup_track']) : '';
-						if ($trackLabel !== '') {
-							$typeLabel .= ' · ' . $trackLabel;
-						}
-					}
-					?>
-					<tr id="appt-<?php echo (int)$appt['id']; ?>"
-						data-filter-text="<?php echo nutritionist_e(strtolower($appt['first_name'] . ' ' . $appt['last_name'] . ' ' . $appt['parent_name'] . ' ' . $appt['status'] . ' ' . $typeLabel)); ?>">
-						<td>
-							<div class="appt-t-date"><?php echo $dt->format('M j, Y'); ?></div>
-							<div class="appt-t-time"><?php echo $dt->format('g:i A'); ?></div>
-						</td>
-						<td>
-							<div class="appt-t-name"><?php echo nutritionist_e($appt['first_name'] . ' ' . $appt['last_name']); ?></div>
-							<div class="appt-t-sub"><?php echo nutritionist_e((string)$appt['child_code']); ?></div>
-						</td>
-						<td>
-							<div class="appt-t-name"><?php echo nutritionist_e((string)$appt['parent_name']); ?></div>
-							<div class="appt-t-sub"><?php echo nutritionist_e((string)($appt['parent_phone'] ?? '')); ?></div>
-						</td>
-						<td><?php echo nutritionist_e($typeLabel); ?></td>
-						<td>
-							<span class="appt-t-loc">
-							<?php echo admin_action_icon('location'); ?>
-							<span><?php echo nutritionist_e((string)$appt['location']); ?></span>
-							</span>
-						</td>
-						<td><span class="admin-pill <?php echo nutritionist_status_class((string)$appt['status']); ?>"><?php echo nutritionist_e(ucfirst((string)$appt['status'])); ?></span></td>
-						<td>
-							<div class="admin-actions">
-								<a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_form.php?id=' . (int)$appt['id'])); ?>"><?php echo admin_action_icon('view'); ?></a>
-								<?php if (!$isFollowup && nutritionist_can_write()): ?>
-									<a class="admin-icon-btn admin-icon-btn-primary" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_form.php?id=' . (int)$appt['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
-									<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" onsubmit="return confirm('Delete this appointment?');" style="display:inline;">
-										<input type="hidden" name="action" value="delete">
-										<input type="hidden" name="id" value="<?php echo (int)$appt['id']; ?>">
-										<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-									</form>
-								<?php elseif ($isFollowup && nutritionist_can_write() && in_array($appt['status'], ['pending', 'confirmed'], true)): ?>
-									<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" onsubmit="return confirm('Verify that a NEW measurement was recorded for this child?');" style="display:inline;">
-										<input type="hidden" name="action" value="complete_followup">
-										<input type="hidden" name="id" value="<?php echo (int)$appt['id']; ?>">
-										<button class="admin-icon-btn admin-icon-btn-primary" title="Verify re-measurement" type="submit"><?php echo admin_action_icon('verify'); ?></button>
-									</form>
-								<?php endif; ?>
-							</div>
-						</td>
-					</tr>
-				<?php endforeach; ?>
+				<?php endforeach;
+				else:
+					foreach ($pageRows as $entry):
+						$fullName = $entry['first_name'] . ' ' . $entry['last_name'];
+						$lastMeasured = $entry['last_measurement_date'] ? date('M j', strtotime($entry['last_measurement_date'])) : '<span style="color:var(--admin-muted);">Never</span>';
+						$dueDate = date('M j', strtotime($entry['next_due']));
+						$pillClass = match ($entry['status']) { 'overdue' => 'overdue', 'due_today' => 'due', 'due_soon' => 'due', 'completed' => 'completed', 'special_monitoring' => 'special', default => 'upcoming' };
+						$pillLabel = match ($entry['status']) { 'overdue' => 'Overdue', 'due_today' => 'Due Today', 'due_soon' => 'Due Soon', 'completed' => 'Completed', 'special_monitoring' => 'Special', default => 'Upcoming' };
+				?>
+				<tr>
+					<td>
+						<strong><?php echo nutritionist_e($fullName); ?></strong>
+						<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($entry['child_code']); ?></div>
+					</td>
+					<td><?php echo $entry['age_months']; ?> mo</td>
+					<td><?php echo nutritionist_e($entry['barangay_name'] ?? ''); ?></td>
+					<td><?php echo $lastMeasured; ?></td>
+					<td>
+						<?php if ($entry['days_until_due'] < 0): ?>
+							<strong style="color:#dc2626;"><?php echo $dueDate; ?></strong>
+						<?php elseif ($entry['days_until_due'] === 0): ?>
+							<strong style="color:#d97706;">Today</strong>
+						<?php else: ?>
+							<?php echo $dueDate; ?>
+						<?php endif; ?>
+					</td>
+					<td><span class="appt-pill <?php echo $pillClass; ?>"><?php echo $pillLabel; ?></span></td>
+					<td>
+						<div style="display:flex;gap:4px;">
+							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/followup_child.php?id=' . $entry['id'])); ?>" style="font-size:10px;padding:3px 8px;">View</a>
+							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?id=' . $entry['id'])); ?>" style="font-size:10px;padding:3px 8px;">Record</a>
+						</div>
+					</td>
+				</tr>
+				<?php endforeach;
+				endif; ?>
 			</tbody>
 		</table>
+	</div>
 
-		<div class="admin-table-pagination">
-			<span class="admin-table-page-info">
-				Showing <?php echo $displayTotal > 0 ? ($tableStart + 1) : 0; ?>–<?php echo $tableEnd; ?> of <?php echo $displayTotal; ?> appointments
-			</span>
-			<div class="admin-table-pages">
-				<?php
-				$queryBase = array_filter([
-					'status' => $filterStatus, 'type' => $filterType, 'child' => $filterChildId > 0 ? $filterChildId : null,
-					'from' => $filterFrom, 'to' => $filterTo, 'q' => $tableSearch,
-				], static fn($v) => $v !== null && $v !== '');
-				$linkFor = static function (int $p) use ($queryBase): string {
-					$params = $queryBase;
-					if ($p > 1) {
-						$params['page'] = $p;
-					} elseif (isset($params['page'])) {
-						unset($params['page']);
-					}
-					return app_url('/nutritionist/appointments.php' . (empty($params) ? '' : '?' . http_build_query($params)));
-				};
-				?>
-				<button class="admin-table-page-btn" <?php echo $tablePage <= 1 ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage - 1)); ?>">‹</button>
-				<?php
-				$pageNumbers = [];
-				if ($totalPages <= 7) {
-					$pageNumbers = range(1, $totalPages);
-				} else {
-					$pageNumbers = [1, 2, 3];
-					if ($tablePage > 4) $pageNumbers[] = '…';
-					if ($tablePage > 3 && $tablePage < $totalPages - 1) $pageNumbers[] = $tablePage;
-					if ($tablePage < $totalPages - 2) $pageNumbers[] = '…';
-					$pageNumbers[] = $totalPages - 1;
-					$pageNumbers[] = $totalPages;
-					$pageNumbers = array_values(array_unique($pageNumbers));
-				}
-				foreach ($pageNumbers as $pn) {
-					if ($pn === '…') {
-						echo '<span class="admin-table-page-dots">…</span>';
-					} else {
-						$cls = 'admin-table-page-btn' . ($pn === $tablePage ? ' is-active' : '');
-						echo '<button class="' . $cls . '" data-href="' . nutritionist_e($linkFor((int)$pn)) . '">' . (int)$pn . '</button>';
-					}
-				}
-				?>
-				<button class="admin-table-page-btn" <?php echo $tablePage >= $totalPages ? 'disabled' : ''; ?> data-href="<?php echo nutritionist_e($linkFor($tablePage + 1)); ?>">›</button>
-			</div>
+	<?php if ($totalPages > 1): ?>
+	<div class="appt-pagination">
+		<span>Showing <?php echo ($offset + 1); ?>–<?php echo min($offset + $perPage, $totalRows); ?> of <?php echo $totalRows; ?></span>
+		<div style="display:flex;gap:4px;">
+			<?php
+			$pageLink = function (int $p) use ($activeTab, $monthParam) {
+				$params = ['tab' => $activeTab];
+				if ($p > 1) $params['page'] = $p;
+				if ($monthParam !== (new DateTimeImmutable('today'))->format('Y-m')) $params['m'] = $monthParam;
+				return app_url('/nutritionist/appointments.php' . '?' . http_build_query($params));
+			};
+			?>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($pageLink($page - 1)); ?>" <?php echo $page <= 1 ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>Prev</a>
+			<span style="padding:4px 8px;">Page <?php echo $page; ?> of <?php echo $totalPages; ?></span>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($pageLink($page + 1)); ?>" <?php echo $page >= $totalPages ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>Next</a>
 		</div>
 	</div>
-</section>
+	<?php endif; ?>
+	<?php endif; ?>
+<?php if ($activeTab !== 'open_requests'): ?>
+</div>
 <?php endif; ?>
 
-<script>
-(function () {
-	var searchForm = document.getElementById('appointment-search-form');
-	if (searchForm) {
-		var searchInput = searchForm.querySelector('input[name="q"]');
-		var searchTimer;
-		searchForm.addEventListener('submit', function (event) {
-			event.preventDefault();
-			var params = new URLSearchParams(new FormData(searchForm));
-			var url = searchForm.action + '?' + params.toString() + '#all-appointments';
-			window.location.assign(url);
-		});
-		if (searchInput) {
-			searchInput.addEventListener('input', function () {
-				window.clearTimeout(searchTimer);
-				searchTimer = window.setTimeout(function () {
-					searchForm.requestSubmit();
-				}, 350);
-			});
-		}
-	}
+<!-- ============ CALENDAR (always visible) ============ -->
+<div class="appt-card">
+	<div class="appt-card-head">
+		<h3 class="appt-card-title"><?php echo nutritionist_e($monthLabel); ?></h3>
+		<div style="display:flex;gap:6px;">
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=' . $activeTab . '&m=' . $prevMonth)); ?>" style="padding:4px 8px;font-size:11px;">&laquo; Prev</a>
+			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=' . $activeTab . '&m=' . $nextMonth)); ?>" style="padding:4px 8px;font-size:11px;">Next &raquo;</a>
+		</div>
+	</div>
+	<div class="sk-cal-wrap" data-sk-calendar>
+		<?php echo nutritionist_render_calendar_grid($monthAnchor, $calendarEntries, $today); ?>
+	</div>
+</div>
 
-	document.querySelectorAll('.appt-table-pagination .admin-table-page-btn[data-href], .admin-table-pagination .admin-table-page-btn[data-href]').forEach(function (btn) {
-		btn.addEventListener('click', function (e) {
-			if (this.disabled) { e.preventDefault(); return; }
-			var href = this.getAttribute('data-href');
-			if (href) { window.location.href = href + '#all-appointments'; }
-		});
-	});
-})();
-</script>
-
-<?php
-nutritionist_layout_end();
+<?php nutritionist_layout_end(); ?>

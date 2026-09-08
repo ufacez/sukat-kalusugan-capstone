@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
+require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -137,6 +138,7 @@ try {
             last_name
          FROM children
          WHERE id = ?
+         AND status = \'active\'
          LIMIT 1'
     );
 
@@ -167,6 +169,38 @@ try {
     if (!is_array($child)) {
         throw new RuntimeException(
             'Selected child was not found.'
+        );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | DUE-DATE CHECK
+    |--------------------------------------------------------------------------
+    |
+    | The kiosk MUST verify the child is scheduled for measurement today.
+    | This is the backend authority — the kiosk cannot start a measurement
+    | unless the child is due (or within the grace window).
+    |
+    */
+
+    $dueCheck = followup_is_due_today($childId);
+
+    if (!$dueCheck['is_due']) {
+        log_action(
+            null,
+            'MEASUREMENT_REJECTED_NOT_DUE',
+            'warning',
+            sprintf(
+                'Kiosk measurement rejected for child #%d (%s %s): %s',
+                $childId,
+                $child['first_name'] ?? '',
+                $child['last_name'] ?? '',
+                $dueCheck['reason']
+            )
+        );
+
+        throw new RuntimeException(
+            $dueCheck['reason']
         );
     }
 

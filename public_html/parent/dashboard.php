@@ -71,6 +71,7 @@ $children = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE c.parent_id = ?
+	 AND c.status = 'active'
 	 ORDER BY c.last_name ASC, c.first_name ASC",
 	'i',
 	[(int)$user['id']]

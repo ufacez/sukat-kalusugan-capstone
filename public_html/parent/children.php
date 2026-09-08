@@ -68,6 +68,7 @@ $children = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE c.parent_id = ?
+	 AND c.status = 'active'
 	 ORDER BY c.last_name ASC, c.first_name ASC",
 	'i',
 	[(int)$user['id']]
@@ -81,6 +82,7 @@ $measurementHistory = admin_fetch_all(
 	 FROM measurements m
 	 INNER JOIN children c ON c.id = m.child_id
 	 WHERE c.parent_id = ?
+	 AND c.status = 'active'
 	 ORDER BY m.measurement_date DESC, m.id DESC",
 	'i',
 	[(int)$user['id']]

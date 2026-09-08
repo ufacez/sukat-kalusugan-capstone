@@ -131,6 +131,7 @@ $appData = [
         'requestProcess' => '../api/kiosk/request_process.php',
         'measurementStatus' => '../api/kiosk/measurement_status.php',
         'measurement' => '../api/esp32/submit_measurement.php',
+        'checkDue' => '../api/kiosk/check_due.php',
     ],
     'defaults' => [
         'deviceId' => $deviceCode,

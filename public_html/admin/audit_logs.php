@@ -17,7 +17,6 @@ $uniqueUsers = admin_scalar("SELECT COUNT(DISTINCT user_id) FROM audit_logs WHER
 
 $actionFilter = $_GET['action'] ?? '';
 $filterWhere = '';
-$filterTypes = '';
 $filterParams = [];
 if ($actionFilter === 'login') {
     $filterWhere = "AND a.action = 'LOGIN'";

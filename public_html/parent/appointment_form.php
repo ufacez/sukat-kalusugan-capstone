@@ -41,10 +41,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	}
 
 	$ok = admin_execute(
-		'INSERT INTO appointments (child_id, parent_id, nutritionist_id, scheduled_at, status, notes)
-		 VALUES (?, ?, ?, ?, ?, ?)',
-		'iiisss',
-		[$childId, (int)$user['id'], $nutritionistId, $scheduledAt, 'pending', $notes]
+		'INSERT INTO appointments (child_id, parent_id, nutritionist_id, scheduled_at, status, notes, created_by)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)',
+		'iiissss',
+		[$childId, (int)$user['id'], $nutritionistId, $scheduledAt, 'pending', $notes, 'parent']
 	);
 
 	admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment requested successfully.'] : ['notice' => 'Appointment could not be created.', 'type' => 'error']);
@@ -54,6 +54,7 @@ $children = admin_fetch_all(
 	'SELECT id, first_name, last_name, child_code
 	 FROM children
 	 WHERE parent_id = ?
+	 AND status = \'active\'
 	 ORDER BY last_name ASC, first_name ASC',
 	'i',
 	[(int)$user['id']]

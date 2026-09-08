@@ -252,6 +252,10 @@ nutritionist_layout_start(
         <article class="nutritionist-panel step-card">
             <div class="step-title"><span class="step-num">3</span> Capture measurement</div>
 
+            <div style="padding:10px 14px;border-radius:8px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);margin-bottom:14px;font-size:12px;color:#92400e;">
+                <strong>Due-date enforced:</strong> Routine manual measurements are only allowed when the child is due for follow-up. If the child is not due, the system will reject the measurement.
+            </div>
+
             <form
                 id="new-measurement-form"
                 data-endpoint="<?php echo nutritionist_e(app_url('/api/nutritionist/measurements_create.php')); ?>"

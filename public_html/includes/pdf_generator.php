@@ -185,7 +185,7 @@ function pdf_scope_and_filter(): array {
 
 	$barangayFilter = (int)($_GET['barangay_id'] ?? 0);
 	$scopeParams = [];
-	$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
+	$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams) . ' AND c.status = \'active\'';
 
 	$barangayFilterSql = '';
 	$barangayFilterParams = [];

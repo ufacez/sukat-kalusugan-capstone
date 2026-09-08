@@ -14,10 +14,10 @@
  *     - older children 24-59 months with no measurement on record yet
  *       (they need a baseline OPT measurement before anything else).
  *
- *   QUARTERLY track (re-measure in the April / July / October rounds):
+ *   QUARTERLY track (re-measure every 3 months in Jan / April / July / October rounds):
  *     - older children 24-59 months classified NORMAL on all axes.
- *       Q1 (January-March) is the annual OPT baseline round; normal
- *       children from that round are re-checked every quarter.
+ *       Re-checked every quarter on a rolling 3-month cycle snapped to
+ *       the nearest official round month.
  *
  *   Children over 59 months have graduated from eOPT coverage.
  *
@@ -30,7 +30,7 @@
 require_once __DIR__ . '/admin_helpers.php';
 require_once __DIR__ . '/audit_logger.php';
 
-const FOLLOWUP_QUARTER_MONTHS = [4, 7, 10];
+const FOLLOWUP_QUARTER_MONTHS = [1, 4, 7, 10];
 const FOLLOWUP_GRACE_DAYS = 7;
 
 /**
@@ -126,14 +126,32 @@ function followup_abnormal_codes(?string $wfa, ?string $hfa, ?string $wfh): arra
  * shape produced by the standard "latest measurement" LEFT JOIN used across
  * the nutritionist pages.
  *
- * @return array{track: ?string, category: string, reason: string}
+ * If a child has a special monitoring status with a custom interval, that
+ * interval overrides the default age-based schedule.
+ *
+ * @return array{track: ?string, category: string, reason: string, custom_interval_days: ?int}
  */
 function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null): array
 {
 	$ageNow = followup_age_months((string)$child['birthdate'], $asOf);
 
 	if ($ageNow > 59) {
-		return ['track' => null, 'category' => '', 'reason' => 'Over 59 months — graduated from eOPT coverage.'];
+		return ['track' => null, 'category' => '', 'reason' => 'Over 59 months — graduated from eOPT coverage.', 'custom_interval_days' => null];
+	}
+
+	$monitoringStatus = $child['monitoring_status'] ?? 'routine';
+	$customInterval = isset($child['custom_interval_days']) ? (int)$child['custom_interval_days'] : null;
+
+	// Special monitoring with custom interval — override age-based defaults
+	if (in_array($monitoringStatus, ['special', 'sick', 'other'], true) && $customInterval !== null && $customInterval > 0) {
+		$label = ucfirst($monitoringStatus);
+		$reasonText = $child['monitoring_reason'] ?? '';
+		return [
+			'track' => 'custom',
+			'category' => $label,
+			'reason' => $label . ' monitoring — custom interval every ' . $customInterval . ' day' . ($customInterval !== 1 ? 's' : '') . ($reasonText !== '' ? ' (' . $reasonText . ')' : '.') . '.',
+			'custom_interval_days' => $customInterval,
+		];
 	}
 
 	$hasMeasurement = !empty($child['measurement_date']);
@@ -146,6 +164,7 @@ function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null):
 			'track' => 'monthly',
 			'category' => '0-23 mo',
 			'reason' => 'Mandatory monthly monitoring — all infants and toddlers 0-23 months.',
+			'custom_interval_days' => null,
 		];
 	}
 
@@ -154,6 +173,7 @@ function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null):
 			'track' => 'monthly',
 			'category' => 'Needs baseline',
 			'reason' => 'No OPT measurement on record — baseline weighing required.',
+			'custom_interval_days' => null,
 		];
 	}
 
@@ -164,6 +184,7 @@ function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null):
 			'track' => 'monthly',
 			'category' => $category,
 			'reason' => 'Malnourished (' . followup_category_label($category) . ') — mandatory monthly re-measurement.',
+			'custom_interval_days' => null,
 		];
 	}
 
@@ -171,6 +192,7 @@ function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null):
 		'track' => 'quarterly',
 		'category' => 'Normal',
 		'reason' => 'Normal — quarterly re-check (April / July / October rounds).',
+		'custom_interval_days' => null,
 	];
 }
 
@@ -182,7 +204,7 @@ function followup_classify_child(array $child, ?DateTimeImmutable $asOf = null):
  * nearest official round month (April / July / October).
  * Never-measured children are anchored to the next upcoming round.
  */
-function followup_next_due(?string $lastMeasuredDate, string $track, ?DateTimeImmutable $asOf = null): DateTimeImmutable
+function followup_next_due(?string $lastMeasuredDate, string $track, ?DateTimeImmutable $asOf = null, ?int $customIntervalDays = null): DateTimeImmutable
 {
 	$asOf ??= new DateTimeImmutable('today');
 
@@ -202,6 +224,14 @@ function followup_next_due(?string $lastMeasuredDate, string $track, ?DateTimeIm
 		$base = new DateTimeImmutable($lastMeasuredDate);
 	} catch (Exception) {
 		return $asOf->modify('+1 month');
+	}
+
+	if ($track === 'custom') {
+		$intervalDays = (int)($customIntervalDays ?? 30);
+		if ($intervalDays < 1) {
+			$intervalDays = 30;
+		}
+		return $base->modify('+' . $intervalDays . ' days');
 	}
 
 	if ($track === 'quarterly') {
@@ -258,7 +288,9 @@ function followup_card_state(
 	?string $wfaStatus = null,
 	?string $hfaStatus = null,
 	?string $wfhStatus = null,
-	?DateTimeImmutable $today = null
+	?DateTimeImmutable $today = null,
+	?string $monitoringStatus = null,
+	?int $customIntervalDays = null
 ): array {
 	$today ??= new DateTimeImmutable('today');
 	$classif = followup_classify_child([
@@ -267,6 +299,8 @@ function followup_card_state(
 		'wfa_status' => $wfaStatus,
 		'hfa_status' => $hfaStatus,
 		'wfh_status' => $wfhStatus,
+		'monitoring_status' => $monitoringStatus ?? 'routine',
+		'custom_interval_days' => $customIntervalDays,
 	], $today);
 
 	$idle = ['due' => null, 'state' => 'none', 'label' => 'Not in eOPT coverage', 'class' => 'is-muted'];
@@ -275,7 +309,7 @@ function followup_card_state(
 		return $idle;
 	}
 
-	$due = followup_next_due($lastMeasuredDate, $classif['track'], $today);
+	$due = followup_next_due($lastMeasuredDate, $classif['track'], $today, $classif['custom_interval_days'] ?? null);
 	$dueLabel = $due->format('M j, Y');
 
 	$daysUntilDue = (int)$today->diff($due->setTime(0, 0))->format('%r%a');
@@ -321,7 +355,10 @@ function followup_sync_for_child(int $childId): array
 			lm.measurement_date,
 			lm.wfa_status,
 			lm.hfa_status,
-			lm.wfh_status
+			lm.wfh_status,
+			COALESCE(cms.monitoring_status, \'routine\') AS monitoring_status,
+			cms.custom_interval_days,
+			cms.reason AS monitoring_reason
 		 FROM children c
 		 LEFT JOIN measurements lm ON lm.id = (
 			SELECT m.id FROM measurements m
@@ -329,6 +366,7 @@ function followup_sync_for_child(int $childId): array
 			ORDER BY m.measurement_date DESC, m.id DESC
 			LIMIT 1
 		 )
+		 LEFT JOIN child_monitoring_status cms ON cms.child_id = c.id
 		 WHERE c.id = ?
 		 LIMIT 1',
 		'i',
@@ -491,7 +529,8 @@ function followup_sync_for_child(int $childId): array
 	$due = followup_next_due(
 		$child['measurement_date'] ?? null,
 		$classif['track'],
-		$today
+		$today,
+		$classif['custom_interval_days'] ?? null
 	)->setTime(9, 0, 0);
 
 	$nutritionistId = followup_pick_nutritionist_for_child($conn, (int)$child['barangay_id']);
@@ -690,4 +729,424 @@ function followup_fetch_visits(int $childId, string $fromDate, string $toDate, i
 	mysqli_stmt_close($stmt);
 
 	return $rows;
+}
+
+// ============================================================
+// MONITORING STATUS FUNCTIONS
+// ============================================================
+
+/**
+ * Get the monitoring status for a child. Returns default 'routine' if no
+ * custom status has been set.
+ *
+ * @return array{monitoring_status: string, custom_interval_days: ?int, reason: ?string, set_by: ?int}
+ */
+function followup_get_monitoring_status(int $childId): array
+{
+	$conn = get_db_connection();
+
+	$row = admin_fetch_one(
+		"SELECT monitoring_status, custom_interval_days, reason, set_by
+		 FROM child_monitoring_status
+		 WHERE child_id = ?
+		 LIMIT 1",
+		'i',
+		[$childId]
+	);
+
+	if ($row === null) {
+		return [
+			'monitoring_status' => 'routine',
+			'custom_interval_days' => null,
+			'reason' => null,
+			'set_by' => null,
+		];
+	}
+
+	return [
+		'monitoring_status' => (string)$row['monitoring_status'],
+		'custom_interval_days' => $row['custom_interval_days'] !== null ? (int)$row['custom_interval_days'] : null,
+		'reason' => $row['reason'] ?? null,
+		'set_by' => $row['set_by'] !== null ? (int)$row['set_by'] : null,
+	];
+}
+
+/**
+ * Set or update the monitoring status for a child.
+ *
+ * @param string $status One of 'routine', 'special', 'sick', 'other'
+ * @param int $staffUserId The nutritionist/admin setting this status
+ * @param int|null $customIntervalDays Custom interval in days (null = use age-based default)
+ * @param string|null $reason Free-text reason for the override
+ * @return bool Success
+ */
+function followup_set_monitoring_status(
+	int $childId,
+	string $status,
+	int $staffUserId,
+	?int $customIntervalDays = null,
+	?string $reason = null
+): bool {
+	$conn = get_db_connection();
+
+	if (!in_array($status, ['routine', 'special', 'sick', 'other'], true)) {
+		return false;
+	}
+
+	// If routine, remove any custom status row
+	if ($status === 'routine') {
+		admin_execute(
+			"DELETE FROM child_monitoring_status WHERE child_id = ?",
+			'i',
+			[$childId]
+		);
+
+		log_action(
+			$staffUserId,
+			'MONITORING_STATUS_REMOVED',
+			'info',
+			sprintf('Child #%d monitoring status reset to routine.', $childId)
+		);
+
+		return true;
+	}
+
+	// Upsert the monitoring status
+	$existing = admin_fetch_one(
+		"SELECT id FROM child_monitoring_status WHERE child_id = ? LIMIT 1",
+		'i',
+		[$childId]
+	);
+
+	if ($existing !== null) {
+		admin_execute(
+			"UPDATE child_monitoring_status
+			 SET monitoring_status = ?,
+			     custom_interval_days = ?,
+			     reason = ?,
+			     set_by = ?,
+			     updated_at = NOW()
+			 WHERE child_id = ?",
+			'sisii',
+			[$status, $customIntervalDays, $reason, $staffUserId, $childId]
+		);
+	} else {
+		admin_execute(
+			"INSERT INTO child_monitoring_status
+			 (child_id, monitoring_status, custom_interval_days, reason, set_by, created_at, updated_at)
+			 VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
+			'isisi',
+			[$childId, $status, $customIntervalDays, $reason, $staffUserId]
+		);
+	}
+
+	log_action(
+		$staffUserId,
+		'MONITORING_STATUS_CHANGED',
+		'info',
+		sprintf(
+			'Child #%d monitoring status set to "%s"%s%s.',
+			$childId,
+			$status,
+			$customIntervalDays !== null ? ' (interval: ' . $customIntervalDays . ' days)' : '',
+			$reason !== '' && $reason !== null ? ' — Reason: ' . $reason : ''
+		)
+	);
+
+	return true;
+}
+
+/**
+ * Check whether a child is due for measurement today (or within the grace window).
+ *
+ * This is the backend authority for whether a kiosk or manual measurement
+ * is allowed. It checks:
+ *   1. Is the child in eOPT coverage (age <= 59 months)?
+ *   2. Has a measurement already been recorded today?
+ *   3. Is today within the grace window of the next scheduled follow-up?
+ *
+ * @return array{is_due: bool, next_due: ?string, reason: string, monitoring_status: string}
+ */
+function followup_is_due_today(int $childId, ?DateTimeImmutable $asOf = null): array
+{
+	$conn = get_db_connection();
+	$asOf ??= new DateTimeImmutable('today');
+	$todayStr = $asOf->format('Y-m-d');
+
+	// Fetch child with latest measurement and monitoring status
+	$child = admin_fetch_one(
+		'SELECT
+			c.id,
+			c.birthdate,
+			c.sex,
+			lm.measurement_date,
+			lm.wfa_status,
+			lm.hfa_status,
+			lm.wfh_status,
+			COALESCE(cms.monitoring_status, \'routine\') AS monitoring_status,
+			cms.custom_interval_days,
+			cms.reason AS monitoring_reason
+		 FROM children c
+		 LEFT JOIN measurements lm ON lm.id = (
+			SELECT m.id FROM measurements m
+			WHERE m.child_id = c.id
+			ORDER BY m.measurement_date DESC, m.id DESC
+			LIMIT 1
+		 )
+		 LEFT JOIN child_monitoring_status cms ON cms.child_id = c.id
+		 WHERE c.id = ?
+		 LIMIT 1',
+		'i',
+		[$childId]
+	);
+
+	if ($child === null) {
+		return [
+			'is_due' => false,
+			'next_due' => null,
+			'reason' => 'Child not found.',
+			'monitoring_status' => 'routine',
+		];
+	}
+
+	$ageMonths = followup_age_months((string)$child['birthdate'], $asOf);
+
+	if ($ageMonths > 59) {
+		return [
+			'is_due' => false,
+			'next_due' => null,
+			'reason' => 'Child is ' . $ageMonths . ' months old — aged out of eOPT coverage (maximum 59 months).',
+			'monitoring_status' => 'routine',
+		];
+	}
+
+	// Check if a measurement already exists today
+	$existingToday = admin_fetch_one(
+		"SELECT id FROM measurements WHERE child_id = ? AND measurement_date = ? LIMIT 1",
+		'is',
+		[$childId, $todayStr]
+	);
+
+	if ($existingToday !== null) {
+		return [
+			'is_due' => false,
+			'next_due' => null,
+			'reason' => 'A measurement has already been recorded for this child today.',
+			'monitoring_status' => (string)$child['monitoring_status'],
+		];
+	}
+
+	// Classify child and compute next due date
+	$classif = followup_classify_child($child, $asOf);
+
+	if ($classif['track'] === null) {
+		return [
+			'is_due' => false,
+			'next_due' => null,
+			'reason' => 'Child is not in eOPT coverage.',
+			'monitoring_status' => (string)$child['monitoring_status'],
+		];
+	}
+
+	$nextDue = followup_next_due(
+		$child['measurement_date'] ?? null,
+		$classif['track'],
+		$asOf,
+		$classif['custom_interval_days'] ?? null
+	);
+
+	$nextDueStr = $nextDue->format('Y-m-d');
+
+	// If no previous measurement, child is always due (needs baseline)
+	if (empty($child['measurement_date'])) {
+		return [
+			'is_due' => true,
+			'next_due' => $nextDueStr,
+			'reason' => 'No measurement on record — baseline measurement required.',
+			'monitoring_status' => (string)$child['monitoring_status'],
+		];
+	}
+
+	// Check if today is within the grace window of the due date
+	$daysUntilDue = (int)$asOf->diff($nextDue->setTime(0, 0))->format('%r%a');
+
+	if ($daysUntilDue <= 0) {
+		// Due today or overdue
+		$reason = $daysUntilDue < 0
+			? 'Overdue — measurement was due on ' . $nextDueStr . '.'
+			: 'Measurement is due today.';
+
+		return [
+			'is_due' => true,
+			'next_due' => $nextDueStr,
+			'reason' => $reason,
+			'monitoring_status' => (string)$child['monitoring_status'],
+		];
+	}
+
+	if ($daysUntilDue <= FOLLOWUP_GRACE_DAYS) {
+		return [
+			'is_due' => true,
+			'next_due' => $nextDueStr,
+			'reason' => 'Within the ' . FOLLOWUP_GRACE_DAYS . '-day grace window (due in ' . $daysUntilDue . ' day' . ($daysUntilDue !== 1 ? 's' : '') . ').',
+			'monitoring_status' => (string)$child['monitoring_status'],
+		];
+	}
+
+	return [
+		'is_due' => false,
+		'next_due' => $nextDueStr,
+		'reason' => 'Not due yet. Next scheduled measurement: ' . $nextDueStr . ' (in ' . $daysUntilDue . ' days).',
+		'monitoring_status' => (string)$child['monitoring_status'],
+	];
+}
+
+/**
+ * Fetch children with their follow-up status for the monitoring dashboard.
+ *
+ * Returns an array of children with computed due-date status, suitable for
+ * the follow-up monitoring table.
+ *
+ * @param array $user Current user (for barangay scope)
+ * @param array $filters Optional filters: status, barangay_id, age_group, schedule, from, to, q
+ * @return array
+ */
+function followup_fetch_monitoring_list(array $user, array $filters = []): array
+{
+	$conn = get_db_connection();
+
+	$params = [];
+	$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $params);
+
+	$ageJoin = '';
+	$ageFilter = '';
+
+	// Build the main query with latest measurement + monitoring status
+	$rows = admin_fetch_all(
+		"SELECT
+			c.id,
+			c.child_code,
+			c.first_name,
+			c.last_name,
+			c.birthdate,
+			c.sex,
+			c.barangay_id,
+			bg.name AS barangay_name,
+			lm.id AS last_measurement_id,
+			lm.measurement_date,
+			lm.height_cm AS last_height,
+			lm.weight_kg AS last_weight,
+			lm.wfa_status,
+			lm.hfa_status,
+			lm.wfh_status,
+			lm.nutritional_status,
+			COALESCE(cms.monitoring_status, 'routine') AS monitoring_status,
+			cms.custom_interval_days,
+			cms.reason AS monitoring_reason
+		 FROM children c
+		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
+		 LEFT JOIN measurements lm ON lm.id = (
+			SELECT m.id FROM measurements m
+			WHERE m.child_id = c.id
+			ORDER BY m.measurement_date DESC, m.id DESC
+			LIMIT 1
+		 )
+		 LEFT JOIN child_monitoring_status cms ON cms.child_id = c.id
+		 WHERE {$scope}
+		   AND c.status = 'active'
+		 ORDER BY c.last_name ASC, c.first_name ASC",
+		str_repeat('i', count($params)),
+		$params
+	);
+
+	$today = new DateTimeImmutable('today');
+	$result = [];
+
+	foreach ($rows as $row) {
+		$ageMonths = followup_age_months((string)$row['birthdate'], $today);
+
+		if ($ageMonths > 59) {
+			continue;
+		}
+
+		$classif = followup_classify_child($row, $today);
+		$nextDue = followup_next_due(
+			$row['measurement_date'] ?? null,
+			$classif['track'],
+			$today,
+			$classif['custom_interval_days'] ?? null
+		);
+
+		$nextDueStr = $nextDue->format('Y-m-d');
+		$daysUntilDue = (int)$today->diff($nextDue->setTime(0, 0))->format('%r%a');
+
+		// Determine status
+		$status = 'upcoming';
+		if ((string)$row['monitoring_status'] !== 'routine') {
+			$status = 'special_monitoring';
+		} elseif (empty($row['measurement_date'])) {
+			$status = 'due_today';
+		} elseif ($daysUntilDue < 0) {
+			$status = 'overdue';
+		} elseif ($daysUntilDue === 0) {
+			$status = 'due_today';
+		} elseif ($daysUntilDue <= FOLLOWUP_GRACE_DAYS) {
+			$status = 'due_soon';
+		}
+
+		// Check if measured today
+		$measuredToday = ($row['measurement_date'] === $today->format('Y-m-d'));
+		if ($measuredToday) {
+			$status = 'completed';
+		}
+
+		// Apply filters
+		if (isset($filters['status']) && $filters['status'] !== '' && $status !== $filters['status']) {
+			continue;
+		}
+		if (isset($filters['barangay_id']) && $filters['barangay_id'] > 0 && (int)$row['barangay_id'] !== (int)$filters['barangay_id']) {
+			continue;
+		}
+		if (isset($filters['schedule']) && $filters['schedule'] !== '' && ($classif['track'] ?? '') !== $filters['schedule']) {
+			continue;
+		}
+		if (isset($filters['q']) && $filters['q'] !== '') {
+			$haystack = strtolower($row['first_name'] . ' ' . $row['last_name'] . ' ' . $row['child_code']);
+			if (strpos($haystack, strtolower($filters['q'])) === false) {
+				continue;
+			}
+		}
+		if (isset($filters['from']) && $filters['from'] !== '' && $nextDueStr < $filters['from']) {
+			continue;
+		}
+		if (isset($filters['to']) && $filters['to'] !== '' && $nextDueStr > $filters['to']) {
+			continue;
+		}
+
+		$result[] = [
+			'id' => (int)$row['id'],
+			'child_code' => (string)$row['child_code'],
+			'first_name' => (string)$row['first_name'],
+			'last_name' => (string)$row['last_name'],
+			'birthdate' => (string)$row['birthdate'],
+			'age_months' => $ageMonths,
+			'barangay_id' => (int)$row['barangay_id'],
+			'barangay_name' => (string)$row['barangay_name'],
+			'last_measurement_date' => $row['measurement_date'] ?? null,
+			'last_weight' => $row['last_weight'] !== null ? (float)$row['last_weight'] : null,
+			'last_height' => $row['last_height'] !== null ? (float)$row['last_height'] : null,
+			'nutritional_status' => $row['nutritional_status'] ?? null,
+			'schedule_type' => $classif['track'] ?? null,
+			'schedule_category' => $classif['category'] ?? '',
+			'next_due' => $nextDueStr,
+			'days_until_due' => $daysUntilDue,
+			'status' => $status,
+			'monitoring_status' => (string)$row['monitoring_status'],
+			'custom_interval_days' => $row['custom_interval_days'] !== null ? (int)$row['custom_interval_days'] : null,
+			'monitoring_reason' => $row['monitoring_reason'] ?? null,
+			'measured_today' => $measuredToday,
+		];
+	}
+
+	return $result;
 }

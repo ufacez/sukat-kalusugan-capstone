@@ -49,6 +49,7 @@ if ($userType === 'parent') {
             birthdate
          FROM children
          WHERE parent_id = ?
+         AND status = \'active\'
          ORDER BY first_name ASC, last_name ASC',
         'i',
         [$parentId]
@@ -90,6 +91,7 @@ if ($userType === 'parent') {
              WHERE (c.first_name LIKE ?
                  OR c.last_name LIKE ?
                  OR c.child_code LIKE ?)
+                 AND c.status = \'active\'
                 ' . $scopeCondition . '
              ORDER BY c.first_name ASC, c.last_name ASC
              LIMIT 50',
@@ -109,6 +111,7 @@ if ($userType === 'parent') {
                 c.birthdate
              FROM children c
              WHERE 1=1
+                 AND c.status = \'active\'
                 ' . $scopeCondition . '
              ORDER BY c.first_name ASC, c.last_name ASC
              LIMIT 200',

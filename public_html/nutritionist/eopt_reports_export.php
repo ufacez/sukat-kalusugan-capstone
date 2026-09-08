@@ -69,7 +69,7 @@ if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
 $barangayFilter = (int)($_GET['barangay_id'] ?? 0);
 
 $scopeParams = [];
-$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams);
+$scope = nutritionist_scope_fragment($user, 'c.barangay_id', $scopeParams) . ' AND c.status = \'active\'';
 
 $userBarangayId = (int)($user['barangay_id'] ?? 0);
 $barangayFilterSql = '';

@@ -65,7 +65,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$childRecord = admin_fetch_one(
 		"SELECT c.id, c.parent_id
 		 FROM children c
-		 WHERE c.id = ? AND {$childScope}
+		 WHERE c.id = ? AND c.status = 'active' AND {$childScope}
 		 LIMIT 1",
 		str_repeat('i', count($childParams)),
 		$childParams
@@ -108,7 +108,7 @@ $children = admin_fetch_all(
 	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
-	 WHERE {$childrenScope}
+	 WHERE {$childrenScope} AND c.status = 'active'
 	 ORDER BY c.last_name ASC, c.first_name ASC",
 	str_repeat('i', count($childrenParams)),
 	$childrenParams

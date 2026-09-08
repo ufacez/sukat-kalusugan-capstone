@@ -1,9 +1,6 @@
 (function () {
   "use strict";
 
-  const COMPACT_LIMIT = 3;
-  const SELECTED_CLASS = "is-selected";
-
   function escapeHtml(value) {
     const div = document.createElement("div");
     div.textContent = String(value ?? "");
@@ -53,8 +50,8 @@
 
     let actionHtml = "";
     if (entry.id) {
-      const href = "appointment_form.php?id=" + encodeURIComponent(entry.id);
-      actionHtml = '<a class="sk-cal-event-action" href="' + escapeHtml(href) + '">Open →</a>';
+      const href = "followup_child.php?id=" + encodeURIComponent(entry.id);
+      actionHtml = '<a class="sk-cal-event-action" href="' + escapeHtml(href) + '">View \u2192</a>';
     }
 
     return (
@@ -74,139 +71,150 @@
     );
   }
 
-  function limitRepeatedAppointments(entries) {
-    let appointmentShown = false;
-    return entries.filter((entry) => {
-      if (entry.type !== "appointment") return true;
-      if (appointmentShown) return false;
-      appointmentShown = true;
-      return true;
+  /* ── Inline detail panel (dashboard) ── */
+  function showInlineDetail(iso, entries) {
+    var panel = document.getElementById("cal-detail-panel");
+    if (!panel) return;
+
+    if (!entries || entries.length === 0) {
+      closeInlineDetail();
+      return;
+    }
+
+    var rel = formatRelativeDay(iso);
+    var heading = rel || formatLongDate(iso);
+    var first = entries[0];
+    var remaining = entries.length - 1;
+
+    var moreHtml = remaining > 0
+      ? '<div class="sk-cal-detail-more">+' + remaining + ' more appointment' + (remaining === 1 ? '' : 's') + '</div>'
+      : "";
+
+    panel.innerHTML =
+      '<div class="sk-cal-detail-head">' +
+        '<h4 class="sk-cal-detail-title">' + escapeHtml(heading) + '</h4>' +
+        '<button type="button" class="sk-cal-detail-close" data-cal-detail-close>&times;</button>' +
+      '</div>' +
+      buildEventCard(first) +
+      moreHtml;
+
+    panel.classList.add("is-open");
+
+    panel.querySelector("[data-cal-detail-close]").addEventListener("click", function () {
+      closeInlineDetail();
     });
   }
 
-  function renderDetail(detailEl, iso, entries) {
-    const visibleEntries = limitRepeatedAppointments(entries);
-    const titleEl = detailEl.querySelector("[data-calendar-detail-title]");
-    const subEl = detailEl.querySelector("[data-calendar-detail-sub]");
-    const listEl = detailEl.querySelector("[data-calendar-detail-list]");
-    const emptyEl = detailEl.querySelector("[data-calendar-detail-empty]");
-    const linkEl = detailEl.querySelector("[data-calendar-detail-link]");
+  function closeInlineDetail() {
+    var panel = document.getElementById("cal-detail-panel");
+    if (panel) {
+      panel.classList.remove("is-open");
+      panel.innerHTML = "";
+    }
+    document.querySelectorAll(".sk-cal-day.is-selected").forEach(function (d) {
+      d.classList.remove("is-selected");
+    });
+  }
 
-    if (!listEl) return;
+  /* ── Modal (appointments page fallback) ── */
+  function openModal(iso, entries) {
+    closeModal();
 
-    if (titleEl) {
-      const rel = formatRelativeDay(iso);
-      titleEl.textContent = rel || formatLongDate(iso);
-      if (rel === "Today") {
-        titleEl.innerHTML += ' <span class="sk-cal-detail-today">Today</span>';
+    var rel = formatRelativeDay(iso);
+    var heading = rel || formatLongDate(iso);
+
+    var cardsHtml = entries.map(buildEventCard).join("");
+
+    var overlay = document.createElement("div");
+    overlay.className = "sk-cal-modal-overlay";
+    overlay.setAttribute("data-calendar-modal", "");
+    overlay.innerHTML =
+      '<div class="sk-cal-modal">' +
+        '<div class="sk-cal-modal-head">' +
+          '<h3 class="sk-cal-modal-title">' + escapeHtml(heading) +
+            (rel === "Today" ? ' <span class="sk-cal-detail-today">Today</span>' : "") +
+          '</h3>' +
+          '<button type="button" class="sk-cal-modal-close" data-calendar-modal-close>&times;</button>' +
+        '</div>' +
+        '<div class="sk-cal-modal-sub">' + entries.length + ' appointment' + (entries.length === 1 ? '' : 's') + '</div>' +
+        '<div class="sk-cal-modal-body">' + cardsHtml + '</div>' +
+      '</div>';
+
+    document.body.appendChild(overlay);
+    document.body.style.overflow = "hidden";
+
+    overlay.addEventListener("click", function (e) {
+      if (e.target === overlay || e.target.closest("[data-calendar-modal-close]")) {
+        closeModal();
       }
-    }
+    });
 
-    if (subEl) {
-      subEl.textContent = visibleEntries.length + " event" + (visibleEntries.length === 1 ? "" : "s");
-    }
-
-    if (visibleEntries.length === 0) {
-      listEl.innerHTML = "";
-      if (emptyEl) emptyEl.style.display = "";
-    } else {
-      if (emptyEl) emptyEl.style.display = "none";
-
-      const compact = visibleEntries.slice(0, COMPACT_LIMIT);
-      let html = compact.map(buildEventCard).join("");
-      if (visibleEntries.length > COMPACT_LIMIT) {
-        html +=
-          '<button type="button" class="sk-cal-show-more" data-calendar-show-more>' +
-          "+ " + (visibleEntries.length - COMPACT_LIMIT) + " more" +
-          "</button>";
-        html += '<div class="sk-cal-event-list-extra" hidden>';
-        html += visibleEntries.slice(COMPACT_LIMIT).map(buildEventCard).join("");
-        html += "</div>";
+    document.addEventListener("keydown", function handler(e) {
+      if (e.key === "Escape") {
+        closeModal();
+        document.removeEventListener("keydown", handler);
       }
-      listEl.innerHTML = html;
-    }
+    });
+  }
 
-    if (linkEl) {
-      linkEl.setAttribute("aria-hidden", "false");
-      linkEl.setAttribute("href", "appointments.php?from=" + encodeURIComponent(iso) + "&to=" + encodeURIComponent(iso));
+  function closeModal() {
+    var existing = document.querySelector("[data-calendar-modal]");
+    if (existing) {
+      existing.remove();
+      document.body.style.overflow = "";
     }
   }
 
+  /* ── Calendar setup ── */
   function setupCalendar(scope) {
-    const grid = scope && scope.matches && scope.matches("[data-sk-calendar]")
+    var grid = scope && scope.matches && scope.matches("[data-sk-calendar]")
       ? scope
       : (scope || document).querySelector("[data-sk-calendar]");
     if (!grid) return;
 
-    const detailId = grid.getAttribute("data-sk-calendar-detail");
-    const detailEl = detailId ? document.getElementById(detailId) : null;
-    if (!detailEl) return;
+    var useInline = !!document.getElementById("cal-detail-panel");
+    var days = grid.querySelectorAll("[data-calendar-day]");
 
-    const defaultIso = grid.getAttribute("data-sk-calendar-default") || null;
-    const days = grid.querySelectorAll("[data-calendar-day]");
-
-    function selectDay(iso, entries) {
-      days.forEach((btn) => {
-        if (btn.getAttribute("data-calendar-day") === iso) {
-          btn.classList.add(SELECTED_CLASS);
-        } else {
-          btn.classList.remove(SELECTED_CLASS);
-        }
-      });
-      renderDetail(detailEl, iso, entries);
-      detailEl.setAttribute("data-calendar-active-day", iso);
-    }
-
-    days.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const iso = btn.getAttribute("data-calendar-day");
+    days.forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var iso = btn.getAttribute("data-calendar-day");
         if (!iso) return;
 
-        const raw = btn.getAttribute("data-calendar-entries") || "[]";
-        let entries = [];
+        var raw = btn.getAttribute("data-calendar-entries") || "[]";
+        var entries = [];
         try {
           entries = JSON.parse(raw);
         } catch (e) {
           entries = [];
         }
 
-        selectDay(iso, entries);
+        if (entries.length === 0) {
+          if (useInline) closeInlineDetail();
+          return;
+        }
+
+        if (useInline) {
+          var wasSelected = btn.classList.contains("is-selected");
+          document.querySelectorAll(".sk-cal-day.is-selected").forEach(function (d) {
+            d.classList.remove("is-selected");
+          });
+          if (wasSelected) {
+            closeInlineDetail();
+          } else {
+            btn.classList.add("is-selected");
+            showInlineDetail(iso, entries);
+          }
+        } else {
+          openModal(iso, entries);
+        }
       });
-    });
-
-    if (defaultIso) {
-      const defaultBtn = grid.querySelector(
-        '[data-calendar-day="' + defaultIso + '"]'
-      );
-      if (defaultBtn) {
-        let entries = [];
-        try {
-          entries = JSON.parse(
-            defaultBtn.getAttribute("data-calendar-entries") || "[]"
-          );
-        } catch (e) {}
-        selectDay(defaultIso, entries);
-      }
-    }
-
-    detailEl.addEventListener("click", (e) => {
-      const moreBtn = e.target.closest("[data-calendar-show-more]");
-      if (!moreBtn) return;
-      const extra = moreBtn.parentElement.querySelector(".sk-cal-event-list-extra");
-      if (!extra) return;
-      const isHidden = extra.hasAttribute("hidden");
-      if (isHidden) {
-        extra.removeAttribute("hidden");
-        moreBtn.textContent = "Show less";
-      } else {
-        extra.setAttribute("hidden", "");
-        moreBtn.textContent = moreBtn.textContent.replace("Show less", "+ more");
-      }
     });
   }
 
   function init() {
-    document.querySelectorAll("[data-sk-calendar]").forEach((grid) => setupCalendar(grid));
+    document.querySelectorAll("[data-sk-calendar]").forEach(function (grid) {
+      setupCalendar(grid);
+    });
   }
 
   if (document.readyState === "loading") {

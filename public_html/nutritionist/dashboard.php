@@ -6,10 +6,6 @@ require_once __DIR__ . '/../includes/who_calculator.php';
 $user = nutritionist_require_access();
 $today = new DateTimeImmutable('today');
 
-// Calendar events are read-only on this dashboard. Adding, editing, and
-// deleting meetings/Oplan Timbang entries happens on the Settings page
-// (see nutritionist/settings.php, "Manage Calendar" section).
-
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 $children = admin_fetch_all(
@@ -136,10 +132,10 @@ $measurements = admin_fetch_all(
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 INNER JOIN (
-		SELECT child_id, MAX(id) AS latest_id
+		SELECT child_id, MAX(measurement_date) AS latest_date
 		FROM measurements
 		GROUP BY child_id
-	 ) latest ON latest.latest_id = m.id
+	 ) latest ON latest.latest_date = m.measurement_date AND latest.child_id = m.child_id
 	 WHERE {$measurementsScope}
 	   AND c.status = 'active'
 	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
@@ -188,18 +184,6 @@ $prevMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['mon
 $nextMonthLink = app_url('/nutritionist/dashboard.php?' . http_build_query(['month' => $calendarDate->modify('+1 month')->format('Y-m')]));
 $monthStart = $calendarDate->format('Y-m-d');
 $monthEnd = $calendarDate->modify('last day of this month')->format('Y-m-d');
-
-$eventsParams = [$monthStart, $monthEnd];
-$eventsScope = nutritionist_scope_fragment($user, 'ne.barangay_id', $eventsParams);
-$monthEvents = admin_fetch_all(
-	"SELECT ne.id, ne.event_type, ne.title, ne.event_date, ne.event_time, ne.location, ne.notes, ne.nutritionist_id, bg.name AS barangay
-	 FROM nutritionist_events ne
-	 LEFT JOIN barangays bg ON bg.id = ne.barangay_id
-	 WHERE ne.event_date BETWEEN ? AND ? AND {$eventsScope}
-	 ORDER BY ne.event_date ASC, ne.event_time ASC, ne.id ASC",
-	str_repeat('s', count($eventsParams)),
-	$eventsParams
-);
 
 $parentsParams = [];
 $parentsScope = nutritionist_scope_fragment($user, 'c.barangay_id', $parentsParams);
@@ -488,28 +472,6 @@ foreach ($appointments as $appointment) {
 	];
 }
 
-foreach ($monthEvents as $eventRow) {
-	try {
-		$date = new DateTimeImmutable((string)$eventRow['event_date']);
-	} catch (Exception) {
-		continue;
-	}
-	$day = (int)$date->format('j');
-	$eventType = (string)$eventRow['event_type'];
-	$eventTime = $eventRow['event_time'] !== null && $eventRow['event_time'] !== ''
-		? (new DateTimeImmutable((string)$eventRow['event_date'] . ' ' . (string)$eventRow['event_time']))->format('g:i A')
-		: null;
-	$calendarEntries[$day][] = [
-		'type' => $eventType,
-		'color' => nutritionist_calendar_color($eventType),
-		'title' => (string)$eventRow['title'],
-		'time' => $eventTime,
-		'id' => (int)$eventRow['id'],
-		'location' => (string)($eventRow['location'] ?? ''),
-		'status' => null,
-	];
-}
-
 $todayStr = $today->format('Y-m-d');
 $todayInCurrentMonth = ((int)$today->format('Y') === (int)$calendarDate->format('Y')
 	&& (int)$today->format('n') === (int)$calendarDate->format('n'));
@@ -528,13 +490,16 @@ if ($todayInCurrentMonth && isset($calendarEntries[(int)$today->format('j')])) {
 		}
 	}
 }
-$recentPage = max(1, (int)($_GET['rmp'] ?? 1));
-$recentPageSize = 3;
-$recentTotal = count($measurements);
-$recentTotalPages = max(1, (int)ceil($recentTotal / $recentPageSize));
-if ($recentPage > $recentTotalPages) $recentPage = $recentTotalPages;
-$recentOffset = ($recentPage - 1) * $recentPageSize;
-$recentMeasurements = array_slice($measurements, $recentOffset, $recentPageSize);
+// Deduplicate to one row per child (latest measurement only)
+$recentSeen = [];
+$recentMeasurements = [];
+foreach ($measurements as $m) {
+	$cid = (int)$m['child_id'];
+	if (isset($recentSeen[$cid])) continue;
+	$recentSeen[$cid] = true;
+	$recentMeasurements[] = $m;
+	if (count($recentMeasurements) >= 3) break;
+}
 
 // AI Insights — driven by the latest WHO growth-indicator snapshot per child.
 // Speaks in the language of WFA / HFA / WFH z-score classifications and
@@ -813,94 +778,23 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 		<?php
 		$todayStr = $today->format('Y-m-d');
-		$initIsoDay = $defaultCalendarDay ?? $calendarDate->format('Y-m-d');
-		$initDayNum = (int)(new DateTimeImmutable($initIsoDay))->format('j');
-		$initEntries = $calendarEntries[$initDayNum] ?? [];
-		$appointmentShown = false;
-		$initEntries = array_values(array_filter($initEntries, static function (array $entry) use (&$appointmentShown): bool {
-			if (($entry['type'] ?? '') !== 'appointment') return true;
-			if ($appointmentShown) return false;
-			$appointmentShown = true;
-			return true;
-		}));
-		$initEntries = array_slice($initEntries, 0, 3);
-		$initLabelDate = new DateTimeImmutable($initIsoDay);
-		$initLabel = $initLabelDate->format('l, F j, Y');
-		$isInitToday = $initIsoDay === $todayStr;
 		?>
 
-		<div class="sk-cal-wrap" data-sk-calendar data-sk-calendar-detail="dashboard-calendar-events" data-sk-calendar-default="<?php echo nutritionist_e($defaultCalendarDay ?? ''); ?>">
+		<div class="sk-cal-wrap" data-sk-calendar>
 			<?php echo nutritionist_render_calendar_grid($calendarDate, $calendarEntries, $today); ?>
 		</div>
 
-		<div class="sk-cal-detail" id="dashboard-calendar-events" data-calendar-detail>
-			<div class="sk-cal-detail-head">
-				<div>
-					<div class="sk-cal-detail-title" data-calendar-detail-title>
-						<?php echo nutritionist_e($initLabel); ?>
-						<?php if ($isInitToday): ?>
-							<span class="sk-cal-detail-today">Today</span>
-						<?php endif; ?>
-					</div>
-					<div class="sk-cal-detail-sub" data-calendar-detail-sub>
-						<?php echo count($initEntries); ?> event<?php echo count($initEntries) !== 1 ? 's' : ''; ?>
-					</div>
+		<div id="cal-detail-panel" class="sk-cal-detail-panel"></div>
+
+		<div class="sk-cal-detail-legend" style="margin-top:12px;">
+			<?php foreach (nutritionist_calendar_legend() as $legendItem): ?>
+				<div class="sk-cal-detail-legend-item">
+					<span class="sk-cal-detail-legend-dot" style="background:<?php echo nutritionist_e($legendItem['color']); ?>;"></span>
+					<?php echo nutritionist_e($legendItem['label']); ?>
 				</div>
-			</div>
-			<div class="sk-cal-event-list is-compact" data-calendar-detail-list>
-				<?php if ($initEntries === []): ?>
-					<div class="sk-cal-detail-empty" data-calendar-detail-empty>
-						No events on this day. Click another date to see its schedule.
-					</div>
-				<?php else: ?>
-					<?php foreach ($initEntries as $te):
-						$teTime = $te['time'] ?? null;
-						$teLabel = nutritionist_calendar_label((string)$te['type']);
-						$teColor = (string)($te['color'] ?? nutritionist_calendar_color((string)$te['type']));
-						$teStatus = (string)($te['status'] ?? '');
-						$hasStatus = in_array($teStatus, ['overdue', 'cancelled', 'completed'], true);
-						$teLoc = (string)($te['location'] ?? '');
-						$teId = isset($te['id']) ? (int)$te['id'] : 0;
-					?>
-					<div class="sk-cal-event" data-entry-type="<?php echo nutritionist_e((string)$te['type']); ?>">
-						<div class="sk-cal-event-head">
-							<span class="sk-cal-event-dot" style="background:<?php echo nutritionist_e($teColor); ?>;"></span>
-							<span class="sk-cal-event-type"><?php echo nutritionist_e($teLabel); ?></span>
-							<?php if ($hasStatus): ?>
-								<span class="sk-cal-event-status is-<?php echo nutritionist_e($teStatus); ?>"><?php echo nutritionist_e(ucfirst($teStatus)); ?></span>
-							<?php endif; ?>
-						</div>
-						<div class="sk-cal-event-body">
-							<?php if ($teTime !== null): ?>
-								<div class="sk-cal-event-time"><?php echo nutritionist_e($teTime); ?></div>
-							<?php endif; ?>
-							<div class="sk-cal-event-title"><?php echo nutritionist_e((string)$te['title']); ?></div>
-							<?php if ($teLoc !== ''): ?>
-								<div class="sk-cal-event-loc">
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
-									<span><?php echo nutritionist_e($teLoc); ?></span>
-								</div>
-							<?php endif; ?>
-						</div>
-						<?php if ($teId > 0): ?>
-							<a class="sk-cal-event-action" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_form.php?id=' . $teId)); ?>">Open →</a>
-						<?php endif; ?>
-					</div>
-					<?php endforeach; ?>
-				<?php endif; ?>
-			</div>
-
-			<div class="sk-cal-detail-legend">
-				<?php foreach (nutritionist_calendar_legend() as $legendItem): ?>
-					<div class="sk-cal-detail-legend-item">
-						<span class="sk-cal-detail-legend-dot" style="background:<?php echo nutritionist_e($legendItem['color']); ?>;"></span>
-						<?php echo nutritionist_e($legendItem['label']); ?>
-					</div>
-				<?php endforeach; ?>
-			</div>
-
-			<a class="sk-cal-detail-link" data-calendar-detail-link href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?from=' . $initIsoDay . '&to=' . $initIsoDay)); ?>">View full calendar →</a>
+			<?php endforeach; ?>
 		</div>
+
 	</article>
 </section>
 
@@ -1011,87 +905,56 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<?php endif; ?>
 			</div>
 
-			<!-- Recent Measurements (with pagination) -->
-			<div class="nutritionist-bottom-col">
-				<div class="nutritionist-toolbar" style="margin-bottom:10px;">
-					<h2 class="admin-section-title" style="margin:0;">Recent Measurements</h2>
-					<a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>" class="admin-mini" style="font-weight:600;">View all →</a>
-				</div>
-				<table class="nutritionist-table" style="font-size:0.82rem;">
-					<thead>
-						<tr>
-							<th>Child</th>
-							<th>Date</th>
-							<th>Weight</th>
-							<th>Height</th>
-							<th>Status</th>
-						</tr>
-					</thead>
-					<tbody>
-						<?php foreach ($recentMeasurements as $m): ?>
-						<tr>
-							<td style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($m['first_name'] . ' ' . $m['last_name']); ?></td>
-							<td><?php echo nutritionist_e(date('M d', strtotime($m['measurement_date']))); ?></td>
-							<td><?php echo nutritionist_e(number_format((float)($m['weight_kg'] ?? 0), 1) . ' kg'); ?></td>
-							<td><?php echo nutritionist_e(number_format((float)($m['height_cm'] ?? 0), 1) . ' cm'); ?></td>
-							<td>
-								<?php
-								$rowPills = combinedStatusPills($m['wfa_status'] ?? null, $m['hfa_status'] ?? null, $m['wfh_status'] ?? null);
-								if (empty($rowPills)) {
-									echo '<span class="admin-pill is-success" style="font-size:0.72rem;padding:2px 6px;">N</span>';
-								} else {
-									echo '<div style="display:flex;gap:4px;flex-wrap:wrap;">';
-									foreach ($rowPills as $pill) {
-										$lvl = match($pill['level']) { 'severe' => 'is-danger', 'refer' => 'is-info', default => 'is-warn' };
-										echo '<span class="admin-pill ' . $lvl . '" style="font-size:0.72rem;padding:2px 6px;">' . nutritionist_e($pill['label']) . '</span>';
-									}
-									echo '</div>';
-								}
-								?>
-							</td>
-						</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-
-				<?php
-				// Pagination controls — keep the query string for the current month
-				$paginationBase = app_url('/nutritionist/dashboard.php');
-				$baseParams = $_GET;
-				unset($baseParams['rmp']);
-				$buildPageLink = static function (int $p) use ($paginationBase, $baseParams): string {
-					$params = $baseParams;
-					if ($p > 1) $params['rmp'] = $p;
-					return nutritionist_e($paginationBase . (empty($params) ? '' : '?' . http_build_query($params))) . '#recent-measurements';
-				};
-				?>
-				<?php if ($recentTotalPages > 1): ?>
-				<div class="nutritionist-pagination" style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;">
-					<div class="admin-mini" style="color:var(--admin-muted);">
-						Showing <?php echo ($recentOffset + 1); ?>–<?php echo min($recentOffset + $recentPageSize, $recentTotal); ?> of <?php echo (int)$recentTotal; ?>
-					</div>
-					<div style="display:flex;gap:4px;">
-						<?php if ($recentPage > 1): ?>
-							<a class="admin-btn-secondary nutritionist-page-btn" href="<?php echo $buildPageLink($recentPage - 1); ?>" style="min-height:26px;padding:0 8px;line-height:24px;font-size:11px;">‹ Prev</a>
-						<?php else: ?>
-							<span class="admin-btn-secondary nutritionist-page-btn is-disabled" style="min-height:26px;padding:0 8px;line-height:24px;font-size:11px;opacity:.4;pointer-events:none;">‹ Prev</span>
-						<?php endif; ?>
-						<?php for ($p = 1; $p <= $recentTotalPages; $p++): ?>
-							<?php if ($p === $recentPage): ?>
-								<span class="nutritionist-page-btn is-active" style="min-width:26px;height:26px;line-height:24px;font-size:11px;padding:0 6px;border-radius:6px;background:var(--admin-primary);color:#fff;font-weight:700;display:inline-flex;align-items:center;justify-content:center;"><?php echo $p; ?></span>
-							<?php else: ?>
-								<a class="admin-btn-secondary nutritionist-page-btn" href="<?php echo $buildPageLink($p); ?>" style="min-width:26px;height:26px;line-height:24px;font-size:11px;padding:0 6px;"><?php echo $p; ?></a>
-							<?php endif; ?>
-						<?php endfor; ?>
-						<?php if ($recentPage < $recentTotalPages): ?>
-							<a class="admin-btn-secondary nutritionist-page-btn" href="<?php echo $buildPageLink($recentPage + 1); ?>" style="min-height:26px;padding:0 8px;line-height:24px;font-size:11px;">Next ›</a>
-						<?php else: ?>
-							<span class="admin-btn-secondary nutritionist-page-btn is-disabled" style="min-height:26px;padding:0 8px;line-height:24px;font-size:11px;opacity:.4;pointer-events:none;">Next ›</span>
-						<?php endif; ?>
-					</div>
-				</div>
-				<?php endif; ?>
+		<!-- Recent Measurements -->
+		<div class="nutritionist-bottom-col">
+			<div class="nutritionist-toolbar" style="margin-bottom:10px;">
+				<h2 class="admin-section-title" style="margin:0;">Recent Measurements</h2>
+				<a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>" class="admin-mini" style="font-weight:600;">View all &rarr;</a>
 			</div>
+
+			<table class="nutritionist-table measurements-table">
+				<thead>
+					<tr>
+						<th>Code</th>
+						<th>Full name of child</th>
+						<th>Date</th>
+						<th>Weight</th>
+						<th>Height</th>
+						<th style="text-align:center;">WFA</th>
+						<th style="text-align:center;">HFA</th>
+						<th style="text-align:center;">WFH</th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ($recentMeasurements as $m):
+						$fullName = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
+						$wfaClass = $m['wfa_status'] !== null ? nutritionist_status_class($m['wfa_status']) : 'is-muted';
+						$hfaClass = $m['hfa_status'] !== null ? nutritionist_status_class($m['hfa_status']) : 'is-muted';
+						$wfhClass = $m['wfh_status'] !== null ? nutritionist_status_class($m['wfh_status']) : 'is-muted';
+						$wfaDisplay = !empty($m['wfa_status']) ? $m['wfa_status'] : '—';
+						$hfaDisplay = !empty($m['hfa_status']) ? $m['hfa_status'] : '—';
+						$wfhDisplay = !empty($m['wfh_status']) ? $m['wfh_status'] : '—';
+					?>
+					<tr>
+						<td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($m['child_code'] ?? ''); ?></td>
+						<td>
+							<div class="child-name-cell">
+								<span class="avatar" style="background:<?php echo nutritionist_e(admin_avatar_color($fullName)); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+								<div class="text">
+									<div class="name"><?php echo nutritionist_e($fullName); ?></div>
+								</div>
+							</div>
+						</td>
+						<td><?php echo nutritionist_e(date('M d', strtotime($m['measurement_date']))); ?></td>
+						<td><?php echo nutritionist_e(number_format((float)($m['weight_kg'] ?? 0), 1) . ' kg'); ?></td>
+						<td><?php echo nutritionist_e(number_format((float)($m['height_cm'] ?? 0), 1) . ' cm'); ?></td>
+						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $wfaClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($wfaDisplay); ?></span></td>
+						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $hfaClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($hfaDisplay); ?></span></td>
+						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $wfhClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($wfhDisplay); ?></span></td>
+					</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
 		</div>
 	</article>
 </section>

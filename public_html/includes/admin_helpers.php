@@ -137,13 +137,14 @@ function admin_grouped_nav_items(): array
                 ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php'), 'icon' => 'barangays'],
             ],
         ],
-        [
-            'label' => 'Monitoring',
-            'items' => [
-                ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php'), 'icon' => 'audit_logs'],
-                ['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php'), 'icon' => 'sensors'],
-            ],
-        ],
+		[
+			'label' => 'Monitoring',
+			'items' => [
+				['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php'), 'icon' => 'audit_logs'],
+				['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php'), 'icon' => 'sensors'],
+				['key' => 'auto_archive', 'label' => 'Auto-Archive', 'href' => app_url('/admin/auto_archive.php'), 'icon' => 'calendar'],
+			],
+		],
         [
             'label' => 'Configuration',
             'items' => [
