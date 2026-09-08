@@ -65,19 +65,70 @@ function pdf_table_header(TCPDF $pdf, array $columns, array $widths, string $fil
 	$pdf->SetFont('helvetica', '', 7);
 }
 
-function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = false, array $aligns = []): void {
-	if ($isAlt) {
-		$pdf->SetFillColor(240, 248, 244);
-	} else {
-		$pdf->SetFillColor(255, 255, 255);
-	}
+function pdf_status_fill(string $code): ?array {
+	$map = [
+		'Normal' => [213, 245, 227],
+		'MUW'    => [254, 249, 231],
+		'SUW'    => [250, 219, 216],
+		'MSt'    => [254, 249, 231],
+		'SSt'    => [250, 219, 216],
+		'MW'     => [254, 249, 231],
+		'SW'     => [250, 219, 216],
+		'OW'     => [253, 235, 208],
+		'Ob'     => [253, 235, 208],
+		'Tall'   => [211, 228, 253],
+	];
+	return $map[$code] ?? null;
+}
 
+function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = false, array $aligns = [], array $cellFills = []): void {
+	$altR = $isAlt ? 240 : 255;
+	$altG = $isAlt ? 248 : 255;
+	$altB = $isAlt ? 244 : 255;
 	$maxH = 5;
 	for ($i = 0; $i < count($values); $i++) {
+		if (isset($cellFills[$i])) {
+			$f = $cellFills[$i];
+			$pdf->SetFillColor($f[0], $f[1], $f[2]);
+		} else {
+			$pdf->SetFillColor($altR, $altG, $altB);
+		}
 		$align = $aligns[$i] ?? 'L';
 		$pdf->Cell($widths[$i], $maxH, (string)$values[$i], 1, 0, $align, true);
 	}
 	$pdf->Ln();
+}
+
+function pdf_two_level_header(TCPDF $pdf, array $widths): void {
+	$r = hexdec('10');
+	$g = hexdec('6E');
+	$b = hexdec('4F');
+	$pdf->SetFillColor($r, $g, $b);
+	$pdf->SetTextColor(255, 255, 255);
+	$pdf->SetFont('helvetica', 'B', 7);
+
+	$rowH = 5;
+	$totalH = $rowH * 2;
+
+	$pdf->Cell($widths[0], $totalH, 'Classification', 1, 0, 'C', true);
+
+	$f1kW = 0;
+	for ($i = 1; $i <= 4; $i++) { $f1kW += $widths[$i]; }
+	$pdf->Cell($f1kW, $rowH, '0-23 Months (F1K)', 1, 0, 'C', true);
+
+	$allW = 0;
+	for ($i = 5; $i <= 8; $i++) { $allW += $widths[$i]; }
+	$pdf->Cell($allW, $rowH, '0-59 Months', 1, 1, 'C', true);
+
+	$pdf->SetX($pdf->GetX() + $widths[0]);
+	$subHeaders = ['Boys', 'Girls', 'Total', 'Prev', 'Boys', 'Girls', 'Total', 'Prev'];
+	for ($i = 0; $i < count($subHeaders); $i++) {
+		$pdf->Cell($widths[$i + 1], $rowH, $subHeaders[$i], 1, 0, 'C', true);
+	}
+	$pdf->Ln();
+
+	$pdf->SetTextColor(0, 0, 0);
+	$pdf->SetFont('helvetica', '', 7);
 }
 
 function pdf_totals_row(TCPDF $pdf, string $label, int $count, array $widths): void {
@@ -245,12 +296,29 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 			(string)($row['wfh_status'] ?? ''),
 		];
 
+		$wfaCode = (string)($row['wfa_status'] ?? '');
+		$hfaCode = (string)($row['hfa_status'] ?? '');
+		$wfhCode = (string)($row['wfh_status'] ?? '');
+		$cellFills = [];
+		$wfaFill = pdf_status_fill($wfaCode);
+		$hfaFill = pdf_status_fill($hfaCode);
+		$wfhFill = pdf_status_fill($wfhCode);
+		if ($wfaFill) {
+			$cellFills[8] = $wfaFill;
+		}
+		if ($hfaFill) {
+			$cellFills[9] = $hfaFill;
+		}
+		if ($wfhFill) {
+			$cellFills[10] = $wfhFill;
+		}
+
 		if ($showCategory) {
 			$catCodes = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
 			$values[] = followup_category_label(implode('+', $catCodes)) ?: '';
 		}
 
-		pdf_data_row($pdf, $values, $widths, $i % 2 === 0);
+		pdf_data_row($pdf, $values, $widths, $i % 2 === 0, [], $cellFills);
 		$count++;
 	}
 
@@ -305,6 +373,12 @@ function pdf_generate_form1a(array $f): TCPDF {
 		}
 
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
+		$wfhCode = (string)($row['wfh_status'] ?? '');
+		$cellFills = [];
+		$wfhFill = pdf_status_fill($wfhCode);
+		if ($wfhFill) {
+			$cellFills[12] = $wfhFill;
+		}
 		pdf_data_row($pdf, [
 			(string)($row['child_code'] ?? ''),
 			(string)($row['address'] ?? ''),
@@ -318,9 +392,9 @@ function pdf_generate_form1a(array $f): TCPDF {
 			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
 			(int)$row['age_months'],
 			(int)$row['age_days'],
-			(string)($row['wfh_status'] ?? ''),
+			$wfhCode,
 			!empty($row['has_disability']) ? 'YES' : 'NO',
-		], $widths, $i % 2 === 0, array_fill(0, count($cols), 'C'));
+		], $widths, $i % 2 === 0, array_fill(0, count($cols), 'C'), $cellFills);
 	}
 
 	for ($blankRow = 0; $blankRow < 5; $blankRow++) {
@@ -388,6 +462,24 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 		if ($wfaStatus === 'Refer to WFL/H') {
 			$wfaStatus = 'Use WFL/H column';
 		}
+		$hfaStatus = (string)($row['hfa_status'] ?? '');
+		$wfhStatus = (string)($row['wfh_status'] ?? '');
+
+		$cellFills = [];
+		$wfaFill = pdf_status_fill($wfaStatus);
+		$hfaFill = pdf_status_fill($hfaStatus);
+		$wfhFill = pdf_status_fill($wfhStatus);
+		if ($wfaFill) {
+			$cellFills[12] = $wfaFill;
+		} elseif ($wfaStatus === 'Use WFL/H column') {
+			$cellFills[12] = [220, 220, 220];
+		}
+		if ($hfaFill) {
+			$cellFills[13] = $hfaFill;
+		}
+		if ($wfhFill) {
+			$cellFills[14] = $wfhFill;
+		}
 
 		pdf_data_row($pdf, [
 			(string)($row['child_code'] ?? ''),
@@ -403,10 +495,10 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 			(int)$row['age_months'],
 			(int)$row['age_days'],
 			$wfaStatus,
-			(string)($row['hfa_status'] ?? ''),
-			(string)($row['wfh_status'] ?? ''),
+			$hfaStatus,
+			$wfhStatus,
 			!empty($row['has_disability']) ? 'YES' : 'NO',
-		], $widths, $index % 2 === 0, array_fill(0, count($columns), 'C'));
+		], $widths, $index % 2 === 0, array_fill(0, count($columns), 'C'), $cellFills);
 	}
 
 	pdf_totals_row($pdf, 'TOTAL NUMBER OF CHILDREN:', count($rows), $widths);
@@ -427,6 +519,7 @@ function pdf_generate_form1b(array $f): TCPDF {
 
 	$summaryRows = admin_fetch_all(
 		"SELECT
+			c.id, c.parent_id,
 			c.first_name, c.last_name, c.birthdate, c.sex, c.is_ip, c.has_disability,
 			m.wfa_status, m.hfa_status, m.wfh_status,
 			m.height_cm, m.weight_kg
@@ -442,19 +535,37 @@ function pdf_generate_form1b(array $f): TCPDF {
 
 	$ageGroups = ['0-5' => [0, 5], '6-11' => [6, 11], '12-23' => [12, 23], '24-35' => [24, 35], '36-47' => [36, 47], '48-59' => [48, 59]];
 	$statusGroups = [
-		'WFA' => ['Normal' => 'Normal', 'MUW' => 'Underweight', 'SUW' => 'Severe Underweight', 'Refer to WFL/H' => 'Referred to WFL/H'],
-		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'Stunted / MSt', 'SSt' => 'Severely Stunted / SSt'],
-		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'Overweight', 'Ob' => 'Obese', 'MW' => 'Wasted / MAM', 'SW' => 'Wasted / SAM'],
+		'WFA' => ['Normal' => 'Normal', 'Ob' => 'Ob', 'OW' => 'OW', 'MUW' => 'MUW', 'SUW' => 'SUW'],
+		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'MSt', 'SSt' => 'SSt'],
+		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'OW', 'Ob' => 'Ob', 'MW' => 'MW/MAM', 'SW' => 'SW/SAM'],
 	];
 	$summary = [];
 	foreach ($statusGroups as $axis => $statuses) {
 		foreach ($statuses as $code => $label) {
-			$summary[$axis][$code] = ['Boys' => 0, 'Girls' => 0, 'Total' => 0, 'ages' => array_fill_keys(array_keys($ageGroups), 0), 'ip_boys' => 0, 'ip_girls' => 0];
+			$summary[$axis][$code] = [
+				'Boys' => 0, 'Girls' => 0, 'Total' => 0,
+				'ages' => array_fill_keys(array_keys($ageGroups), 0),
+				'age_sex' => array_fill_keys(array_keys($ageGroups), ['Boys' => 0, 'Girls' => 0]),
+				'ip_boys' => 0, 'ip_girls' => 0,
+			];
 		}
 	}
 	$totalAssessed = 0;
+	$f1kTotal = 0;
 	$disabilityCount = 0;
 	$ipCount = 0;
+	$wsChildren59 = [];
+	$wsChildren2459 = [];
+	$owObChildren59 = [];
+	$wsChildren23 = [];
+	$ageCount029 = 0;
+	$ageCount3059 = 0;
+	$ageCount2459 = 0;
+	$mcIds59 = [];
+	$mcWsIds59 = [];
+	$mcOwObIds59 = [];
+	$mcIds23 = [];
+	$mcWsIds23 = [];
 	$anchor = $f['anchor_date'];
 	foreach ($summaryRows as $row) {
 		try {
@@ -468,6 +579,9 @@ function pdf_generate_form1b(array $f): TCPDF {
 			continue;
 		}
 		$totalAssessed++;
+		if ($ageMonths <= 23) {
+			$f1kTotal++;
+		}
 		$sex = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';
 		$ageGroup = null;
 		foreach ($ageGroups as $group => [$min, $max]) {
@@ -481,6 +595,7 @@ function pdf_generate_form1b(array $f): TCPDF {
 				$summary[$axis][$code][$sex]++;
 				$summary[$axis][$code]['Total']++;
 				$summary[$axis][$code]['ages'][$ageGroup]++;
+				$summary[$axis][$code]['age_sex'][$ageGroup][$sex]++;
 				if (!empty($row['is_ip'])) {
 					$summary[$axis][$code]['ip_' . strtolower($sex)]++;
 				}
@@ -491,6 +606,22 @@ function pdf_generate_form1b(array $f): TCPDF {
 		}
 		if (!empty($row['is_ip'])) {
 			$ipCount++;
+		}
+		$childId = (int)$row['id'];
+		$parentId = (int)$row['parent_id'];
+		$isWs = in_array($row['wfh_status'], ['MW', 'SW'], true) || in_array($row['hfa_status'], ['MSt', 'SSt'], true);
+		$isOwOb = in_array($row['wfh_status'], ['OW', 'Ob'], true);
+		$mcIds59[$parentId] = true;
+		if ($isWs) { $wsChildren59[$childId] = true; $mcWsIds59[$parentId] = true; }
+		if ($isOwOb) { $owObChildren59[$childId] = true; $mcOwObIds59[$parentId] = true; }
+		if ($ageMonths >= 24 && $ageMonths <= 59) {
+			$ageCount2459++;
+			if ($isWs) { $wsChildren2459[$childId] = true; }
+		}
+		if ($ageMonths <= 29) { $ageCount029++; } else { $ageCount3059++; }
+		if ($ageMonths <= 23) {
+			$mcIds23[$parentId] = true;
+			if ($isWs) { $wsChildren23[$childId] = true; $mcWsIds23[$parentId] = true; }
 		}
 	}
 
@@ -506,37 +637,134 @@ function pdf_generate_form1b(array $f): TCPDF {
 	$pdf->Cell(65, 5, 'Children with disability:', 0, 0); $pdf->Cell(70, 5, (string)$disabilityCount, 0, 1);
 	$pdf->Ln(3);
 
-	$cols = ['Classification', 'Boys', 'Girls', 'Total', '0-5', '6-11', '12-23', '24-35', '36-47', '48-59', 'Birth-5 Total', 'Birth-5 %', '0-23 Total', '0-23 %', 'IP Boys', 'IP Girls', 'IP Total'];
-	$widths = [34, 9, 9, 9, 9, 9, 9, 9, 9, 9, 14, 12, 14, 12, 9, 9, 9];
+	$wLabel = 24;
+	$wAgeSub = 10;
+	$wSumSub = 12;
+	$wIPSub = 6;
+	$wAgeGroup = 3 * $wAgeSub;
+	$wSummary = 2 * $wSumSub;
+	$wIP = 3 * $wIPSub;
+
+	$ageGroupLabels = ['0-5', '6-11', '12-23', '24-35', '36-47', '48-59'];
+	$subHeaders = ['Boys', 'Girls', 'Total'];
+
 	$pdf->SetFont('helvetica', 'B', 8);
 	$pdf->Cell(0, 6, 'NUTRITIONAL STATUS CONSOLIDATION TABLE', 0, 1);
-	pdf_table_header($pdf, $cols, $widths);
+
+	$darkFill = [16, 110, 79];
+	$pdf->SetFillColor($darkFill[0], $darkFill[1], $darkFill[2]);
+	$pdf->SetTextColor(255, 255, 255);
+	$y1 = $pdf->GetY();
+	$x = $pdf->GetX();
+
+	$pdf->SetFont('helvetica', 'B', 6);
+	$hTop = 10;
+	$pdf->Cell($wLabel, $hTop, "ACRONYMS &\nABBREVIATIONS", 1, 0, 'C', true);
+	$pdf->SetFont('helvetica', '', 6);
+	foreach ($ageGroupLabels as $gl) {
+		$pdf->Cell($wAgeGroup, $hTop, $gl . " Months", 1, 0, 'C', true);
+	}
+	$pdf->SetFont('helvetica', 'B', 5);
+	$pdf->Cell($wSummary, $hTop, "Birth to 5 Years\n(0-59 Months)", 1, 0, 'C', true);
+	$pdf->Cell($wSummary, $hTop, "F1K\n(0-23 Months)", 1, 0, 'C', true);
+	$pdf->Cell($wIP, $hTop, "# IP\nChildren", 1, 0, 'C', true);
+	$pdf->Ln();
+
+	$pdf->SetFont('helvetica', 'B', 6);
+	$hSub = 6;
+	$pdf->Cell($wLabel, $hSub, '', 1, 0, 'C', true);
+	for ($g = 0; $g < 6; $g++) {
+		foreach ($subHeaders as $sh) {
+			$pdf->Cell($wAgeSub, $hSub, $sh, 1, 0, 'C', true);
+		}
+	}
+	foreach (['Total', 'Prev'] as $sh) {
+		$pdf->Cell($wSumSub, $hSub, $sh, 1, 0, 'C', true);
+	}
+	foreach (['Total', 'Prev'] as $sh) {
+		$pdf->Cell($wSumSub, $hSub, $sh, 1, 0, 'C', true);
+	}
+	foreach (['Boys', 'Girls', 'Total'] as $sh) {
+		$pdf->Cell($wIPSub, $hSub, $sh, 1, 0, 'C', true);
+	}
+	$pdf->Ln();
+
+	$pdf->SetTextColor(0, 0, 0);
+	$pdf->SetFont('helvetica', '', 5);
+	$rowH = 5;
 	$rowIndex = 0;
+
+	$owMessage = 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.';
+
 	foreach ($summary as $axis => $summaryTable) {
 		foreach ($summaryTable as $code => $counts) {
-			$birthToFive = $counts['Total'];
+			$label = $axis . ' - ' . $statusGroups[$axis][$code];
+
+			if ($axis === 'WFA' && ($code === 'Ob' || $code === 'OW')) {
+				if ($code === 'OW') {
+					$totalWidth = $wLabel + (6 * $wAgeGroup) + (2 * $wSummary) + $wIP;
+					$pdf->SetFillColor(240, 248, 244);
+					$pdf->SetFont('helvetica', 'I', 5);
+					$pdf->MultiCell($totalWidth, $rowH, $owMessage, 1, 'C', true);
+					$pdf->SetFont('helvetica', '', 5);
+					$rowIndex++;
+				}
+				continue;
+			}
+
 			$zeroToTwentyThree = array_sum(array_slice($counts['ages'], 0, 3));
 			$ipTotal = $counts['ip_boys'] + $counts['ip_girls'];
-			$values = [$axis . ' - ' . $statusGroups[$axis][$code], $counts['Boys'], $counts['Girls'], $counts['Total']];
-			foreach (array_keys($ageGroups) as $group) {
+
+			$values = [$label];
+			foreach ($ageGroupLabels as $group) {
+				$values[] = $counts['age_sex'][$group]['Boys'];
+				$values[] = $counts['age_sex'][$group]['Girls'];
 				$values[] = $counts['ages'][$group];
 			}
-			$values[] = $birthToFive;
-			$values[] = $totalAssessed > 0 ? number_format(($birthToFive / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $counts['Total'];
+			$values[] = $totalAssessed > 0 ? number_format(($counts['Total'] / $totalAssessed) * 100, 1) . '%' : '0.0%';
 			$values[] = $zeroToTwentyThree;
-			$values[] = $totalAssessed > 0 ? number_format(($zeroToTwentyThree / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $f1kTotal > 0 ? number_format(($zeroToTwentyThree / $f1kTotal) * 100, 1) . '%' : '0.0%';
 			$values[] = $counts['ip_boys'];
 			$values[] = $counts['ip_girls'];
 			$values[] = $ipTotal;
-			pdf_data_row($pdf, $values, $widths, $rowIndex % 2 === 0, array_merge(['L'], array_fill(0, 16, 'C')));
+
+			$widths = array_merge([$wLabel], array_fill(0, 18, $wAgeSub), array_fill(0, 2, $wSumSub), array_fill(0, 2, $wSumSub), array_fill(0, 3, $wIPSub));
+			$aligns = array_merge(['L'], array_fill(0, 25, 'C'));
+
+			if ($rowIndex % 2 === 0) {
+				$pdf->SetFillColor(240, 248, 244);
+			} else {
+				$pdf->SetFillColor(255, 255, 255);
+			}
+			for ($i = 0; $i < count($values); $i++) {
+				$align = $aligns[$i] ?? 'L';
+				$pdf->Cell($widths[$i], $rowH, (string)$values[$i], 1, 0, $align, true);
+			}
+			$pdf->Ln();
 			$rowIndex++;
 		}
 	}
 
-	$pdf->SetFont('helvetica', 'B', 9);
-	$pdf->Cell(0, 6, 'Required nutrition and data-quality summaries', 0, 1);
-	$pdf->SetFont('helvetica', '', 8);
-	$qualityRowsSource = admin_fetch_all(
+	$sumChildren = [
+		'ws59' => count($wsChildren59),
+		'ws2459' => count($wsChildren2459),
+		'owOb59' => count($owObChildren59),
+		'total23' => $f1kTotal,
+		'ws23' => count($wsChildren23),
+		'age029' => $ageCount029,
+		'age3059' => $ageCount3059,
+		'age2459' => $ageCount2459,
+	];
+	$sumMC = [
+		'total59' => count($mcIds59),
+		'ws59' => count($mcWsIds59),
+		'owOb59' => count($mcOwObIds59),
+		'total23' => count($mcIds23),
+		'ws23' => count($mcWsIds23),
+	];
+
+	$qualitySource = admin_fetch_all(
 		"SELECT c.first_name, c.last_name, c.birthdate, c.sex, c.local_area_id,
 			p.name AS parent_name, p.address AS parent_address,
 			m.height_cm, m.weight_kg
@@ -551,53 +779,73 @@ function pdf_generate_form1b(array $f): TCPDF {
 		array_merge($f['scope_params'], $f['barangay_filter_params'])
 	);
 	$duplicateKeys = [];
-	$missingInformation = 0;
-	$noParentAddress = 0;
-	$noSex = 0;
-	$olderThan59 = 0;
-	$heightWithoutWeight = 0;
-	$weightWithoutHeight = 0;
-	foreach ($qualityRowsSource as $qualityRow) {
-		$key = strtolower(trim((string)$qualityRow['first_name'] . '|' . (string)$qualityRow['last_name'] . '|' . (string)$qualityRow['birthdate']));
+	$missingInfo = $noParentAddr = $noSex = $noDob = $older59 = $htNoWt = $wtNoHt = 0;
+	foreach ($qualitySource as $qr) {
+		$key = strtolower(trim((string)$qr['first_name'] . '|' . (string)$qr['last_name'] . '|' . (string)$qr['birthdate']));
 		$duplicateKeys[$key] = ($duplicateKeys[$key] ?? 0) + 1;
-		if (trim((string)$qualityRow['first_name']) === '' || trim((string)$qualityRow['last_name']) === '' || trim((string)$qualityRow['birthdate']) === '') {
-			$missingInformation++;
-		}
-		if (trim((string)$qualityRow['parent_name']) === '' || (int)($qualityRow['local_area_id'] ?? 0) === 0 && trim((string)$qualityRow['parent_address']) === '') {
-			$noParentAddress++;
-		}
-		if (trim((string)$qualityRow['sex']) === '') {
-			$noSex++;
-		}
+		if (trim((string)$qr['first_name']) === '' || trim((string)$qr['last_name']) === '' || trim((string)$qr['birthdate']) === '') { $missingInfo++; }
+		if (trim((string)$qr['parent_name']) === '' || ((int)($qr['local_area_id'] ?? 0) === 0 && trim((string)$qr['parent_address']) === '')) { $noParentAddr++; }
+		if (trim((string)$qr['sex']) === '') { $noSex++; }
 		try {
-			$qualityAge = (new DateTimeImmutable((string)$qualityRow['birthdate']))->diff($anchor);
-			if (($qualityAge->y * 12) + $qualityAge->m > 59) {
-				$olderThan59++;
-			}
-		} catch (Exception) {
-			$missingInformation++;
-		}
-		if ($qualityRow['height_cm'] !== null && $qualityRow['weight_kg'] === null) {
-			$heightWithoutWeight++;
-		}
-		if ($qualityRow['weight_kg'] !== null && $qualityRow['height_cm'] === null) {
-			$weightWithoutHeight++;
-		}
+			$qAge = (new DateTimeImmutable((string)$qr['birthdate']))->diff($anchor);
+			if (($qAge->y * 12) + $qAge->m > 59) { $older59++; }
+		} catch (Exception) { $noDob++; }
+		if ($qr['height_cm'] !== null && $qr['weight_kg'] === null) { $htNoWt++; }
+		if ($qr['weight_kg'] !== null && $qr['height_cm'] === null) { $wtNoHt++; }
 	}
-	$repeatedChildren = count(array_filter($duplicateKeys, static fn($count) => $count > 1));
-	$qualityRows = [
-		['Total children assessed', $totalAssessed],
-		['Children with names and birthdate repeated', $repeatedChildren],
-		['Children with missing information', $missingInformation],
-		['Children with no parent/address', $noParentAddress],
-		['Children with no sex data', $noSex],
-		['Children older than 59 months', $olderThan59],
-		['Children with length/height but no weight', $heightWithoutWeight],
-		['Children with weight but no length/height', $weightWithoutHeight],
+	$repeatedChildren = count(array_filter($duplicateKeys, static fn($c) => $c > 1));
+
+	$pdf->Ln(3);
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell(0, 6, 'SUMMARY', 0, 1);
+
+	$sFill = [16, 110, 79];
+	$pdf->SetFillColor($sFill[0], $sFill[1], $sFill[2]);
+	$pdf->SetTextColor(255, 255, 255);
+	$pdf->SetFont('helvetica', 'B', 6);
+
+	$scW = [80, 12, 80, 12, 72, 6];
+	$pdf->Cell($scW[0], 6, 'Summary of Children covered by e-OPT Plus', 1, 0, 'C', true);
+	$pdf->Cell($scW[1], 6, '', 1, 0, 'C', true);
+	$pdf->Cell($scW[2], 6, 'Mothers/Caregivers Summary', 1, 0, 'C', true);
+	$pdf->Cell($scW[3], 6, '', 1, 0, 'C', true);
+	$pdf->Cell($scW[4], 6, 'Data Inaccuracy', 1, 0, 'C', true);
+	$pdf->Cell($scW[5], 6, '', 1, 1, 'C', true);
+
+	$pdf->SetTextColor(0, 0, 0);
+	$pdf->SetFont('helvetica', '', 5.5);
+	$sRowH = 5;
+
+	$summaryData = [
+		['# Children 0-59 mos. Wasted/Stunted', $sumChildren['ws59'], 'Total Number of M/Cs 0-59 mos. old', $sumMC['total59'], '# Children with names and birthdate repeated', $repeatedChildren],
+		['# Children 24-59 mos. Wasted/Stunted', $sumChildren['ws2459'], '# M/Cs of 0-59 mos. affected by W/S', $sumMC['ws59'], '# Children with missing information', $missingInfo],
+		['# Children 0-59 mos. Overweight/Obese', $sumChildren['owOb59'], '# M/Cs of 0-59 mos. Overweight/Obese', $sumMC['owOb59'], '# Children with no parent/address', $noParentAddr],
+		['Total Children 0-23 mos.', $sumChildren['total23'], 'Total M/Cs 0-23 mos.', $sumMC['total23'], '# Children with no sex', $noSex],
+		['# Children 0-23 mos. Wasted/Stunted', $sumChildren['ws23'], '# M/Cs 0-23 mos. affected by W/S', $sumMC['ws23'], '# Children with no DOB', $noDob],
+		['Children 0-29 mos.', $sumChildren['age029'], '', '', '# Children >59 mos.', $older59],
+		['Children 30-59 mos.', $sumChildren['age3059'], '', '', '# Length/height no weight', $htNoWt],
+		['Children 24-59 mos.', $sumChildren['age2459'], '', '', '# Weight no ht/length', $wtNoHt],
 	];
-	foreach ($qualityRows as [$label, $value]) {
-		$pdf->Cell(115, 5, $label, 1, 0, 'L');
-		$pdf->Cell(25, 5, (string)$value, 1, 1, 'C');
+
+	foreach ($summaryData as $si => $sd) {
+		if ($si % 2 === 0) {
+			$pdf->SetFillColor(240, 248, 244);
+		} else {
+			$pdf->SetFillColor(255, 255, 255);
+		}
+		$pdf->Cell($scW[0], $sRowH, $sd[0], 1, 0, 'L', true);
+		$pdf->SetFont('helvetica', 'B', 5.5);
+		$pdf->Cell($scW[1], $sRowH, (string)$sd[1], 1, 0, 'C', true);
+		$pdf->SetFont('helvetica', '', 5.5);
+		$pdf->Cell($scW[2], $sRowH, $sd[2], 1, 0, 'L', true);
+		$pdf->SetFont('helvetica', 'B', 5.5);
+		$pdf->Cell($scW[3], $sRowH, (string)$sd[3], 1, 0, 'C', true);
+		$pdf->SetFont('helvetica', '', 5.5);
+		$pdf->Cell($scW[4], $sRowH, $sd[4], 1, 0, 'L', true);
+		$pdf->SetFont('helvetica', 'B', 5.5);
+		$pdf->Cell($scW[5], $sRowH, (string)$sd[5], 1, 0, 'C', true);
+		$pdf->SetFont('helvetica', '', 5.5);
+		$pdf->Ln();
 	}
 
 	pdf_signature_block($pdf);
@@ -668,31 +916,70 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 		}
 	}
 
-	$pdf->SetFont('helvetica', 'B', 8);
-	$pdf->Cell(0, 5, 'Year: ' . $f['year'] . '    Barangay: ' . $f['barangay_name'] . '    Municipality/City: City of San Fernando    Province: Pampanga    PSGC: Not configured', 0, 1, 'C');
-	foreach ($summary as $axis => $statuses) {
+	$axisConfig = [
+		'WFA' => [
+			'title' => '3. WEIGHT FOR AGE',
+			'order' => ['Normal', 'MUW', 'SUW'],
+			'message' => 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.',
+		],
+		'HFA' => [
+			'title' => '4. HEIGHT FOR AGE',
+			'order' => ['Normal', 'Tall', 'MSt', 'SSt'],
+			'message' => null,
+		],
+		'WFL/H' => [
+			'title' => '5. WEIGHT FOR LENGTH/HEIGHT',
+			'order' => ['Normal', 'OW', 'Ob', 'MW', 'SW'],
+			'message' => null,
+		],
+	];
+	$widths = [50, 18, 18, 18, 20, 18, 18, 18, 20];
+
+	foreach ($axisConfig as $axis => $cfg) {
 		$pdf->SetFont('helvetica', 'B', 9);
-		$pdf->Cell(0, 6, $axis === 'WFL/H' ? 'WEIGHT FOR LENGTH/HEIGHT' : ($axis === 'HFA' ? 'HEIGHT / LENGTH FOR AGE' : 'WEIGHT FOR AGE'), 0, 1);
-		$columns = ['Classification', 'Boys', 'Girls', 'Total', 'Prev', 'Boys', 'Girls', 'Total', 'Prev'];
-		$widths = [50, 18, 18, 18, 20, 18, 18, 18, 20];
-		pdf_table_header($pdf, $columns, $widths);
+		$pdf->Cell(0, 6, $cfg['title'], 0, 1);
+		$lineY = $pdf->GetY() + 1;
+		$xLeft = $pdf->GetX();
+		$pdf->Line($xLeft, $lineY, $pdf->GetPageWidth() - $xLeft, $lineY);
+		$pdf->Ln(3);
+
+		pdf_two_level_header($pdf, $widths);
+
 		$i = 0;
-		foreach ($statuses as $code => $label) {
+		foreach ($cfg['order'] as $code) {
+			$label = $definitions[$axis][$code] ?? $code;
+
 			$earlyTotal = $summary[$axis][$code]['0-23']['Boys'] + $summary[$axis][$code]['0-23']['Girls'];
 			$allTotal = $summary[$axis][$code]['0-59']['Boys'] + $summary[$axis][$code]['0-59']['Girls'];
-			$earlyPrev = $denominators[$axis]['0-23'] > 0 ? number_format(($earlyTotal / $denominators[$axis]['0-23']) * 100, 2) . '%' : '0.00%';
-			$allPrev = $denominators[$axis]['0-59'] > 0 ? number_format(($allTotal / $denominators[$axis]['0-59']) * 100, 2) . '%' : '0.00%';
-			$statusLabel = $definitions[$axis][$code] ?? $code;
-			pdf_data_row($pdf, [$statusLabel, $summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev, $summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
+			$earlyPrev = $denominators[$axis]['0-23'] > 0 ? number_format(($earlyTotal / $denominators[$axis]['0-23']) * 100, 1) . '%' : '0.0%';
+			$allPrev = $denominators[$axis]['0-59'] > 0 ? number_format(($allTotal / $denominators[$axis]['0-59']) * 100, 1) . '%' : '0.0%';
+			pdf_data_row($pdf, [
+				$label,
+				$summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev,
+				$summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev,
+			], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
 			$i++;
+
+			if ($code === 'Normal' && !empty($cfg['message'])) {
+				$totalW = 0;
+				for ($c = 0; $c < count($widths); $c++) { $totalW += $widths[$c]; }
+				$pdf->SetFillColor(240, 248, 244);
+				$pdf->SetFont('helvetica', 'I', 7);
+				$pdf->MultiCell($totalW, 5, $cfg['message'], 1, 'C', true);
+				$pdf->SetFont('helvetica', '', 7);
+				$i++;
+			}
 		}
-		$pdf->Ln(3);
+		$pdf->Ln(4);
 	}
-	$pdf->SetFont('helvetica', 'B', 8);
-	$pdf->Cell(105, 8, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN 0-59 MONTHS AFFECTED BY UNDERNUTRITION', 1, 0, 'C');
-	$pdf->Cell(25, 8, (string)count($affectedParents['0-59']), 1, 0, 'C');
-	$pdf->Cell(105, 8, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN 0-23 MONTHS AFFECTED BY UNDERNUTRITION', 1, 0, 'C');
-	$pdf->Cell(25, 8, (string)count($affectedParents['0-23']), 1, 1, 'C');
+
+	$pdf->Ln(2);
+	$pdf->SetFont('helvetica', 'B', 7);
+	$pdf->Cell(0, 7, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-59 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 1, 'L');
+	$pdf->Cell(20, 7, (string)count($affectedParents['0-59']), 1, 1, 'C');
+	$pdf->Ln(2);
+	$pdf->Cell(0, 7, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-23 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 1, 'L');
+	$pdf->Cell(20, 7, (string)count($affectedParents['0-23']), 1, 1, 'C');
 	pdf_signature_block($pdf);
 
 	return $pdf;
@@ -762,7 +1049,22 @@ function pdf_generate_form1c(array $f): TCPDF {
 		$wfa = $row['wfa_status'] === 'Refer to WFL/H' ? 'Use the WFL/H column' : (string)($row['wfa_status'] ?? 'Normal');
 		$hfa = (string)($row['hfa_status'] ?? 'Normal');
 		$wfh = (string)($row['wfh_status'] ?? 'Normal');
-		pdf_data_row($pdf, [(string)($row['address'] ?? ''), (string)($row['parent_name'] ?? ''), $fullName, (string)$row['sex'], (int)$row['age_months'], $wfa, $hfa, $wfh], $widths, $index % 2 === 0, ['L', 'L', 'L', 'C', 'C', 'C', 'C', 'C']);
+		$cellFills = [];
+		$wfaFill = pdf_status_fill($wfa);
+		$hfaFill = pdf_status_fill($hfa);
+		$wfhFill = pdf_status_fill($wfh);
+		if ($wfaFill) {
+			$cellFills[5] = $wfaFill;
+		} elseif ($wfa === 'Use the WFL/H column') {
+			$cellFills[5] = [220, 220, 220];
+		}
+		if ($hfaFill) {
+			$cellFills[6] = $hfaFill;
+		}
+		if ($wfhFill) {
+			$cellFills[7] = $wfhFill;
+		}
+		pdf_data_row($pdf, [(string)($row['address'] ?? ''), (string)($row['parent_name'] ?? ''), $fullName, (string)$row['sex'], (int)$row['age_months'], $wfa, $hfa, $wfh], $widths, $index % 2 === 0, ['L', 'L', 'L', 'C', 'C', 'C', 'C', 'C'], $cellFills);
 	}
 	pdf_signature_block($pdf);
 
@@ -880,94 +1182,246 @@ function pdf_generate_prevalence(array $f): TCPDF {
 	return $pdf;
 }
 
+function dqc_log_factorial(int $n): float {
+	if ($n <= 1) {
+		return 0.0;
+	}
+	$s = 0.0;
+	for ($i = 2; $i <= $n; $i++) {
+		$s += log($i);
+	}
+	return $s;
+}
+
+function dqc_poisson_cdf(int $k, float $lambda): float {
+	if ($lambda <= 0) {
+		return 0.0;
+	}
+	$sum = 0.0;
+	for ($i = 0; $i <= $k; $i++) {
+		$sum += exp(-$lambda + $i * log($lambda) - dqc_log_factorial($i));
+	}
+	return $sum;
+}
+
+function dqc_section_table(TCPDF $pdf, string $title, array $rows, array $headerRgb, array $bodyRgb, float $totalWidth = 170): void {
+	$letterW = 10;
+	$descW = $totalWidth - $letterW - 20;
+	$valueW = 20;
+
+	$pdf->SetFillColor($headerRgb[0], $headerRgb[1], $headerRgb[2]);
+	$pdf->SetFont('helvetica', 'B', 8);
+	$pdf->Cell($totalWidth, 7, $title, 1, 1, 'C', true);
+
+	$pdf->SetFont('helvetica', '', 7);
+	$pdf->SetTextColor(0, 0, 0);
+	foreach ($rows as [$letter, $desc, $value]) {
+		$pdf->SetFillColor($bodyRgb[0], $bodyRgb[1], $bodyRgb[2]);
+		$pdf->Cell($letterW, 6, $letter, 1, 0, 'C', true);
+		$pdf->Cell($descW, 6, $desc, 1, 0, 'L', true);
+		$pdf->Cell($valueW, 6, $value, 1, 1, 'R', true);
+	}
+}
+
 function pdf_generate_dqc(array $f): TCPDF {
-	$pdf = pdf_base('Data Quality Check Report');
+	$pdf = pdf_base('Data Quality Check Report', 'Landscape');
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
 	$pdf->SetFont('helvetica', 'B', 11);
-	$pdf->Cell(0, 7, 'DATA QUALITY CHECK (DQC) SUMMARY', 0, 1, 'C');
+	$pdf->Cell(0, 7, 'DATA QUALITY CHECK (DQC)', 0, 1, 'C');
 	$pdf->Ln(2);
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
-	$totalRecords = admin_scalar(
-		"SELECT COUNT(*) FROM children c WHERE 1=1 {$f['barangay_filter_sql']}",
-		str_repeat('i', count($f['barangay_filter_params'])),
-		$f['barangay_filter_params']
+	$scopeSql = $f['scope'];
+	$scopeParams = $f['scope_params'];
+	$brgySql = $f['barangay_filter_sql'];
+	$brgyParams = $f['barangay_filter_params'];
+	$anchorParam = $f['anchor_param'];
+	$allParams = array_merge($scopeParams, $brgyParams);
+	$allTypes = str_repeat('i', count($allParams));
+
+	$totalChildren = admin_scalar(
+		"SELECT COUNT(*) FROM children c WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'i' . $allTypes, array_merge([$anchorParam], $allParams)
 	);
 
-	$completeRecords = admin_scalar(
+	$totalWithMeasurement = admin_scalar(
 		"SELECT COUNT(DISTINCT c.id) FROM children c
-		 INNER JOIN parents p ON p.id = c.parent_id
-		 INNER JOIN measurements m ON m.child_id = c.id
-		 WHERE c.sex IS NOT NULL AND c.birthdate IS NOT NULL
-		   AND c.first_name != '' AND c.last_name != ''
-		   AND p.name IS NOT NULL AND p.name != ''
-		   AND m.height_cm IS NOT NULL AND m.weight_kg IS NOT NULL
-		   AND {$f['scope']}{$f['barangay_filter_sql']}",
-		str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-		array_merge($f['scope_params'], $f['barangay_filter_params'])
+		 INNER JOIN measurements m ON m.child_id = c.id AND m.measurement_date <= ?
+		 WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
 	);
 
-	$dqIssues = [
-		['Repeated name and birthdate', count(admin_fetch_all(
-			"SELECT 1 FROM children c1 GROUP BY c1.first_name, c1.last_name, c1.birthdate HAVING COUNT(*) > 1", '', []
-		))],
-		['Missing sex', admin_scalar("SELECT COUNT(*) FROM children c WHERE c.sex IS NULL AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
-		['Missing date of birth', admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NULL AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
-		['No parent or address information', admin_scalar(
-			"SELECT COUNT(*) FROM children c LEFT JOIN parents p ON p.id = c.parent_id
-			 WHERE (p.id IS NULL OR p.name IS NULL OR p.name = '') AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
-		['Children older than 59 months', admin_scalar(
-			"SELECT COUNT(*) FROM children c WHERE c.birthdate IS NOT NULL
-			 AND TIMESTAMPDIFF(YEAR, c.birthdate, CURDATE()) > 4 AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
-		['Height recorded but no weight', admin_scalar(
-			"SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id
-			 WHERE m.height_cm IS NOT NULL AND m.weight_kg IS NULL AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
-		['Weight recorded but no height/length', admin_scalar(
-			"SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id
-			 WHERE m.weight_kg IS NOT NULL AND m.height_cm IS NULL AND {$f['scope']}{$f['barangay_filter_sql']}",
-			str_repeat('i', count($f['scope_params']) + count($f['barangay_filter_params'])),
-			array_merge($f['scope_params'], $f['barangay_filter_params']))],
+	$dqDuplicateGroups = count(admin_fetch_all(
+		"SELECT 1 FROM children c WHERE {$scopeSql}{$brgySql}
+		 AND c.first_name != '' AND c.last_name != '' AND c.birthdate IS NOT NULL
+		 GROUP BY c.first_name, c.last_name, c.birthdate HAVING COUNT(*) > 1",
+		$allTypes, $allParams
+	));
+
+	$dqHeightNoWeight = admin_scalar(
+		"SELECT COUNT(DISTINCT c.id) FROM children c
+		 INNER JOIN measurements m ON m.child_id = c.id AND m.measurement_date <= ?
+		 WHERE m.height_cm IS NOT NULL AND m.weight_kg IS NULL
+		 AND {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
+	);
+
+	$dqWeightNoHeight = admin_scalar(
+		"SELECT COUNT(DISTINCT c.id) FROM children c
+		 INNER JOIN measurements m ON m.child_id = c.id AND m.measurement_date <= ?
+		 WHERE m.weight_kg IS NOT NULL AND m.height_cm IS NULL
+		 AND {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
+	);
+
+	$dqMissingDob = admin_scalar(
+		"SELECT COUNT(*) FROM children c WHERE c.birthdate IS NULL
+		 AND {$scopeSql}{$brgySql}",
+		$allTypes, $allParams
+	);
+
+	$dqMissingSex = admin_scalar(
+		"SELECT COUNT(*) FROM children c WHERE c.sex IS NULL
+		 AND {$scopeSql}{$brgySql}",
+		$allTypes, $allParams
+	);
+
+	$dqNoParentAddress = admin_scalar(
+		"SELECT COUNT(*) FROM children c LEFT JOIN parents p ON p.id = c.parent_id
+		 WHERE (p.id IS NULL OR COALESCE(p.name, '') = '' OR (c.local_area_id IS NULL AND COALESCE(p.address, '') = ''))
+		 AND {$scopeSql}{$brgySql}",
+		$allTypes, $allParams
+	);
+
+	$pct = static function (int $num, int $den) use ($totalChildren, $totalWithMeasurement): string {
+		$d = $den > 0 ? $den : 1;
+		return number_format(($num / $d) * 100, 2) . '%';
+	};
+
+	$completenessRows = [
+		['A', '% Coverage (population of 0-59 months)', $pct($totalWithMeasurement, $totalChildren)],
+		['B', '% Children measured with duplicate cases', $pct($dqDuplicateGroups, $totalWithMeasurement)],
+		['C', '% Children with length/height but no weight', $pct($dqHeightNoWeight, $totalWithMeasurement)],
+		['D', '% Children with weight but no length/height', $pct($dqWeightNoHeight, $totalWithMeasurement)],
+		['E', '% Children with no date of birth data', $pct($dqMissingDob, $totalChildren)],
+		['F', '% Children with no sex data', $pct($dqMissingSex, $totalChildren)],
+		['G', '% Children with no name of parents/address', $pct($dqNoParentAddress, $totalChildren)],
 	];
 
-	$pdf->SetFont('helvetica', 'B', 9);
-	$pdf->Cell(0, 6, 'SUMMARY', 0, 1);
-	$pdf->Ln(1);
+	dqc_section_table($pdf, 'COMPLETENESS', $completenessRows, [232, 168, 124], [248, 215, 181]);
+	$pdf->Ln(5);
 
-	$pdf->SetFont('helvetica', '', 8);
-	$pdf->Cell(50, 5, 'Total records:', 0, 0);
-	$pdf->Cell(20, 5, (string)$totalRecords, 0, 1);
-	$pdf->Cell(50, 5, 'Complete records:', 0, 0);
-	$pdf->Cell(20, 5, (string)$completeRecords, 0, 1);
-	$pdf->Cell(50, 5, 'Records with issues:', 0, 0);
-	$pdf->Cell(20, 5, (string)($totalRecords - $completeRecords), 0, 1);
-	$pdf->Ln(4);
+	$measRows = admin_fetch_all(
+		"SELECT m.whz, m.is_flagged, m.weight_kg, m.height_cm
+		 FROM children c
+		 INNER JOIN measurements m ON m.id = (
+			SELECT m2.id FROM measurements m2
+			WHERE m2.child_id = c.id AND m2.measurement_date <= ?
+			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
+		 )
+		 WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
+	);
 
-	$cols = ['Data Quality Issue', 'Count', 'Severity'];
-	$widths = [100, 25, 25];
-	pdf_table_header($pdf, $cols, $widths);
+	$dqFlagged = 0;
+	$dqDigitNumerator = 0;
+	$dqDigitDenominator = 0;
+	$dqWhzValues = [];
+	$dqWhzBelowNeg2 = 0;
+	$dqValidWhzCount = 0;
 
-	$i = 0;
-	$totalIssues = 0;
-	foreach ($dqIssues as [$label, $count]) {
-		$severity = $count > 0 ? ($count > 5 ? 'High' : 'Medium') : 'OK';
-		pdf_data_row($pdf, [$label, $count, $severity], $widths, $i % 2 === 0, ['L', 'C', 'C']);
-		$totalIssues += $count;
-		$i++;
+	foreach ($measRows as $m) {
+		if (!empty($m['is_flagged'])) {
+			$dqFlagged++;
+		}
+
+		if ($m['weight_kg'] !== null) {
+			$dqDigitDenominator++;
+			$lastDigit = (int)round((float)$m['weight_kg'] * 10) % 10;
+			if ($lastDigit === 0 || $lastDigit === 5) {
+				$dqDigitNumerator++;
+			}
+		}
+		if ($m['height_cm'] !== null) {
+			$dqDigitDenominator++;
+			$lastDigit = (int)round((float)$m['height_cm'] * 10) % 10;
+			if ($lastDigit === 0 || $lastDigit === 5) {
+				$dqDigitNumerator++;
+			}
+		}
+
+		if ($m['whz'] !== null) {
+			$whzVal = (float)$m['whz'];
+			$dqWhzValues[] = $whzVal;
+			$dqValidWhzCount++;
+			if ($whzVal < -2) {
+				$dqWhzBelowNeg2++;
+			}
+		}
 	}
 
-	pdf_totals_row($pdf, 'TOTAL ISSUES:', $totalIssues, $widths);
+	$dqFlaggedPct = $pct($dqFlagged, count($measRows));
+	$dqDigitPref = $dqDigitDenominator > 0 ? number_format(($dqDigitNumerator / $dqDigitDenominator) * 100, 2) : '0.00';
+
+	$dqSkewness = 'N/A';
+	$dqKurtosis = 'N/A';
+	$dqWhzStdDev = 'N/A';
+	$dqPoissonP = 'N/A';
+
+	if ($dqValidWhzCount >= 10) {
+		$whzMean = array_sum($dqWhzValues) / $dqValidWhzCount;
+		$whzVariance = 0.0;
+		foreach ($dqWhzValues as $wv) {
+			$whzVariance += ($wv - $whzMean) * ($wv - $whzMean);
+		}
+		$whzVariance /= ($dqValidWhzCount - 1);
+		$whzStdDev = sqrt($whzVariance);
+		$dqWhzStdDev = number_format($whzStdDev, 2);
+
+		if ($whzStdDev > 0) {
+			$skewSum = 0.0;
+			$kurtSum = 0.0;
+			foreach ($dqWhzValues as $wv) {
+				$z = ($wv - $whzMean) / $whzStdDev;
+				$skewSum += $z * $z * $z;
+				$kurtSum += $z * $z * $z * $z;
+			}
+			$n = $dqValidWhzCount;
+			$dqSkewness = number_format(($n / (($n - 1) * ($n - 2))) * $skewSum, 2);
+			$dqKurtosis = number_format(
+				(($n * ($n + 1)) / (($n - 1) * ($n - 2) * ($n - 3))) * $kurtSum
+				- (3 * ($n - 1) * ($n - 1)) / (($n - 2) * ($n - 3)),
+				2
+			);
+		}
+
+		$lambda = $dqValidWhzCount * 0.0228;
+		if ($lambda > 0) {
+			$pVal = 1.0 - dqc_poisson_cdf($dqWhzBelowNeg2 - 1, $lambda);
+			$dqPoissonP = number_format(max(0, $pVal), 4);
+		}
+	}
+
+	$accuracyRows = [
+		['A', '% Children with flagged measurement based on z-scores', $dqFlaggedPct . '%'],
+		['B', 'Digit preference score for anthropometric data', $dqDigitPref . '%'],
+		['C', 'Skewness of weight-for-height/length z-score', $dqSkewness],
+		['D', 'Kurtosis of weight-for-height/length z-score', $dqKurtosis],
+		['E', 'Poisson distribution (p-value) for WL/H z (<-2)', $dqPoissonP],
+	];
+
+	dqc_section_table($pdf, 'ACCURACY', $accuracyRows, [157, 189, 228], [217, 229, 242]);
+	$pdf->Ln(5);
+
+	$reliabilityRows = [
+		['A', 'Standard deviation of weight-for-height/length z-score', $dqWhzStdDev],
+	];
+
+	dqc_section_table($pdf, 'RELIABILITY', $reliabilityRows, [240, 217, 140], [255, 242, 204]);
+
+	$pdf->Ln(8);
 	pdf_signature_block($pdf);
 
 	return $pdf;

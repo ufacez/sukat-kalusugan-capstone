@@ -71,6 +71,8 @@ $children = admin_fetch_all(
 		LIMIT 1
 	 )
 	 WHERE {$childrenScope}
+	   AND c.status = 'active'
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
 	 ORDER BY c.last_name ASC, c.first_name ASC",
 	str_repeat('i', count($childrenParams)),
 	$childrenParams
@@ -139,6 +141,8 @@ $measurements = admin_fetch_all(
 		GROUP BY child_id
 	 ) latest ON latest.latest_id = m.id
 	 WHERE {$measurementsScope}
+	   AND c.status = 'active'
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
 	 ORDER BY m.measurement_date DESC, m.id DESC",
 	str_repeat('i', count($measurementsParams)),
 	$measurementsParams

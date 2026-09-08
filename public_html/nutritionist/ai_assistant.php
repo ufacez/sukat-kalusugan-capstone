@@ -2,7 +2,7 @@
 /**
  * nutritionist/ai_assistant.php
  *
- * Dedicated AI Assistant page for nutritionists.
+ * Dedicated Kali AI page for nutritionists.
  * Two-panel layout: left sidebar (child list + details), right chat area.
  */
 
@@ -14,7 +14,7 @@ $user = nutritionist_require_access();
 $apiBase = app_url('/api/chatbot');
 
 nutritionist_layout_start(
-    'AI Assistant',
+    'Kali AI',
     '',
     'ai_assistant'
 );
@@ -68,7 +68,7 @@ nutritionist_layout_start(
     <main class="ai-chat">
         <div class="ai-chat-header">
             <div>
-                <div class="ai-chat-title" id="aiChatTitle">AI Assistant</div>
+                <div class="ai-chat-title" id="aiChatTitle">Kali AI</div>
                 <div class="ai-chat-subtitle" id="aiChatSubtitle">Select a child or ask a general question</div>
             </div>
             <div class="ai-chat-actions">
@@ -91,7 +91,7 @@ nutritionist_layout_start(
                 <div class="ai-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
                 </div>
-                <h3>Sukat Kalusugan AI</h3>
+                <h3>Kali AI</h3>
                 <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
                 <div class="ai-empty-suggestions">
                     <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>
@@ -301,7 +301,7 @@ nutritionist_layout_start(
             const child = state.children.find(c => c.id === childId);
             dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
             loadChildDetail(childId);
-            dom.chatTitle.textContent = child ? child.name : 'AI Assistant';
+            dom.chatTitle.textContent = child ? child.name : 'Kali AI';
             dom.chatSubtitle.textContent = child.child_code || '';
         }
 
@@ -407,12 +407,12 @@ nutritionist_layout_start(
             const child = state.children.find(c => c.id === state.selectedChildId);
             dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
             loadChildDetail(state.selectedChildId);
-            dom.chatTitle.textContent = child ? child.name : 'AI Assistant';
+            dom.chatTitle.textContent = child ? child.name : 'Kali AI';
             dom.chatSubtitle.textContent = child ? (child.child_code || '') : '';
         } else {
             dom.childPickerLabel.textContent = 'General nutrition assistant';
             dom.childDetail.style.display = 'none';
-            dom.chatTitle.textContent = 'AI Assistant';
+            dom.chatTitle.textContent = 'Kali AI';
             dom.chatSubtitle.textContent = 'Conversation history';
         }
 
@@ -611,7 +611,7 @@ nutritionist_layout_start(
         const el = document.createElement('div');
         el.className = 'ai-msg is-' + role;
         const avatar = role === 'assistant'
-            ? '<div class="ai-msg-avatar" aria-hidden="true">AI</div>'
+            ? '<div class="ai-msg-avatar" aria-hidden="true">Kali</div>'
             : '';
         const content = role === 'assistant' ? formatAssistantText(text) : esc(text).replace(/\n/g, '<br>');
         el.innerHTML = avatar + '<div class="ai-msg-bubble">' + content + '</div>';
@@ -679,14 +679,14 @@ nutritionist_layout_start(
     }
 
     function showGlobalEmpty() {
-        dom.chatTitle.textContent = 'AI Assistant';
+        dom.chatTitle.textContent = 'Kali AI';
         dom.chatSubtitle.textContent = 'Select a child or ask a general question';
         dom.messages.innerHTML = `
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
                 </div>
-                <h3>Sukat Kalusugan AI</h3>
+                <h3>Kali AI</h3>
                 <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
                 <div class="ai-empty-suggestions">
                     <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>

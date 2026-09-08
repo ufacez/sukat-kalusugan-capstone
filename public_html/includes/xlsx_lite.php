@@ -300,6 +300,12 @@ const XLSX_LITE_STYLES = [
 	'total'       => ['font' => 2, 'fill' => 2, 'border' => 1, 'align' => 'right'],
 	'total_label' => ['font' => 2, 'fill' => 2, 'border' => 1, 'align' => 'left'],
 	'note'        => ['font' => 3, 'fill' => 0, 'border' => 0, 'align' => 'left'],
+	'cell_green'  => ['font' => 0, 'fill' => 3, 'border' => 1, 'align' => 'center'],
+	'cell_orange' => ['font' => 0, 'fill' => 4, 'border' => 1, 'align' => 'center'],
+	'cell_yellow' => ['font' => 0, 'fill' => 5, 'border' => 1, 'align' => 'center'],
+	'cell_red'    => ['font' => 0, 'fill' => 6, 'border' => 1, 'align' => 'center'],
+	'cell_blue'   => ['font' => 0, 'fill' => 7, 'border' => 1, 'align' => 'center'],
+	'cell_gray'   => ['font' => 0, 'fill' => 8, 'border' => 1, 'align' => 'center'],
 ];
 
 /**
@@ -503,7 +509,13 @@ function xlsx_lite_styles_xml(): string
 	$fillsXml =
 		'<fill><patternFill patternType="none"/></fill>' .
 		'<fill><patternFill patternType="gray125"/></fill>' .
-		'<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>';
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFD5F5E3"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFFDEBD0"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFFEF9E7"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFFADBD8"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFD3E4FD"/><bgColor indexed="64"/></patternFill></fill>' .
+		'<fill><patternFill patternType="solid"><fgColor rgb="FFDCDCDC"/><bgColor indexed="64"/></patternFill></fill>';
 
 	$bordersXml =
 		'<border><left/><right/><top/><bottom/><diagonal/></border>' .
@@ -539,7 +551,7 @@ function xlsx_lite_styles_xml(): string
 	return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' .
 		'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' .
 		'<fonts count="4">' . $fontsXml . '</fonts>' .
-		'<fills count="3">' . $fillsXml . '</fills>' .
+		'<fills count="9">' . $fillsXml . '</fills>' .
 		'<borders count="2">' . $bordersXml . '</borders>' .
 		'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' .
 		'<cellXfs count="' . count(XLSX_LITE_STYLES) . '">' . $cellXfsXml . '</cellXfs>' .

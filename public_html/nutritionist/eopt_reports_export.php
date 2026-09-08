@@ -4,6 +4,19 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/followup_scheduler.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 
+$statusToStyle = [
+	'Normal' => 'cell_green', 'MUW' => 'cell_yellow', 'SUW' => 'cell_red',
+	'MSt' => 'cell_yellow', 'SSt' => 'cell_red',
+	'MW' => 'cell_yellow', 'SW' => 'cell_red',
+	'OW' => 'cell_orange', 'Ob' => 'cell_orange', 'Tall' => 'cell_blue',
+	'Use the WFL/H column' => 'cell_gray', 'Use WFL/H column' => 'cell_gray',
+];
+
+function xlsx_status_style(string $code): string {
+	global $statusToStyle;
+	return $statusToStyle[$code] ?? 'cell_center';
+}
+
 ob_start();
 
 $user = nutritionist_require_access();
@@ -366,7 +379,18 @@ if ($isForm1C) {
 	foreach ($form1cRows as $row) {
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
 		$wfa = $row['wfa_status'] === 'Refer to WFL/H' ? 'Use the WFL/H column' : (string)($row['wfa_status'] ?? 'Normal');
-		$addForm1cRow($form1cRowsOut, [(string)($row['address'] ?? ''), (string)($row['parent_name'] ?? ''), $fullName, (string)$row['sex'], (int)$row['age_months'], $wfa, (string)($row['hfa_status'] ?? 'Normal'), (string)($row['wfh_status'] ?? 'Normal')]);
+		$hfa = (string)($row['hfa_status'] ?? 'Normal');
+		$wfh = (string)($row['wfh_status'] ?? 'Normal');
+		$form1cRowsOut[] = [
+			['v' => (string)($row['address'] ?? ''), 's' => 'cell'],
+			['v' => (string)($row['parent_name'] ?? ''), 's' => 'cell'],
+			['v' => $fullName, 's' => 'cell'],
+			['v' => (string)$row['sex'], 's' => 'cell_center'],
+			['v' => (int)$row['age_months'], 's' => 'cell_center'],
+			['v' => $wfa, 's' => xlsx_status_style($wfa)],
+			['v' => $hfa, 's' => xlsx_status_style($hfa)],
+			['v' => $wfh, 's' => xlsx_status_style($wfh)],
+		];
 	}
 	$sheets[] = [
 		'name' => 'Form_1C',
@@ -378,7 +402,7 @@ if ($isForm1C) {
 
 if ($isForm1B) {
 	$form1bRows = admin_fetch_all(
-		"SELECT c.birthdate, c.sex, c.is_ip, c.has_disability, m.wfa_status, m.hfa_status, m.wfh_status
+		"SELECT c.id, c.parent_id, c.birthdate, c.sex, c.is_ip, c.has_disability, m.wfa_status, m.hfa_status, m.wfh_status
 		 FROM children c
 		 INNER JOIN measurements m ON m.id = (
 			SELECT m2.id FROM measurements m2
@@ -392,19 +416,37 @@ if ($isForm1B) {
 
 	$ageGroups = ['0-5' => [0, 5], '6-11' => [6, 11], '12-23' => [12, 23], '24-35' => [24, 35], '36-47' => [36, 47], '48-59' => [48, 59]];
 	$statusGroups = [
-		'WFA' => ['Normal' => 'Normal', 'MUW' => 'Underweight', 'SUW' => 'Severe Underweight', 'Refer to WFL/H' => 'Referred to WFL/H'],
-		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'Stunted / MSt', 'SSt' => 'Severely Stunted / SSt'],
-		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'Overweight', 'Ob' => 'Obese', 'MW' => 'Wasted / MAM', 'SW' => 'Wasted / SAM'],
+		'WFA' => ['Normal' => 'Normal', 'Ob' => 'Ob', 'OW' => 'OW', 'MUW' => 'MUW', 'SUW' => 'SUW'],
+		'HFA' => ['Normal' => 'Normal', 'Tall' => 'Tall', 'MSt' => 'MSt', 'SSt' => 'SSt'],
+		'WFL/H' => ['Normal' => 'Normal', 'OW' => 'OW', 'Ob' => 'Ob', 'MW' => 'MW/MAM', 'SW' => 'SW/SAM'],
 	];
 	$form1bSummary = [];
 	foreach ($statusGroups as $axis => $statuses) {
 		foreach ($statuses as $code => $_label) {
-			$form1bSummary[$axis][$code] = ['Boys' => 0, 'Girls' => 0, 'Total' => 0, 'ages' => array_fill_keys(array_keys($ageGroups), 0), 'ip_boys' => 0, 'ip_girls' => 0];
+			$form1bSummary[$axis][$code] = [
+				'Boys' => 0, 'Girls' => 0, 'Total' => 0,
+				'ages' => array_fill_keys(array_keys($ageGroups), 0),
+				'age_sex' => array_fill_keys(array_keys($ageGroups), ['Boys' => 0, 'Girls' => 0]),
+				'ip_boys' => 0, 'ip_girls' => 0,
+			];
 		}
 	}
 	$totalAssessed = 0;
+	$f1kTotal = 0;
 	$disabilityCount = 0;
 	$ipCount = 0;
+	$f1bWsChildren59 = [];
+	$f1bWsChildren2459 = [];
+	$f1bOwObChildren59 = [];
+	$f1bWsChildren23 = [];
+	$f1bAgeCount029 = 0;
+	$f1bAgeCount3059 = 0;
+	$f1bAgeCount2459 = 0;
+	$f1bMcIds59 = [];
+	$f1bMcWsIds59 = [];
+	$f1bMcOwObIds59 = [];
+	$f1bMcIds23 = [];
+	$f1bMcWsIds23 = [];
 	$anchor = $anchorDate;
 	foreach ($form1bRows as $row) {
 		try {
@@ -418,6 +460,9 @@ if ($isForm1B) {
 			continue;
 		}
 		$totalAssessed++;
+		if ($ageMonths <= 23) {
+			$f1kTotal++;
+		}
 		$sex = (string)$row['sex'] === 'Male' ? 'Boys' : 'Girls';
 		$ageGroup = '48-59';
 		foreach ($ageGroups as $group => [$min, $max]) {
@@ -431,6 +476,7 @@ if ($isForm1B) {
 				$form1bSummary[$axis][$code][$sex]++;
 				$form1bSummary[$axis][$code]['Total']++;
 				$form1bSummary[$axis][$code]['ages'][$ageGroup]++;
+				$form1bSummary[$axis][$code]['age_sex'][$ageGroup][$sex]++;
 				if (!empty($row['is_ip'])) {
 					$form1bSummary[$axis][$code]['ip_' . strtolower($sex)]++;
 				}
@@ -442,43 +488,110 @@ if ($isForm1B) {
 		if (!empty($row['is_ip'])) {
 			$ipCount++;
 		}
+		$childId = (int)$row['id'];
+		$parentId = (int)$row['parent_id'];
+		$isWs = in_array($row['wfh_status'], ['MW', 'SW'], true) || in_array($row['hfa_status'], ['MSt', 'SSt'], true);
+		$isOwOb = in_array($row['wfh_status'], ['OW', 'Ob'], true);
+		$f1bMcIds59[$parentId] = true;
+		if ($isWs) { $f1bWsChildren59[$childId] = true; $f1bMcWsIds59[$parentId] = true; }
+		if ($isOwOb) { $f1bOwObChildren59[$childId] = true; $f1bMcOwObIds59[$parentId] = true; }
+		if ($ageMonths >= 24 && $ageMonths <= 59) {
+			$f1bAgeCount2459++;
+			if ($isWs) { $f1bWsChildren2459[$childId] = true; }
+		}
+		if ($ageMonths <= 29) { $f1bAgeCount029++; } else { $f1bAgeCount3059++; }
+		if ($ageMonths <= 23) {
+			$f1bMcIds23[$parentId] = true;
+			if ($isWs) { $f1bWsChildren23[$childId] = true; $f1bMcWsIds23[$parentId] = true; }
+		}
 	}
 
 	$form1bOutput = [];
 	$addForm1bRow = static function (array &$output, array $values, string $style = 'default'): void {
 		$output[] = array_map(static fn($value) => ['v' => $value, 's' => $style], $values);
 	};
-	$addForm1bRow($form1bOutput, ['OPT PLUS FORM 1B: SUMMARY SHEET OF NUTRITIONAL STATUS', '', '', '', '', '', '', '', '', '', ''], 'title');
-	$addForm1bRow($form1bOutput, ['Barangay:', $barangayName, '', 'Municipality:', 'City of San Fernando', '', 'Province:', 'Pampanga', '', '', ''], 'label');
-	$addForm1bRow($form1bOutput, ['Reporting year:', $year, '', 'Period:', $periodLabel, '', 'Total assessed:', $totalAssessed, '', 'OPT Plus coverage:', $totalAssessed . ' assessed'], 'label');
-	$addForm1bRow($form1bOutput, ['IP children:', $ipCount, '', 'Children with disability:', $disabilityCount, '', 'Coverage:', '0-59 months', '', '', ''], 'label');
-	$addForm1bRow($form1bOutput, array_fill(0, 11, ''));
+	$addForm1bRow($form1bOutput, ['OPT PLUS FORM 1B: SUMMARY SHEET OF NUTRITIONAL STATUS', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], 'title');
+	$addForm1bRow($form1bOutput, ['Barangay:', $barangayName, '', 'Municipality:', 'City of San Fernando', '', 'Province:', 'Pampanga', '', 'Total assessed:', $totalAssessed, '', 'IP children:', $ipCount, '', 'Disability:', $disabilityCount, '', 'Coverage:', '0-59 months', '', '', '', '', '', ''], 'label');
+	$addForm1bRow($form1bOutput, array_fill(0, 26, ''));
 
-	$summaryHeaders = ['Classification', 'Boys', 'Girls', 'Total', '0-5', '6-11', '12-23', '24-35', '36-47', '48-59', 'Birth-5 Total', 'Birth-5 %', '0-23 Total', '0-23 %', 'IP Boys', 'IP Girls', 'IP Total'];
-	$addForm1bRow($form1bOutput, ['NUTRITIONAL STATUS CONSOLIDATION TABLE', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], 'label');
-	$addForm1bRow($form1bOutput, $summaryHeaders, 'header');
+	$ageGroupLabels = ['0-5', '6-11', '12-23', '24-35', '36-47', '48-59'];
+	$subHeaders = ['Boys', 'Girls', 'Total'];
+
+	$row1 = ['ACRONYMS & ABBREVIATIONS'];
+	foreach ($ageGroupLabels as $gl) {
+		$row1[] = $gl . ' Months';
+		for ($pad = 1; $pad < 3; $pad++) {
+			$row1[] = '';
+		}
+	}
+	$row1[] = 'Birth to 5 Years (0-59 Months)';
+	$row1[] = '';
+	$row1[] = 'F1K (0-23 Months)';
+	$row1[] = '';
+	$row1[] = '# IP Children';
+	$row1[] = '';
+	$row1[] = '';
+	$addForm1bRow($form1bOutput, $row1, 'header');
+
+	$row2 = [''];
+	foreach ($ageGroupLabels as $gl) {
+		foreach ($subHeaders as $sh) {
+			$row2[] = $sh;
+		}
+	}
+	$row2[] = 'Total';
+	$row2[] = 'Prev';
+	$row2[] = 'Total';
+	$row2[] = 'Prev';
+	$row2[] = 'Boys';
+	$row2[] = 'Girls';
+	$row2[] = 'Total';
+	$addForm1bRow($form1bOutput, $row2, 'header');
+
+	$owMessage = 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.';
+	$dataRowIndex = 0;
 	foreach ($form1bSummary as $axis => $summaryTable) {
 		foreach ($summaryTable as $code => $counts) {
-			$birthToFive = $counts['Total'];
+			$label = $axis . ' - ' . $statusGroups[$axis][$code];
+
+			if ($axis === 'WFA' && ($code === 'Ob' || $code === 'OW')) {
+				if ($code === 'OW') {
+					$msgRow = ['', $owMessage];
+					while (count($msgRow) < 26) {
+						$msgRow[] = '';
+					}
+					$addForm1bRow($form1bOutput, $msgRow, 'cell_center');
+					$dataRowIndex++;
+				}
+				continue;
+			}
+
 			$zeroToTwentyThree = array_sum(array_slice($counts['ages'], 0, 3));
 			$ipTotal = $counts['ip_boys'] + $counts['ip_girls'];
-			$values = [$axis . ' - ' . $statusGroups[$axis][$code], $counts['Boys'], $counts['Girls'], $counts['Total']];
-			foreach (array_keys($ageGroups) as $group) {
+			$values = [$label];
+			foreach ($ageGroupLabels as $group) {
+				$values[] = $counts['age_sex'][$group]['Boys'];
+				$values[] = $counts['age_sex'][$group]['Girls'];
 				$values[] = $counts['ages'][$group];
 			}
-			$values[] = $birthToFive;
-			$values[] = $totalAssessed > 0 ? number_format(($birthToFive / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $counts['Total'];
+			$values[] = $totalAssessed > 0 ? number_format(($counts['Total'] / $totalAssessed) * 100, 1) . '%' : '0.0%';
 			$values[] = $zeroToTwentyThree;
-			$values[] = $totalAssessed > 0 ? number_format(($zeroToTwentyThree / $totalAssessed) * 100, 2) . '%' : '0.00%';
+			$values[] = $f1kTotal > 0 ? number_format(($zeroToTwentyThree / $f1kTotal) * 100, 1) . '%' : '0.0%';
 			$values[] = $counts['ip_boys'];
 			$values[] = $counts['ip_girls'];
 			$values[] = $ipTotal;
 			$addForm1bRow($form1bOutput, $values);
+			$dataRowIndex++;
 		}
 	}
 
-	$addForm1bRow($form1bOutput, ['NUTRITION AND DATA-QUALITY SUMMARY', '', '', '', '', '', '', '', '', '', ''], 'label');
-	$qualityRowsSource = admin_fetch_all(
+	$addForm1bRow($form1bOutput, array_fill(0, 26, ''));
+	$addForm1bRow($form1bOutput, ['SUMMARY', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], 'label');
+	$addForm1bRow($form1bOutput, ['Summary of Children covered by e-OPT Plus', '', '', '', 'Mothers/Caregivers Summary', '', '', '', 'Data Inaccuracy', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], 'header');
+	$addForm1bRow($form1bOutput, ['', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '']);
+
+	$qualitySource = admin_fetch_all(
 		"SELECT c.first_name, c.last_name, c.birthdate, c.sex, c.local_area_id,
 			p.name AS parent_name, p.address AS parent_address, m.height_cm, m.weight_kg
 		 FROM children c
@@ -492,39 +605,113 @@ if ($isForm1B) {
 		$scopeParams
 	);
 	$duplicateKeys = [];
-	$missingInformation = $noParentAddress = $noSex = $olderThan59 = $heightWithoutWeight = $weightWithoutHeight = 0;
-	foreach ($qualityRowsSource as $qualityRow) {
-		$key = strtolower(trim((string)$qualityRow['first_name'] . '|' . (string)$qualityRow['last_name'] . '|' . (string)$qualityRow['birthdate']));
+	$missingInfo = $noParentAddr = $noSex = $noDob = $older59 = $htNoWt = $wtNoHt = 0;
+	foreach ($qualitySource as $qr) {
+		$key = strtolower(trim((string)$qr['first_name'] . '|' . (string)$qr['last_name'] . '|' . (string)$qr['birthdate']));
 		$duplicateKeys[$key] = ($duplicateKeys[$key] ?? 0) + 1;
-		if (trim((string)$qualityRow['first_name']) === '' || trim((string)$qualityRow['last_name']) === '' || trim((string)$qualityRow['birthdate']) === '') $missingInformation++;
-		if (trim((string)$qualityRow['parent_name']) === '' || ((int)($qualityRow['local_area_id'] ?? 0) === 0 && trim((string)$qualityRow['parent_address']) === '')) $noParentAddress++;
-		if (trim((string)$qualityRow['sex']) === '') $noSex++;
+		if (trim((string)$qr['first_name']) === '' || trim((string)$qr['last_name']) === '' || trim((string)$qr['birthdate']) === '') { $missingInfo++; }
+		if (trim((string)$qr['parent_name']) === '' || ((int)($qr['local_area_id'] ?? 0) === 0 && trim((string)$qr['parent_address']) === '')) { $noParentAddr++; }
+		if (trim((string)$qr['sex']) === '') { $noSex++; }
 		try {
-			$qualityAge = (new DateTimeImmutable((string)$qualityRow['birthdate']))->diff($anchor);
-			if (($qualityAge->y * 12) + $qualityAge->m > 59) $olderThan59++;
-		} catch (Exception) {
-			$missingInformation++;
-		}
-		if ($qualityRow['height_cm'] !== null && $qualityRow['weight_kg'] === null) $heightWithoutWeight++;
-		if ($qualityRow['weight_kg'] !== null && $qualityRow['height_cm'] === null) $weightWithoutHeight++;
+			$qAge = (new DateTimeImmutable((string)$qr['birthdate']))->diff($anchor);
+			if (($qAge->y * 12) + $qAge->m > 59) { $older59++; }
+		} catch (Exception) { $noDob++; }
+		if ($qr['height_cm'] !== null && $qr['weight_kg'] === null) { $htNoWt++; }
+		if ($qr['weight_kg'] !== null && $qr['height_cm'] === null) { $wtNoHt++; }
 	}
-	$repeatedChildren = count(array_filter($duplicateKeys, static fn($count) => $count > 1));
-	foreach ([
-		['Total children assessed', $totalAssessed],
-		['Children with names and birthdate repeated', $repeatedChildren],
-		['Children with missing information', $missingInformation],
-		['Children with no parent/address', $noParentAddress],
-		['Children with no sex data', $noSex],
-		['Children older than 59 months', $olderThan59],
-		['Children with length/height but no weight', $heightWithoutWeight],
-		['Children with weight but no length/height', $weightWithoutHeight],
-	] as [$label, $value]) {
-		$addForm1bRow($form1bOutput, [$label, $value, '', '', '', '', '', '', '', '', '']);
+	$repeatedChildren = count(array_filter($duplicateKeys, static fn($c) => $c > 1));
+
+	$f1bSumChildren = [
+		'ws59' => count($f1bWsChildren59),
+		'ws2459' => count($f1bWsChildren2459),
+		'owOb59' => count($f1bOwObChildren59),
+		'total23' => $f1kTotal,
+		'ws23' => count($f1bWsChildren23),
+		'age029' => $f1bAgeCount029,
+		'age3059' => $f1bAgeCount3059,
+		'age2459' => $f1bAgeCount2459,
+	];
+	$f1bSumMC = [
+		'total59' => count($f1bMcIds59),
+		'ws59' => count($f1bMcWsIds59),
+		'owOb59' => count($f1bMcOwObIds59),
+		'total23' => count($f1bMcIds23),
+		'ws23' => count($f1bMcWsIds23),
+	];
+
+	$summaryRows = [
+		['# Children 0-59 mos. Wasted/Stunted', $f1bSumChildren['ws59'], '', 'Total Number of M/Cs 0-59 mos. old', $f1bSumMC['total59'], '', '# Children with names and birthdate repeated', $repeatedChildren],
+		['# Children 24-59 mos. Wasted/Stunted', $f1bSumChildren['ws2459'], '', '# M/Cs of 0-59 mos. affected by W/S', $f1bSumMC['ws59'], '', '# Children with missing information', $missingInfo],
+		['# Children 0-59 mos. Overweight/Obese', $f1bSumChildren['owOb59'], '', '# M/Cs of 0-59 mos. Overweight/Obese', $f1bSumMC['owOb59'], '', '# Children with no parent/address', $noParentAddr],
+		['Total Children 0-23 mos.', $f1bSumChildren['total23'], '', 'Total M/Cs 0-23 mos.', $f1bSumMC['total23'], '', '# Children with no sex', $noSex],
+		['# Children 0-23 mos. Wasted/Stunted', $f1bSumChildren['ws23'], '', '# M/Cs 0-23 mos. affected by W/S', $f1bSumMC['ws23'], '', '# Children with no DOB', $noDob],
+		['Children 0-29 mos.', $f1bSumChildren['age029'], '', '', '', '', '# Children >59 mos.', $older59],
+		['Children 30-59 mos.', $f1bSumChildren['age3059'], '', '', '', '', '# Length/height no weight', $htNoWt],
+		['Children 24-59 mos.', $f1bSumChildren['age2459'], '', '', '', '', '# Weight no ht/length', $wtNoHt],
+	];
+	foreach ($summaryRows as $sr) {
+		$padded = $sr;
+		while (count($padded) < 26) { $padded[] = ''; }
+		$addForm1bRow($form1bOutput, $padded);
 	}
+
+	$form1bColCount = 26;
+	$form1bLastCol = '';
+	$ci = $form1bColCount;
+	while ($ci > 0) {
+		$ci--;
+		$form1bLastCol = chr(65 + ($ci % 26)) . $form1bLastCol;
+		$ci = intdiv($ci, 26);
+	}
+
+	$form1bTitleRow = 1;
+	$form1bHeaderRow1 = 3;
+	$form1bHeaderRow2 = 4;
+	$form1bFirstDataRow = 5;
+
+	$merges = [
+		"A{$form1bTitleRow}:{$form1bLastCol}{$form1bTitleRow}",
+		"A{$form1bHeaderRow1}:A{$form1bHeaderRow2}",
+	];
+
+	$colPos = 2;
+	foreach ($ageGroupLabels as $gl) {
+		$startCol = '';
+		$ci = $colPos;
+		while ($ci > 0) { $ci--; $startCol = chr(65 + ($ci % 26)) . $startCol; $ci = intdiv($ci, 26); }
+		$endCol = '';
+		$ci = $colPos + 2;
+		while ($ci > 0) { $ci--; $endCol = chr(65 + ($ci % 26)) . $endCol; $ci = intdiv($ci, 26); }
+		$merges[] = "{$startCol}{$form1bHeaderRow1}:{$endCol}{$form1bHeaderRow1}";
+		$colPos += 3;
+	}
+	for ($g = 0; $g < 2; $g++) {
+		$startCol = '';
+		$ci = $colPos;
+		while ($ci > 0) { $ci--; $startCol = chr(65 + ($ci % 26)) . $startCol; $ci = intdiv($ci, 26); }
+		$endCol = '';
+		$ci = $colPos + 1;
+		while ($ci > 0) { $ci--; $endCol = chr(65 + ($ci % 26)) . $endCol; $ci = intdiv($ci, 26); }
+		$merges[] = "{$startCol}{$form1bHeaderRow1}:{$endCol}{$form1bHeaderRow1}";
+		$colPos += 2;
+	}
+	$startCol = '';
+	$ci = $colPos;
+	while ($ci > 0) { $ci--; $startCol = chr(65 + ($ci % 26)) . $startCol; $ci = intdiv($ci, 26); }
+	$endCol = '';
+	$ci = $colPos + 2;
+	while ($ci > 0) { $ci--; $endCol = chr(65 + ($ci % 26)) . $endCol; $ci = intdiv($ci, 26); }
+	$merges[] = "{$startCol}{$form1bHeaderRow1}:{$endCol}{$form1bHeaderRow1}";
+
+	$msgRowNum = $form1bFirstDataRow + 2;
+	$merges[] = "B{$msgRowNum}:{$form1bLastCol}{$msgRowNum}";
+	$msgRowNum2 = $form1bFirstDataRow + 3;
+	$merges[] = "B{$msgRowNum2}:{$form1bLastCol}{$msgRowNum2}";
+
 	$sheets[] = [
 		'name' => 'Form_1B',
-		'widths' => [34, 10, 10, 10, 10, 10, 10, 10, 10, 10, 14, 12, 13, 12, 10, 10, 10],
-		'merges' => ['A1:Q1'],
+		'widths' => array_merge([22], array_fill(0, 18, 7), array_fill(0, 4, 9), array_fill(0, 3, 7)),
+		'merges' => $merges,
 		'rows' => $form1bOutput,
 	];
 }
@@ -609,9 +796,9 @@ if ($isNutStatus) {
 			['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 			['v' => (int)$row['age_months'], 's' => 'cell_num'],
 			['v' => (int)$row['age_days'], 's' => 'cell_num'],
-			['v' => $wfaStatus, 's' => 'cell_center'],
-			['v' => (string)($row['hfa_status'] ?? ''), 's' => 'cell_center'],
-			['v' => (string)($row['wfh_status'] ?? ''), 's' => 'cell_center'],
+			['v' => $wfaStatus, 's' => xlsx_status_style($wfaStatus)],
+			['v' => (string)($row['hfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['hfa_status'] ?? ''))],
+			['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
 			['v' => !empty($row['has_disability']) ? 'YES' : 'NO', 's' => 'cell_center'],
 		];
 	}
@@ -809,7 +996,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 				['v' => (int)$row['age_months'], 's' => 'cell_num'],
 				['v' => (int)$row['age_days'], 's' => 'cell_num'],
-				['v' => (string)($row['wfh_status'] ?? ''), 's' => 'cell_center'],
+				['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
 				['v' => !empty($row['has_disability']) ? 'YES' : 'NO', 's' => 'cell_center'],
 			]
 			: [
@@ -821,9 +1008,9 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => (string)$row['birthdate'], 's' => 'cell_center'],
 				['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 				['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
-				['v' => (string)($row['wfa_status'] ?? ''), 's' => 'cell_center'],
-				['v' => (string)($row['hfa_status'] ?? ''), 's' => 'cell_center'],
-				['v' => (string)($row['wfh_status'] ?? ''), 's' => 'cell_center'],
+				['v' => (string)($row['wfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfa_status'] ?? ''))],
+				['v' => (string)($row['hfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['hfa_status'] ?? ''))],
+				['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
 			];
 
 		$outRows[] = $dataRow;

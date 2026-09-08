@@ -2,7 +2,7 @@
 /**
  * chatbot_helper.php
  *
- * Growth Result Assistant for Sukat Kalusugan.
+ * Kali AI for Sukat Kalusugan.
  *
  * The assistant is intentionally restricted to explaining
  * measurements already calculated by the system.
@@ -24,7 +24,7 @@ require_once __DIR__ . '/chatbot_knowledge_base.php';
 function chatbot_system_prompt(): string
 {
     return <<<PROMPT
-You are the "Growth Result Assistant" inside Sukat Kalusugan, a child
+You are the "Kali AI" inside Sukat Kalusugan, a child
 nutrition monitoring system used by barangay nutritionists and parents
 in the Philippines.
 
@@ -1313,7 +1313,7 @@ function chatbot_nutritionist_assistant_prompt(): string
     $knowledge = chatbot_compile_knowledge_base();
 
     return <<<PROMPT
-You are the Sukat Kalusugan AI Assistant for barangay nutritionists in the Philippines.
+You are the Kali AI for barangay nutritionists in the Philippines.
 
 CORE RULES:
 - ONLY use data from MEASUREMENT DATA. Never invent child data.

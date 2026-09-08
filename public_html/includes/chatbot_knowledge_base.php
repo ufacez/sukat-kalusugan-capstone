@@ -2,7 +2,7 @@
 /**
  * includes/chatbot_knowledge_base.php
  *
- * Condensed nutrition knowledge base for the AI Assistant.
+ * Condensed nutrition knowledge base for Kali AI.
  * Keep short — embedded in every system prompt alongside child data & history.
  */
 

@@ -717,23 +717,28 @@ if ($weightKg !== null && $heightCm !== null) {
     $wfaStatus = $metrics['wfa_status'];
     $hfaStatus = $metrics['hfa_status'];
     $wfhStatus = $metrics['wfh_status'];
+    $isFlagged = $metrics['is_flagged'] ? 1 : 0;
+    $flagReason = $metrics['flag_reason'];
 } elseif ($weightKg !== null && $heightCm === null) {
     // Weight only — compute WAZ / WFA only; no HAZ / WHZ
     $waz = calculate_waz($weightKg, $ageDays, $childSex);
     $wfaStatus = classify_wfa_status($waz);
     $status = $wfaStatus;
+    $flag = flag_measurement($waz, 0.0, 0.0);
+    $isFlagged = $flag['is_flagged'] ? 1 : 0;
+    $flagReason = $flag['reason'];
 } elseif ($heightCm !== null && $weightKg === null) {
     // Height only — compute HAZ / HFA only; no WAZ / WHZ
     $haz = calculate_haz($heightCm, $ageDays, $childSex);
     $hfaStatus = classify_hfa_status($haz);
     $status = $hfaStatus;
+    $flag = flag_measurement(0.0, $haz, 0.0);
+    $isFlagged = $flag['is_flagged'] ? 1 : 0;
+    $flagReason = $flag['reason'];
+} else {
+    $isFlagged = 0;
+    $flagReason = null;
 }
-
-$isFlagged =
-    $metrics['is_flagged'] ? 1 : 0;
-
-$flagReason =
-    $metrics['flag_reason'];
 
 /*
 |--------------------------------------------------------------------------

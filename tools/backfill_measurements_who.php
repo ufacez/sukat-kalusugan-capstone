@@ -7,8 +7,9 @@
  * row in `measurements` using the CURRENT reference tables and calculator,
  * then updates rows whose stored values differ.
  *
- * Age semantics: uses the stored per-measurement `age_months` snapshot (the
- * schema's documented contract) -- birthdates are NOT re-evaluated.
+ * Age semantics: prefers the stored per-measurement `age_days` snapshot for
+ * accurate WHO z-score computation. Falls back to `age_months * 30` when
+ * `age_days` is missing.
  *
  * Run AFTER applying db/20260826_who_reference_rebuild_expanded.sql.
  *
@@ -33,7 +34,7 @@ $conn = get_db_connection();
 
 $res = mysqli_query(
 	$conn,
-	'SELECT m.id, m.height_cm, m.weight_kg, m.age_months,
+	'SELECT m.id, m.height_cm, m.weight_kg, m.age_months, m.age_days,
 	        m.waz, m.haz, m.whz,
 	        m.nutritional_status, m.wfa_status, m.hfa_status, m.wfh_status,
 	        m.is_flagged, m.flag_reason,
@@ -57,7 +58,10 @@ while ($row = mysqli_fetch_assoc($res)) {
 
 	$height = (float)$row['height_cm'];
 	$weight = (float)$row['weight_kg'];
-	$age = (int)$row['age_months'];
+	$age = (int)($row['age_days'] ?? 0);
+	if ($age <= 0) {
+		$age = (int)$row['age_months'] * 30;
+	}
 	$sex = (string)$row['sex'];
 
 	if ($height <= 0 || $weight <= 0 || $age < 0) {

@@ -670,13 +670,25 @@ nutritionist_layout_start(
                 '✓ Saved for <strong>' + escapeHtml(json.data.child_name) + '</strong> (' + escapeHtml(json.data.child_code) + '). <a href="' + escapeHtml(form.getAttribute('data-redirect')) + '" style="color:var(--admin-primary);text-decoration:underline;margin-left:6px;">View measurements →</a>',
                 false
             );
+            weightInput.value = '';
+            heightInput.value = '';
+            whoResult.style.display = 'none';
+            flagBanner.classList.remove('is-visible');
+            saveBtn.innerHTML = 'Saved!';
+            setTimeout(function () {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalLabel;
+            }, 2000);
+            return;
         })
         .catch(function (err) {
             setFeedback('⚠ ' + escapeHtml(err.message || 'Could not save the measurement.'), true);
         })
         .finally(function () {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = originalLabel;
+            if (saveBtn.innerHTML !== 'Saved!') {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = originalLabel;
+            }
         });
     });
 

@@ -163,6 +163,8 @@ $appointments = admin_fetch_all(
 	 INNER JOIN users u ON u.id = a.nutritionist_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 	 WHERE {$scope}
+	   AND c.status = 'active'
+	   AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59
 	 ORDER BY a.scheduled_at ASC, a.id ASC",
 	str_repeat('i', count($params)),
 	$params
@@ -201,6 +203,7 @@ $filterType = (string)($_GET['type'] ?? '');
 $tableSearch = trim((string)($_GET['q'] ?? ''));
 $tablePage = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 5;
+$activeTab = in_array(($_GET['tab'] ?? ''), ['open', 'all'], true) ? ($_GET['tab'] ?? '') : 'open';
 
 $monthParam = (string)($_GET['m'] ?? $now->format('Y-m'));
 try {
@@ -723,6 +726,86 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 	</aside>
 </div>
 
+<!-- ============ APPOINTMENT TABS ============ -->
+<div class="rp-tabs" style="margin:18px 0;">
+	<a class="rp-tab <?php echo $activeTab === 'open' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=open')); ?>">Open Follow-ups <span style="opacity:.7;">(<?php echo $followUpOpen; ?>)</span></a>
+	<a class="rp-tab <?php echo $activeTab === 'all' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=all')); ?>">All Appointments</a>
+</div>
+
+<?php if ($activeTab === 'open'): ?>
+<!-- ============ OPEN FOLLOW-UPS ============ -->
+<section class="appt-card appt-table-card" id="open-followups">
+	<div class="appt-card-head">
+		<div>
+			<h3 class="appt-card-title">Open Follow-ups</h3>
+			<p class="appt-card-sub"><?php echo $followUpOpen; ?> pending or confirmed follow-up visit<?php echo $followUpOpen !== 1 ? 's' : ''; ?><?php echo $followUpOverdue > 0 ? ' — <span style="color:#dc2626;font-weight:600;">' . $followUpOverdue . ' overdue</span>' : ''; ?></p>
+		</div>
+	</div>
+	<div class="appt-table-wrap admin-table-wrap">
+		<table class="nutritionist-table" data-no-paginate style="min-width:800px;">
+			<thead>
+				<tr>
+					<th style="width:150px;">Child</th>
+					<th style="width:100px;">Category</th>
+					<th style="width:100px;">Track</th>
+					<th style="width:160px;">Scheduled</th>
+					<th style="width:100px;">Status</th>
+					<th style="width:80px;">Actions</th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php
+				$openFollowups = array_filter($followUpAppointments, static function (array $a): bool {
+					return in_array($a['status'], ['pending', 'confirmed'], true);
+				});
+				usort($openFollowups, static function (array $a, array $b): int {
+					return $a['scheduled_dt'] <=> $b['scheduled_dt'];
+				});
+				if ($openFollowups === []): ?>
+					<tr><td colspan="6" style="text-align:center;padding:24px;color:var(--admin-muted);">No open follow-ups. All children have been measured or no follow-ups are scheduled.</td></tr>
+				<?php else: ?>
+					<?php foreach ($openFollowups as $fu):
+						$isOd = $fu['is_overdue'] ?? false;
+						$trackLabel = ucfirst((string)($fu['followup_track'] ?? ''));
+						$catLabel = (string)($fu['followup_category'] ?? '');
+						$scheduledLabel = $fu['scheduled_dt']->format('M d, Y');
+						if ($fu['scheduled_dt'] instanceof DateTimeImmutable) {
+							$daysUntil = (int)$now->diff($fu['scheduled_dt'])->format('%r%a');
+							if ($isOd) {
+								$scheduledLabel .= ' <span style="color:#dc2626;font-weight:600;">(overdue)</span>';
+							} elseif ($daysUntil <= 7 && $daysUntil >= 0) {
+								$scheduledLabel .= ' <span style="color:#d97706;">(in ' . $daysUntil . 'd)</span>';
+							}
+						}
+					?>
+					<tr>
+						<td>
+							<strong><?php echo nutritionist_e($fu['first_name'] . ' ' . $fu['last_name']); ?></strong>
+							<div style="font-size:11px;color:var(--admin-muted);"><?php echo nutritionist_e($fu['child_code'] ?? ''); ?></div>
+						</td>
+						<td><?php echo nutritionist_e($catLabel); ?></td>
+						<td><?php echo nutritionist_e($trackLabel); ?></td>
+						<td><?php echo $scheduledLabel; ?></td>
+						<td>
+							<?php if ($fu['status'] === 'pending'): ?>
+								<span style="color:#d97706;font-weight:600;">Pending</span>
+							<?php else: ?>
+								<span style="color:#059669;font-weight:600;">Confirmed</span>
+							<?php endif; ?>
+						</td>
+						<td>
+							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/appointment_view.php?id=' . $fu['id'])); ?>" style="font-size:11px;padding:3px 8px;">View</a>
+						</td>
+					</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</tbody>
+		</table>
+	</div>
+</section>
+<?php endif; ?>
+
+<?php if ($activeTab === 'all'): ?>
 <!-- ============ ALL APPOINTMENTS TABLE ============ -->
 <section class="appt-card appt-table-card" id="all-appointments">
 	<div class="appt-card-head">
@@ -873,6 +956,7 @@ nutritionist_layout_start('Appointments', 'Manage and track nutrition consultati
 		</div>
 	</div>
 </section>
+<?php endif; ?>
 
 <script>
 (function () {

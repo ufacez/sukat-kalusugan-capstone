@@ -12,9 +12,13 @@ $childrenScopeParams = [];
 $childrenScopeTypes = '';
 
 if ($kioskBarangay !== null) {
-    $childrenScopeSql = ' WHERE c.barangay_id = ?';
-    $childrenScopeParams = [$kioskBarangay['id']];
-    $childrenScopeTypes = 'i';
+    $childrenScopeSql = ' WHERE c.barangay_id = ? AND c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
+    $childrenScopeParams = [$kioskBarangay['id'], 'active'];
+    $childrenScopeTypes = 'is';
+} else {
+    $childrenScopeSql = ' WHERE c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
+    $childrenScopeParams = ['active'];
+    $childrenScopeTypes = 's';
 }
 
 $children = kiosk_fetch_all(

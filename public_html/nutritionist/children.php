@@ -24,6 +24,10 @@ if ($localAreaFilter > 0) {
     $types .= 'i';
     $filterParams[] = $localAreaFilter;
 }
+$where[] = 'c.status = ?';
+$types .= 's';
+$filterParams[] = 'active';
+$where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
 $whereSql = implode(' AND ', $where);
 
 /*

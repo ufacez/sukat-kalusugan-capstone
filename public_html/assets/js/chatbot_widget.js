@@ -30,7 +30,7 @@
   panel.innerHTML = `
     <div class="chatbot-panel-header">
       <div>
-        <h2>Growth Result Assistant</h2>
+        <h2>Kali AI</h2>
         <p>Explains your child's measurement results</p>
       </div>
       <button type="button" class="chatbot-close" aria-label="Close"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg></button>

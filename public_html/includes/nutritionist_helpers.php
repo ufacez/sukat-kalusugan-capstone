@@ -19,7 +19,7 @@ function nutritionist_nav_items(): array
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
-        ['key' => 'ai_assistant', 'label' => 'AI Assistant', 'href' => app_url('/nutritionist/ai_assistant.php')],
+        ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php')],
     ];
 }
 
@@ -58,7 +58,7 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Tools',
             'items' => [
-                ['key' => 'ai_assistant', 'label' => 'AI Assistant', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
+                ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
     ];
