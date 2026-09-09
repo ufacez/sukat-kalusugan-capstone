@@ -167,7 +167,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		$hash = password_hash($password, PASSWORD_DEFAULT);
 		$ok = admin_execute(
 			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssssssi',
+			'ssssssiiis',
 			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
 		);
 
@@ -184,13 +184,13 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 			$hash = password_hash($password, PASSWORD_DEFAULT);
 			$ok = admin_execute(
 				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
-				'sssssssssii',
+				'ssssssiiisi',
 				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
 			);
 		} else {
 			$ok = admin_execute(
 				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
-				'ssssssssii',
+				'sssssiiisi',
 				[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
 			);
 		}
