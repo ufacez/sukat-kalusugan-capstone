@@ -731,6 +731,74 @@ function followup_fetch_visits(int $childId, string $fromDate, string $toDate, i
 	return $rows;
 }
 
+/**
+ * Batched sequence map for EOPT monitoring lists (List_0-23 Month# columns).
+ *
+ * Month#N = the Nth follow-up appointment of that child in chronological
+ * order (scheduled_at ASC, id ASC), so Month#1 is the child's first
+ * follow-up ever. Cancelled rows are excluded. Returns
+ * [child_id => [0 => ['scheduled_at'=>..., 'status'=>...], ...]] with at
+ * most $maxVisits entries per child (index 0 = Month#1).
+ */
+function eopt_fetch_followup_sequence_map(array $childIds, int $maxVisits = 6): array
+{
+	$ids = [];
+	foreach ($childIds as $id) {
+		$id = (int)$id;
+		if ($id > 0) {
+			$ids[$id] = true;
+		}
+	}
+	$ids = array_keys($ids);
+	$map = [];
+	foreach ($ids as $id) {
+		$map[$id] = [];
+	}
+	if ($ids === []) {
+		return $map;
+	}
+	$maxVisits = max(1, min(12, (int)$maxVisits));
+	$placeholders = implode(',', array_fill(0, count($ids), '?'));
+	$rows = admin_fetch_all(
+		"SELECT child_id, scheduled_at, status
+		 FROM appointments
+		 WHERE child_id IN ({$placeholders})
+		   AND appointment_type = 'followup'
+		   AND status != 'cancelled'
+		 ORDER BY child_id ASC, scheduled_at ASC, id ASC",
+		str_repeat('i', count($ids)),
+		$ids
+	);
+	foreach ($rows as $row) {
+		$cid = (int)($row['child_id'] ?? 0);
+		if (!isset($map[$cid]) || count($map[$cid]) >= $maxVisits) {
+			continue;
+		}
+		$map[$cid][] = [
+			'scheduled_at' => (string)($row['scheduled_at'] ?? ''),
+			'status' => (string)($row['status'] ?? ''),
+		];
+	}
+	return $map;
+}
+
+/**
+ * Date-only label + tooltip for a Month# sequence cell.
+ * Returns [label, title]. Label is '—' when $visit is null.
+ */
+function eopt_followup_cell(array $visit = null): array
+{
+	if ($visit === null || ($visit['scheduled_at'] ?? '') === '') {
+		return ['—', 'No follow-up visit'];
+	}
+	try {
+		$dt = new DateTimeImmutable((string)$visit['scheduled_at']);
+		return [$dt->format('M j, Y'), $dt->format('M j, Y g:i A')];
+	} catch (Exception) {
+		return ['—', 'No follow-up visit'];
+	}
+}
+
 // ============================================================
 // MONITORING STATUS FUNCTIONS
 // ============================================================

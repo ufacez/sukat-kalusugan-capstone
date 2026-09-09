@@ -213,7 +213,7 @@ foreach ($listsSpec as $spec) {
 }
 $isSingleList = $listParamKey !== '' && isset($codeLowerMap[$listParamKey]);
 $listParam = $isSingleList ? $codeLowerMap[$listParamKey]['code'] : $listParamRaw;
-$activeSpecs = $isSingleList || $isNutStatus || $isNutStatusBrgy ? [] : $listsSpec;
+$activeSpecs = $isNutStatus || $isNutStatusBrgy ? [] : ($isSingleList ? [$codeLowerMap[$listParamKey]] : $listsSpec);
 if ($isForm1A || $isForm1B || $isForm1C) {
 	$activeSpecs = [];
 }
@@ -941,7 +941,22 @@ foreach ($activeSpecs as $listIndex => $spec) {
 		$spec['age_max'] ?? 59
 	);
 
-	$totalCols = count($listColumns);
+	// List_0-23 carries 6 sequence-based follow-up columns:
+	// Month#N = the child's Nth follow-up appointment (scheduled_at ASC).
+	$isInfantSheet = (($spec['code'] ?? '') === '0-23') || !empty($spec['is_infant']);
+	$activeListColumns = $listColumns;
+	$activeListWidths = $listWidths;
+	if ($isInfantSheet && !$isForm1A) {
+		for ($mh = 1; $mh <= 6; $mh++) {
+			$activeListColumns[] = 'Month#' . $mh;
+			$activeListWidths[] = 16;
+		}
+	}
+	$followupSeqMap = ($isInfantSheet && !$isForm1A && !empty($rows))
+		? eopt_fetch_followup_sequence_map(array_column($rows, 'id'))
+		: [];
+
+	$totalCols = count($activeListColumns);
 	$outRows = [];
 
 	$titleText = $isForm1A
@@ -974,7 +989,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	$outRows[] = $metaRow;
 
 	$headerRow = [];
-	foreach ($listColumns as $columnTitle) {
+	foreach ($activeListColumns as $columnTitle) {
 		$headerRow[] = ['v' => $columnTitle, 's' => 'header'];
 	}
 	$outRows[] = $headerRow;
@@ -1012,6 +1027,23 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => (string)($row['hfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['hfa_status'] ?? ''))],
 				['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
 			];
+
+		if ($isInfantSheet && !$isForm1A) {
+			$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
+			for ($mn = 1; $mn <= 6; $mn++) {
+				$visit = $seqVisits[$mn - 1] ?? null;
+				if ($visit === null || ($visit['scheduled_at'] ?? '') === '') {
+					$dataRow[] = ['v' => '', 's' => 'cell_center'];
+				} else {
+					try {
+						$cellText = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M j, Y');
+					} catch (Exception) {
+						$cellText = '';
+					}
+					$dataRow[] = ['v' => $cellText, 's' => 'cell_center'];
+				}
+			}
+		}
 
 		$outRows[] = $dataRow;
 	}
@@ -1063,7 +1095,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 
 	$sheets[] = [
 		'name' => $spec['sheet'],
-		'widths' => $listWidths,
+		'widths' => $activeListWidths,
 		'merges' => $merges,
 		'rows' => $outRows,
 	];

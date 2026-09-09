@@ -388,12 +388,22 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 			<a class="admin-btn" href="<?php echo nutritionist_e($listExportUrl); ?>" style="font-size:12px;min-height:32px;"><?php echo admin_action_icon('export'); ?> Excel</a>
 		</div>
 	</div>
+	<?php
+	$isInfantList = ($listParam === '0-23');
+	$followupSeqMap = ($isInfantList && !empty($listRows))
+		? eopt_fetch_followup_sequence_map(array_column($listRows, 'id'))
+		: [];
+	?>
 	<?php if (empty($listRows)): ?>
 		<div style="padding:24px;text-align:center;color:var(--admin-muted);font-size:13px;">No children match this monitoring list for the selected filters.</div>
 	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:850px;">
+			<table class="nutritionist-table" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
+				<?php if ($isInfantList): ?>
+				<thead><tr><th rowspan="2">No.</th><th rowspan="2">Address</th><th rowspan="2">Mother/Caregiver</th><th rowspan="2">Child Name</th><th rowspan="2">Sex</th><th rowspan="2">Birthdate</th><th rowspan="2">Height</th><th rowspan="2">Weight</th><th rowspan="2">WFA</th><th rowspan="2">HFA</th><th rowspan="2">WFH</th><th colspan="6" style="text-align:center;">Follow-up Visits</th></tr><tr><?php for ($mh = 1; $mh <= 6; $mh++): ?><th>Month#<?php echo $mh; ?></th><?php endfor; ?></tr></thead>
+				<?php else: ?>
 				<thead><tr><th>No.</th><th>Address</th><th>Mother/Caregiver</th><th>Child Name</th><th>Sex</th><th>Birthdate</th><th>Height</th><th>Weight</th><th>WFA</th><th>HFA</th><th>WFH</th></tr></thead>
+				<?php endif; ?>
 				<tbody>
 					<?php foreach ($listRows as $i => $row): ?>
 						<tr>
@@ -408,6 +418,15 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></span></td>
+							<?php if ($isInfantList): ?>
+								<?php
+								$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
+								for ($mn = 1; $mn <= 6; $mn++):
+									[$fuLabel, $fuTitle] = eopt_followup_cell($seqVisits[$mn - 1] ?? null);
+								?>
+								<td title="<?php echo nutritionist_e($fuTitle); ?>" style="white-space:nowrap;font-size:11px;"><?php if ($fuLabel === '—'): ?><span style="color:var(--admin-muted);">—</span><?php else: ?><?php echo nutritionist_e($fuLabel); ?><?php endif; ?></td>
+								<?php endfor; ?>
+							<?php endif; ?>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>

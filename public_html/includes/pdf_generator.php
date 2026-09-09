@@ -46,14 +46,14 @@ function pdf_metadata_row(TCPDF $pdf, string $barangayName, string $periodLabel,
 	$pdf->Ln(3);
 }
 
-function pdf_table_header(TCPDF $pdf, array $columns, array $widths, string $fillColor = '106E4F'): void {
+function pdf_table_header(TCPDF $pdf, array $columns, array $widths, string $fillColor = '106E4F', int $fontSize = 7): void {
 	$r = hexdec(substr($fillColor, 0, 2));
 	$g = hexdec(substr($fillColor, 2, 2));
 	$b = hexdec(substr($fillColor, 4, 2));
 
 	$pdf->SetFillColor($r, $g, $b);
 	$pdf->SetTextColor(255, 255, 255);
-	$pdf->SetFont('helvetica', 'B', 7);
+	$pdf->SetFont('helvetica', 'B', $fontSize);
 
 	$height = 8;
 	for ($i = 0; $i < count($columns); $i++) {
@@ -62,7 +62,7 @@ function pdf_table_header(TCPDF $pdf, array $columns, array $widths, string $fil
 	$pdf->Ln();
 
 	$pdf->SetTextColor(0, 0, 0);
-	$pdf->SetFont('helvetica', '', 7);
+	$pdf->SetFont('helvetica', '', $fontSize);
 }
 
 function pdf_status_fill(string $code): ?array {
@@ -262,7 +262,7 @@ function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ag
 	);
 }
 
-function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = false): void {
+function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = false, array $followupSeqMap = [], bool $showFollowups = false): void {
 	$cols = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
 	$widths = [12, 28, 32, 50, 14, 20, 18, 18, 14, 14, 14];
 
@@ -271,14 +271,28 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 		$widths[] = 30;
 	}
 
-	$pdf->AddPage();
-	pdf_table_header($pdf, $cols, $widths);
+	if ($showFollowups) {
+		// Condensed base widths so 11 base + 6 Month# cols fit landscape A4
+		// (printable ~273mm). Smaller 6pt font keeps "Month#6" headers inside.
+		$widths = [7, 18, 22, 28, 9, 14, 11, 11, 9, 9, 9];
+		for ($mh = 1; $mh <= 6; $mh++) {
+			$cols[] = 'Month#' . $mh;
+			$widths[] = 14;
+		}
+	}
+
+	// Continue directly under the title block when space allows; only break
+	// to a fresh page if the header already filled most of this one.
+	if ($pdf->GetY() > 140) {
+		$pdf->AddPage();
+	}
+	pdf_table_header($pdf, $cols, $widths, '106E4F', $showFollowups ? 6 : 7);
 
 	$count = 0;
 	foreach ($rows as $i => $row) {
-		if ($pdf->GetY() > 270) {
+		if ($pdf->GetY() > 150) {
 			$pdf->AddPage();
-			pdf_table_header($pdf, $cols, $widths);
+			pdf_table_header($pdf, $cols, $widths, '106E4F', $showFollowups ? 6 : 7);
 		}
 
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
@@ -316,6 +330,22 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 		if ($showCategory) {
 			$catCodes = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
 			$values[] = followup_category_label(implode('+', $catCodes)) ?: '';
+		}
+
+		if ($showFollowups) {
+			$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
+			for ($mn = 1; $mn <= 6; $mn++) {
+				$visit = $seqVisits[$mn - 1] ?? null;
+				if ($visit === null || ($visit['scheduled_at'] ?? '') === '') {
+					$values[] = '';
+				} else {
+					try {
+						$values[] = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M j, Y');
+					} catch (Exception) {
+						$values[] = '';
+					}
+				}
+			}
 		}
 
 		pdf_data_row($pdf, $values, $widths, $i % 2 === 0, [], $cellFills);
@@ -1090,6 +1120,7 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	}
 
 	$pdf = pdf_base($spec['title'], 'Landscape');
+	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 
 	$pdf->SetFont('helvetica', 'B', 10);
@@ -1100,7 +1131,13 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
 	$rows = pdf_fetch_list($f, $spec['condition'], $spec['age_min'], $spec['age_max']);
-	pdf_render_list_table($pdf, $rows, $listCode !== '0-23');
+	// List_0-23 carries 6 sequence-based follow-up columns:
+	// Month#N = the child's Nth follow-up appointment (scheduled_at ASC).
+	$isInfantList = ($listCode === '0-23');
+	$followupSeqMap = ($isInfantList && !empty($rows))
+		? eopt_fetch_followup_sequence_map(array_column($rows, 'id'))
+		: [];
+	pdf_render_list_table($pdf, $rows, $listCode !== '0-23', $followupSeqMap, $isInfantList);
 
 	return $pdf;
 }
