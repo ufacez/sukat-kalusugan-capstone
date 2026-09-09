@@ -321,7 +321,7 @@ nutritionist_layout_start('Appointments', 'Track children due for reweighing and
 						<th style="width:100px;">Last Measured</th>
 						<th style="width:100px;">Next Due</th>
 						<th style="width:90px;">Status</th>
-						<th style="width:80px;">Actions</th>
+						<th style="width:100px;">Actions</th>
 					<?php endif; ?>
 				</tr>
 			</thead>
@@ -403,9 +403,9 @@ nutritionist_layout_start('Appointments', 'Track children due for reweighing and
 					</td>
 					<td><span class="appt-pill <?php echo $pillClass; ?>"><?php echo $pillLabel; ?></span></td>
 					<td>
-						<div style="display:flex;gap:4px;">
-							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/followup_child.php?id=' . $entry['id'])); ?>" style="font-size:10px;padding:3px 8px;">View</a>
-							<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?id=' . $entry['id'])); ?>" style="font-size:10px;padding:3px 8px;">Record</a>
+						<div class="admin-actions" onclick="event.stopPropagation();">
+							<a class="admin-icon-btn admin-icon-btn-primary" title="View follow-up" href="<?php echo nutritionist_e(app_url('/nutritionist/followup_child.php?id=' . $entry['id'])); ?>"><?php echo admin_action_icon('view'); ?></a>
+							<a class="admin-icon-btn" title="Record measurement" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?id=' . $entry['id'])); ?>"><?php echo admin_action_icon('add'); ?></a>
 						</div>
 					</td>
 				</tr>

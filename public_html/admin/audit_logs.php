@@ -62,10 +62,10 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 ?>
 
 <style>
-.audit-hero{display:grid;grid-template-columns:1fr 360px;gap:14px;margin-bottom:20px}
+.audit-hero{display:grid;grid-template-columns:1fr 320px;gap:14px;margin-bottom:20px}
 @media(max-width:1100px){.audit-hero{grid-template-columns:1fr}}
 
-.audit-chart-wrap{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:18px;position:relative;overflow:hidden}
+.audit-chart-wrap{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:14px;position:relative;overflow:hidden}
 .audit-chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .audit-chart-title{font-size:13px;font-weight:700;color:var(--admin-text)}
 .audit-chart-badge{font-size:9px;font-weight:600;padding:2px 7px;border-radius:20px;background:var(--admin-primary-soft);color:var(--admin-primary);display:flex;align-items:center;gap:4px}
@@ -75,7 +75,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-legend-item{display:flex;align-items:center;gap:4px;font-size:9px;font-weight:500;color:var(--admin-muted)}
 .audit-legend-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .audit-chart-body{position:relative}
-.audit-chart-canvas{width:100%;height:clamp(200px,40vw,280px);cursor:crosshair}
+.audit-chart-canvas{width:100%;height:clamp(170px,30vw,230px);cursor:crosshair}
 .audit-chart-y-axis{position:absolute;left:2px;top:0;bottom:0;width:28px;display:flex;flex-direction:column;justify-content:space-between;pointer-events:none}
 .audit-chart-y-label{font-size:8px;color:var(--admin-muted);font-family:Inter,monospace;text-align:right}
 .audit-chart-x-axis{display:flex;justify-content:space-between;padding:2px 30px 0 30px}
@@ -83,13 +83,23 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-chart-tooltip{position:absolute;pointer-events:none;background:var(--admin-text);color:var(--admin-surface);padding:6px 10px;border-radius:6px;font-size:10px;font-weight:500;white-space:nowrap;transform:translate(-50%,0);opacity:0;transition:opacity .12s;z-index:10;line-height:1.5;max-width:300px}
 .audit-chart-tooltip::after{content:'';position:absolute;left:50%;top:100%;transform:translateX(-50%);border:3px solid transparent;border-top-color:var(--admin-text)}
 
-.audit-ai-wrap{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:18px;display:flex;flex-direction:column}
+.audit-ai-wrap{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:14px;display:flex;flex-direction:column}
+.audit-side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.audit-details-wrap{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:14px;flex:1}
+.audit-details{margin-top:6px;display:flex;flex-direction:column}
+.audit-detail-row{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:6px 2px;font-size:11px;border-bottom:1px solid var(--admin-border)}
+.audit-detail-row:last-child{border-bottom:none}
+.audit-detail-label{display:flex;align-items:center;gap:6px;color:var(--admin-muted);font-weight:500;white-space:nowrap}
+.audit-detail-value{font-weight:700;color:var(--admin-text);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}
+.audit-detail-value .is-muted{color:var(--admin-muted);font-weight:500}
+.audit-detail-event{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--admin-surface-alt);font-size:10px;line-height:1.5;color:var(--admin-muted)}
+.audit-detail-event strong{color:var(--admin-text)}
 .audit-ai-header{display:flex;align-items:center;gap:8px;margin-bottom:12px}
 .audit-ai-icon{width:28px;height:28px;border-radius:7px;background:var(--admin-primary-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .audit-ai-icon svg{width:14px;height:14px;color:var(--admin-primary)}
 .audit-ai-title{font-size:13px;font-weight:700;color:var(--admin-text)}
 .audit-ai-subtitle{font-size:9px;color:var(--admin-muted)}
-.audit-ai-insights{flex:1;display:flex;flex-direction:column;gap:0;overflow-y:auto;max-height:220px;scrollbar-width:thin;scrollbar-color:var(--admin-border) transparent}
+.audit-ai-insights{flex:1;display:flex;flex-direction:column;gap:0;overflow-y:auto;max-height:170px;scrollbar-width:thin;scrollbar-color:var(--admin-border) transparent}
 .audit-ai-insights::-webkit-scrollbar{width:4px}
 .audit-ai-insights::-webkit-scrollbar-track{background:transparent}
 .audit-ai-insights::-webkit-scrollbar-thumb{background:var(--admin-border);border-radius:4px}
@@ -230,6 +240,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         </div>
         <div class="audit-chart-x-axis" id="audit-x-axis"></div>
     </div>
+    <div class="audit-side">
     <div class="audit-ai-wrap">
         <div class="audit-ai-header">
             <div class="audit-ai-icon">
@@ -246,6 +257,24 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 <span>Analyzing...</span>
             </div>
         </div>
+    </div>
+    <div class="audit-details-wrap">
+        <div class="audit-ai-header">
+            <div class="audit-ai-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+            </div>
+            <div>
+                <div class="audit-ai-title">At a glance</div>
+                <div class="audit-ai-subtitle">Live summary</div>
+            </div>
+        </div>
+        <div class="audit-details" id="audit-details">
+            <div class="audit-ai-loading">
+                <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+                <span>Loading summary...</span>
+            </div>
+        </div>
+    </div>
     </div>
 </section>
 
@@ -509,10 +538,9 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         ctx = canvas.getContext('2d');
         dpr = window.devicePixelRatio || 1;
         var rect = canvas.parentElement.getBoundingClientRect();
-        // The height is now driven by CSS (clamp(180px, 32vw, 260px)) so the
+        // The height is now driven by CSS (clamp(170px, 30vw, 230px)) so the
         // chart adapts to every viewport size. Read the actual rendered
-        // height back from the canvas style so a 360px phone gets a 180px
-        // chart and a 1024px tablet gets the full 260px.
+        // height back from the canvas style.
         W = rect.width;
         var cssH = window.getComputedStyle(canvas).height;
         var parsedH = parseInt(cssH, 10);
@@ -675,12 +703,79 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         panel.innerHTML = html;
     }
 
+    function esc(s){
+        return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function(c){
+            return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+        });
+    }
+
+    function fmtNum(n){
+        n = Number(n) || 0;
+        return n.toLocaleString('en-US');
+    }
+
+    function levelCount(levels, name){
+        for(var i=0;i<levels.length;i++){
+            if(String(levels[i].level)===name) return Number(levels[i].cnt) || 0;
+        }
+        return 0;
+    }
+
+    function friendlyAction(action){
+        var a = String(action || '');
+        if(a==='LOGIN') return 'Login';
+        if(a==='LOGOUT') return 'Logout';
+        if(a==='measurement.create') return 'Create measurement';
+        var m = a.match(/^(CREATE|UPDATE|DELETE)_(.+)$/);
+        if(m) return m[1].charAt(0) + m[1].slice(1).toLowerCase() + ' ' + m[2].toLowerCase().replace(/_/g, ' ');
+        return a.toLowerCase().replace(/_/g, ' ');
+    }
+
+    function renderDetails(result){
+        var box = document.getElementById('audit-details');
+        if(!box) return;
+        var levels = result.level_breakdown || [];
+        var actions = result.action_breakdown || [];
+        var utypes = result.user_type_breakdown || [];
+        var recent = result.recent_activity || [];
+        var html = '';
+        html += '<div class="audit-detail-row"><span class="audit-detail-label"><span class="audit-level-dot is-info"></span>Info</span><span class="audit-detail-value">' + fmtNum(levelCount(levels, 'info')) + '</span></div>';
+        html += '<div class="audit-detail-row"><span class="audit-detail-label"><span class="audit-level-dot is-warning"></span>Warning</span><span class="audit-detail-value">' + fmtNum(levelCount(levels, 'warning')) + '</span></div>';
+        html += '<div class="audit-detail-row"><span class="audit-detail-label"><span class="audit-level-dot is-danger"></span>Critical</span><span class="audit-detail-value">' + fmtNum(levelCount(levels, 'danger')) + '</span></div>';
+        if(actions.length){
+            html += '<div class="audit-detail-row"><span class="audit-detail-label">Top action</span><span class="audit-detail-value">' + esc(friendlyAction(actions[0].action)) + ' <span class="is-muted">(' + fmtNum(actions[0].cnt) + ')</span></span></div>';
+        } else {
+            html += '<div class="audit-detail-row"><span class="audit-detail-label">Top action</span><span class="audit-detail-value">—</span></div>';
+        }
+        if(utypes.length){
+            var who = String(utypes[0].user_type || 'system');
+            who = who.charAt(0).toUpperCase() + who.slice(1);
+            html += '<div class="audit-detail-row"><span class="audit-detail-label">Most active</span><span class="audit-detail-value">' + esc(who) + ' <span class="is-muted">(' + fmtNum(utypes[0].cnt) + ')</span></span></div>';
+        } else {
+            html += '<div class="audit-detail-row"><span class="audit-detail-label">Most active</span><span class="audit-detail-value">—</span></div>';
+        }
+        if(recent.length){
+            var last = recent[0];
+            var when = '';
+            try {
+                var d = new Date(String(last.created_at).replace(' ', 'T'));
+                when = d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                if(when === 'Invalid Date') when = String(last.created_at);
+            } catch(e) { when = String(last.created_at || ''); }
+            html += '<div class="audit-detail-event">Latest event<br><strong>' + esc(friendlyAction(last.action)) + '</strong> by ' + esc(last.actor || 'System') + '<br>' + esc(when) + '</div>';
+        } else {
+            html += '<div class="audit-detail-event">No events recorded yet.</div>';
+        }
+        box.innerHTML = html;
+    }
+
     function loadInsights(){
         fetch(api,{credentials:'same-origin'})
             .then(function(r){return r.json()})
             .then(function(result){
                 if(result.success && result.category_chart) initChart(result.category_chart);
                 renderInsights(result);
+                renderDetails(result);
             })
             .catch(function(){
                 var panel=document.getElementById('audit-ai-panel');

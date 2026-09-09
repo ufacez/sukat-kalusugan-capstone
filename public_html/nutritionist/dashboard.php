@@ -239,14 +239,17 @@ foreach ($children as $child) {
 // from the WFA / HFA / WFH-or-WFL status columns on the latest measurement.
 function buildAxisCounts(array $measurements, string $statusField): array {
 	// WFA adds a 4th "Refer" bucket (DOH eOPT Plus rule: WAZ > +2 is
-	// read off the WFL/H axis). HFA / WFL/H stay at the three standard
-	// Normal / Moderate / Severe buckets.
-	$counts = ['Normal' => 0, 'Moderate' => 0, 'Severe' => 0, 'Refer' => 0];
+	// read off the WFL/H axis). HFA adds a 4th "Tall" bucket (HAZ > +2,
+	// per classify_hfa_status()) kept exclusive from Normal so the
+	// sidebar rows always sum to the measured children count.
+	$counts = ['Normal' => 0, 'Moderate' => 0, 'Severe' => 0, 'Refer' => 0, 'Tall' => 0];
 	foreach ($measurements as $m) {
 		$status = strtolower(trim((string)($m[$statusField] ?? '')));
 		if (str_contains($status, 'refer')) {
 			$counts['Refer']++;
-		} elseif ($status === 'normal' || $status === 'n' || $status === 'tall' || $status === 't' || $status === '') {
+		} elseif ($status === 'tall' || $status === 't') {
+			$counts['Tall']++;
+		} elseif ($status === 'normal' || $status === 'n' || $status === '') {
 			$counts['Normal']++;
 		} elseif (str_contains($status, 'severe') || $status === 'sst' || $status === 'sw' || $status === 'suw' || $status === 'ob') {
 			$counts['Severe']++;
@@ -270,7 +273,7 @@ $axisCounts = [
 // above +2 — per the DOH eOPT Plus rule, that reading is read off the
 // WFL/H axis instead.
 function buildAxisPillCounts(array $measurements, string $statusField, string $axis): array {
-	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW' => 0, 'Ob' => 0, 'REF' => 0];
+	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW' => 0, 'Ob' => 0, 'REF' => 0, 'Tall' => 0];
 	foreach ($measurements as $m) {
 		$c = classifyAxisStatus($axis, (string)($m[$statusField] ?? ''));
 		$key = $c['label'];
@@ -390,13 +393,14 @@ function buildChartData(array $measurements, string $statusField): array {
 		$months[$month->format('Y-m')] = 0;
 	}
 	// WFA gains a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2).
-	// HFA / WFL/H keep the three normal / moderate / severe series; the
-	// "Refer" series just stays at zero on those tabs.
+	// HFA gains a fourth "Tall" series (HAZ > +2, exclusive from Normal).
+	// The unused series just stays at zero on the other tabs.
 	$monthly = [
 		'Normal' => $months,
 		'Moderate' => array_map(fn($v) => 0, $months),
 		'Severe' => array_map(fn($v) => 0, $months),
 		'Refer' => array_map(fn($v) => 0, $months),
+		'Tall' => array_map(fn($v) => 0, $months),
 	];
 	foreach ($measurements as $m) {
 		$key = (new DateTimeImmutable((string)($m['measurement_date'])))->format('Y-m');
@@ -407,8 +411,9 @@ function buildChartData(array $measurements, string $statusField): array {
 		} elseif ($status === 'normal' || $status === 'n' || $status === '') {
 			$monthly['Normal'][$key] = ($monthly['Normal'][$key] ?? 0) + 1;
 		} elseif ($status === 'tall' || $status === 't') {
-			// For HFA: tall counts as Normal (it's the desirable high end of HFA).
-			$monthly['Normal'][$key] = ($monthly['Normal'][$key] ?? 0) + 1;
+			// HFA Tall is its own series so Normal + Moderate + Severe + Tall
+			// always equals the measured children count for that month.
+			$monthly['Tall'][$key] = ($monthly['Tall'][$key] ?? 0) + 1;
 		} elseif (str_contains($status, 'severe') || $status === 'sst' || $status === 'sw' || $status === 'suw' || $status === 'ob') {
 			$monthly['Severe'][$key] = ($monthly['Severe'][$key] ?? 0) + 1;
 		} else {
@@ -429,6 +434,8 @@ $chartSeriesColors = [
 	'Severe' => 'var(--admin-danger)',
 	// Gray for the WFA "Refer to WFL/H" overflow series.
 	'Refer' => 'var(--admin-muted)',
+	// Blue for the HFA "Tall" series (matches Tall pill color).
+	'Tall' => '#2563eb',
 ];
 
 $chartXs = [56, 110, 164, 218, 272, 326, 380, 420]; // kept for any external legacy references
@@ -520,6 +527,7 @@ $mst = (int)($axisPillCounts['hfa']['MSt'] ?? 0);
 $mw  = (int)($axisPillCounts['wflh']['MW']  ?? 0);
 $owWflh = (int)($axisPillCounts['wflh']['OW'] ?? 0);
 $refWfa = (int)($axisPillCounts['wfa']['REF'] ?? 0);
+$tallHfa = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
 $nWfa  = (int)($axisCounts['wfa']['Normal']  ?? 0);
 $nHfa  = (int)($axisCounts['hfa']['Normal']  ?? 0);
 $nWflh = (int)($axisCounts['wflh']['Normal'] ?? 0);
@@ -528,11 +536,13 @@ $totalSevere   = $suw + $sst + $sw + $ob;
 $totalModerate = $muw + $mst + $mw + $owWflh;
 $totalNormal   = $nWfa + $nHfa + $nWflh;
 $totalRefer    = $refWfa;
-$totalAxes     = $totalNormal + $totalModerate + $totalSevere + $totalRefer;
+$totalTall     = $tallHfa;
+$totalAxes     = $totalNormal + $totalModerate + $totalSevere + $totalRefer + $totalTall;
 $pctSevere   = $totalAxes > 0 ? round(($totalSevere / $totalAxes) * 100, 1) : 0;
 $pctModerate = $totalAxes > 0 ? round(($totalModerate / $totalAxes) * 100, 1) : 0;
 $pctNormal   = $totalAxes > 0 ? round(($totalNormal / $totalAxes) * 100, 1) : 0;
 $pctRefer    = $totalAxes > 0 ? round(($totalRefer / $totalAxes) * 100, 1) : 0;
+$pctTall     = $totalAxes > 0 ? round(($totalTall / $totalAxes) * 100, 1) : 0;
 
 // Insight 1 — Severe classification distribution (always shown).
 if ($totalSevere > 0) {
@@ -575,7 +585,8 @@ if ($mw + $sw + $ob + $owWflh > 0) {
 // Insight 5 — Overall distribution summary (always shown once we have data).
 if ($totalAxes > 0) {
 	$referClause = $pctRefer > 0 ? ', ' . $pctRefer . '% Refer to WFL/H' : '';
-	$aiBullets[] = '<strong>Distribution snapshot.</strong> Across all three axes the latest readings are ' . $pctNormal . '% Normal, ' . $pctModerate . '% Moderate, and ' . $pctSevere . '% Severe' . $referClause . '. Switch the WFA / HFA / WFH tabs above to see each axis in detail.';
+	$tallClause = $pctTall > 0 ? ', ' . $pctTall . '% Tall' : '';
+	$aiBullets[] = '<strong>Distribution snapshot.</strong> Across all three axes the latest readings are ' . $pctNormal . '% Normal, ' . $pctModerate . '% Moderate, and ' . $pctSevere . '% Severe' . $referClause . $tallClause . '. Switch the WFA / HFA / WFH tabs above to see each axis in detail.';
 }
 
 // Insight 6 — Coverage warning when measurements are missing.
@@ -676,6 +687,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<div class="audit-legend-item"><span class="audit-legend-dot is-accent"></span>Moderate</div>
 						<div class="audit-legend-item"><span class="audit-legend-dot is-danger"></span>Severe</div>
 						<div class="audit-legend-item" data-legend-row="Refer"><span class="audit-legend-dot is-gray"></span>Refer to WFL/H</div>
+						<div class="audit-legend-item" data-legend-row="Tall" hidden><span class="audit-legend-dot" style="background:#2563eb;"></span>Tall</div>
 					</div>
 					<div class="audit-chart-badge">
 						<span style="width:6px;height:6px;border-radius:50%;background:var(--admin-primary);animation:pulse-dot 2s infinite;"></span>Live
@@ -724,10 +736,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<div class="stat-row" data-axis-row="hfa" hidden>
 					<div class="stat-label"><span class="stat-dot is-primary"></span><span data-axis-label="hfa"><strong>Tall</strong> <span class="stat-code">Tall</span></span></div>
 					<div class="stat-count" data-axis-count="hfa" data-axis-key="Tall"><?php
-						$tallCount = 0;
-						foreach ($measurements as $m) {
-							if (strtolower(trim((string)($m['hfa_status'] ?? ''))) === 'tall') $tallCount++;
-						}
+						$tallCount = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
 						echo $tallCount;
 					?><span class="stat-pct"><?php echo $axisTotalHfa > 0 ? round($tallCount / $axisTotalHfa * 100, 0) : 0; ?>%</span></div>
 				</div>
@@ -967,8 +976,9 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 <script>
 // Chart data embedded from PHP for interactive Canvas switching.
 // WFA gets a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2
-// routes the operator to the WFL/H axis). HFA / WFL/H keep three
-// series; their Refer bucket stays at zero.
+// routes the operator to the WFL/H axis). HFA gets a fourth "Tall"
+// series (HAZ > +2, exclusive from Normal). The unused series stays
+// at zero on the other tabs.
 var chartMonths = <?php echo json_encode($chartMonths); ?>;
 var chartXs = [56, 110, 164, 218, 272, 326, 380, 420];
 var chartColors = {
@@ -976,26 +986,31 @@ var chartColors = {
 	Moderate: 'var(--admin-accent)',
 	Severe: 'var(--admin-danger)',
 	// Gray for the WFA "Refer to WFL/H" overflow series.
-	Refer: 'var(--admin-muted)'
+	Refer: 'var(--admin-muted)',
+	// Blue for the HFA "Tall" series.
+	Tall: '#2563eb'
 };
 var chartDataEmbedded = {
 	wfa: {
 		Normal: <?php echo json_encode(array_values($wfaData['Normal'])); ?>,
 		Moderate: <?php echo json_encode(array_values($wfaData['Moderate'])); ?>,
 		Severe: <?php echo json_encode(array_values($wfaData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($wfaData['Refer'] ?? [])); ?>
+		Refer: <?php echo json_encode(array_values($wfaData['Refer'] ?? [])); ?>,
+		Tall: <?php echo json_encode(array_values($wfaData['Tall'] ?? [])); ?>
 	},
 	hfa: {
 		Normal: <?php echo json_encode(array_values($hfaData['Normal'])); ?>,
 		Moderate: <?php echo json_encode(array_values($hfaData['Moderate'])); ?>,
 		Severe: <?php echo json_encode(array_values($hfaData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($hfaData['Refer'] ?? [])); ?>
+		Refer: <?php echo json_encode(array_values($hfaData['Refer'] ?? [])); ?>,
+		Tall: <?php echo json_encode(array_values($hfaData['Tall'] ?? [])); ?>
 	},
 	wflh: {
 		Normal: <?php echo json_encode(array_values($wflhData['Normal'])); ?>,
 		Moderate: <?php echo json_encode(array_values($wflhData['Moderate'])); ?>,
 		Severe: <?php echo json_encode(array_values($wflhData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($wflhData['Refer'] ?? [])); ?>
+		Refer: <?php echo json_encode(array_values($wflhData['Refer'] ?? [])); ?>,
+		Tall: <?php echo json_encode(array_values($wflhData['Tall'] ?? [])); ?>
 	}
 };
 
@@ -1055,15 +1070,17 @@ var chartDataEmbedded = {
 
 	// Pull the live theme palette so colors adapt to light/dark mode.
 	// The "Refer" series (gray) only renders a non-zero line for the WFA
-	// tab -- it is a WFA-specific overflow ("Refer to WFL/H"). On HFA /
-	// WFL/H it stays flat at zero and is hidden from the legend via the
-	// CSS `[data-legend-row="Refer"]` toggle in the tab switcher below.
+	// tab -- it is a WFA-specific overflow ("Refer to WFL/H"). The "Tall"
+	// series (blue) only renders for the HFA tab (HAZ > +2, exclusive
+	// from Normal). Both are hidden from the legend on the other tabs
+	// via the `[data-legend-row]` toggle in the tab switcher below.
 	function palette() {
 		return [
 			{ key: 'Normal',   color: resolveColor('var(--admin-primary)'), fill: rgbaFromVar('--admin-primary', 0.14), label: 'Normal' },
 			{ key: 'Moderate', color: resolveColor('var(--admin-accent)'),  fill: rgbaFromVar('--admin-accent', 0.18),  label: 'Moderate' },
 			{ key: 'Severe',   color: resolveColor('var(--admin-danger)'),  fill: rgbaFromVar('--admin-danger', 0.14),  label: 'Severe' },
-			{ key: 'Refer',    color: resolveColor('var(--admin-muted)'),   fill: rgbaFromVar('--admin-muted', 0.10),   label: 'Refer to WFL/H' }
+			{ key: 'Refer',    color: resolveColor('var(--admin-muted)'),   fill: rgbaFromVar('--admin-muted', 0.10),   label: 'Refer to WFL/H' },
+			{ key: 'Tall',     color: '#2563eb',                            fill: 'rgba(37,99,235,0.12)',               label: 'Tall' }
 		];
 	}
 
@@ -1077,7 +1094,7 @@ var chartDataEmbedded = {
 	var W = 0, H = 320, cW = 0, cH = 0, dpr = 1, maxVal = 1;
 	var currentKey = 'wfa';
 	var currentSeries = []; // [{key,color,fill,label,values:[n]}]
-	var catData = []; // [{Normal:n,Moderate:n,Severe:n,label:'Jan'}]
+	var catData = []; // [{Normal:n,Moderate:n,Severe:n,Refer:n,Tall:n,label:'Jan'}]
 	var hoverIndex = -1;
 	var lastWidth = 0;
 
@@ -1087,7 +1104,7 @@ var chartDataEmbedded = {
 	}
 
 	function buildSeries(key) {
-		var raw = (chartDataEmbedded && chartDataEmbedded[key]) || { Normal: [], Moderate: [], Severe: [], Refer: [] };
+		var raw = (chartDataEmbedded && chartDataEmbedded[key]) || { Normal: [], Moderate: [], Severe: [], Refer: [], Tall: [] };
 		var cats = palette();
 		catData = months.map(function (m, i) {
 			return {
@@ -1095,7 +1112,8 @@ var chartDataEmbedded = {
 				Normal: Number(raw.Normal[i] || 0),
 				Moderate: Number(raw.Moderate[i] || 0),
 				Severe: Number(raw.Severe[i] || 0),
-				Refer: Number(raw.Refer[i] || 0)
+				Refer: Number(raw.Refer[i] || 0),
+				Tall: Number(raw.Tall[i] || 0)
 			};
 		});
 		currentSeries = cats.map(function (c) {
@@ -1329,8 +1347,12 @@ var chartDataEmbedded = {
 
 		// The "Refer to WFL/H" legend item is a WFA-specific overflow
 		// (WAZ > +2). Hide it on HFA / WFL/H where it's never meaningful.
+		// The "Tall" legend item is HFA-specific (HAZ > +2, exclusive
+		// from Normal). Hide it everywhere except the HFA tab.
 		document.querySelectorAll('[data-legend-row]').forEach(function (item) {
-			item.hidden = item.getAttribute('data-legend-row') === 'Refer' && key !== 'wfa';
+			var row = item.getAttribute('data-legend-row');
+			if (row === 'Refer') item.hidden = key !== 'wfa';
+			else if (row === 'Tall') item.hidden = key !== 'hfa';
 		});
 	}
 
