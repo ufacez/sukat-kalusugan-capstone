@@ -214,6 +214,43 @@ bool calMode = false;
 bool calWaitingForWeight = false;
 float calKnownWeight = 0.0f;
 
+// WebSocket admin calibration (Admin > Sensors > Edit Device).
+// The admin wizard sends {type:'calibrate', action:'tare'|'read_raw'|
+// 'stop_reading'|'commit'} and expects a {type:'calibrate'} reply per
+// action plus {type:'calibrate_status'} live raw readings. Sampling is
+// accumulated non-blockingly in loop() so WS event handlers stay fast.
+//
+// IMPORTANT: raw readings are streamed as factor-independent ADC
+// counts (getData() * calFactor + tareOffset), NOT scaled kg. A wrong
+// calibration factor amplifies electrical noise when expressed in kg,
+// which made the old kg-based stability check impossible to satisfy.
+// Counts are exact regardless of the current factor, and the commit
+// math below derives the true factor in one shot.
+bool calWsReading = false;
+unsigned long calWsLastStatus = 0;
+float calWsSum = 0;
+int calWsSamples = 0;
+float calWsLastRaw = 0;
+bool calWsHaveRaw = false;
+int calWsStableCount = 0;
+bool calWsStable = false;
+const unsigned long CAL_WS_STATUS_INTERVAL = 200;
+const float CAL_WS_STABLE_EPSILON_COUNTS = 300.0f;
+const int CAL_WS_STABLE_REQUIRED = 5;
+
+// LiDAR side of the same admin session: raw gap (sensor lens to
+// whatever is below it) in cm, factor-free by nature. With an empty
+// platform the gap IS the mounting height, so no known reference is
+// strictly required — a known-height object just adds verification.
+float calWsDistSum = 0;
+int calWsDistSamples = 0;
+float calWsLastDist = 0;
+bool calWsHaveDist = false;
+int calWsDistStableCount = 0;
+bool calWsDistStable = false;
+const float CAL_WS_DIST_EPSILON_CM = 2.0f;
+const int CAL_WS_DIST_REQUIRED = 5;
+
 long currentSessionId = 0;
 long lastSessionId = 0;
 
@@ -2014,6 +2051,153 @@ void onWsEvent(
                 "[WS] PROCESS command received"
               );
             }
+          } else if (msgType == "calibrate") {
+            String action =
+              cmdDoc["action"] | "";
+
+            StaticJsonDocument<192> replyDoc;
+            replyDoc["type"] = "calibrate";
+            replyDoc["action"] = action;
+
+            if (measuring) {
+              replyDoc["result"] = "error";
+              replyDoc["message"] =
+                "Device is mid-measurement. Try again when idle.";
+            } else if (action == "tare") {
+              if (!hx711Ready) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] = "HX711 not ready. Check scale wiring.";
+              } else {
+                // Non-blocking tare: loop() keeps calling
+                // LoadCell.update(), which drives it to completion.
+                // The admin proceeds to Read Raw afterwards, so the
+                // tare has settled by the time samples are taken.
+                LoadCell.tareNoDelay();
+                calWsSum = 0;
+                calWsSamples = 0;
+                calWsHaveRaw = false;
+                calWsStableCount = 0;
+                calWsStable = false;
+                calWsDistSum = 0;
+                calWsDistSamples = 0;
+                calWsHaveDist = false;
+                calWsDistStableCount = 0;
+                calWsDistStable = false;
+                replyDoc["result"] = "ok";
+                replyDoc["message"] = "Tare started.";
+                Serial.println("[WS] Calibrate: tare started");
+              }
+            } else if (action == "read_raw") {
+              if (!hx711Ready) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] = "HX711 not ready. Check scale wiring.";
+              } else {
+                calWsReading = true;
+                calWsSum = 0;
+                calWsSamples = 0;
+                calWsHaveRaw = false;
+                calWsStableCount = 0;
+                calWsStable = false;
+                calWsDistSum = 0;
+                calWsDistSamples = 0;
+                calWsHaveDist = false;
+                calWsDistStableCount = 0;
+                calWsDistStable = false;
+                calWsLastStatus = 0;
+                replyDoc["result"] = "ok";
+                replyDoc["message"] = "Streaming raw readings.";
+                Serial.println("[WS] Calibrate: raw streaming started");
+              }
+            } else if (action == "stop_reading") {
+              calWsReading = false;
+              replyDoc["result"] = "ok";
+              replyDoc["message"] = "Streaming stopped.";
+              Serial.println("[WS] Calibrate: raw streaming stopped");
+            } else if (action == "commit") {
+              float knownWeight =
+                cmdDoc["known_weight_kg"] | 0.0f;
+
+              if (!hx711Ready) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] = "HX711 not ready. Check scale wiring.";
+              } else if (knownWeight <= 0.0f) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] = "Known weight must be > 0.";
+              } else if (calWsSamples < 10) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] =
+                  "Not enough readings yet. Click Read Raw first and wait for samples to accumulate.";
+              } else {
+                // Exact factor from raw ADC counts, independent of the
+                // current (possibly wrong) factor:
+                //   trueWeight = (rawCounts - tareOffset) / trueFactor
+                // so trueFactor = (avgCounts - tareOffset) / knownWeight.
+                // (The USB-serial 'c' flow instead averages *scaled*
+                // readings, which bakes the old factor's error in.)
+                float avgRaw = calWsSum / calWsSamples;
+                float tareOffset =
+                  (float)LoadCell.getTareOffset();
+                float newFactor =
+                  (avgRaw - tareOffset) / knownWeight;
+
+                hx711CalFactor = newFactor;
+                LoadCell.setCalFactor(hx711CalFactor);
+                preferences.putFloat("hx711_cal", hx711CalFactor);
+
+                replyDoc["result"] = "ok";
+                replyDoc["new_calibration_factor"] = newFactor;
+                replyDoc["message"] = "Factor calculated.";
+
+                Serial.print("[WS] Calibrate: new factor ");
+                Serial.println(newFactor, 4);
+                Serial.println("[WS] Calibrate: save it in Admin > Sensors > Edit Device to persist.");
+              }
+            } else if (action == "commit_height") {
+              float knownHeight =
+                cmdDoc["known_height_cm"] | 0.0f;
+
+              if (calWsDistSamples < 10) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] =
+                  "Not enough distance readings yet. Click Read distance first and wait for samples to accumulate.";
+              } else if (knownHeight < 0.0f) {
+                replyDoc["result"] = "error";
+                replyDoc["message"] = "Known height must be 0 or more.";
+              } else {
+                float avgDist = calWsDistSum / calWsDistSamples;
+                float newMounting =
+                  knownHeight > 0.0f
+                    ? knownHeight + avgDist
+                    : avgDist;
+
+                if (newMounting < 50.0f || newMounting > 300.0f) {
+                  replyDoc["result"] = "error";
+                  replyDoc["message"] =
+                    "Implausible mounting height. Clear the platform (or check the known height) and try again.";
+                } else {
+                  // Apply live so the kiosk verifies instantly; the
+                  // server value wins on the next poll unless the admin
+                  // saves this in Sensors > Edit Device.
+                  mountingHeightCm = newMounting;
+
+                  replyDoc["result"] = "ok";
+                  replyDoc["new_mounting_height"] = newMounting;
+                  replyDoc["message"] = "Mounting height calculated.";
+
+                  Serial.print("[WS] Calibrate: new mounting height ");
+                  Serial.print(newMounting, 1);
+                  Serial.println(" cm");
+                  Serial.println("[WS] Calibrate: save it in Admin > Sensors > Edit Device to persist.");
+                }
+              }
+            } else {
+              replyDoc["result"] = "error";
+              replyDoc["message"] = "Unknown calibrate action.";
+            }
+
+            String replyJson;
+            serializeJson(replyDoc, replyJson);
+            client->text(replyJson);
           }
         }
       }
@@ -2138,6 +2322,12 @@ void setup() {
 
   Serial.print("Server URL: ");
   Serial.println(serverBaseUrl);
+
+  // Keep a locally calibrated factor across reboots until the admin
+  // saves it to the Sensors page (the server value then wins on the
+  // next get_command poll via applyCalibrationFromServer).
+  hx711CalFactor =
+    preferences.getFloat("hx711_cal", hx711CalFactor);
 
   customServerUrlParam = new WiFiManagerParameter(
     "server_url",
@@ -2318,7 +2508,12 @@ void loop() {
   // HX711
   // ===================================================
 
-  if (hx711Ready) {
+  // Pump the HX711 here EXCEPT while the admin wizard is streaming
+  // (calWsReading): the stream block below must be the sole consumer
+  // then, otherwise this call eats each fresh sample microseconds
+  // after it arrives and the stream tick below always finds nothing —
+  // the sample count stalls at 0 forever.
+  if (hx711Ready && !calWsReading) {
     LoadCell.update();
   }
 
@@ -2327,6 +2522,107 @@ void loop() {
   // ===================================================
 
   ws.cleanupClients();
+
+  // ===================================================
+  // WS ADMIN CALIBRATION STREAM (idle only)
+  // ===================================================
+  //
+  // While the admin wizard is on "Read Raw", push live raw ADC
+  // counts plus a stability flag ~5x per second. Counts are
+  // factor-independent (see globals comment), so stability
+  // detection works even when the current factor is wrong.
+  // Sampling accumulates here so Commit can average without
+  // blocking.
+
+  if (
+    calWsReading &&
+    !measuring &&
+    ws.count() > 0 &&
+    millis() - calWsLastStatus >= CAL_WS_STATUS_INTERVAL
+  ) {
+    // Sample both sensors; send when either produced fresh data (or
+    // the scale died, so the admin hears about it instead of going
+    // quiet). Dry ticks stay silent and the display simply holds.
+    float distCm = 0;
+    bool freshDist = readTFLunaDistanceCm(distCm);
+    bool freshWeight = hx711Ready && LoadCell.update();
+
+    if (freshWeight || freshDist || !hx711Ready) {
+      calWsLastStatus = millis();
+
+      StaticJsonDocument<256> statusDoc;
+      statusDoc["type"] = "calibrate_status";
+      statusDoc["hx711_ready"] = hx711Ready;
+
+      if (freshWeight) {
+        float v =
+          LoadCell.getData() * hx711CalFactor +
+          (float)LoadCell.getTareOffset();
+
+        if (
+          calWsHaveRaw &&
+          fabs(v - calWsLastRaw) <= CAL_WS_STABLE_EPSILON_COUNTS
+        ) {
+          calWsStableCount++;
+        } else {
+          calWsStableCount = 0;
+          calWsStable = false;
+        }
+
+        calWsLastRaw = v;
+        calWsHaveRaw = true;
+
+        if (calWsStableCount >= CAL_WS_STABLE_REQUIRED) {
+          calWsStable = true;
+        }
+
+        calWsSum += v;
+        calWsSamples++;
+      }
+
+      if (freshDist) {
+        if (
+          calWsHaveDist &&
+          fabs(distCm - calWsLastDist) <= CAL_WS_DIST_EPSILON_CM
+        ) {
+          calWsDistStableCount++;
+        } else {
+          calWsDistStableCount = 0;
+          calWsDistStable = false;
+        }
+
+        calWsLastDist = distCm;
+        calWsHaveDist = true;
+
+        if (calWsDistStableCount >= CAL_WS_DIST_REQUIRED) {
+          calWsDistStable = true;
+        }
+
+        calWsDistSum += distCm;
+        calWsDistSamples++;
+      }
+
+      if (calWsHaveRaw) {
+        statusDoc["latest_raw"] = (long)calWsLastRaw;
+      } else {
+        statusDoc["latest_raw"] = nullptr;
+      }
+      statusDoc["stable"] = calWsStable;
+      statusDoc["samples"] = calWsSamples;
+
+      if (calWsHaveDist) {
+        statusDoc["latest_distance_cm"] = calWsLastDist;
+      } else {
+        statusDoc["latest_distance_cm"] = nullptr;
+      }
+      statusDoc["distance_stable"] = calWsDistStable;
+      statusDoc["distance_samples"] = calWsDistSamples;
+
+      String statusJson;
+      serializeJson(statusDoc, statusJson);
+      ws.textAll(statusJson);
+    }
+  }
 
   // ===================================================
   // SERIAL CALIBRATION (idle only)

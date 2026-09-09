@@ -36,6 +36,17 @@ function get_db_connection(): mysqli
 
         $conn = $connection;
         mysqli_set_charset($conn, 'utf8mb4');
+
+        // Sync MySQL session timezone with PHP's so that NOW(),
+        // DATE_ADD(), and other time functions return consistent
+        // values across both layers. Without this, a timezone
+        // mismatch (e.g. PHP UTC+2 vs MySQL UTC+8) corrupts
+        // expires_at and other computed datetimes.
+        $offset = (new DateTimeImmutable('now', new DateTimeZone(date_default_timezone_get())))->getOffset();
+        $sign   = $offset >= 0 ? '+' : '-';
+        $hours  = abs(intdiv($offset, 3600));
+        $mins   = abs(intdiv($offset % 3600, 60));
+        mysqli_query($conn, "SET time_zone = '{$sign}{$hours}:{$mins}'");
     }
 
     return $conn;

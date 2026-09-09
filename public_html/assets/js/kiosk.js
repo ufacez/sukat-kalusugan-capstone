@@ -147,6 +147,13 @@
       lookupPreview.hidden = true;
       lookupPreview.innerHTML = "";
     }
+    var errorBanner =
+      document.getElementById(
+        "lookupError"
+      );
+    if (errorBanner) {
+      errorBanner.hidden = true;
+    }
     foundChild = null;
     showLookupState("idle");
   }
@@ -345,6 +352,26 @@
 
   if (lookupSubmitBtn) {
     lookupSubmitBtn.addEventListener("click", handleChildLookup);
+  }
+
+  var lookupErrorDismiss =
+    document.getElementById(
+      "lookupErrorDismiss"
+    );
+
+  if (lookupErrorDismiss) {
+    lookupErrorDismiss.addEventListener(
+      "click",
+      function () {
+        var errorBanner =
+          document.getElementById(
+            "lookupError"
+          );
+        if (errorBanner) {
+          errorBanner.hidden = true;
+        }
+      }
+    );
   }
 
   const processBtn =
@@ -3198,11 +3225,90 @@
       ) {
         const nextDue =
           dueCheckJson?.data?.next_due || "unknown";
-        pushFeed(
-          "Hindi pa due",
-          "Ang bata ay hindi pa scheduled para sa measurement ngayon. Next scheduled: " + nextDue + ". Gamitin ang Override Measurement sa nutritionist portal kung kailangan.",
-          "error"
-        );
+        const reason =
+          dueCheckJson?.data?.reason || "";
+
+        const notDueName =
+          document.getElementById(
+            "notDueChildName"
+          );
+        const notDueCode =
+          document.getElementById(
+            "notDueChildCode"
+          );
+        const notDueAge =
+          document.getElementById(
+            "notDueChildAge"
+          );
+        const notDueSex =
+          document.getElementById(
+            "notDueChildSex"
+          );
+        const notDueReason =
+          document.getElementById(
+            "notDueReason"
+          );
+
+        if (notDueName) {
+          notDueName.textContent =
+            (child.first_name || "") +
+            " " +
+            (child.last_name || "");
+        }
+
+        if (notDueCode) {
+          notDueCode.textContent =
+            child.child_code || "";
+        }
+
+        if (notDueAge) {
+          notDueAge.textContent =
+            child.age_display || "";
+        }
+
+        if (notDueSex) {
+          notDueSex.textContent =
+            child.sex === "male"
+              ? "Lalaki"
+              : "Babae";
+        }
+
+        if (notDueReason) {
+          var formattedDate = nextDue;
+          try {
+            var parts = nextDue.split("-");
+            var d = new Date(
+              Number(parts[0]),
+              Number(parts[1]) - 1,
+              Number(parts[2])
+            );
+            formattedDate = d.toLocaleDateString(
+              "en-US",
+              {
+                month: "long",
+                day: "numeric",
+                year: "numeric"
+              }
+            );
+          } catch (_e) {}
+
+          var daysMatch =
+            reason.match(
+              /\(in (\d+) days?\)/
+            );
+          var daysText = daysMatch
+            ? " " + daysMatch[0]
+            : "";
+
+          notDueReason.textContent =
+            "Hindi pa due. Next scheduled: " +
+            formattedDate +
+            daysText +
+            ".";
+        }
+
+        showLookupState("not-due");
+
         state.submitting = false;
         state.startRequestInProgress = false;
         syncStartButtonState();
@@ -3516,7 +3622,24 @@
         !state.deviceStatusChecked ||
         state.deviceOnline
       ) {
-        setStep("child-lookup");
+        resetLookup();
+
+        var errorBanner =
+          document.getElementById(
+            "lookupError"
+          );
+        var errorText =
+          document.getElementById(
+            "lookupErrorText"
+          );
+
+        if (errorBanner && errorText) {
+          errorText.textContent =
+            error.message ||
+            "Hindi nagsimula ang measurement. Subukan muli.";
+          errorBanner.hidden =
+            false;
+        }
       }
 
       return false;
@@ -3594,21 +3717,29 @@
       }
 
       try {
+        const statusUrl =
+          new URL(
+            endpoint,
+            window.location.href
+          );
+        statusUrl.searchParams.set(
+          "device_id",
+          deviceId
+        );
+        statusUrl.searchParams.set(
+          "session_id",
+          String(sessionId)
+        );
+
         const response =
           await fetch(
-            endpoint,
+            statusUrl.toString(),
             {
-              method: "POST",
+              method: "GET",
               headers: {
-                "Content-Type":
-                  "application/json",
                 Accept:
                   "application/json"
               },
-              body: JSON.stringify({
-                device_id: deviceId,
-                session_id: sessionId
-              }),
               cache: "no-store"
             }
           );
@@ -5197,6 +5328,10 @@ function finishResults(
       state.session &&
       state.session.session_id
     ) {
+      const cancelEndpoint =
+        data?.endpoints?.cancelSession ||
+        "../api/kiosk/cancel_session.php";
+
       const cancelBody =
         JSON.stringify({
           device_id: deviceId,
@@ -5205,7 +5340,7 @@ function finishResults(
         });
 
       fetch(
-        "../api/kiosk/cancel_session.php",
+        cancelEndpoint,
         {
           method: "POST",
           headers: {
@@ -5830,12 +5965,12 @@ function finishResults(
                   false
                 );
               }
-              // Always navigate to the measurement screen first so the
-              // user sees the live measurement UI even if the device is
-              // offline (common during development). The start flow
-              // below handles the actual session creation and will
-              // gracefully fall back if the device is unreachable.
-              setStep("measurement");
+              // startMeasurementFlow() handles the navigation to the
+              // measurement screen after the due-date check and session
+              // creation succeed. Do NOT call setStep("measurement")
+              // here — if the due-date check fails, the UI would be
+              // stranded on the measurement screen with no active
+              // session or polling.
               startMeasurementFlow();
             } else {
               pushFeed(

@@ -132,6 +132,7 @@ $appData = [
         'measurementStatus' => '../api/kiosk/measurement_status.php',
         'measurement' => '../api/esp32/submit_measurement.php',
         'checkDue' => '../api/kiosk/check_due.php',
+        'cancelSession' => '../api/kiosk/cancel_session.php',
     ],
     'defaults' => [
         'deviceId' => $deviceCode,
@@ -311,6 +312,17 @@ $appData = [
                         <h1 class="kiosk-lookup-title">Sino ang susukatin?</h1>
                         <p class="kiosk-lookup-subtitle">I-type ang Child ID o pangalan ng bata para mahanap ang record niya.</p>
 
+                        <!-- Error banner (shown when start fails) -->
+                        <div class="kiosk-lookup-error" id="lookupError" hidden>
+                            <div class="kiosk-lookup-error-icon">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#dc2626" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
+                            </div>
+                            <span class="kiosk-lookup-error-text" id="lookupErrorText"></span>
+                            <button class="kiosk-lookup-error-dismiss" type="button" id="lookupErrorDismiss" aria-label="Isara">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+
                         <!-- IDLE STATE -->
                         <div class="kiosk-lookup-state" data-lookup-state="idle">
                             <div class="kiosk-lookup-input-group">
@@ -366,6 +378,32 @@ $appData = [
                                 </button>
                                 <button class="kiosk-btn kiosk-btn-primary" type="button" data-kiosk-action="lookup-confirm">
                                     Simulan na
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- NOT-DUE STATE -->
+                        <div class="kiosk-lookup-state" data-lookup-state="not-due" hidden>
+                            <div class="kiosk-lookup-found-icon" style="background: #fee2e2;">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="#dc2626" width="28" height="28"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
+                            </div>
+                            <p class="kiosk-lookup-found-label" style="color: #dc2626;">HINDI PA DUE</p>
+
+                            <div class="kiosk-lookup-found-card">
+                                <div class="kiosk-lookup-found-name" id="notDueChildName">&mdash;</div>
+                                <div class="kiosk-lookup-found-id" id="notDueChildCode">&mdash;</div>
+                                <div class="kiosk-lookup-found-meta">
+                                    <span id="notDueChildAge">&mdash;</span>
+                                    <span class="kiosk-lookup-meta-dot"></span>
+                                    <span id="notDueChildSex">&mdash;</span>
+                                </div>
+                            </div>
+
+                            <div class="kiosk-lookup-not-due-reason" id="notDueReason"></div>
+
+                            <div class="kiosk-lookup-found-actions">
+                                <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="lookup-retry">
+                                    Hanapin Ulit
                                 </button>
                             </div>
                         </div>

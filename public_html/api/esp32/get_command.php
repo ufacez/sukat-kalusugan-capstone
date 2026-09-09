@@ -219,12 +219,55 @@ if (
             $expireStmt
         );
 
+        if (mysqli_affected_rows($conn) > 0) {
+            $sessionRow = null;
+        }
+
         mysqli_stmt_close(
             $expireStmt
         );
     }
+}
 
-    $sessionRow = null;
+// =====================================================
+// CLEANUP STALE START_REQUESTED
+// =====================================================
+//
+// If a session has been stuck in START_REQUESTED for longer
+// than the timeout, clean it up too. This handles cases where
+// start_measurement.php created a session but the ESP32 never
+// polled (e.g. kiosk browser refreshed before ESP32 picked it up).
+//
+
+if (
+    is_array($sessionRow) &&
+    (string)($sessionRow['status'] ?? '') === 'START_REQUESTED'
+) {
+    $startedAt = strtotime((string)($sessionRow['started_at'] ?? 'now'));
+    $ageSeconds = time() - ($startedAt ?: time());
+
+    if ($ageSeconds > MEASUREMENT_SESSION_TIMEOUT_SECONDS) {
+        $staleStartId = (int)($sessionRow['session_id'] ?? 0);
+
+        $staleStmt = mysqli_prepare(
+            $conn,
+            'UPDATE measurement_sessions
+             SET
+                status = \'ERROR\',
+                error_message = \'Session expired (never claimed by device).\',
+                updated_at = NOW()
+             WHERE id = ?
+               AND status = \'START_REQUESTED\''
+        );
+
+        if ($staleStmt !== false) {
+            mysqli_stmt_bind_param($staleStmt, 'i', $staleStartId);
+            mysqli_stmt_execute($staleStmt);
+            mysqli_stmt_close($staleStmt);
+        }
+
+        $sessionRow = null;
+    }
 }
 
 // =====================================================

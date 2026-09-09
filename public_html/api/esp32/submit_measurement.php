@@ -815,16 +815,22 @@ $deviceDbId =
         ?? 0
     );
 
+// measurement_type is ENUM('ROUTINE','OVERRIDE'): kiosk submissions are
+// always ROUTINE (the kiosk/manual/mobile distinction lives in
+// source_type). Must be a variable — mysqli_stmt_bind_param() takes
+// every value by reference, so the old 'KIOSK' literal fataled here.
+$measurementType = 'ROUTINE';
+
 mysqli_stmt_bind_param(
     $measurementInsert,
-    'iddiisssdsssssssisi',
+    'iddiissdddssssisi',
     $childId,
     $heightCm,
     $weightKg,
     $ageMonths,
     $ageDays,
     $sourceType,
-    'KIOSK',
+    $measurementType,
     $waz,
     $haz,
     $whz,

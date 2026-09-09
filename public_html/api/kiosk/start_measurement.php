@@ -70,13 +70,91 @@ if ($childId <= 0) {
 
 $conn = get_db_connection();
 
+/*
+|--------------------------------------------------------------------------
+| Find device (before transaction — needed for cleanup)
+|--------------------------------------------------------------------------
+*/
+
+$preDeviceStmt = mysqli_prepare(
+    $conn,
+    'SELECT id FROM devices WHERE device_code = ? LIMIT 1'
+);
+
+if ($preDeviceStmt === false) {
+    api_error('Unable to prepare device lookup.', 500);
+}
+
+mysqli_stmt_bind_param($preDeviceStmt, 's', $deviceCode);
+mysqli_stmt_execute($preDeviceStmt);
+$preDeviceResult = mysqli_stmt_get_result($preDeviceStmt);
+$preDeviceRow = (
+    $preDeviceResult instanceof mysqli_result
+        ? mysqli_fetch_assoc($preDeviceResult)
+        : null
+);
+mysqli_stmt_close($preDeviceStmt);
+
+if (!is_array($preDeviceRow)) {
+    api_error('Device not registered: ' . $deviceCode, 400);
+}
+
+$deviceDbId = (int)$preDeviceRow['id'];
+$timeoutSeconds = (int)MEASUREMENT_SESSION_TIMEOUT_SECONDS;
+
+/*
+|--------------------------------------------------------------------------
+| CLEANUP STALE SESSIONS (OUTSIDE transaction — persists on rollback)
+|--------------------------------------------------------------------------
+|
+| This MUST run outside the transaction so that cleaned-up sessions
+| are not undone by a later rollback. Otherwise, the active-session
+| check throws an exception, the rollback undoes the cleanup, and
+| the kiosk stays permanently locked.
+|
+| Any session in START_REQUESTED or MEASURING status for this device
+| is treated as abandoned. The kiosk operator explicitly chose to
+| start a new measurement, so the old session is by definition stale.
+| Time-based conditions are deliberately avoided — clock skew or
+| NTP drift can cause future-dated timestamps that make time-based
+| comparisons silently skip the cleanup.
+|
+*/
+
+$staleCleanup = mysqli_prepare(
+    $conn,
+    'UPDATE measurement_sessions
+     SET
+        status = \'ERROR\',
+        error_message = \'Session superseded by new measurement request.\',
+        updated_at = NOW()
+     WHERE device_id = ?
+       AND status IN (\'START_REQUESTED\', \'MEASURING\')'
+);
+
+if ($staleCleanup !== false) {
+    mysqli_stmt_bind_param(
+        $staleCleanup,
+        'i',
+        $deviceDbId
+    );
+    mysqli_stmt_execute($staleCleanup);
+    mysqli_stmt_close($staleCleanup);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Transaction — validate inputs, check for active sessions, create session
+|--------------------------------------------------------------------------
+*/
+
 mysqli_begin_transaction($conn);
 
 try {
 
     /*
     |--------------------------------------------------------------------------
-    | Find device
+    | Find device (re-verify inside transaction)
     |--------------------------------------------------------------------------
     */
 
@@ -301,9 +379,6 @@ try {
             'Unable to prepare measurement session creation.'
         );
     }
-
-    $timeoutSeconds =
-        (int)MEASUREMENT_SESSION_TIMEOUT_SECONDS;
 
     mysqli_stmt_bind_param(
         $insertStmt,
