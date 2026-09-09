@@ -91,7 +91,29 @@ foreach ($rows as $row) {
 $tmpPath = tempnam(sys_get_temp_dir(), 'who_export_') . '.xlsx';
 $sheetName = strtoupper($indicator) . '_' . $sex;
 
+if (empty($dataRows)) {
+	admin_redirect('/nutritionist/who_reference.php', [
+		'indicator' => $indicator,
+		'sex' => $sex,
+		'range' => $ageRange,
+		'notice' => 'No reference rows found for this indicator. The reference table may not be seeded yet.',
+		'type' => 'error',
+	]);
+}
+
 if (!xlsx_lite_write($tmpPath, $header, $dataRows, $sheetName)) {
+	admin_redirect('/nutritionist/who_reference.php', [
+		'indicator' => $indicator,
+		'sex' => $sex,
+		'range' => $ageRange,
+		'notice' => 'The export file could not be generated.',
+		'type' => 'error',
+	]);
+}
+
+$fileSize = filesize($tmpPath);
+if ($fileSize === false) {
+	@unlink($tmpPath);
 	admin_redirect('/nutritionist/who_reference.php', [
 		'indicator' => $indicator,
 		'sex' => $sex,
@@ -105,7 +127,7 @@ $downloadName = 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange .
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 header('Content-Disposition: attachment; filename="' . $downloadName . '"');
-header('Content-Length: ' . (string)filesize($tmpPath));
+header('Content-Length: ' . (string)$fileSize);
 header('Cache-Control: no-store');
 
 readfile($tmpPath);

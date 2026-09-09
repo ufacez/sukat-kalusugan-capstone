@@ -183,6 +183,7 @@ admin_layout_start(
                     return;
                 }
                 res.data.forEach(function(area) {
+                    if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) return;
                     var opt = document.createElement('option');
                     opt.value = area.id;
                     opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;

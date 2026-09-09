@@ -42,11 +42,35 @@ if ($id <= 0 || $name === '' || $email === '') {
     admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Parent id, name, and email are required.', 'type' => 'error']);
 }
 
+$existingParent = admin_fetch_one(
+    'SELECT id, barangay_id, local_area_id FROM parents WHERE id = ? LIMIT 1',
+    'i',
+    [$id]
+);
+if (!$existingParent) {
+    admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Parent not found.', 'type' => 'error']);
+}
+
 if (!admin_is_valid_ph_mobile($phone)) {
     admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 }
 
 $phone = preg_replace('/[^0-9]/', '', $phone);
+
+if ($localAreaId !== null && $localAreaId > 0) {
+    $localArea = admin_fetch_one(
+        'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+        'ii',
+        [$localAreaId, $barangayId]
+    );
+    $keepsExistingInactiveArea = $localAreaId === (int)($existingParent['local_area_id'] ?? 0)
+        && $barangayId !== null
+        && (int)$barangayId === (int)($existingParent['barangay_id'] ?? 0);
+
+    if (!$localArea && !$keepsExistingInactiveArea) {
+        admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
+    }
+}
 
 if (!in_array($status, ['active', 'inactive'], true)) {
     $status = 'active';

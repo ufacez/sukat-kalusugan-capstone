@@ -53,6 +53,21 @@ if (!admin_is_valid_ph_mobile($phone)) {
     admin_redirect('/admin/parent_form.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 }
 
+if ($localAreaId !== null && $localAreaId > 0) {
+    if ($barangayId === null) {
+        admin_redirect('/admin/parent_form.php', ['notice' => 'A Barangay is required before assigning a Local Area.', 'type' => 'error']);
+    }
+
+    $localArea = admin_fetch_one(
+        'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+        'ii',
+        [$localAreaId, $barangayId]
+    );
+    if (!$localArea) {
+        admin_redirect('/admin/parent_form.php', ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
+    }
+}
+
 $phone = preg_replace('/[^0-9]/', '', $phone);
 
 if ($password === '') {

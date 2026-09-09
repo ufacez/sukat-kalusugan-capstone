@@ -453,6 +453,10 @@ function xlsx_lite_sheet_body_xml(array $spec, array &$sharedStrings): string
 			}
 
 			$value = $cell['v'] ?? '';
+			if (is_array($value) || (is_object($value) && !method_exists($value, '__toString'))) {
+				error_log('[SukatKalusugan] xlsx_lite: non-scalar cell value coerced to empty string.');
+				$value = '';
+			}
 			$styleKey = (string)($cell['s'] ?? 'default');
 			$styleIndex = xlsx_lite_style_index($styleKey);
 			$cellRef = xlsx_lite_index_to_column_ref($colIndex) . $excelRow;

@@ -194,9 +194,10 @@ $listsSpec = [
 ];
 
 /*
- | Single-list export mode: &list=SUW exports ONLY that one list sheet
+ | Single-list export mode: &list=0-23 exports ONLY that one list sheet
  | (same template), skipping the Summary sheet. Case-insensitive so
- | Ob/SSt/St work regardless of URL casing.
+ | codes like mst_sst work regardless of URL casing. Unknown codes fall
+ | back to the full multi-sheet workbook.
  */
 $listParamRaw = trim((string)($_GET['list'] ?? ''));
 $reportParam = strtolower(trim((string)($_GET['report'] ?? '')));
@@ -550,6 +551,7 @@ if ($isForm1B) {
 
 	$owMessage = 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.';
 	$dataRowIndex = 0;
+	$owMsgRowNum = null;
 	foreach ($form1bSummary as $axis => $summaryTable) {
 		foreach ($summaryTable as $code => $counts) {
 			$label = $axis . ' - ' . $statusGroups[$axis][$code];
@@ -561,6 +563,7 @@ if ($isForm1B) {
 						$msgRow[] = '';
 					}
 					$addForm1bRow($form1bOutput, $msgRow, 'cell_center');
+					$owMsgRowNum = count($form1bOutput);
 					$dataRowIndex++;
 				}
 				continue;
@@ -664,10 +667,12 @@ if ($isForm1B) {
 		$ci = intdiv($ci, 26);
 	}
 
+	// Actual sheet layout: row 1 title, row 2 meta, row 3 blank,
+	// row 4 header group labels, row 5 sub-headers, row 6+ data.
 	$form1bTitleRow = 1;
-	$form1bHeaderRow1 = 3;
-	$form1bHeaderRow2 = 4;
-	$form1bFirstDataRow = 5;
+	$form1bHeaderRow1 = 4;
+	$form1bHeaderRow2 = 5;
+	$form1bFirstDataRow = 6;
 
 	$merges = [
 		"A{$form1bTitleRow}:{$form1bLastCol}{$form1bTitleRow}",
@@ -703,10 +708,11 @@ if ($isForm1B) {
 	while ($ci > 0) { $ci--; $endCol = chr(65 + ($ci % 26)) . $endCol; $ci = intdiv($ci, 26); }
 	$merges[] = "{$startCol}{$form1bHeaderRow1}:{$endCol}{$form1bHeaderRow1}";
 
-	$msgRowNum = $form1bFirstDataRow + 2;
-	$merges[] = "B{$msgRowNum}:{$form1bLastCol}{$msgRowNum}";
-	$msgRowNum2 = $form1bFirstDataRow + 3;
-	$merges[] = "B{$msgRowNum2}:{$form1bLastCol}{$msgRowNum2}";
+	// Merge the OW notice row across the data columns (tracked at emit time
+	// so it always lands on the message row, never on a data row).
+	if ($owMsgRowNum !== null) {
+		$merges[] = "B{$owMsgRowNum}:{$form1bLastCol}{$owMsgRowNum}";
+	}
 
 	$sheets[] = [
 		'name' => 'Form_1B',
@@ -979,12 +985,9 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	];
 	foreach ($metaTexts as $metaText) {
 		$metaRow[] = ['v' => $metaText, 's' => 'label'];
-		for ($pad = 0; $pad < 3; $pad++) {
-			$metaRow[] = ['v' => '', 's' => 'default'];
-		}
 	}
-	while (count($metaRow) > $totalCols) {
-		array_pop($metaRow);
+	while (count($metaRow) < $totalCols) {
+		$metaRow[] = ['v' => '', 's' => 'default'];
 	}
 	$outRows[] = $metaRow;
 
@@ -1071,12 +1074,16 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	];
 
 	foreach ($signatureRows as [$signLabel, $signRole]) {
-		$outRows[] = [
+		$signRow = [
 			['v' => $signLabel, 's' => 'label'],
 			['v' => '', 's' => 'default'],
 			['v' => '', 's' => 'default'],
 			['v' => $signRole, 's' => 'note'],
 		];
+		while (count($signRow) < $totalCols) {
+			$signRow[] = ['v' => '', 's' => 'default'];
+		}
+		$outRows[] = $signRow;
 	}
 
 	// Title block spans the full grid width on every list sheet.

@@ -29,13 +29,20 @@ if (!$barangay) {
 
 $areas = admin_fetch_all(
     "SELECT id, area_code, area_name, area_type, description, is_active, created_at,
-            (SELECT COUNT(*) FROM children WHERE local_area_id = local_areas.id) AS children_count
+            (SELECT COUNT(*) FROM children WHERE local_area_id = local_areas.id) AS children_count,
+            (SELECT COUNT(*) FROM parents WHERE local_area_id = local_areas.id) AS parents_count,
+            (SELECT COUNT(*) FROM households WHERE local_area_id = local_areas.id) AS households_count
      FROM local_areas
      WHERE barangay_id = ?
      ORDER BY area_type ASC, area_name ASC",
     'i',
     [$barangayId]
 );
+
+foreach ($areas as &$area) {
+    $area['linked_count'] = (int)$area['children_count'] + (int)$area['parents_count'] + (int)$area['households_count'];
+}
+unset($area);
 
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/barangays.php'))
@@ -92,10 +99,10 @@ $flash = admin_flash_message();
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
             </div>
             <div class="admin-card-content">
-                <div class="admin-card-label">Children Linked</div>
-                <div class="admin-card-value"><?php echo array_sum(array_map(fn($a) => (int)$a['children_count'], $areas)); ?></div>
+                <div class="admin-card-label">Linked Records</div>
+                <div class="admin-card-value"><?php echo array_sum(array_map(fn($a) => (int)$a['linked_count'], $areas)); ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend is-up">Across all local areas</span>
+                    <span class="admin-card-trend is-up">Children, parents, and households</span>
                 </div>
             </div>
         </div>
@@ -127,7 +134,7 @@ $flash = admin_flash_message();
                         <th>Area Name</th>
                         <th>Type</th>
                         <th>Description</th>
-                        <th>Children</th>
+                        <th>Linked Records</th>
                         <th>Status</th>
                         <th>Actions</th>
                     </tr>
@@ -143,7 +150,7 @@ $flash = admin_flash_message();
                                 </span>
                             </td>
                             <td style="color:var(--admin-muted);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"><?php echo admin_e((string)($area['description'] ?? '—')); ?></td>
-                            <td><?php echo (int)$area['children_count']; ?></td>
+                            <td><?php echo (int)$area['linked_count']; ?></td>
                             <td>
                                 <span class="admin-pill <?php echo (int)$area['is_active'] === 1 ? 'is-success' : 'is-muted'; ?>">
                                     <?php echo (int)$area['is_active'] === 1 ? 'Active' : 'Inactive'; ?>
@@ -160,7 +167,14 @@ $flash = admin_flash_message();
                                         data-description="<?php echo admin_e((string)($area['description'] ?? '')); ?>"
                                         data-active="<?php echo (int)$area['is_active']; ?>"
                                     ><?php echo admin_action_icon('edit'); ?></button>
-                                    <?php if ((int)$area['children_count'] === 0): ?>
+                                    <?php if ((int)$area['is_active'] === 0): ?>
+                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" onsubmit="return confirm('Reactivate <?php echo admin_e($area['area_name']); ?>? It will appear for new registrations again.');" style="display:inline;">
+                                            <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
+                                            <input type="hidden" name="is_active" value="1">
+                                            <input type="hidden" name="_method" value="PATCH">
+                                            <button class="admin-icon-btn admin-icon-btn-primary" title="Activate" type="submit"><?php echo admin_action_icon('add'); ?></button>
+                                        </form>
+                                    <?php elseif ((int)$area['linked_count'] === 0): ?>
                                         <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($area['area_name']); ?>? This cannot be undone.');" style="display:inline;">
                                             <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
                                             <input type="hidden" name="_method" value="DELETE">
@@ -172,7 +186,7 @@ $flash = admin_flash_message();
                                             <input type="hidden" name="is_active" value="0">
                                             <input type="hidden" name="_method" value="PATCH">
                                             <button class="admin-icon-btn admin-icon-btn-danger" title="Deactivate" type="submit">
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636"/></svg>
+                                                <?php echo admin_action_icon('archive'); ?>
                                             </button>
                                         </form>
                                     <?php endif; ?>
@@ -294,7 +308,7 @@ $flash = admin_flash_message();
         }
 
         fetch(url, {
-            method: isEdit ? 'PUT' : 'POST',
+            method: 'POST',
             body: body
         })
         .then(function(r) { return r.json(); })

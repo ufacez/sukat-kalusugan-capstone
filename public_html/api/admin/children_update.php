@@ -48,6 +48,14 @@ if ($barangayId === null) {
     admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'The selected parent/guardian does not have a Barangay assigned.', 'type' => 'error']);
 }
 
+$currentChild = null;
+if ($id > 0) {
+    $currentChild = admin_fetch_one('SELECT id, parent_id, local_area_id FROM children WHERE id = ? LIMIT 1', 'i', [$id]);
+    if (!$currentChild) {
+        admin_redirect('/admin/children.php', ['notice' => 'Invalid child id.', 'type' => 'error']);
+    }
+}
+
 $validatedLocalAreaId = null;
 if ($localAreaId > 0) {
     $localArea = admin_fetch_one(
@@ -55,8 +63,13 @@ if ($localAreaId > 0) {
         'ii',
         [$localAreaId, $barangayId]
     );
+    $keepsExistingInactiveArea = $localAreaId === (int)($currentChild['local_area_id'] ?? 0)
+        && $parentId === (int)($currentChild['parent_id'] ?? 0);
+
     if ($localArea) {
         $validatedLocalAreaId = (int)$localArea['id'];
+    } elseif (!$keepsExistingInactiveArea) {
+        admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
     }
 }
 

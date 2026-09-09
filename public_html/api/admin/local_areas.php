@@ -220,8 +220,19 @@ if ($method === 'DELETE') {
         'i',
         [$id]
     );
+    $parentCount = admin_scalar(
+        "SELECT COUNT(*) FROM parents WHERE local_area_id = ?",
+        'i',
+        [$id]
+    );
+    $householdCount = admin_scalar(
+        "SELECT COUNT(*) FROM households WHERE local_area_id = ?",
+        'i',
+        [$id]
+    );
+    $referenceCount = $childCount + $parentCount + $householdCount;
 
-    if ($childCount > 0) {
+    if ($referenceCount > 0) {
         admin_execute(
             "UPDATE local_areas SET is_active = 0 WHERE id = ?",
             'i',
@@ -230,9 +241,9 @@ if ($method === 'DELETE') {
 
         $actor = current_user();
         log_action($actor['id'] ?? null, 'DEACTIVATE_LOCAL_AREA', 'info',
-            "Deactivated local area \"{$existing['area_name']}\" (#{$id}) — {$childCount} children linked");
+            "Deactivated local area \"{$existing['area_name']}\" (#{$id}) — {$referenceCount} records linked");
 
-        api_success([], 'Local area deactivated (children still reference it).');
+        api_success([], 'Local area deactivated (linked records preserved).');
         exit;
     }
 

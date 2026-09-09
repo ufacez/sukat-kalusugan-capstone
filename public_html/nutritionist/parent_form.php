@@ -110,15 +110,39 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	 * belong to the parent's barangay so a Dela Paz Norte parent can't
 	 * be assigned a Malpitic purok by accident.
 	 */
-	if ($localAreaId !== null && $barangayId !== null) {
+	$existingParent = null;
+	if ($action === 'update') {
+		$existingParent = admin_fetch_one(
+			'SELECT id, barangay_id, local_area_id FROM parents WHERE id = ? LIMIT 1',
+			'i',
+			[$parentId]
+		);
+		if (!$existingParent) {
+			admin_redirect($redirectBack, ['notice' => 'Parent not found.', 'type' => 'error']);
+		}
+	}
+
+	if ($localAreaId !== null && $localAreaId > 0) {
+		if ($barangayId === null) {
+			admin_redirect($redirectBack, [
+				'notice' => 'A Barangay is required before assigning a Local Area.',
+				'type' => 'error',
+			]);
+		}
+
 		$localAreaCheck = admin_fetch_one(
 			'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
 			'ii',
 			[$localAreaId, $barangayId]
 		);
-		if (!$localAreaCheck) {
+		$keepsExistingInactiveArea = $action === 'update'
+			&& $existingParent !== null
+			&& $localAreaId === (int)($existingParent['local_area_id'] ?? 0)
+			&& $barangayId === (int)($existingParent['barangay_id'] ?? 0);
+
+		if (!$localAreaCheck && !$keepsExistingInactiveArea) {
 			admin_redirect($redirectBack, [
-				'notice' => 'Selected local area does not belong to the assigned barangay.',
+				'notice' => 'Selected Local Area is inactive or does not belong to the assigned Barangay.',
 				'type' => 'error',
 			]);
 		}
@@ -466,6 +490,9 @@ nutritionist_layout_start(
 					return;
 				}
 				res.data.forEach(function(area) {
+					if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) {
+						return;
+					}
 					var opt = document.createElement('option');
 					opt.value = area.id;
 					opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;

@@ -94,6 +94,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         admin_redirect($errorBackUrl, ['notice' => 'The selected parent/guardian does not have a Barangay assigned.', 'type' => 'error']);
     }
 
+    $currentChild = null;
+    if ($action === 'update' && $childId > 0) {
+        $currentChild = admin_fetch_one('SELECT id, parent_id, local_area_id FROM children WHERE id = ? LIMIT 1', 'i', [$childId]);
+        if (!$currentChild) {
+            admin_redirect($errorBackUrl, ['notice' => 'Child not found.', 'type' => 'error']);
+        }
+    }
+
     $validatedLocalAreaId = null;
     if ($localAreaId > 0) {
         $localArea = admin_fetch_one(
@@ -101,8 +109,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'ii',
             [$localAreaId, $barangayId]
         );
+        $keepsExistingInactiveArea = $action === 'update'
+            && $currentChild !== null
+            && $localAreaId === (int)($currentChild['local_area_id'] ?? 0)
+            && $parentId === (int)($currentChild['parent_id'] ?? 0);
+
         if ($localArea) {
             $validatedLocalAreaId = (int)$localArea['id'];
+        } elseif (!$keepsExistingInactiveArea) {
+            admin_redirect($errorBackUrl, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
         }
     }
 
@@ -286,6 +301,7 @@ admin_layout_start(
                     return;
                 }
                 res.data.forEach(function(area) {
+                    if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) return;
                     var opt = document.createElement('option');
                     opt.value = area.id;
                     opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
