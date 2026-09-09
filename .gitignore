@@ -1,5 +1,7 @@
 # --- Secrets / local config ---
-public_html/includes/config.php
+# config.php itself no longer holds secrets (moved to .env below) --
+# it now only contains env() calls with safe defaults, so it's safe
+# and correct to track it in git going forward. Only .env stays ignored.
 .env
 .env.*
 
