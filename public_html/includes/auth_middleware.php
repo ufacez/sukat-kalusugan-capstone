@@ -78,6 +78,18 @@ function start_secure_session(?int $lifetimeSeconds = null): void
     ]);
 
     session_start();
+
+    // Every page that starts a session is either the login page itself or
+    // something behind an auth check -- neither should ever be served from
+    // the browser's local cache. Without this, hitting refresh (or back)
+    // after logging out can show the last-rendered page straight from
+    // cache, without the browser even asking the server again -- meaning
+    // the auth check never runs and stale data appears to still "work"
+    // even though the server-side session is genuinely gone. This matters
+    // a lot on a shared kiosk/clinic computer where the next person could
+    // otherwise see the previous staff member's screen after they log out.
+    header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+    header('Pragma: no-cache');
 }
 
 function current_user(): ?array
