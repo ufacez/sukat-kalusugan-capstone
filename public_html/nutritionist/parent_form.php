@@ -45,7 +45,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 	if (!$isAdmin) {
 		if ($userBarangayId === null || $userBarangayId === '') {
-			admin_redirect($redirectBack, [
+			/** @disregard */
+			admin_redirect($redirectBack , [
 				'notice' => 'Your account is not assigned to a barangay. Contact your administrator to set one before adding parents.',
 				'type' => 'error',
 			]);
