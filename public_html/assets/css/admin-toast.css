@@ -183,13 +183,13 @@
   color: #dce8e1;
 }
 
-/* ---- Mobile: top-docked (never over the drawer footer) ---- */
+/* ---- Mobile: bottom sheet (thumb-friendly on parent phones) ---- */
 @media (max-width: 480px) {
   .admin-toast-stack {
-    top: calc(64px + env(safe-area-inset-top, 0px));
-    bottom: auto;
+    top: auto;
     right: 14px;
     left: 14px;
+    bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     width: auto;
   }
 
@@ -198,11 +198,11 @@
   }
 
   .admin-toast.is-leaving {
-    transform: translateY(-12px);
+    transform: translateY(12px);
   }
 
   @keyframes admin-toast-in-mobile {
-    from { opacity: 0; transform: translateY(-14px) scale(0.98); }
+    from { opacity: 0; transform: translateY(14px) scale(0.98); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
 }

@@ -115,7 +115,6 @@
   flex-direction: column;
   gap: 6px;
   border-right: 1px solid var(--admin-border);
-  overflow-y: auto;
   overflow-x: hidden;
   transition: width 0.2s ease, padding 0.2s ease;
 }
@@ -262,6 +261,8 @@
   flex: 1;
   min-height: 0;
   overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .admin-nav-group + .admin-nav-group {
@@ -331,23 +332,18 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 12px;
-  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(20px, env(safe-area-inset-bottom, 0px) + 12px);
   border-top: 1px solid var(--admin-border);
-  margin-top: auto;
-  /* Pins the footer to the bottom of the sidebar's own scroll area
-   * (not the viewport) so Sign Out always lands inside the visibly
-   * tappable region -- relying on margin-top:auto plus a guessed
-   * padding value alone left it reachable in theory but hidden behind
-   * some mobile browsers' bottom toolbar in practice (Android Chrome
-   * in particular doesn't expose a safe-area-inset value the way iOS
-   * does, so that padding alone couldn't account for it). Sticky
-   * positioning guarantees this regardless of which browser chrome is
-   * doing what on a given device.
+  flex-shrink: 0;
+  /* No sticky/scroll trickery here on purpose. .admin-nav above is the
+   * ONLY scrolling region in the sidebar (flex: 1; overflow-y: auto),
+   * so this footer sits in the static remainder of the flex column --
+   * always in the same place, never covered by mobile browser chrome,
+   * and never subject to WebKit's known bug where position:sticky
+   * descendants of a transformed ancestor (the drawer's
+   * transform: translateX(...) open/close animation) can render
+   * correctly but silently stop receiving taps.
    */
-  position: sticky;
-  bottom: 0;
-  background: var(--admin-sidebar-bg);
-  z-index: 1;
 }
 .admin-sidebar-footer .admin-logout {
   width: 100%;
@@ -695,38 +691,9 @@
  * but disable the double-tap-zoom gesture that can swallow link taps. */
 .admin-sidebar-toggle,
 .admin-nav-link,
-.admin-logout,
-.admin-topbar-logout {
+.admin-logout {
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
-}
-
-/* Topbar sign-out: mobile-only shortcut so logging out never depends on
- * the drawer. Hidden on desktop where the sidebar footer owns it. */
-.admin-topbar-logout {
-  display: none;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
-  border: 1px solid var(--admin-border);
-  border-radius: 12px;
-  background: var(--admin-surface-alt);
-  color: var(--admin-muted);
-}
-.admin-topbar-logout svg {
-  width: 20px;
-  height: 20px;
-}
-.admin-topbar-logout:hover {
-  color: var(--admin-danger);
-  border-color: var(--admin-logout-hover-border);
-  background: var(--admin-logout-hover-bg);
-}
-@media (max-width: 920px) {
-  .admin-topbar-logout {
-    display: inline-flex;
-  }
 }
 
 /* 44px minimum touch target on phones + coarse-pointer devices. */
@@ -1664,15 +1631,10 @@
     max-width: 300px;
     height: 100vh;
     height: 100dvh;
-    /* Clearance so the footer (sign-out) always scrolls fully above the
-     * mobile browser toolbar / home-indicator zone in portrait. */
-    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     transform: translateX(-105%);
     transition: transform 280ms cubic-bezier(0.32, 0.72, 0, 1);
     z-index: 40;
-    overflow-y: auto;
-    overflow-x: hidden;
-    -webkit-overflow-scrolling: touch;
+    overflow: hidden;
     box-shadow: 6px 0 28px rgba(0, 0, 0, 0.18);
     /* When closed, hide from a11y and avoid focus traps. */
     visibility: hidden;
