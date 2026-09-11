@@ -703,19 +703,26 @@ function followup_fetch_visits(int $childId, string $fromDate, string $toDate, i
 	$conn = get_db_connection();
 
 	// Use @ to suppress mysqli warnings if columns don't exist in the
-	// appointments table (some deployments use a schema without these columns)
-	$stmt = @$conn->prepare(
-		"SELECT a.scheduled_at, a.intervention_type, a.intervention_notes,
-		        a.status AS appt_status,
-		        m.nutritional_status
-		 FROM appointments a
-		 LEFT JOIN measurements m ON m.id = a.source_measurement_id
-		 WHERE a.child_id = ?
-		   AND a.appointment_type = 'followup'
-		   AND a.scheduled_at BETWEEN ? AND ?
-		 ORDER BY a.scheduled_at ASC
-		 LIMIT ?"
-	);
+	// appointments table (some deployments use a schema without these columns).
+	// The try/catch is the real guard: on PHP 8 + mysqlnd, prepare() throws
+	// mysqli_sql_exception instead of returning false, which @ cannot stop.
+	try {
+		$stmt = @$conn->prepare(
+			"SELECT a.scheduled_at, a.intervention_type, a.intervention_notes,
+			        a.status AS appt_status,
+			        m.nutritional_status
+			 FROM appointments a
+			 LEFT JOIN measurements m ON m.id = a.source_measurement_id
+			 WHERE a.child_id = ?
+			   AND a.appointment_type = 'followup'
+			   AND a.scheduled_at BETWEEN ? AND ?
+			 ORDER BY a.scheduled_at ASC
+			 LIMIT ?"
+		);
+	} catch (Throwable $e) {
+		error_log('followup_fetch_visits prepare failed: ' . $e->getMessage());
+		return [];
+	}
 
 	if ($stmt === false) {
 		return [];
