@@ -316,11 +316,11 @@ $flash = admin_flash_message();
             if (res.success) {
                 location.reload();
             } else {
-                alert(res.message || 'Something went wrong.');
+                AdminToast.error(res.message || 'Something went wrong.');
             }
         })
         .catch(function() {
-            alert('Network error. Please try again.');
+            AdminToast.error('Network error. Please try again.');
         });
     });
 })();

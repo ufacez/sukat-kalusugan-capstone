@@ -235,6 +235,7 @@ parent_layout_start('Growth Progress', 'Track your child\'s growth over time.', 
 			<button class="admin-modal-close" id="allModalClose" type="button">&times;</button>
 		</div>
 		<div style="padding:16px 20px;overflow-y:auto;max-height:60vh;">
+			<div class="parent-table-wrap">
 			<table class="parent-table" style="width:100%;">
 				<thead>
 					<tr>
@@ -247,6 +248,7 @@ parent_layout_start('Growth Progress', 'Track your child\'s growth over time.', 
 				<tbody id="allMeasurementsBody">
 				</tbody>
 			</table>
+			</div>
 		</div>
 	</div>
 </div>

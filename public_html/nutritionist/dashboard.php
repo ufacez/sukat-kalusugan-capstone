@@ -924,6 +924,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				<a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>" class="admin-mini" style="font-weight:600;">View all &rarr;</a>
 			</div>
 
+			<div class="nutritionist-table-wrap">
 			<table class="nutritionist-table measurements-table">
 				<thead>
 					<tr>
@@ -967,6 +968,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 					<?php endforeach; ?>
 				</tbody>
 			</table>
+		</div>
 		</div>
 	</article>
 </section>

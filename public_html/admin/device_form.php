@@ -772,7 +772,7 @@ is optional verification.
     el('cal-btn-commit').addEventListener('click', function() {
         var weight = parseFloat(el('cal-known-weight').value);
         if (!weight || weight <= 0) {
-            alert('Enter a valid weight in kg.');
+            AdminToast.error('Enter a valid weight in kg.');
             return;
         }
         log('3', 'Committing with known weight: ' + weight + ' kg...');
@@ -1053,7 +1053,7 @@ is optional verification.
         if (rawKnown !== '' && rawKnown !== null && rawKnown !== undefined) {
             var known = parseFloat(rawKnown);
             if (!isFinite(known) || known < 0 || known > 250) {
-                alert('Enter a valid height in cm, or leave it empty.');
+                AdminToast.error('Enter a valid height in cm, or leave it empty.');
                 return;
             }
             if (known > 0) payload.known_height_cm = known;

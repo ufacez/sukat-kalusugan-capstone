@@ -1,0 +1,196 @@
+/* =========================================================================
+ *  PARENT KALI AI — child-friendly shapes over ai_assistant.css, using the
+ *  SYSTEM palette only (no custom hues): --admin-primary family + surfaces.
+ *  Scoped to body.parent-ai_assistant so the nutritionist page is untouched.
+ *  Friendliness lives in the rounded shapes, roomy text, and warm copy —
+ *  not in off-palette colors.
+ * ========================================================================= */
+
+body.parent-ai_assistant {
+  --ai-accent: var(--admin-primary, #0b6e4f);
+  --ai-accent-soft: var(--admin-primary-soft, #dff1ea);
+  --ai-bg: var(--admin-bg, #eef4f0);
+}
+
+/* ---- Friendlier shapes, slightly larger readable text ---- */
+body.parent-ai_assistant .ai-msg-bubble {
+  border-radius: 18px;
+  font-size: 0.92rem;
+}
+body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble {
+  background: linear-gradient(135deg, var(--admin-primary, #0b6e4f), var(--admin-primary-strong, #07513a));
+  border-bottom-right-radius: 6px;
+}
+body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble {
+  background: var(--admin-primary-soft, #dff1ea);
+  border: 1px solid var(--ai-border);
+  color: var(--ai-text);
+  border-bottom-left-radius: 6px;
+}
+body.parent-ai_assistant .ai-msg-bubble strong {
+  color: var(--admin-primary, #0b6e4f);
+}
+body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble strong {
+  color: #fff;
+}
+body.parent-ai_assistant .ai-msg-avatar {
+  background: linear-gradient(135deg, var(--admin-primary, #0b6e4f), var(--admin-primary-strong, #07513a));
+}
+
+/* ---- Header + empty state ---- */
+body.parent-ai_assistant .ai-chat-header {
+  background: linear-gradient(180deg, var(--admin-primary-soft, #dff1ea), var(--ai-surface));
+}
+body.parent-ai_assistant .ai-empty-icon {
+  animation: ai-float 3.2s ease-in-out infinite;
+}
+body.parent-ai_assistant .ai-suggestion {
+  border-radius: 22px;
+  padding: 8px 15px;
+  font-size: 0.78rem;
+}
+body.parent-ai_assistant .ai-suggestion:hover {
+  background: var(--admin-primary-soft, #dff1ea);
+  border-color: var(--admin-primary, #0b6e4f);
+  color: var(--admin-primary, #0b6e4f);
+}
+
+/* ---- Controls in system green ---- */
+body.parent-ai_assistant .ai-send-btn {
+  background: linear-gradient(135deg, var(--admin-primary, #0b6e4f), var(--admin-primary-strong, #07513a));
+}
+body.parent-ai_assistant .ai-send-btn:hover:not(:disabled) {
+  filter: brightness(1.07);
+}
+body.parent-ai_assistant .ai-input-row textarea:focus {
+  border-color: var(--admin-primary, #0b6e4f);
+  box-shadow: 0 0 0 3px rgba(11, 110, 79, 0.12);
+}
+body.parent-ai_assistant .ai-child-picker-btn:hover,
+body.parent-ai_assistant .ai-modal-item.is-active {
+  border-color: var(--admin-primary, #0b6e4f);
+}
+body.parent-ai_assistant .ai-modal-item.is-active {
+  background: var(--admin-primary-soft, #dff1ea);
+}
+body.parent-ai_assistant .ai-session-item:hover,
+body.parent-ai_assistant .ai-session-item.is-active {
+  border-color: var(--admin-primary, #0b6e4f);
+  background: var(--admin-primary-soft, #dff1ea);
+}
+
+/* =========================================================================
+ *  MOBILE — parent portal
+ * ========================================================================= */
+
+/* The base file collapses the sidebar on small screens; the parent page's
+ * hamburger toggles .is-context-open to reopen it as a sheet with the
+ * children list + recent chats. */
+@media (max-width: 720px) {
+  body.parent-ai_assistant .ai-layout.is-context-open .ai-sidebar {
+    box-shadow: 0 -12px 32px rgba(0, 0, 0, 0.18);
+    border-top: 2px solid var(--admin-primary, #0b6e4f);
+  }
+  body.parent-ai_assistant .ai-msg {
+    max-width: 92%;
+  }
+}
+
+@media (max-width: 480px) {
+  body.parent-ai_assistant .ai-chat-header {
+    gap: 8px;
+  }
+  body.parent-ai_assistant .ai-chat-actions {
+    gap: 6px;
+  }
+  body.parent-ai_assistant .ai-msg-bubble {
+    font-size: 0.85rem;
+  }
+  body.parent-ai_assistant .ai-modal {
+    max-width: 100%;
+    border-radius: 18px 18px 0 0;
+  }
+  body.parent-ai_assistant .ai-modal-overlay {
+    padding: 0;
+    align-items: flex-end;
+  }
+}
+
+/* ---- Dark theme: same tokens as the rest of the portal ---- */
+:root[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble,
+[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble {
+  background: #1e3a2e;
+  border-color: #2e5040;
+  color: #c8dace;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-msg-bubble strong,
+[data-theme="dark"] body.parent-ai_assistant .ai-msg-bubble strong {
+  color: #2ec57a;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble,
+[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble {
+  background: #2ec57a;
+  color: #0f1a14;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble strong,
+[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble strong {
+  color: #0f1a14;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-chat-header,
+[data-theme="dark"] body.parent-ai_assistant .ai-chat-header {
+  background: #162019;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-empty-icon,
+[data-theme="dark"] body.parent-ai_assistant .ai-empty-icon {
+  background: rgba(46, 197, 122, 0.15);
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-empty-icon svg,
+[data-theme="dark"] body.parent-ai_assistant .ai-empty-icon svg {
+  color: #2ec57a;
+}
+:root[data-theme="dark"] body.parent-ai_assistant .ai-suggestion:hover,
+[data-theme="dark"] body.parent-ai_assistant .ai-suggestion:hover {
+  background: rgba(46, 197, 122, 0.15);
+  border-color: #2ec57a;
+  color: #dce8e1;
+}
+
+/* =========================================================================
+ *  MOBILE — composer pinned flush to the bottom, no whitespace
+ *  The base file drops .ai-layout to height:auto on small screens (composer
+ *  flows after content) while .admin-main keeps 28px bottom padding + gap.
+ *  Here the card takes a fixed viewport height, messages scroll inside it,
+ *  the redundant pageheader is hidden (chat has its own header), and the
+ *  input gets safe-area padding.
+ * ========================================================================= */
+@media (max-width: 720px) {
+  body.parent-ai_assistant .admin-pageheader {
+    display: none;
+  }
+  body.parent-ai_assistant .ai-layout {
+    height: calc(100vh - 140px);
+    height: calc(100dvh - 140px);
+    min-height: 440px;
+    margin-bottom: 0;
+  }
+  body.parent-ai_assistant .ai-chat {
+    height: 100%;
+    min-height: 0;
+    flex: 1 1 auto;
+  }
+  body.parent-ai_assistant .ai-messages {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  body.parent-ai_assistant .ai-input-area {
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+  /* Touch momentum + pan gesture for every inner scroller. Without these
+   * some mobile browsers trap the drag and the thread feels frozen. */
+  body.parent-ai_assistant .ai-messages,
+  body.parent-ai_assistant .ai-modal-list,
+  body.parent-ai_assistant .ai-session-list {
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+  }
+}

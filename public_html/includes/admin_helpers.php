@@ -458,6 +458,8 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/admin.css')) . '">';
+    $toastCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin-toast.css');
+    echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/admin-toast.css?v=' . $toastCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . admin_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
 
     echo '<script>';
@@ -545,7 +547,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
 
     if ($flash !== null) {
         $flashClass = $flash['type'] === 'error' ? 'admin-flash is-error' : 'admin-flash';
-        echo '<div class="' . $flashClass . '">' . admin_e($flash['message']) . '</div>';
+        echo '<div class="' . $flashClass . '" data-toast>' . admin_e($flash['message']) . '</div>';
     }
 
     echo '<main class="admin-content">';
@@ -568,6 +570,8 @@ function admin_layout_end(): void
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+    $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
+    echo '<script src="' . admin_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
     echo '</body>';
     echo '</html>';
 }

@@ -32,6 +32,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
     <link rel="stylesheet" href="../assets/css/auth.css?v=5">
+    <link rel="stylesheet" href="../assets/css/admin-toast.css?v=1">
     <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){
@@ -155,6 +156,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
         });
     })();
     </script>
+    <script src="../assets/js/admin-toast.js?v=1"></script>
 </body>
 
 </html>

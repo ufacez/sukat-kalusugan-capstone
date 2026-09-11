@@ -80,15 +80,14 @@ $actions = '<a class="admin-btn-secondary" href="'
 
 nutritionist_layout_start(
     'New measurement',
-    'Select a child, capture weight and height (with sensor or manual entry), and save the WHO assessment.',
+    'Select a child, type weight and height, see the WHO assessment live, and save.',
     'measurements',
     $actions,
     'New measurement'
 );
 ?>
 <style>
-.record-shell{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1.3fr);gap:14px;align-items:start}
-@media(max-width:1000px){.record-shell{grid-template-columns:minmax(0,1fr)}}
+.record-shell{display:grid;grid-template-columns:minmax(0,720px);justify-content:center;gap:14px;align-items:start}
 
 .step-card{padding:18px}
 .step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--admin-primary);color:#fff;font-size:11px;font-weight:700;margin-right:8px}
@@ -113,21 +112,6 @@ nutritionist_layout_start(
 .child-summary .row .label{color:var(--admin-muted)}
 .child-summary .row .value{font-weight:600;color:var(--admin-text)}
 .child-summary .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
-
-.sensor-status{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;background:var(--admin-surface-alt);border:1px solid var(--admin-border);font-size:12px;margin-bottom:10px}
-.sensor-dot{width:9px;height:9px;border-radius:50%;background:#94a3b8;flex-shrink:0;box-shadow:0 0 0 4px rgba(148,163,184,0.18)}
-.sensor-dot.is-online{background:#16a34a;box-shadow:0 0 0 4px rgba(22,163,74,0.18);animation:sensor-pulse 2s infinite}
-.sensor-dot.is-offline{background:#dc2626;box-shadow:0 0 0 4px rgba(220,38,38,0.18)}
-@keyframes sensor-pulse{0%,100%{opacity:1}50%{opacity:0.5}}
-.sensor-status .label{font-weight:600;color:var(--admin-text)}
-.sensor-status .meta{color:var(--admin-muted);font-size:11px;margin-left:auto;text-align:right}
-
-.sensor-readout{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:10px}
-.sensor-readout .cell{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:10px;padding:12px;text-align:center}
-.sensor-readout .cell .axis{font-size:10px;color:var(--admin-muted);text-transform:uppercase;letter-spacing:0.04em}
-.sensor-readout .cell .value{font-size:20px;font-weight:800;color:var(--admin-text);margin:4px 0}
-.sensor-readout .cell .value.is-empty{color:var(--admin-muted);font-size:13px;font-weight:500}
-.sensor-readout .cell .unit{font-size:10px;color:var(--admin-muted)}
 
 .measurement-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
 .measurement-form .admin-field{margin:0;display:flex;flex-direction:column;gap:4px}
@@ -217,40 +201,8 @@ nutritionist_layout_start(
             </div>
         </article>
 
-        <article class="nutritionist-panel step-card" style="margin-top:14px;">
-            <div class="step-title"><span class="step-num">2</span> Sensor / kiosk status</div>
-
-            <div class="sensor-status" id="sensor-status">
-                <span class="sensor-dot" id="sensor-dot"></span>
-                <span class="label" id="sensor-label">Checking device…</span>
-                <span class="meta" id="sensor-meta"></span>
-            </div>
-
-            <div class="sensor-readout">
-                <div class="cell">
-                    <div class="axis">Weight</div>
-                    <div class="value is-empty" id="readout-weight">—</div>
-                    <div class="unit">kg (load cell)</div>
-                </div>
-                <div class="cell">
-                    <div class="axis">Height</div>
-                    <div class="value is-empty" id="readout-height">—</div>
-                    <div class="unit">cm (LiDAR)</div>
-                </div>
-                <div class="cell">
-                    <div class="axis">Status</div>
-                    <div class="value is-empty" id="readout-status" style="font-size:13px;font-weight:600;">Idle</div>
-                    <div class="unit" id="readout-status-meta">awaiting scan</div>
-                </div>
-            </div>
-
-            <p class="admin-mini" style="margin-top:10px;">Sensor values appear automatically when a kiosk scan completes. You can also type values manually using the fields on the right — the WHO assessment recalculates live.</p>
-        </article>
-    </div>
-
-    <div>
         <article class="nutritionist-panel step-card">
-            <div class="step-title"><span class="step-num">3</span> Capture measurement</div>
+            <div class="step-title"><span class="step-num">2</span> Enter values</div>
 
             <div style="padding:10px 14px;border-radius:8px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);margin-bottom:14px;font-size:12px;color:#92400e;">
                 <strong>Due-date enforced:</strong> Routine manual measurements are only allowed when the child is due for follow-up. If the child is not due, the system will reject the measurement.
@@ -259,7 +211,6 @@ nutritionist_layout_start(
             <form
                 id="new-measurement-form"
                 data-endpoint="<?php echo nutritionist_e(app_url('/api/nutritionist/measurements_create.php')); ?>"
-                data-redirect="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>"
             >
                 <div class="measurement-form">
                     <label class="admin-field">
@@ -314,10 +265,7 @@ nutritionist_layout_start(
                 <button class="admin-btn-secondary" type="button" id="reset-btn">Clear values</button>
                 <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" id="cancel-link">Cancel</a>
             </div>
-
-            <div id="save-feedback" style="display:none;margin-top:12px;"></div>
         </article>
-    </div>
 </section>
 
 <script id="children-data" type="application/json"><?php echo $childrenJson; ?></script>
@@ -327,7 +275,7 @@ nutritionist_layout_start(
     try { CHILDREN = JSON.parse(document.getElementById('children-data').textContent || '[]'); }
     catch (err) { CHILDREN = []; }
 
-    var DEVICE_STATUS_URL = '<?php echo nutritionist_e(app_url("/api/kiosk/device_status.php")); ?>';
+    var PREVIEW_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/who_preview.php")); ?>';
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -341,15 +289,6 @@ nutritionist_layout_start(
     var heightInput = $('height-input');
     var dateInput = $('date-input');
 
-    var readoutWeight = $('readout-weight');
-    var readoutHeight = $('readout-height');
-    var readoutStatus = $('readout-status');
-    var readoutStatusMeta = $('readout-status-meta');
-
-    var sensorDot = $('sensor-dot');
-    var sensorLabel = $('sensor-label');
-    var sensorMeta = $('sensor-meta');
-
     var whoResult = $('who-result');
     var whoAge = $('who-age');
     var whoWaz = $('who-waz');
@@ -360,7 +299,9 @@ nutritionist_layout_start(
     var flagBanner = $('flag-banner');
     var saveBtn = $('save-btn');
     var resetBtn = $('reset-btn');
-    var saveFeedback = $('save-feedback');
+
+    var previewTimer = null;
+    var previewController = null;
 
     /*
      * ---- Child picker ----
@@ -442,37 +383,10 @@ nutritionist_layout_start(
     }
 
     /*
-     * ---- Sensor status poll ----
-     */
-    function updateSensorUi(payload) {
-        var online = !!(payload && payload.connected);
-        if (online) {
-            sensorDot.className = 'sensor-dot is-online';
-            sensorLabel.textContent = 'Kiosk online — ' + (payload.location || payload.device_id || 'device ready');
-            sensorMeta.textContent = 'last seen ' + (payload.last_seen_at || 'just now');
-        } else {
-            sensorDot.className = 'sensor-dot is-offline';
-            sensorLabel.textContent = 'Kiosk offline — manual entry';
-            sensorMeta.textContent = payload && payload.message ? payload.message : 'no live readings';
-        }
-    }
-
-    function pollDeviceStatus() {
-        fetch(DEVICE_STATUS_URL + '?device=ESP32-KIOSK-01', { credentials: 'same-origin' })
-            .then(function (r) { return r.json(); })
-            .then(function (j) { if (j && j.success && j.data) updateSensorUi(j.data); })
-            .catch(function () { updateSensorUi({ connected: false, message: 'device unavailable' }); });
-    }
-    pollDeviceStatus();
-    setInterval(pollDeviceStatus, 5000);
-
-    /*
-     * ---- WHO live computation (client-side preview) ----
-     * The server will re-compute on save and return authoritative values.
-     * Here we only render the live preview so the user sees the WHO result
-     * as soon as they type. Z-score formulas are simplified to match the
-     * server's reference tables — the server result is always the
-     * canonical one and is what we display after save.
+     * ---- Live WHO preview (canonical server values) ----
+     * Every keystroke debounces into who_preview.php, which runs the same
+     * calculate_who_metrics() the save endpoint uses — so the numbers shown
+     * while typing always match what save will record.
      */
     function computeAgeMonths(birthdate, onDate) {
         if (!birthdate) return null;
@@ -498,29 +412,6 @@ nutritionist_layout_start(
         return (v > 0 ? '+' : '') + v.toFixed(2);
     }
 
-    function statusFromZ(waz, haz, whz) {
-        // Combine non-normal axes using DOH abbreviations.
-        // Exclude Normal; show all abnormal axes together.
-        // WAZ > +2 is a "Refer to WFL/H" redirect, not an OW label -- the
-        // actual overweight / obese status is read off the WFH axis.
-        var parts = [];
-        if (waz !== null && waz < -3) parts.push('SUW');
-        else if (waz !== null && waz < -2) parts.push('MUW');
-        else if (waz !== null && waz > 2) parts.push('Refer to WFL/H');
-
-        if (haz !== null && haz < -3) parts.push('SSt');
-        else if (haz !== null && haz < -2) parts.push('MSt');
-        else if (haz !== null && haz > 2) parts.push('Tall');
-
-        if (whz !== null && whz < -3) parts.push('SW');
-        else if (whz !== null && whz < -2) parts.push('MW');
-        else if (whz !== null && whz > 3) parts.push('Ob');
-        else if (whz !== null && whz > 2) parts.push('OW');
-
-        if (parts.length === 0) return 'Normal';
-        return parts.join(' + ');
-    }
-
     function statusPillClass(status) {
         if (status === 'Normal') return 'is-success';
         if (status.indexOf('Refer') !== -1) return 'is-info';
@@ -543,34 +434,54 @@ nutritionist_layout_start(
             saveBtn.disabled = true;
             return;
         }
+
         var ageMonths = computeAgeMonths(selectedChild.birthdate, dateInput.value);
         if (ageMonths === null || ageMonths < 0) {
             whoResult.style.display = 'none';
             saveBtn.disabled = true;
             return;
         }
+
+        // Show the panel immediately with a loading state, then fill in
+        // the canonical values when the preview responds.
         whoResult.style.display = 'block';
         whoAge.textContent = ageMonths + ' months · ' + selectedChild.sex;
+        whoWaz.textContent = '…';
+        whoHaz.textContent = '…';
+        whoWhz.textContent = '…';
+        whoSummary.innerHTML = '<span>Calculating…</span>';
+        saveBtn.disabled = true;
 
-        // Client preview z-scores are placeholders. The server computes
-        // the authoritative values from the WHO reference tables and we
-        // show those right after save. For the live preview we display
-        // a "submit to compute" hint, which is honest about what the
-        // server does.
-        whoWaz.textContent = '—';
-        whoHaz.textContent = '—';
-        whoWhz.textContent = '—';
-        whoWaz.className = 'value is-ok';
-        whoHaz.className = 'value is-ok';
-        whoWhz.className = 'value is-ok';
+        if (previewTimer) clearTimeout(previewTimer);
+        if (previewController) previewController.abort();
 
-        whoSummary.innerHTML = '<span>Ready to save. WHO z-scores will be calculated from the official reference tables on submit.</span>';
+        previewTimer = setTimeout(function() {
+            previewController = new AbortController();
 
-        flagBanner.classList.remove('is-visible');
-        flagBanner.textContent = '';
-        whoFlags.innerHTML = '';
+            var url = PREVIEW_URL
+                + '?child_id=' + selectedChild.id
+                + '&weight_kg=' + encodeURIComponent(w)
+                + '&height_cm=' + encodeURIComponent(h)
+                + '&measurement_date=' + encodeURIComponent(dateInput.value || '');
 
-        saveBtn.disabled = false;
+            fetch(url, { credentials: 'same-origin', signal: previewController.signal })
+                .then(function (r) { return r.json(); })
+                .then(function (json) {
+                    if (!json.success) throw new Error(json.message || 'Could not preview the assessment.');
+                    renderSavedResult(json.data);
+                    saveBtn.disabled = false;
+                })
+                .catch(function (err) {
+                    if (err && err.name === 'AbortError') return;
+                    whoWaz.textContent = '—';
+                    whoHaz.textContent = '—';
+                    whoWhz.textContent = '—';
+                    whoSummary.innerHTML = '<span>' + escapeHtml(err.message || 'Could not preview the assessment.') + '</span>';
+                    whoFlags.innerHTML = '';
+                    flagBanner.classList.remove('is-visible');
+                    saveBtn.disabled = true;
+                });
+        }, 300);
     }
 
     weightInput.addEventListener('input', recomputeWho);
@@ -631,23 +542,16 @@ nutritionist_layout_start(
         }
     }
 
-    function setFeedback(message, isError) {
-        saveFeedback.style.display = 'block';
-        saveFeedback.style.padding = '12px';
-        saveFeedback.style.borderRadius = '8px';
-        saveFeedback.style.fontSize = '12px';
-        saveFeedback.style.fontWeight = '600';
-        saveFeedback.style.background = isError ? 'rgba(224,49,49,0.08)' : 'var(--admin-primary-soft)';
-        saveFeedback.style.color = isError ? '#E03131' : 'var(--admin-text)';
-        saveFeedback.innerHTML = message;
+    function toastError(message) {
+        if (window.AdminToast) AdminToast.error(message);
     }
 
     saveBtn.addEventListener('click', function () {
-        if (!selectedChild) { setFeedback('Please select a child first.', true); return; }
+        if (!selectedChild) { toastError('Please select a child first.'); return; }
         var w = parseFloat(weightInput.value);
         var h = parseFloat(heightInput.value);
         if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
-            setFeedback('Please enter a valid weight and height.', true);
+            toastError('Please enter a valid weight and height.');
             return;
         }
         saveBtn.disabled = true;
@@ -669,15 +573,10 @@ nutritionist_layout_start(
         .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
         .then(function (json) {
             if (!json.success) throw new Error(json.message || 'Could not save the measurement.');
+            // The panel already shows these exact values from the live
+            // preview; re-render with the authoritative save response.
             renderSavedResult(json.data);
-            setFeedback(
-                '✓ Saved for <strong>' + escapeHtml(json.data.child_name) + '</strong> (' + escapeHtml(json.data.child_code) + '). <a href="' + escapeHtml(form.getAttribute('data-redirect')) + '" style="color:var(--admin-primary);text-decoration:underline;margin-left:6px;">View measurements →</a>',
-                false
-            );
-            weightInput.value = '';
-            heightInput.value = '';
-            whoResult.style.display = 'none';
-            flagBanner.classList.remove('is-visible');
+            if (window.AdminToast) AdminToast.success('Measurement saved for ' + json.data.child_name + ' (' + json.data.child_code + ').');
             saveBtn.innerHTML = 'Saved!';
             setTimeout(function () {
                 saveBtn.disabled = false;
@@ -686,7 +585,7 @@ nutritionist_layout_start(
             return;
         })
         .catch(function (err) {
-            setFeedback('⚠ ' + escapeHtml(err.message || 'Could not save the measurement.'), true);
+            toastError(err.message || 'Could not save the measurement.');
         })
         .finally(function () {
             if (saveBtn.innerHTML !== 'Saved!') {
@@ -702,7 +601,6 @@ nutritionist_layout_start(
         dateInput.value = new Date().toISOString().slice(0, 10);
         whoResult.style.display = 'none';
         saveBtn.disabled = true;
-        saveFeedback.style.display = 'none';
         flagBanner.classList.remove('is-visible');
     });
 

@@ -1,40 +1,51 @@
 <?php
+
+declare(strict_types=1);
+
 /**
- * nutritionist/ai_assistant.php
+ * parent/ai_assistant.php
  *
- * Dedicated Kali AI page for nutritionists.
- * Two-panel layout: left sidebar (child list + details), right chat area.
+ * Kali AI for parents. Same two-panel design as the nutritionist assistant:
+ * left context sidebar (own children + recent chats), right chat area.
+ *
+ * Privacy is enforced server-side: api/chatbot/children.php only returns
+ * this parent's own children, and api/chatbot/chat.php rejects any other
+ * child_id with a 404 — so the picker below can never leak another family.
  */
 
-require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/parent_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 
-$user = nutritionist_require_access();
+$user = parent_require_access();
 
 $apiBase = app_url('/api/chatbot');
 
-nutritionist_layout_start(
+parent_layout_start(
     'Kali AI',
-    '',
+    "Friendly answers about your child's growth",
     'ai_assistant'
 );
+
+$aiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/ai_assistant.css');
+$parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assistant.css');
 ?>
 
-<link rel="stylesheet" href="<?php echo app_url('/assets/css/ai_assistant.css'); ?>">
+<link rel="stylesheet" href="<?php echo app_url('/assets/css/ai_assistant.css?v=' . $aiCssVersion); ?>">
+<link rel="stylesheet" href="<?php echo app_url('/assets/css/parent_ai_assistant.css?v=' . $parentAiCssVersion); ?>">
 
 <div class="ai-layout">
 
-    <!-- ===== RIGHT CONTEXT PANEL ===== -->
+    <!-- ===== CONTEXT PANEL ===== -->
     <aside class="ai-sidebar" id="aiSidebar">
         <div class="ai-sidebar-header">
             <div class="ai-sidebar-title-row">
-                <h3>Assistant context</h3>
+                <h3>Your children</h3>
                 <button type="button" class="ai-context-close" id="aiContextClose" aria-label="Close child context panel">&times;</button>
             </div>
             <label class="ai-child-select-label">Child</label>
             <button type="button" class="ai-child-picker-btn" id="aiChildPickerBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span id="aiChildPickerLabel">General nutrition assistant</span>
+                <span id="aiChildPickerLabel">Select your child</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12"><path d="m6 9 6 6 6-6"/></svg>
             </button>
         </div>
@@ -49,38 +60,38 @@ nutritionist_layout_start(
 
         <div class="ai-sessions">
             <div class="ai-sessions-header">
-                <h3>Recent sessions</h3>
+                <h3>Recent chats</h3>
                 <span id="aiSessionCount">0</span>
             </div>
             <button type="button" class="ai-archive-btn" id="aiArchiveBtn">Clear conversations</button>
             <div class="ai-session-list" id="aiSessionList">
-                <div class="ai-session-empty">No sessions yet</div>
+                <div class="ai-session-empty">No chats yet</div>
             </div>
             <div class="ai-session-pagination">
-                <button type="button" class="ai-session-page-btn" id="aiSessionPrev" disabled aria-label="Previous sessions">&lsaquo;</button>
+                <button type="button" class="ai-session-page-btn" id="aiSessionPrev" disabled aria-label="Previous chats">&lsaquo;</button>
                 <span id="aiSessionPage">Page 1</span>
-                <button type="button" class="ai-session-page-btn" id="aiSessionNext" disabled aria-label="Next sessions">&rsaquo;</button>
+                <button type="button" class="ai-session-page-btn" id="aiSessionNext" disabled aria-label="Next chats">&rsaquo;</button>
             </div>
         </div>
     </aside>
 
-    <!-- ===== RIGHT CHAT ===== -->
+    <!-- ===== CHAT ===== -->
     <main class="ai-chat">
         <div class="ai-chat-header">
             <div>
                 <div class="ai-chat-title" id="aiChatTitle">Kali AI</div>
-                <div class="ai-chat-subtitle" id="aiChatSubtitle">Select a child or ask a general question</div>
+                <div class="ai-chat-subtitle" id="aiChatSubtitle">Pick your child above, or ask a general question</div>
             </div>
             <div class="ai-chat-actions">
                 <button type="button" class="ai-btn-context" id="aiContextOpen" title="Choose a child">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                    Analyze child
+                    My child
                 </button>
                 <button type="button" class="ai-btn-new" id="aiBtnNew" title="New conversation">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 5v14M5 12h14"/></svg>
                     New
                 </button>
-                <button type="button" class="ai-btn-menu" id="aiContextMenu" title="Toggle assistant context panel" aria-label="Toggle assistant context panel" aria-expanded="false">
+                <button type="button" class="ai-btn-menu" id="aiContextMenu" title="Toggle children panel" aria-label="Toggle children panel" aria-expanded="false">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>
                 </button>
             </div>
@@ -91,39 +102,39 @@ nutritionist_layout_start(
                 <div class="ai-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
                 </div>
-                <h3>Kali AI</h3>
-                <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
+                <h3>Hi, I&#8217;m Kali!</h3>
+                <p>I can explain your child&#8217;s growth results in simple words. Pick your child above to begin.</p>
                 <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain stunting in children">Explain stunting</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Complementary feeding</button>
-                    <button class="ai-suggestion" data-msg="What is the eOPT Plus program?">eOPT Plus program</button>
+                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
+                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
+                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What is WAZ?</button>
+                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Feeding tips</button>
                 </div>
             </div>
         </div>
 
         <div class="ai-input-area">
             <div class="ai-input-row">
-                <textarea id="aiInput" placeholder="Ask a question..." rows="1"></textarea>
-                <button type="button" class="ai-send-btn" id="aiSendBtn" title="Send message">
+                <textarea id="aiInput" placeholder="Ask about your child's growth..." rows="1"></textarea>
+                <button type="button" class="ai-send-btn" id="aiSendBtn" title="Send message" disabled>
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
                 </button>
             </div>
-            <div class="ai-disclaimer">AI-generated responses are for educational purposes only — not a substitute for professional medical advice.</div>
+            <div class="ai-disclaimer">Kali explains measurement results in simple words — for medical advice, please visit your barangay nutritionist or doctor.</div>
         </div>
     </main>
 </div>
 
 <!-- ===== CHILD PICKER MODAL ===== -->
-<div class="ai-modal-overlay" id="aiChildModal" role="dialog" aria-modal="true" aria-label="Select a child" hidden>
+<div class="ai-modal-overlay" id="aiChildModal" role="dialog" aria-modal="true" aria-label="Select your child" hidden>
     <div class="ai-modal">
         <div class="ai-modal-header">
-            <h3>Select a child</h3>
+            <h3>Select your child</h3>
             <button type="button" class="ai-modal-close" id="aiChildModalClose" aria-label="Close">&times;</button>
         </div>
         <div class="ai-modal-search">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-            <input type="text" id="aiChildSearch" placeholder="Search by name or code..." autocomplete="off">
+            <input type="text" id="aiChildSearch" placeholder="Search by name..." autocomplete="off">
         </div>
         <div class="ai-modal-list" id="aiChildModalList"></div>
         <div class="ai-modal-footer">
@@ -134,7 +145,7 @@ nutritionist_layout_start(
         <div class="ai-modal-general">
             <button type="button" class="ai-modal-general-btn" id="aiGeneralModeBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
-                General nutrition assistant
+                General questions
             </button>
         </div>
     </div>
@@ -146,14 +157,31 @@ nutritionist_layout_start(
 
     const API = '<?php echo $apiBase; ?>/';
     const PAGE_URLS = {
-        eoptExport: '<?php echo app_url('/nutritionist/eopt_reports_export.php'); ?>',
-        eoptReports: '<?php echo app_url('/nutritionist/eopt_reports.php'); ?>',
-        measurements: '<?php echo app_url('/nutritionist/measurements.php'); ?>',
-        whoAnalysis: '<?php echo app_url('/nutritionist/who_analysis.php'); ?>',
-        children: '<?php echo app_url('/nutritionist/children.php'); ?>'
+        growthHistory: '<?php echo app_url('/parent/growth_history.php'); ?>',
+        children: '<?php echo app_url('/parent/children.php'); ?>',
+        appointments: '<?php echo app_url('/parent/appointments.php'); ?>'
     };
     const $ = (s, p) => (p || document).querySelector(s);
     const $$ = (s, p) => [...(p || document).querySelectorAll(s)];
+
+    // fetch() never times out on its own: on mobile data a hung request
+    // would leave state.sending stuck true forever (grey Send button, every
+    // later tap silently ignored). Every network call goes through here.
+    function fetchWithTimeout(url, options, ms) {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), ms);
+        const opts = Object.assign({}, options, { signal: controller.signal });
+        return fetch(url, opts).finally(() => clearTimeout(timer));
+    }
+    const CHAT_TIMEOUT_MS = 75000;
+    const QUICK_TIMEOUT_MS = 20000;
+
+    function isTimeout(error) {
+        return !!error && (error.name === 'AbortError' || (error.message || '').toLowerCase().includes('abort'));
+    }
+    function timeoutMessage() {
+        return 'Kali is taking too long to reply. Please check your connection and try again.';
+    }
 
     // --- State ---
     let state = {
@@ -210,18 +238,31 @@ nutritionist_layout_start(
     };
 
 
+    // --- Init guard: one missing element must not kill the whole script.
+    // A dead script is what leaves the Send button grey forever, so fail loud.
+    const on = (el, ev, fn) => {
+        if (el) {
+            el.addEventListener(ev, fn);
+        } else {
+            console.error('Kali AI: missing page element, skipped listener for', ev);
+        }
+    };
+
     /* ================================================================
-     * CHILD LIST
+     * CHILD LIST (backend returns ONLY this parent's own children)
      * ================================================================ */
 
     function loadChildren() {
-        fetch(API + 'children.php')
+        fetchWithTimeout(API + 'children.php', undefined, QUICK_TIMEOUT_MS)
             .then(r => r.json())
             .then(res => {
-                if (!res.success) return;
+                if (!res.success) {
+                    console.error('Kali AI: children.php:', res.message || 'request failed');
+                    return;
+                }
                 state.children = res.data.children || [];
             })
-            .catch(() => {});
+            .catch((error) => { console.error('Kali AI: children.php fetch failed:', error); });
     }
 
     /* ================================================================
@@ -269,7 +310,7 @@ nutritionist_layout_start(
         dom.childModalList.innerHTML = page.map(child => {
             const active = Number(child.id) === state.selectedChildId ? ' is-active' : '';
             const initials = (child.name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-            const sexLabel = child.sex ? (child.sex === 'M' ? 'Male' : 'Female') : '';
+            const sexLabel = child.sex ? (child.sex === 'M' ? 'Boy' : 'Girl') : '';
             const ageLabel = child.birthdate ? computeAge(child.birthdate) : '';
             const metaParts = [sexLabel, ageLabel].filter(Boolean);
             const metaStr = metaParts.join(' · ');
@@ -296,13 +337,14 @@ nutritionist_layout_start(
         state.selectedChildId = childId;
         state.conversationId = null;
 
-        // Update picker label
         if (childId) {
-            const child = state.children.find(c => c.id === childId);
-            dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
-            loadChildDetail(childId);
-            dom.chatTitle.textContent = child ? child.name : 'Kali AI';
-            dom.chatSubtitle.textContent = child.child_code || '';
+            const child = state.children.find(c => Number(c.id) === childId);
+            dom.childPickerLabel.textContent = child ? child.name : 'Select your child';
+            if (child) {
+                loadChildDetail(childId);
+                dom.chatTitle.textContent = child.name;
+                dom.chatSubtitle.textContent = child.child_code || 'Growth results';
+            }
         }
 
         dom.messages.innerHTML = '';
@@ -314,24 +356,27 @@ nutritionist_layout_start(
         if (state.sending) return;
         state.selectedChildId = null;
         state.conversationId = null;
-        dom.childPickerLabel.textContent = 'General nutrition assistant';
+        dom.childPickerLabel.textContent = 'General questions';
         dom.childDetail.style.display = 'none';
-        dom.chatTitle.textContent = 'General nutrition assistant';
-        dom.chatSubtitle.textContent = 'Ask about eOPT, measurements, trends, or growth monitoring';
+        dom.chatTitle.textContent = 'Kali AI';
+        dom.chatSubtitle.textContent = 'General questions about child growth';
         dom.messages.innerHTML = '';
         createConversation(null);
     }
 
     function loadSessions() {
-        fetch(API + 'conversations.php')
+        fetchWithTimeout(API + 'conversations.php', undefined, QUICK_TIMEOUT_MS)
             .then(r => r.json())
             .then(res => {
-                if (!res.success) return;
+                if (!res.success) {
+                    console.error('Kali AI: sessions:', res.message || 'request failed');
+                    return;
+                }
                 state.sessions = res.data.conversations || [];
                 state.sessionPage = 1;
                 renderSessions();
             })
-            .catch(() => {});
+            .catch((error) => { console.error('Kali AI: sessions fetch failed:', error); });
     }
 
     function renderSessions() {
@@ -347,13 +392,13 @@ nutritionist_layout_start(
         dom.sessionNext.disabled = state.sessionPage >= totalPages;
 
         if (pageSessions.length === 0) {
-            dom.sessionList.innerHTML = '<div class="ai-session-empty">No sessions yet</div>';
+            dom.sessionList.innerHTML = '<div class="ai-session-empty">No chats yet</div>';
             return;
         }
 
         dom.sessionList.innerHTML = pageSessions.map(session => {
             const active = Number(session.id) === state.conversationId ? ' is-active' : '';
-            const title = session.title || 'New conversation';
+            const title = session.title || 'New chat';
             const child = session.child_name || 'General question';
             return `<button type="button" class="ai-session-item${active}" data-session-id="${session.id}">
                 <strong>${esc(title)}</strong><span>${esc(child)}</span>
@@ -383,15 +428,21 @@ nutritionist_layout_start(
     }
 
     function toggleContextPanel() {
-        if ($('.ai-layout').classList.contains('is-context-open')) {
-            hideContextPanel();
+        // Mobile (<=720px): the sidebar is collapsed, so the menu button
+        // opens it as an overlay sheet with the children + recent chats.
+        // Desktop: the sidebar is already visible, so open the picker modal.
+        if (window.matchMedia('(max-width: 720px)').matches) {
+            const layout = $('.ai-layout');
+            const open = !layout.classList.contains('is-context-open');
+            layout.classList.toggle('is-context-open', open);
+            if (dom.contextMenu) dom.contextMenu.setAttribute('aria-expanded', String(open));
         } else {
             revealContextPanel();
         }
     }
 
     function isChildAssessmentPrompt(text) {
-        return /\b(child|children|kid|kids|pupil|which .*need|who .*need|follow[- ]?up|at[- ]?risk|worsening|improv|assess|review)\b/i.test(text);
+        return /\b(child|children|kid|kids|my son|my daughter|which .*need|who .*need|follow[- ]?up|at[- ]?risk|worsening|improv|assess|review|growing well)\b/i.test(text);
     }
 
     function openSession(sessionId) {
@@ -402,27 +453,28 @@ nutritionist_layout_start(
         state.conversationId = sessionId;
         state.selectedChildId = session.child_id ? Number(session.child_id) : null;
 
-        // Update picker label
         if (state.selectedChildId) {
-            const child = state.children.find(c => c.id === state.selectedChildId);
-            dom.childPickerLabel.textContent = child ? child.name : 'Select a child...';
-            loadChildDetail(state.selectedChildId);
-            dom.chatTitle.textContent = child ? child.name : 'Kali AI';
-            dom.chatSubtitle.textContent = child ? (child.child_code || '') : '';
+            const child = state.children.find(c => Number(c.id) === state.selectedChildId);
+            dom.childPickerLabel.textContent = child ? child.name : 'Select your child';
+            if (child) {
+                loadChildDetail(state.selectedChildId);
+                dom.chatTitle.textContent = child.name;
+                dom.chatSubtitle.textContent = child.child_code || 'Growth results';
+            }
         } else {
-            dom.childPickerLabel.textContent = 'General nutrition assistant';
+            dom.childPickerLabel.textContent = 'General questions';
             dom.childDetail.style.display = 'none';
             dom.chatTitle.textContent = 'Kali AI';
-            dom.chatSubtitle.textContent = 'Conversation history';
+            dom.chatSubtitle.textContent = 'Past chat';
         }
 
-        dom.messages.innerHTML = '<div class="ai-session-loading">Loading conversation...</div>';
+        dom.messages.innerHTML = '<div class="ai-session-loading">Loading chat...</div>';
         renderSessions();
 
-        fetch(API + 'conversations.php?id=' + sessionId)
+        fetchWithTimeout(API + 'conversations.php?id=' + sessionId, undefined, QUICK_TIMEOUT_MS)
             .then(r => r.json())
             .then(res => {
-                if (!res.success) throw new Error(res.message || 'Could not load this session.');
+                if (!res.success) throw new Error(res.message || 'Could not load this chat.');
                 dom.messages.innerHTML = '';
                 (res.data.messages || []).forEach(message => {
                     appendBubble(message.role === 'assistant' ? 'assistant' : 'user', message.content);
@@ -430,19 +482,22 @@ nutritionist_layout_start(
             })
             .catch(error => {
                 dom.messages.innerHTML = '';
-                appendBubble('system', error.message || 'Could not load this session.');
+                appendBubble('system', error.message || 'Could not load this chat.');
             });
     }
 
     function loadChildDetail(childId) {
-        fetch(API + 'child_summary.php?child_id=' + childId)
+        fetchWithTimeout(API + 'child_summary.php?child_id=' + childId, undefined, QUICK_TIMEOUT_MS)
             .then(r => r.json())
             .then(res => {
-                if (!res.success) return;
+                if (!res.success) {
+                    console.error('Kali AI: child_summary:', res.message || 'request failed');
+                    return;
+                }
                 state.childDetail = res.data;
                 renderChildDetail(res.data);
             })
-            .catch(() => {});
+            .catch((error) => { console.error('Kali AI: child_summary fetch failed:', error); });
     }
 
     function renderChildDetail(data) {
@@ -488,15 +543,22 @@ nutritionist_layout_start(
     function createConversation(childId) {
         const requestToken = ++state.conversationRequestToken;
         state.creatingConversation = true;
-        fetch(API + 'conversations.php', {
+        fetchWithTimeout(API + 'conversations.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ child_id: childId, title: null })
-        })
+        }, QUICK_TIMEOUT_MS)
         .then(r => r.json())
         .then(res => {
             if (requestToken !== state.conversationRequestToken) return;
-            if (!res.success) return;
+            if (!res.success) {
+                // Never fail silently: the queued message is dropped here,
+                // so say so and keep the chat usable.
+                state.pendingMessage = null;
+                console.error('Kali AI: conversations.php:', res.message || 'request failed');
+                appendBubble('system', (res && res.message) || 'Could not start the chat. Please try again.');
+                return;
+            }
             state.conversationId = res.data.id;
             loadSessions();
             if (childId) {
@@ -508,7 +570,14 @@ nutritionist_layout_start(
             state.pendingMessage = null;
             if (pendingMessage) sendMessage(pendingMessage);
         })
-        .catch(() => {})
+        .catch((error) => {
+            console.error('Kali AI: conversations.php fetch failed:', error);
+            if (requestToken !== state.conversationRequestToken) return;
+            // The queued message is dropped here — say so instead of
+            // swallowing it silently.
+            state.pendingMessage = null;
+            appendBubble('system', isTimeout(error) ? timeoutMessage() : 'Could not reach Kali. Please check your connection and try again.');
+        })
         .finally(() => {
             if (requestToken === state.conversationRequestToken) {
                 state.creatingConversation = false;
@@ -522,12 +591,12 @@ nutritionist_layout_start(
                 <div class="ai-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>
                 </div>
-                <h3>Ask about this child</h3>
-                <p>I can explain growth measurements, z-scores, and nutritional status.</p>
+                <h3>Ask about your child</h3>
+                <p>I explain growth results in simple words — no confusing terms.</p>
                 <div class="ai-empty-suggestions">
                     <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain the z-scores">Explain z-scores</button>
-                    <button class="ai-suggestion" data-msg="Is the child growing well?">Is the child growing well?</button>
+                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
+                    <button class="ai-suggestion" data-msg="Explain the z-scores simply">Explain simply</button>
                 </div>
             </div>`;
         bindSuggestions();
@@ -555,21 +624,18 @@ nutritionist_layout_start(
         dom.input.value = '';
         dom.input.style.height = 'auto';
 
-        // Remove empty state
         const emptyEl = dom.messages.querySelector('.ai-empty');
         if (emptyEl) emptyEl.remove();
 
-        // Add user bubble
         appendBubble('user', text);
 
-        // Show typing
         const typingEl = document.createElement('div');
         typingEl.className = 'ai-msg is-assistant';
         typingEl.innerHTML = '<div class="ai-typing"><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div></div>';
         dom.messages.appendChild(typingEl);
         scrollToBottom();
 
-        fetch(API + 'chat.php', {
+        fetchWithTimeout(API + 'chat.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -577,17 +643,17 @@ nutritionist_layout_start(
                 child_id: state.selectedChildId,
                 message: text
             })
-        })
+        }, CHAT_TIMEOUT_MS)
         .then(async r => {
             const raw = await r.text();
             let res;
             try {
                 res = JSON.parse(raw);
             } catch (error) {
-                throw new Error('The assistant returned an invalid server response.');
+                throw new Error('Kali returned an unclear response. Please try again.');
             }
             if (!r.ok || !res.success) {
-                throw new Error(res.message || `Assistant request failed (HTTP ${r.status}).`);
+                throw new Error(res.message || `Something went wrong (HTTP ${r.status}).`);
             }
             return res;
         })
@@ -599,7 +665,8 @@ nutritionist_layout_start(
         })
         .catch(error => {
             typingEl.remove();
-            appendBubble('system', error.message || 'Could not reach the assistant. Please try again.');
+            console.error('Kali AI: chat.php:', error);
+            appendBubble('system', isTimeout(error) ? timeoutMessage() : (error.message || 'Could not reach Kali. Please try again.'));
         })
         .finally(() => {
             state.sending = false;
@@ -632,23 +699,19 @@ nutritionist_layout_start(
         const value = prompt.toLowerCase();
         let action = null;
 
-        if ((value.includes('eopt') || value.includes('program')) && (value.includes('export') || value.includes('download'))) {
-            action = { label: 'Open current EOPT export', href: PAGE_URLS.eoptExport };
-        } else if (value.includes('eopt') || value.includes('program report')) {
-            action = { label: 'Open EOPT Reports', href: PAGE_URLS.eoptReports };
-        } else if (value.includes('measurement') || value.includes('measurements')) {
-            action = { label: 'Open Measurements', href: PAGE_URLS.measurements };
-        } else if (value.includes('who') || value.includes('z-score') || value.includes('zscore')) {
-            action = { label: 'Open WHO Analysis', href: PAGE_URLS.whoAnalysis };
-        } else if (value.includes('children') || value.includes('child list')) {
-            action = { label: 'Open Children', href: PAGE_URLS.children };
+        if (value.includes('appointment') || value.includes('check-up') || value.includes('checkup')) {
+            action = { label: 'View Appointments', href: PAGE_URLS.appointments };
+        } else if (value.includes('growth') || value.includes('measurement') || value.includes('result') || value.includes('weigh')) {
+            action = { label: 'View Growth History', href: PAGE_URLS.growthHistory };
+        } else if (value.includes('children') || value.includes('child list') || value.includes('my kids')) {
+            action = { label: 'View My Children', href: PAGE_URLS.children };
         }
 
         if (!action) return;
 
         const card = document.createElement('div');
         card.className = 'ai-navigation-action';
-        card.innerHTML = '<span>Open the matching Sukat Kalusugan page:</span>'
+        card.innerHTML = '<span>Open the matching page:</span>'
             + '<a href="' + action.href + '">' + esc(action.label) + ' <span aria-hidden="true">&rarr;</span></a>';
         dom.messages.appendChild(card);
         scrollToBottom();
@@ -672,36 +735,34 @@ nutritionist_layout_start(
         if (state.selectedChildId) {
             createConversation(state.selectedChildId);
         } else {
-            dom.childPickerLabel.textContent = 'General nutrition assistant';
+            dom.childPickerLabel.textContent = 'Select your child';
             dom.childDetail.style.display = 'none';
-            dom.chatTitle.textContent = 'General nutrition assistant';
-            dom.chatSubtitle.textContent = 'Ask about eOPT, measurements, trends, or growth monitoring';
+            dom.chatTitle.textContent = 'Kali AI';
+            dom.chatSubtitle.textContent = 'General questions about child growth';
             createConversation(null);
         }
     }
 
     function showGlobalEmpty() {
-        dom.chatTitle.textContent = 'Kali AI';
-        dom.chatSubtitle.textContent = 'Select a child or ask a general question';
+        dom.chatTitle.textContent = 'Hi, I\u2019m Kali!';
+        dom.chatSubtitle.textContent = 'Pick your child above, or ask a general question';
         dom.messages.innerHTML = `
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
                 </div>
-                <h3>Kali AI</h3>
-                <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
+                <h3>Hi, I&#8217;m Kali!</h3>
+                <p>I can explain your child&#8217;s growth results in simple words. Pick your child above to begin.</p>
                 <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain stunting in children">Explain stunting</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Complementary feeding</button>
-                    <button class="ai-suggestion" data-msg="What is the eOPT Plus program?">eOPT Plus program</button>
-                    <button class="ai-suggestion" data-msg="Which children need follow-up based on their latest measurements?">Analyze children needing follow-up</button>
+                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
+                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
+                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What is WAZ?</button>
+                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Feeding tips</button>
                 </div>
-                <div class="ai-page-links" aria-label="Nutritionist pages">
-                    <a href="<?php echo app_url('/nutritionist/measurements.php'); ?>">Measurements</a>
-                    <a href="<?php echo app_url('/nutritionist/who_analysis.php'); ?>">WHO Analysis</a>
-                    <a href="<?php echo app_url('/nutritionist/eopt_reports.php'); ?>">EOPT Reports</a>
-                    <a href="<?php echo app_url('/nutritionist/children.php'); ?>">Children</a>
+                <div class="ai-page-links" aria-label="Parent pages">
+                    <a href="<?php echo app_url('/parent/growth_history.php'); ?>">Growth History</a>
+                    <a href="<?php echo app_url('/parent/children.php'); ?>">My Children</a>
+                    <a href="<?php echo app_url('/parent/appointments.php'); ?>">Appointments</a>
                 </div>
             </div>`;
         bindSuggestions();
@@ -717,13 +778,12 @@ nutritionist_layout_start(
             btn.addEventListener('click', () => {
                 const msg = btn.dataset.msg;
                 if (msg) {
-                    // If no conversation, create one first (for general queries)
                     if (!state.conversationId) {
-                        fetch(API + 'conversations.php', {
+                        fetchWithTimeout(API + 'conversations.php', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ child_id: state.selectedChildId, title: null })
-                        })
+                        }, QUICK_TIMEOUT_MS)
                         .then(r => r.json())
                         .then(res => {
                             if (res.success) {
@@ -750,10 +810,6 @@ nutritionist_layout_start(
         return d.innerHTML;
     }
 
-    function getInitials(name) {
-        return (name || '?').split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase();
-    }
-
     function computeAge(birthdate) {
         if (!birthdate) return '';
         const birth = new Date(birthdate);
@@ -776,51 +832,51 @@ nutritionist_layout_start(
      * EVENT LISTENERS
      * ================================================================ */
 
-    dom.childPickerBtn.addEventListener('click', openChildModal);
-    dom.childModalClose.addEventListener('click', closeChildModal);
-    dom.childModal.addEventListener('click', (e) => {
+    on(dom.childPickerBtn, 'click', openChildModal);
+    on(dom.childModalClose, 'click', closeChildModal);
+    on(dom.childModal, 'click', (e) => {
         if (e.target === dom.childModal) closeChildModal();
     });
-    dom.childModalSearch.addEventListener('input', () => {
+    on(dom.childModalSearch, 'input', () => {
         state.childSearch = dom.childModalSearch.value;
         state.childModalPage = 1;
         renderChildModal();
     });
-    dom.childModalPrev.addEventListener('click', () => {
+    on(dom.childModalPrev, 'click', () => {
         state.childModalPage--;
         renderChildModal();
     });
-    dom.childModalNext.addEventListener('click', () => {
+    on(dom.childModalNext, 'click', () => {
         state.childModalPage++;
         renderChildModal();
     });
-    dom.generalModeBtn.addEventListener('click', selectGeneralFromModal);
+    on(dom.generalModeBtn, 'click', selectGeneralFromModal);
 
-    dom.contextOpen.addEventListener('click', revealContextPanel);
-    dom.contextClose.addEventListener('click', hideContextPanel);
-    dom.contextMenu.addEventListener('click', toggleContextPanel);
+    on(dom.contextOpen, 'click', revealContextPanel);
+    on(dom.contextClose, 'click', hideContextPanel);
+    on(dom.contextMenu, 'click', toggleContextPanel);
 
-    dom.sessionPrev.addEventListener('click', () => {
+    on(dom.sessionPrev, 'click', () => {
         state.sessionPage -= 1;
         renderSessions();
     });
 
-    dom.sessionNext.addEventListener('click', () => {
+    on(dom.sessionNext, 'click', () => {
         state.sessionPage += 1;
         renderSessions();
     });
 
-    dom.archiveBtn.addEventListener('click', () => {
-        if (!state.sessions.length || !window.confirm('Archive all assistant conversations?')) return;
+    on(dom.archiveBtn, 'click', () => {
+        if (!state.sessions.length || !window.confirm('Delete all your chats with Kali?')) return;
 
-        fetch(API + 'conversations.php', {
+        fetchWithTimeout(API + 'conversations.php', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'archive_all' })
-        })
+        }, QUICK_TIMEOUT_MS)
         .then(r => r.json())
         .then(res => {
-            if (!res.success) throw new Error(res.message || 'Could not archive conversations.');
+            if (!res.success) throw new Error(res.message || 'Could not delete chats.');
             state.conversationId = null;
             state.sessions = [];
             renderSessions();
@@ -830,13 +886,11 @@ nutritionist_layout_start(
         .catch(error => appendBubble('system', error.message));
     });
 
-    // Send on button click
-    dom.sendBtn.addEventListener('click', () => {
+    on(dom.sendBtn, 'click', () => {
         sendMessage(dom.input.value.trim());
     });
 
-    // Send on Enter (Shift+Enter for newline)
-    dom.input.addEventListener('keydown', (e) => {
+    on(dom.input, 'keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendMessage(dom.input.value.trim());
@@ -845,19 +899,26 @@ nutritionist_layout_start(
 
     // Auto-resize textarea + dim send button when empty
     const syncSendState = () => {
+        if (!dom.sendBtn || !dom.input) return;
         dom.sendBtn.disabled = state.sending || dom.input.value.trim() === '';
     };
-    dom.input.addEventListener('input', () => {
+    on(dom.input, 'input', () => {
         dom.input.style.height = 'auto';
         dom.input.style.height = Math.min(dom.input.scrollHeight, 120) + 'px';
         syncSendState();
     });
     syncSendState();
 
-    // New conversation
-    dom.btnNew.addEventListener('click', newConversation);
+    on(dom.btnNew, 'click', newConversation);
 
-    // Bind initial suggestions
+    // Safety sweep: never leave the page scroll-locked (e.g. after
+    // back-navigation or an interrupted modal interaction).
+    window.addEventListener('pageshow', () => {
+        if (dom.childModal && dom.childModal.hasAttribute('hidden')) {
+            document.body.style.overflow = '';
+        }
+    });
+
     bindSuggestions();
 
 
@@ -872,4 +933,4 @@ nutritionist_layout_start(
 })();
 </script>
 
-<?php nutritionist_layout_end(); ?>
+<?php parent_layout_end(); ?>

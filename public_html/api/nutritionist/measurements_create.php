@@ -232,18 +232,25 @@ $isFlagged = $metrics['is_flagged'] ? 1 : 0;
 $flagReason = $metrics['flag_reason'];
 $recordedBy = (int)($user['id'] ?? 0);
 
+// bind_param() takes its values by reference, so inline ternaries/expressions
+// are fatal on PHP 8 ("cannot be passed by reference"). Resolve everything
+// into plain variables first.
+$measurementType = $isOverride ? 'OVERRIDE' : 'ROUTINE';
+$overrideReasonValue = $isOverride ? $overrideReason : null;
+$overrideAuthority = $isOverride ? (string)($user['name'] ?? '') : null;
+
 mysqli_stmt_bind_param(
     $insertStmt,
-    'iddiissssdsssssisi',
+    'iddiissssdddssssisi',
     $childId,
     $heightCm,
     $weightKg,
     $ageMonths,
     $ageDays,
     $measurementDate,
-    $isOverride ? 'OVERRIDE' : 'ROUTINE',
-    $isOverride ? $overrideReason : null,
-    $isOverride ? (string)($user['name'] ?? '') : null,
+    $measurementType,
+    $overrideReasonValue,
+    $overrideAuthority,
     $waz,
     $haz,
     $whz,

@@ -222,10 +222,10 @@ document.querySelectorAll('.rp-dropdown-item').forEach(function(item) {
             if (data.success) {
                 window.location.reload();
             } else {
-                alert(data.message || 'Failed to update access level.');
+                AdminToast.error(data.message || 'Failed to update access level.');
             }
         })
-        .catch(function() { alert('Network error. Please try again.'); });
+        .catch(function() { AdminToast.error('Network error. Please try again.'); });
     });
 });
 </script>

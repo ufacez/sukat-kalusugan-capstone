@@ -4767,13 +4767,6 @@
   }
 }
 
-/* --- Recent measurements table (nutritionist dashboard widget) --- */
-.nutritionist-page .nutritionist-recent-table,
-.admin-page .nutritionist-recent-table {
-  min-width: 560px;
-  width: 100%;
-}
-
 /* --- Appointments table --- */
 .nutritionist-page .appt-table-wrap,
 .admin-page .appt-table-wrap {
@@ -4928,3 +4921,33 @@
 .measurements-table .child-name-cell .text,.children-table .child-name-cell .text{min-width:0}
 .measurements-table .child-name-cell .text .name,.children-table .child-name-cell .text .name{font-weight:600;color:var(--admin-text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .measurements-table .child-name-cell .text .sub,.children-table .child-name-cell .text .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
+
+/* =========================================================================
+ *  PARENT PICKER — searchable modal replacing the 100-option dropdown
+ *  in child_form.php. System tokens only; works in dark theme as-is.
+ * ========================================================================= */
+.parent-picker-btn{display:flex;align-items:center;gap:8px;width:100%;padding:10px 12px;border:1px solid var(--admin-border);border-radius:9px;background:var(--admin-surface);color:var(--admin-text);font:inherit;font-size:.85rem;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s,transform .15s}
+.parent-picker-btn:hover{border-color:var(--admin-primary);box-shadow:0 0 0 3px rgba(11,110,79,.1);transform:translateY(-1px)}
+.parent-picker-btn span:first-child{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.parent-picker-btn-icon{color:var(--admin-muted);font-size:1.1rem;line-height:1}
+#parent-picker-overlay[hidden]{display:none}
+.parent-picker-modal{max-width:460px;animation:parent-picker-in .18s ease}
+@keyframes parent-picker-in{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+.parent-picker-search{padding:14px 20px;border-bottom:1px solid var(--admin-border)}
+.parent-picker-search input{width:100%;padding:10px 12px;border:1px solid var(--admin-border);border-radius:9px;background:var(--admin-surface-alt,#f7faf8);color:var(--admin-text);font:inherit;font-size:.85rem;outline:none;box-sizing:border-box;transition:border-color .15s,box-shadow .15s}
+.parent-picker-search input:focus{border-color:var(--admin-primary);box-shadow:0 0 0 3px rgba(11,110,79,.1)}
+.parent-picker-list{padding:8px 12px;min-height:180px;max-height:320px;overflow-y:auto;scrollbar-width:thin}
+.parent-picker-item{display:flex;align-items:center;gap:12px;width:100%;padding:11px 12px;margin-bottom:4px;border-radius:12px;border:1.5px solid transparent;background:var(--admin-surface);cursor:pointer;text-align:left;transition:background .12s,border-color .12s,box-shadow .12s,transform .12s;font:inherit;color:var(--admin-text)}
+.parent-picker-item:hover{background:var(--admin-surface-alt,#f7faf8);border-color:var(--admin-border);box-shadow:0 2px 8px rgba(0,0,0,.06);transform:translateX(2px)}
+.parent-picker-item.is-active{background:var(--admin-primary-soft);border-color:var(--admin-primary)}
+.parent-picker-avatar{width:36px;height:36px;min-width:36px;border-radius:50%;background:var(--admin-primary);color:#fff;display:flex;align-items:center;justify-content:center;font-size:.65rem;font-weight:800}
+.parent-picker-item-info{flex:1;min-width:0}
+.parent-picker-item-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.parent-picker-item-meta{font-size:.68rem;color:var(--admin-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.parent-picker-empty{padding:32px 16px;text-align:center;color:var(--admin-muted);font-size:.82rem}
+.parent-picker-footer{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 20px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt,#f7faf8);font-size:.72rem;color:var(--admin-muted)}
+.parent-picker-page-btn{transition:background .12s,border-color .12s}
+.parent-picker-page-btn:hover:not(:disabled){border-color:var(--admin-primary);color:var(--admin-primary)}
+.parent-picker-page-btn:disabled{opacity:.35;cursor:not-allowed}
+@media (max-width:480px){.parent-picker-modal{max-width:100%}}
+@media (prefers-reduced-motion:reduce){.parent-picker-modal{animation:none}.parent-picker-item:hover,.parent-picker-btn:hover{transform:none}}

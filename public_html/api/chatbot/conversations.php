@@ -12,6 +12,7 @@
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 
 start_secure_session();
 $user = current_user();
@@ -135,6 +136,18 @@ if ($method === 'POST') {
     $childId = api_int($payload['child_id'] ?? null);
     $title    = trim((string)($payload['title'] ?? ''));
 
+    // Parents may only open conversations about their OWN children.
+    if (($user['type'] ?? '') === 'parent' && $childId > 0) {
+        $owned = admin_fetch_one(
+            'SELECT id FROM children WHERE id = ? AND parent_id = ? AND status = \'active\' LIMIT 1',
+            'ii',
+            [$childId, $userId]
+        );
+        if ($owned === null) {
+            api_error('That child could not be found.', 404);
+        }
+    }
+
     if ($title === '') {
         $title = 'New Conversation';
     }
@@ -147,15 +160,27 @@ if ($method === 'POST') {
            VALUES (?, NULL, ?, NOW(), NOW())';
 
     $stmt = mysqli_prepare($db, $sql);
+    if ($stmt === false) {
+        error_log('conversations.php: prepare failed: ' . mysqli_error($db));
+        api_error('Could not start the chat. Please try again.', 500);
+    }
     if ($hasChild) {
         mysqli_stmt_bind_param($stmt, 'iis', $userId, $childId, $title);
     } else {
         mysqli_stmt_bind_param($stmt, 'is', $userId, $title);
     }
-    mysqli_stmt_execute($stmt);
+    $executed = mysqli_stmt_execute($stmt);
 
-    $convId = mysqli_insert_id($db);
+    $convId = $executed ? mysqli_insert_id($db) : 0;
     mysqli_stmt_close($stmt);
+
+    if (!$executed || $convId <= 0) {
+        // Log internals server-side; keep the JSON envelope clean so the
+        // client can always parse it (previously a raw DB warning printed
+        // ahead of the JSON broke parent clients).
+        error_log('conversations.php: insert failed for user ' . $userId);
+        api_error('Could not start the chat. Please try again.', 500);
+    }
 
     api_success([
         'id'    => (int)$convId,

@@ -375,32 +375,11 @@ if ($editId > 0) {
 
 
 /*
- * Parents list is scoped to the nutritionist's barangay. A
- * non-admin nutritionist can only see / pick parents already in their
- * barangay, which is what determines the child's `barangay_id` on
- * save.
+ * Parent picking runs through api/nutritionist/parents_lookup.php (search +
+ * pagination, same barangay scoping as below), so the full parents list is
+ * never loaded into this page. The scope fragment is reused by the lookup
+ * endpoint to enforce the identical rule server-side.
  */
-$parentParams = [];
-$parentScope = nutritionist_scope_fragment($user, 'p.barangay_id', $parentParams);
-$parents = admin_fetch_all(
-    "SELECT
-        p.id,
-        p.name,
-        p.parent_type,
-        p.status,
-        p.phone,
-        p.address,
-        p.barangay_id,
-        p.local_area_id,
-        bg.name AS barangay
-     FROM parents p
-     LEFT JOIN barangays bg
-        ON bg.id = p.barangay_id
-     WHERE {$parentScope}
-     ORDER BY p.name ASC",
-    str_repeat('i', count($parentParams)),
-    $parentParams
-);
 
 $householdBarangayFilter = (int)($editChild['barangay_id'] ?? $user['barangay_id'] ?? 0);
 $households = [];
@@ -630,48 +609,34 @@ nutritionist_layout_start(
                 <span class="admin-required">*</span>
             </span>
 
-            <select
+            <input
+                type="hidden"
                 name="parent_id"
-                required
+                id="parent-id-input"
+                value="<?php echo (int)($editChild['parent_id'] ?? 0); ?>"
             >
 
-                <option value="">
+            <button
+                type="button"
+                class="parent-picker-btn"
+                id="parent-picker-btn"
+            >
+                <span id="parent-picker-label">
                     -- Select Parent --
-                </option>
+                </span>
 
-                <?php foreach ($parents as $parent): ?>
-
-                    <option
-                        value="<?php echo (int)$parent['id']; ?>"
-                        data-barangay-id="<?php echo (int)($parent['barangay_id'] ?? 0); ?>"
-                        data-local-area-id="<?php echo (int)($parent['local_area_id'] ?? 0); ?>"
-                        <?php echo (
-                            (int)($editChild['parent_id'] ?? 0)
-                            === (int)$parent['id']
-                        )
-                            ? 'selected'
-                            : ''; ?>
-                    >
-
-                        <?php
-                        echo nutritionist_e(
-                            $parent['name']
-                            . ' · '
-                            . ' · Barangay: '
-                            . ($parent['barangay'] ?? 'Not assigned')
-                        );
-                        ?>
-
-                    </option>
-
-                <?php endforeach; ?>
-
-            </select>
+                <span
+                    class="parent-picker-btn-icon"
+                    aria-hidden="true"
+                >
+                    &#8250;
+                </span>
+            </button>
 
             <small
                 style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;"
             >
-                The child's Barangay will automatically match the selected parent's Barangay.
+                Search by name — the list loads 5 at a time. The child's Barangay will automatically match the selected parent's Barangay.
             </small>
 
         </label>
@@ -856,12 +821,94 @@ nutritionist_layout_start(
 </section>
 
 
+<div
+    class="admin-modal-overlay"
+    id="parent-picker-overlay"
+    hidden
+>
+    <div
+        class="admin-modal parent-picker-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-label="Select parent or guardian"
+    >
+        <div class="admin-modal-head">
+            <h3>Select Parent/Guardian</h3>
+            <button
+                type="button"
+                class="admin-modal-close"
+                id="parent-picker-close"
+                aria-label="Close"
+            >
+                &times;
+            </button>
+        </div>
+
+        <div class="parent-picker-search">
+            <input
+                type="text"
+                id="parent-picker-search"
+                placeholder="Search by name..."
+                autocomplete="off"
+            >
+        </div>
+
+        <div
+            class="parent-picker-list"
+            id="parent-picker-list"
+        ></div>
+
+        <div class="parent-picker-footer">
+            <button
+                type="button"
+                class="admin-btn-secondary parent-picker-page-btn"
+                id="parent-picker-prev"
+            >
+                &#8249; Prev
+            </button>
+            <span id="parent-picker-page">Page 1</span>
+            <button
+                type="button"
+                class="admin-btn-secondary parent-picker-page-btn"
+                id="parent-picker-next"
+            >
+                Next &#8250;
+            </button>
+        </div>
+    </div>
+</div>
+
+
 <script>
 (function() {
-    var parentSelect = document.querySelector('select[name="parent_id"]');
+    var parentInput = document.getElementById('parent-id-input');
+    var pickerBtn = document.getElementById('parent-picker-btn');
+    var pickerLabel = document.getElementById('parent-picker-label');
+    var overlay = document.getElementById('parent-picker-overlay');
+    var closeBtn = document.getElementById('parent-picker-close');
+    var searchInput = document.getElementById('parent-picker-search');
+    var listEl = document.getElementById('parent-picker-list');
+    var pageEl = document.getElementById('parent-picker-page');
+    var prevBtn = document.getElementById('parent-picker-prev');
+    var nextBtn = document.getElementById('parent-picker-next');
     var areaSelect = document.getElementById('local-area-select');
     var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
     var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+    var pickerApi = '<?php echo app_url("/api/nutritionist/parents_lookup.php"); ?>';
+
+    var selectedParent = null;
+    var pickerState = { q: '', page: 1, pages: 1 };
+    var searchTimer = null;
+
+    function esc(s) {
+        var d = document.createElement('div');
+        d.textContent = s == null ? '' : String(s);
+        return d.innerHTML;
+    }
+
+    function initials(name) {
+        return (name || '?').split(' ').map(function(w) { return w[0]; }).join('').substring(0, 2).toUpperCase();
+    }
 
     function loadAreas(barangayId, selectedId) {
         areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
@@ -901,27 +948,130 @@ nutritionist_layout_start(
             });
     }
 
-    function getParentBarangayId() {
-        var selected = parentSelect.options[parentSelect.selectedIndex];
-        if (!selected || !selected.value) return 0;
-        return parseInt(selected.getAttribute('data-barangay-id') || '0', 10);
+    function openPicker() {
+        pickerState.page = 1;
+        renderPicker();
+        overlay.removeAttribute('hidden');
+        document.body.style.overflow = 'hidden';
+        searchInput.focus();
     }
 
-    function getParentLocalAreaId() {
-        var selected = parentSelect.options[parentSelect.selectedIndex];
-        if (!selected || !selected.value) return 0;
-        return parseInt(selected.getAttribute('data-local-area-id') || '0', 10);
+    function closePicker() {
+        overlay.setAttribute('hidden', '');
+        document.body.style.overflow = '';
     }
 
-    parentSelect.addEventListener('change', function() {
-        currentAreaId = getParentLocalAreaId();
-        loadAreas(getParentBarangayId(), currentAreaId);
+    function renderPicker() {
+        listEl.innerHTML = '<div class="parent-picker-empty">Loading...</div>';
+
+        var url = pickerApi + '?page=' + pickerState.page + '&page_size=5&q=' + encodeURIComponent(pickerState.q);
+
+        fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (!res || !res.success) {
+                    throw new Error((res && res.message) || 'Could not load parents.');
+                }
+
+                var parents = res.data.parents || [];
+                pickerState.page = res.data.page || 1;
+                pickerState.pages = res.data.pages || 1;
+
+                pageEl.textContent = 'Page ' + pickerState.page + ' of ' + pickerState.pages + ' (' + (res.data.total || 0) + ')';
+                prevBtn.disabled = pickerState.page <= 1;
+                nextBtn.disabled = pickerState.page >= pickerState.pages;
+
+                if (parents.length === 0) {
+                    listEl.innerHTML = '<div class="parent-picker-empty">No parents found</div>';
+                    return;
+                }
+
+                listEl.innerHTML = '';
+
+                parents.forEach(function(p) {
+                    var item = document.createElement('button');
+                    item.type = 'button';
+                    item.className = 'parent-picker-item'
+                        + ((selectedParent && Number(selectedParent.id) === Number(p.id)) ? ' is-active' : '');
+                    item.innerHTML = '<span class="parent-picker-avatar">' + esc(initials(p.name)) + '</span>'
+                        + '<span class="parent-picker-item-info">'
+                        + '<span class="parent-picker-item-name">' + esc(p.name) + '</span>'
+                        + '<span class="parent-picker-item-meta">' + esc([p.parent_type, p.barangay].filter(Boolean).join(' · ')) + '</span>'
+                        + '</span>';
+                    item.addEventListener('click', function() { selectParent(p); });
+                    listEl.appendChild(item);
+                });
+            })
+            .catch(function(err) {
+                listEl.innerHTML = '<div class="parent-picker-empty">Could not load parents. Please try again.</div>';
+                if (window.AdminToast) AdminToast.error(err.message || 'Could not load parents.');
+            });
+    }
+
+    function selectParent(p) {
+        selectedParent = p;
+        parentInput.value = p.id;
+        pickerLabel.textContent = p.name;
+        closePicker();
+        currentAreaId = parseInt(p.local_area_id || '0', 10) || currentAreaId;
+        loadAreas(parseInt(p.barangay_id || '0', 10), currentAreaId);
+    }
+
+    pickerBtn.addEventListener('click', openPicker);
+    closeBtn.addEventListener('click', closePicker);
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closePicker();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !overlay.hasAttribute('hidden')) closePicker();
+    });
+    searchInput.addEventListener('input', function() {
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function() {
+            pickerState.q = searchInput.value;
+            pickerState.page = 1;
+            renderPicker();
+        }, 300);
+    });
+    prevBtn.addEventListener('click', function() {
+        if (pickerState.page > 1) {
+            pickerState.page--;
+            renderPicker();
+        }
+    });
+    nextBtn.addEventListener('click', function() {
+        if (pickerState.page < pickerState.pages) {
+            pickerState.page++;
+            renderPicker();
+        }
     });
 
-    var initialBarangayId = getParentBarangayId();
-    if (initialBarangayId > 0) {
-        loadAreas(initialBarangayId, currentAreaId);
-    }
+    // A hidden input skips native `required` validation, so guard the
+    // submit here instead.
+    parentInput.form.addEventListener('submit', function(e) {
+        if (!parentInput.value || parseInt(parentInput.value, 10) <= 0) {
+            e.preventDefault();
+            if (window.AdminToast) AdminToast.error('Please select a parent/guardian first.');
+            openPicker();
+        }
+    });
+
+    // Edit mode: resolve the saved parent id into its label + areas.
+    (function initSelected() {
+        var id = parseInt(parentInput.value || '0', 10);
+        if (id <= 0) return;
+
+        fetch(pickerApi + '?id=' + id, { credentials: 'same-origin', headers: { 'Accept': 'application/json' } })
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                if (!res || !res.success || !res.data.parent) return;
+                var p = res.data.parent;
+                selectedParent = p;
+                pickerLabel.textContent = p.name;
+                loadAreas(parseInt(p.barangay_id || '0', 10), currentAreaId);
+            })
+            .catch(function() {});
+    })();
 })();
 </script>
 

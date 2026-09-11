@@ -912,9 +912,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     .then(function (r) { return r.json(); })
                     .then(function (res) {
                         if (res.success) loadSpotDetails(householdId);
-                        else alert(res.message || 'Failed to unassign.');
+                        else AdminToast.error(res.message || 'Failed to unassign.');
                     })
-                    .catch(function () { alert('Network error.'); });
+                    .catch(function () { AdminToast.error('Network error.'); });
             });
         });
 
@@ -985,7 +985,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         var fieldName = type === 'children' ? 'child_ids[]' : 'parent_ids[]';
         var checked = form.querySelectorAll('[name="' + fieldName + '"]:checked');
         if (checked.length === 0) {
-            alert('Please select at least one ' + (type === 'children' ? 'child' : 'parent') + '.');
+            AdminToast.error('Please select at least one ' + (type === 'children' ? 'child' : 'parent') + '.');
             return;
         }
 
@@ -1002,10 +1002,10 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     form.reset();
                     loadSpotDetails(parseInt(householdId, 10));
                 } else {
-                    alert(res.message || 'Failed to assign.');
+                    AdminToast.error(res.message || 'Failed to assign.');
                 }
             })
-            .catch(function () { alert('Network error.'); });
+            .catch(function () { AdminToast.error('Network error.'); });
     }
 
     function openEditModal(spot) {
@@ -1403,10 +1403,10 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     if (tempPin) { map.removeLayer(tempPin); tempPin = null; }
                     location.reload();
                 } else {
-                    alert(res.message || 'Failed to add spot.');
+                    AdminToast.error(res.message || 'Failed to add spot.');
                 }
             })
-            .catch(function () { alert('Network error. Please try again.'); });
+            .catch(function () { AdminToast.error('Network error. Please try again.'); });
         });
 
         document.getElementById('spot-import-form').addEventListener('submit', function (e) {
@@ -1424,10 +1424,10 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     document.getElementById('spot-import-modal').style.display = 'none';
                     location.reload();
                 } else {
-                    alert(res.message || 'Failed to import spots.');
+                    AdminToast.error(res.message || 'Failed to import spots.');
                 }
             })
-            .catch(function () { alert('Network error. Please try again.'); });
+            .catch(function () { AdminToast.error('Network error. Please try again.'); });
         });
 
         renderSummaryTable();

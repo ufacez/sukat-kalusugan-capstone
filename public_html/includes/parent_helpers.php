@@ -15,6 +15,7 @@ function parent_nav_items(): array
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php')],
         ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php')],
+        ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/parent/ai_assistant.php')],
     ];
 }
 
@@ -33,6 +34,12 @@ function parent_grouped_nav_items(): array
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/parent/children.php'), 'icon' => 'children'],
                 ['key' => 'growth_history', 'label' => 'Growth History', 'href' => app_url('/parent/growth_history.php'), 'icon' => 'linechart'],
                 ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/parent/appointments.php'), 'icon' => 'calendar'],
+            ],
+        ],
+        [
+            'label' => 'Assistant',
+            'items' => [
+                ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/parent/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
     ];
@@ -183,9 +190,9 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/app.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css')) . '">';
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css')) . '">';
+    $toastCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin-toast.css');
+    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin-toast.css?v=' . $toastCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . parent_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
-
-    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/chatbot.css')) . '">';
     echo '<script>';
     echo '(function(){';
     echo 'var t=localStorage.getItem("theme");';
@@ -272,7 +279,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
 
     if ($flash !== null) {
         $flashClass = $flash['type'] === 'error' ? 'admin-flash is-error' : 'admin-flash';
-        echo '<div class="' . $flashClass . '">' . parent_e($flash['message']) . '</div>';
+        echo '<div class="' . $flashClass . '" data-toast>' . parent_e($flash['message']) . '</div>';
     }
 
     echo '<main class="admin-content">';
@@ -294,9 +301,15 @@ function parent_layout_end(): void
     echo '</div>';
     echo '<script src="' . parent_e(app_url('/assets/js/admin.js')) . '"></script>';
 
-    $chatbotConfig = ['apiBase' => app_url('/api/chatbot'), 'role' => 'parent'];
-    echo '<script>window.CHATBOT_CONFIG = ' . json_encode($chatbotConfig, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE) . ';</script>';
-    echo '<script src="' . parent_e(app_url('/assets/js/chatbot_widget.js')) . '"></script>';
+    // Floating Kali AI widget — same shared widget as the nutritionist portal.
+    $kaliWidgetRole = 'parent';
+    $kaliWidget = __DIR__ . '/kali_widget.php';
+    if (is_file($kaliWidget)) {
+        require $kaliWidget;
+    }
+
+    $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
+    echo '<script src="' . parent_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
 
     echo '</body>';
     echo '</html>';

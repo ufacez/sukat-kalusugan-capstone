@@ -294,7 +294,7 @@ nutritionist_layout_start(
         <div style="text-align:center;padding:18px;color:var(--admin-muted);font-size:12px;">No measurements recorded yet.</div>
     <?php else: ?>
     <div style="overflow-x:auto;">
-        <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:2px solid var(--admin-border);font-size:10px;color:var(--admin-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;">
+        <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:2px solid var(--admin-border);font-size:10px;color:var(--admin-muted);font-weight:600;text-transform:uppercase;letter-spacing:0.04em;min-width:520px;">
             <div>Date</div>
             <div>Weight (kg)</div>
             <div>Height (cm)</div>
@@ -310,7 +310,7 @@ nutritionist_layout_start(
             $nutStatus = $m['nutritional_status'] ?? '';
             $nutPillClass = nutritionist_status_class($nutStatus);
         ?>
-        <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:1px solid var(--admin-border);font-size:11px;align-items:center;">
+        <div style="display:grid;grid-template-columns:80px 1fr 1fr 1fr 1fr;gap:6px;padding:6px 0;border-bottom:1px solid var(--admin-border);font-size:11px;align-items:center;min-width:520px;">
             <div><?php echo date('M j, Y', strtotime($m['measurement_date'])); ?></div>
             <div><strong><?php echo number_format((float)$m['weight_kg'], 1); ?></strong></div>
             <div><strong><?php echo number_format((float)$m['height_cm'], 1); ?></strong></div>

@@ -87,7 +87,12 @@ if ($childId <= 0) {
     $scopeCondition = '';
     $scopeParams = [];
     $scopeTypes = '';
-    if (($user['role'] ?? '') === 'nutritionist' && ($user['barangay_id'] ?? '') !== '') {
+    if (($user['type'] ?? '') === 'parent') {
+        // Parents only ever see aggregates over their OWN children.
+        $scopeCondition = ' WHERE c.parent_id = ?';
+        $scopeTypes = 'i';
+        $scopeParams[] = $userId;
+    } elseif (($user['role'] ?? '') === 'nutritionist' && ($user['barangay_id'] ?? '') !== '') {
         $scopeCondition = ' WHERE c.barangay_id = ?';
         $scopeTypes = 'i';
         $scopeParams[] = (int)$user['barangay_id'];
@@ -124,14 +129,27 @@ if ($childId <= 0) {
 
 if ($childId !== null && $childId > 0) {
 
-    // Load child
-    $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
-            FROM children WHERE id = ?';
-    $stmt = mysqli_prepare($db, $sql);
-    mysqli_stmt_bind_param($stmt, 'i', $childId);
+    // Load child. Parents may only open their OWN children — any other
+    // id behaves as "not found" so one family can never read another's data.
+    $isParentUser = ($user['type'] ?? '') === 'parent';
+    if ($isParentUser) {
+        $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
+                FROM children WHERE id = ? AND parent_id = ?';
+        $stmt = mysqli_prepare($db, $sql);
+        mysqli_stmt_bind_param($stmt, 'ii', $childId, $userId);
+    } else {
+        $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
+                FROM children WHERE id = ?';
+        $stmt = mysqli_prepare($db, $sql);
+        mysqli_stmt_bind_param($stmt, 'i', $childId);
+    }
     mysqli_stmt_execute($stmt);
     $child = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
     mysqli_stmt_close($stmt);
+
+    if ($child === null && $isParentUser) {
+        api_error('That child could not be found.', 404);
+    }
 
     if ($child !== null) {
 
@@ -249,7 +267,11 @@ if ($childId > 0 && $child !== null) {
 }
 
 try {
-    $llmResult = @chatbot_call_llm_enhanced($contextBlock, $message, $llmHistory);
+    if (($user['type'] ?? '') === 'parent') {
+        $llmResult = @chatbot_call_llm_enhanced($contextBlock, $message, $llmHistory, chatbot_parent_assistant_prompt());
+    } else {
+        $llmResult = @chatbot_call_llm_enhanced($contextBlock, $message, $llmHistory);
+    }
 } catch (Throwable $e) {
     $llmResult = ['ok' => false, 'reply' => null, 'error' => 'AI service unavailable: ' . $e->getMessage()];
 }

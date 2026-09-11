@@ -11,16 +11,17 @@
 $appEnv = defined('APP_ENV') ? APP_ENV : 'development';
 
 if ($appEnv === 'development') {
-    // Never show raw errors/warnings/stack traces to visitors in production —
-    // they can leak file paths, SQL, and other internals.
+    // Development: surface everything to make debugging easier.
+    error_reporting(E_ALL);
+    ini_set('display_errors', '1');
+    ini_set('display_startup_errors', '1');
+} else {
+    // Never show raw errors/warnings/stack traces to visitors in
+    // staging/production — they can leak file paths, SQL, and other
+    // internals (and corrupt JSON API envelopes).
     error_reporting(E_ALL);
     ini_set('display_errors', '0');
     ini_set('display_startup_errors', '0');
     ini_set('log_errors', '1');
     ini_set('error_log', __DIR__ . '/../../logs/php_errors.log');
-} else {
-    // Development: surface everything to make debugging easier.
-    error_reporting(E_ALL);
-    ini_set('display_errors', '1');
-    ini_set('display_startup_errors', '1');
 }

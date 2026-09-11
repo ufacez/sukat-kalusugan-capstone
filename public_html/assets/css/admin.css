@@ -3365,12 +3365,6 @@ body.admin-page .admin-pagination--mini {
   z-index: 1;
 }
 
-/* --- Recent measurements: fluid table, scroll inside --- */
-body.nutritionist-page .nutritionist-recent-table,
-body.admin-page .nutritionist-recent-table {
-  min-width: 600px;
-}
-
 /* --- Appointments: ensure the table wrap is scrollable --- */
 body.nutritionist-page .appointments-table-wrap,
 body.admin-page .appointments-table-wrap {

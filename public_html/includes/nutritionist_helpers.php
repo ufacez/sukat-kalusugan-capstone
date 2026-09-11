@@ -184,6 +184,8 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin.css?v=' . $adminCssVersion)) . '">';
     $nutritionistCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/nutritionist.css');
     echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/nutritionist.css?v=' . $nutritionistCssVersion)) . '">';
+    $toastCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin-toast.css');
+    echo '<link rel="stylesheet" href="' . nutritionist_e(app_url('/assets/css/admin-toast.css?v=' . $toastCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . nutritionist_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
 
     echo '<script>';
@@ -271,7 +273,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
 
     if ($flash !== null) {
         $flashClass = $flash['type'] === 'error' ? 'admin-flash is-error' : 'admin-flash';
-        echo '<div class="' . $flashClass . '">' . nutritionist_e($flash['message']) . '</div>';
+        echo '<div class="' . $flashClass . '" data-toast>' . nutritionist_e($flash['message']) . '</div>';
     }
 
     echo '<main class="admin-content">';
@@ -296,6 +298,15 @@ function nutritionist_layout_end(): void
     $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+
+    // Floating Kali AI widget (general-mode) on every nutritionist page.
+    $kaliWidget = __DIR__ . '/kali_widget.php';
+    if (is_file($kaliWidget)) {
+        require $kaliWidget;
+    }
+
+    $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
 
     echo '</body>';
     echo '</html>';
