@@ -262,6 +262,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
     echo '<a href="' . nutritionist_e(app_url('/nutritionist/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
+    echo '<a href="' . nutritionist_e($logoutUrl) . '" class="admin-topbar-logout" title="Sign out" aria-label="Sign out">' . admin_action_icon('logout') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';

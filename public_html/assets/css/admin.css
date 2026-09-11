@@ -677,6 +677,44 @@
   border-color: var(--admin-primary);
 }
 
+/* Instant, reliable taps on touch screens: leave pan/pinch to the browser
+ * but disable the double-tap-zoom gesture that can swallow link taps. */
+.admin-sidebar-toggle,
+.admin-nav-link,
+.admin-logout,
+.admin-topbar-logout {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Topbar sign-out: mobile-only shortcut so logging out never depends on
+ * the drawer. Hidden on desktop where the sidebar footer owns it. */
+.admin-topbar-logout {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+}
+.admin-topbar-logout svg {
+  width: 20px;
+  height: 20px;
+}
+.admin-topbar-logout:hover {
+  color: var(--admin-danger);
+  border-color: var(--admin-logout-hover-border);
+  background: var(--admin-logout-hover-bg);
+}
+@media (max-width: 920px) {
+  .admin-topbar-logout {
+    display: inline-flex;
+  }
+}
+
 /* 44px minimum touch target on phones + coarse-pointer devices. */
 @media (max-width: 720px), (pointer: coarse) {
   .admin-sidebar-toggle {
