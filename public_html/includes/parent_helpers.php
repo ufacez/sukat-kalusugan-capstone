@@ -182,14 +182,17 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '<html lang="en">';
     echo '<head>';
     echo '<meta charset="utf-8">';
-    echo '<meta name="viewport" content="width=device-width, initial-scale=1">';
+    echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
     echo '<title>' . parent_e($title) . ' | Sukat Kalusugan Parent Portal</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
     echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
-    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/app.css')) . '">';
-    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css')) . '">';
-    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css')) . '">';
+    $appCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/app.css');
+    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/app.css?v=' . $appCssVersion)) . '">';
+    $adminCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin.css');
+    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin.css?v=' . $adminCssVersion)) . '">';
+    $parentCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent.css');
+    echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/parent.css?v=' . $parentCssVersion)) . '">';
     $toastCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin-toast.css');
     echo '<link rel="stylesheet" href="' . parent_e(app_url('/assets/css/admin-toast.css?v=' . $toastCssVersion)) . '">';
     echo '<link rel="icon" type="image/svg+xml" href="' . parent_e(app_url('/assets/img/logo/logo_forlight.svg')) . '">';
@@ -299,7 +302,8 @@ function parent_layout_end(): void
     echo '</main>';
     echo '</div>';
     echo '</div>';
-    echo '<script src="' . parent_e(app_url('/assets/js/admin.js')) . '"></script>';
+    $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
+    echo '<script src="' . parent_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
 
     // Floating Kali AI widget — same shared widget as the nutritionist
     // portal, except on the dedicated assistant page itself.
