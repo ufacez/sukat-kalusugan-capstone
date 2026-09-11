@@ -1,5 +1,7 @@
 <?php
 
+// scan-ok: no-auth-gate — public invitation-code endpoint by design; the
+// 6-character code is the credential, validated below before any write.
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';

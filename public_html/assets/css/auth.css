@@ -702,9 +702,15 @@
   }
 
   .auth-row {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.75rem;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .auth-row .link {
+    white-space: nowrap;
+    font-size: 0.85rem;
   }
 
   .password-field {

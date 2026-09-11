@@ -9,6 +9,9 @@
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 
+// The full chat lives on this page — hide the floating mini widget.
+define('SKIP_KALI_WIDGET', true);
+
 $user = nutritionist_require_access();
 
 $apiBase = app_url('/api/chatbot');

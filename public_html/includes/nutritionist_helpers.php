@@ -299,10 +299,13 @@ function nutritionist_layout_end(): void
     echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
 
-    // Floating Kali AI widget (general-mode) on every nutritionist page.
-    $kaliWidget = __DIR__ . '/kali_widget.php';
-    if (is_file($kaliWidget)) {
-        require $kaliWidget;
+    // Floating Kali AI widget (general-mode) on every nutritionist page
+    // except the dedicated assistant page itself.
+    if (!defined('SKIP_KALI_WIDGET')) {
+        $kaliWidget = __DIR__ . '/kali_widget.php';
+        if (is_file($kaliWidget)) {
+            require $kaliWidget;
+        }
     }
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');

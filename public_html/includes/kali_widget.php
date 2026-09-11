@@ -18,6 +18,10 @@ declare(strict_types=1);
  * Child-specific analysis stays on the full page (ai_assistant.php).
  */
 
+// Standalone-safe: the including layout already has these, but the widget
+// must not fatal if rendered from a new context.
+require_once __DIR__ . '/admin_helpers.php';
+
 $kaliWidgetRole = $kaliWidgetRole ?? 'nutritionist';
 $kaliFullPageUrl = ($kaliWidgetRole === 'parent')
     ? app_url('/parent/ai_assistant.php')

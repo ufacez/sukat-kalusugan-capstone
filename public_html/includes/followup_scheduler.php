@@ -702,12 +702,12 @@ function followup_fetch_visits(int $childId, string $fromDate, string $toDate, i
 {
 	$conn = get_db_connection();
 
-	// Use @ to suppress mysqli warnings if columns don't exist in the
-	// appointments table (some deployments use a schema without these columns).
-	// The try/catch is the real guard: on PHP 8 + mysqlnd, prepare() throws
-	// mysqli_sql_exception instead of returning false, which @ cannot stop.
+	// Columns may be absent on deployments whose schema predates the
+	// intervention-tracking migration; the try/catch below degrades to an
+	// empty visit list instead of fataling (on PHP 8 + mysqlnd, prepare()
+	// throws mysqli_sql_exception rather than returning false).
 	try {
-		$stmt = @$conn->prepare(
+		$stmt = $conn->prepare(
 			"SELECT a.scheduled_at, a.intervention_type, a.intervention_notes,
 			        a.status AS appt_status,
 			        m.nutritional_status

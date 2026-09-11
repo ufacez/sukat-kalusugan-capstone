@@ -301,11 +301,14 @@ function parent_layout_end(): void
     echo '</div>';
     echo '<script src="' . parent_e(app_url('/assets/js/admin.js')) . '"></script>';
 
-    // Floating Kali AI widget — same shared widget as the nutritionist portal.
-    $kaliWidgetRole = 'parent';
-    $kaliWidget = __DIR__ . '/kali_widget.php';
-    if (is_file($kaliWidget)) {
-        require $kaliWidget;
+    // Floating Kali AI widget — same shared widget as the nutritionist
+    // portal, except on the dedicated assistant page itself.
+    if (!defined('SKIP_KALI_WIDGET')) {
+        $kaliWidgetRole = 'parent';
+        $kaliWidget = __DIR__ . '/kali_widget.php';
+        if (is_file($kaliWidget)) {
+            require $kaliWidget;
+        }
     }
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');

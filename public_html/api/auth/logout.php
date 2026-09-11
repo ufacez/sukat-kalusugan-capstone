@@ -40,5 +40,5 @@ if (wants_json_response()) {
     exit;
 }
 
-    header('Location: ' . app_url('/auth/login.php'));
+    header('Location: ' . app_url('/auth/login.php?notice=' . urlencode('Signed out successfully. See you soon!')));
 exit;

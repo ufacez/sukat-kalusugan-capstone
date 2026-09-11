@@ -331,6 +331,7 @@
   flex-direction: column;
   gap: 8px;
   padding-top: 12px;
+  padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--admin-border);
   margin-top: auto;
 }
@@ -365,7 +366,8 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 44px;
+  position: relative;
   border-radius: 8px;
   text-decoration: none;
   font-size: 0.85rem;
@@ -673,6 +675,19 @@
   color: var(--admin-text);
   background: var(--admin-primary-soft);
   border-color: var(--admin-primary);
+}
+
+/* 44px minimum touch target on phones + coarse-pointer devices. */
+@media (max-width: 720px), (pointer: coarse) {
+  .admin-sidebar-toggle {
+    width: 44px;
+    height: 44px;
+    border-radius: 13px;
+  }
+  .admin-sidebar-toggle svg {
+    width: 22px;
+    height: 22px;
+  }
 }
 
 .admin-sidebar-overlay {
