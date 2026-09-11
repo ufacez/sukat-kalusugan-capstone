@@ -334,6 +334,20 @@
   padding-bottom: max(0px, env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--admin-border);
   margin-top: auto;
+  /* Pins the footer to the bottom of the sidebar's own scroll area
+   * (not the viewport) so Sign Out always lands inside the visibly
+   * tappable region -- relying on margin-top:auto plus a guessed
+   * padding value alone left it reachable in theory but hidden behind
+   * some mobile browsers' bottom toolbar in practice (Android Chrome
+   * in particular doesn't expose a safe-area-inset value the way iOS
+   * does, so that padding alone couldn't account for it). Sticky
+   * positioning guarantees this regardless of which browser chrome is
+   * doing what on a given device.
+   */
+  position: sticky;
+  bottom: 0;
+  background: var(--admin-sidebar-bg);
+  z-index: 1;
 }
 .admin-sidebar-footer .admin-logout {
   width: 100%;
