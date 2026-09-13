@@ -92,9 +92,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		admin_redirect($redirectBack, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
 	}
 
-	// Global uniqueness: email must not exist in staff or other parents.
-	$excludeParent = ($action === 'update' && $parentId > 0) ? $parentId : null;
-	if (admin_email_in_use($email, null, $excludeParent)) {
+	// Global uniqueness is enforced on ADD only — edits must always save
+	// (same-table conflicts still fail on the UNIQUE key with a generic
+	// message).
+	if ($action === 'create' && admin_email_in_use($email, null, null)) {
 		admin_redirect($redirectBack, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 	}
 

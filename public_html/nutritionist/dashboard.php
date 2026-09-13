@@ -609,7 +609,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 <div class="nutritionist-dashboard">
 
-<section class="dashboard-stat-grid" aria-label="Key statistics">
+<section class="dashboard-stat-grid sk-stagger" aria-label="Key statistics">
 	<article class="dashboard-stat-card">
 		<div class="dashboard-stat-row">
 			<div class="dashboard-stat-icon-wrap is-primary">
@@ -617,7 +617,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Children Monitored</div>
-				<div class="dashboard-stat-value"><?php echo count($children); ?></div>
+				<div class="dashboard-stat-value" data-count-up><?php echo count($children); ?></div>
 				<div class="dashboard-stat-meta"><span class="highlight">Registered in your scope</span></div>
 			</div>
 		</div>
@@ -630,7 +630,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Children Needing Attention</div>
-				<div class="dashboard-stat-value"><?php echo count($atRiskChildren); ?></div>
+				<div class="dashboard-stat-value" data-count-up><?php echo count($atRiskChildren); ?></div>
 				<div class="dashboard-stat-meta is-danger"><span class="highlight"><?php echo $severeCount; ?> severe cases</span></div>
 			</div>
 		</div>
@@ -643,7 +643,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
-				<div class="dashboard-stat-value"><?php echo count($measurements); ?></div>
+				<div class="dashboard-stat-value" data-count-up><?php echo count($measurements); ?></div>
 				<div class="dashboard-stat-meta">This month <a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>">View all →</a></div>
 			</div>
 		</div>
@@ -656,7 +656,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Appointments</div>
-				<div class="dashboard-stat-value"><?php echo count($upcomingAppointments); ?></div>
+				<div class="dashboard-stat-value" data-count-up><?php echo count($upcomingAppointments); ?></div>
 				<div class="dashboard-stat-meta">Upcoming <a href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">View all →</a></div>
 			</div>
 		</div>

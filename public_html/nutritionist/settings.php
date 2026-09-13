@@ -37,12 +37,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
         admin_redirect('/nutritionist/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
     }
 
-    if (admin_email_in_use($email, (int)$actor['id'], null)) {
-        admin_redirect('/nutritionist/settings.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
-    }
-    if (admin_username_in_use($username, (int)$actor['id'])) {
-        admin_redirect('/nutritionist/settings.php', ['notice' => 'This username is already taken. Choose a different username.', 'type' => 'error']);
-    }
+    // Duplicate enforcement lives on the ADD paths only — self-save must
+    // always go through (same-table conflicts still fail on the UNIQUE
+    // keys with a generic message).
 
     $current = admin_fetch_one('SELECT password_hash, email FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
 

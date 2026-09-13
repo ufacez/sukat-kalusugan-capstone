@@ -3842,3 +3842,15 @@ body.admin-page .appointments-table {
     gap: 4px;
   }
 }
+/* ---- Reduced motion: instant state changes, static indicators ---- */
+@media (prefers-reduced-motion: reduce) {
+  .admin-sidebar,
+  .admin-main,
+  .admin-content,
+  .admin-topbar-profile,
+  .admin-toast,
+  .audit-chart-badge::before {
+    transition: none !important;
+    animation: none !important;
+  }
+}

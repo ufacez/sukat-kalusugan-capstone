@@ -181,7 +181,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 	}
 ?>
 
-<section class="parent-dashboard-top">
+<section class="parent-dashboard-top sk-stagger">
 	<article class="parent-panel parent-profile-card">
 		<button type="button" class="parent-child-trigger" data-child-picker-open aria-haspopup="dialog" aria-controls="parent-child-picker">
 		<div class="parent-child-banner">

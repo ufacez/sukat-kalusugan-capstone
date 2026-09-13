@@ -51,7 +51,12 @@
         throw new Error((payload && payload.message) || "Unable to reset password.");
       }
 
-      window.location.href = "login.php?notice=" + encodeURIComponent(payload.message || "Password reset. Please sign in.");
+      const redirectUrl = "login.php?notice=" + encodeURIComponent(payload.message || "Password reset. Please sign in.");
+      if (window.SKAuthHandoff) {
+        window.SKAuthHandoff.exitTo({ button: submitButton, url: redirectUrl });
+      } else {
+        window.location.href = redirectUrl;
+      }
     } catch (error) {
       message.textContent = error.message || "Unable to reset password.";
       submitButton.disabled = false;

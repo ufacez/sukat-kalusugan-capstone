@@ -73,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $pendingCount = admin_scalar("SELECT COUNT(*) FROM invitations WHERE status = 'pending' AND expires_at > NOW()", '', [], 0);
     if ($pendingCount >= 3) {
+        admin_clear_form_state();
         admin_redirect('/admin/invitations.php', ['notice' => 'Maximum 3 pending invitations. Cancel or wait for expiry.', 'type' => 'error']);
     }
 

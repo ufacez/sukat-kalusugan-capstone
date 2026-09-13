@@ -88,25 +88,24 @@ if ($password !== '' && $password !== $passwordConfirm) {
     admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 }
 
-// Duplicate email check — globally unique (exclude self).
+// Duplicate enforcement lives on the ADD paths only — edits must always
+// save (same-table conflicts still fail on the UNIQUE key below with a
+// generic message). Format is still validated here.
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
-}
-if (admin_email_in_use($email, null, $id)) {
-    admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 }
 
 if ($password !== '') {
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $ok = admin_execute(
         'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
-        'ssssssssi',
+        'ssssssiisi',
         [$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $id]
     );
 } else {
     $ok = admin_execute(
         'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, status = ? WHERE id = ?',
-        'sssssssi',
+        'sssssiisi',
         [$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $status, $id]
     );
 }

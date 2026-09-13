@@ -468,3 +468,179 @@
     });
   }
 })();
+
+(function () {
+  "use strict";
+
+  /* One-shot welcome emphasis after login (flag planted by auth-handoff.js).
+   * Adds body.sk-welcome for the header rise, then consumes the flag so a
+   * refresh never replays it. Paint only — no navigation or data involved. */
+  try {
+    if (window.sessionStorage && window.sessionStorage.getItem("sk-welcome") === "1") {
+      window.sessionStorage.removeItem("sk-welcome");
+      document.body.classList.add("sk-welcome");
+    }
+  } catch (error) {
+    // sessionStorage unavailable (private mode) — skip silently.
+  }
+
+  /* Count-up for dashboard stat numbers. Opt-in via data-count-up on an
+   * element whose text is a plain number (commas allowed). Animates 0 ?
+   * value over ~700ms with rAF; reduced-motion and non-numeric content
+   * render the final value instantly. Idempotent per element. */
+  function countUp(el) {
+    if (!el || el.dataset.counted === "1") return;
+    el.dataset.counted = "1";
+    var raw = (el.textContent || "").trim().replace(/,/g, "");
+    var target = Number(raw);
+    if (!isFinite(target)) return;
+    var reduceMotion =
+      typeof window.matchMedia === "function" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduceMotion) {
+      el.textContent = target.toLocaleString("en-US");
+      return;
+    }
+    var duration = 700;
+    var start = null;
+    function frame(now) {
+      if (start === null) start = now;
+      var progress = Math.min((now - start) / duration, 1);
+      var eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = Math.round(target * eased).toLocaleString("en-US");
+      if (progress < 1) window.requestAnimationFrame(frame);
+    }
+    window.requestAnimationFrame(frame);
+  }
+
+  function initCountUps(scope) {
+    (scope || document).querySelectorAll("[data-count-up]").forEach(countUp);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { initCountUps(document); });
+  } else {
+    initCountUps(document);
+  }
+
+  window.SKCountUp = { init: initCountUps };
+})();
+
+(function () {
+  "use strict";
+
+  /* SKBusy — shared buffering feedback for slow internet.
+   * Paint only: spins the trigger and blocks double-activation while a
+   * request is in flight. Never changes URLs, payloads, or timing. */
+  var BUSY_FAILSAFE_MS = 60000;
+  var DOWNLOAD_FAILSAFE_MS = 45000;
+
+  function ensureSpinner(el) {
+    if (!el) return null;
+    var spin = el.querySelector(":scope > .sk-btn-spinner");
+    if (!spin) {
+      spin = document.createElement("span");
+      spin.className = "sk-btn-spinner";
+      spin.setAttribute("aria-hidden", "true");
+      el.insertBefore(spin, el.firstChild);
+    }
+    return spin;
+  }
+
+  function setBusy(el, busy) {
+    if (!el) return function () {};
+    if (busy) {
+      if (el.dataset.skBusy === "1") return function () {};
+      el.dataset.skBusy = "1";
+      ensureSpinner(el);
+      el.classList.add("is-busy");
+      el.setAttribute("aria-busy", "true");
+      if ("disabled" in el) {
+        try { el.disabled = true; } catch (error) { /* read-only control */ }
+      }
+      var failsafe = window.setTimeout(function () { setBusy(el, false); }, BUSY_FAILSAFE_MS);
+      el._skFailsafe = failsafe;
+    } else {
+      if (el._skFailsafe) {
+        window.clearTimeout(el._skFailsafe);
+        el._skFailsafe = null;
+      }
+      delete el.dataset.skBusy;
+      el.classList.remove("is-busy");
+      el.removeAttribute("aria-busy");
+      if ("disabled" in el && el.dataset.skKeepDisabled !== "1") {
+        try { el.disabled = false; } catch (error) { /* read-only control */ }
+      }
+    }
+    return function () {};
+  }
+
+  /* Full-page POST forms: spin the submitter. Runs after validators
+   * (setTimeout 0) so blocked submits never spin. Page unload on success
+   * clears everything naturally; the failsafe covers fetch-handled forms. */
+  function wireForms(scope) {
+    (scope || document).querySelectorAll("form[data-validate-form]").forEach(function (form) {
+      if (form.dataset.skBusyWired === "1") return;
+      form.dataset.skBusyWired = "1";
+      form.addEventListener("submit", function (e) {
+        var submitter = e.submitter || form.querySelector('[type="submit"]');
+        window.setTimeout(function () {
+          if (e.defaultPrevented) return;
+          setBusy(submitter, true);
+        }, 0);
+      });
+    });
+  }
+
+  /* File-download links: the page never unloads, so clear on refocus
+   * (save dialog blurs the window) plus a failsafe. Scoped to known
+   * export endpoints only — never navigation links. */
+  var DOWNLOAD_SELECTOR = "a[href*=\"eopt_reports_export.php\"], a[href*=\"who_reference_export.php\"], a[href*=\"eopt_pdf_generate.php\"]";
+
+  function wireDownloads(scope) {
+    (scope || document).querySelectorAll(DOWNLOAD_SELECTOR).forEach(function (link) {
+      if (link.dataset.skBusyWired === "1") return;
+      link.dataset.skBusyWired = "1";
+      link.addEventListener("click", function () {
+        if (link.dataset.skBusy === "1") return;
+        setBusy(link, true);
+        var done = false;
+        var release = function () {
+          if (done) return;
+          done = true;
+          setBusy(link, false);
+          window.removeEventListener("focus", release);
+        };
+        window.addEventListener("focus", release);
+        window.setTimeout(release, DOWNLOAD_FAILSAFE_MS);
+      }, true);
+    });
+  }
+
+  /* Offline awareness via the existing toast system (if loaded). */
+  function announceOnline() {
+    if (window.AdminToast && typeof window.AdminToast.success === "function") {
+      window.AdminToast.success("Back online.");
+    }
+  }
+  function announceOffline() {
+    if (window.AdminToast && typeof window.AdminToast.error === "function") {
+      window.AdminToast.error("You are offline. Actions may fail until connection returns.");
+    }
+  }
+  window.addEventListener("online", announceOnline);
+  window.addEventListener("offline", announceOffline);
+
+  function init(scope) {
+    wireForms(scope);
+    wireDownloads(scope);
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", function () { init(document); });
+  } else {
+    init(document);
+  }
+
+  window.SKBusy = { set: setBusy, init: init };
+})();

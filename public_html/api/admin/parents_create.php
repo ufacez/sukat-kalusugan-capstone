@@ -93,7 +93,7 @@ if (admin_email_in_use($email)) {
 $hash = password_hash($password, PASSWORD_DEFAULT);
 $ok = admin_execute(
     'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-    'ssssssss',
+    'ssssssiis',
     [$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $status]
 );
 

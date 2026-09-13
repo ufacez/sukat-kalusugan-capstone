@@ -32,9 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 		admin_redirect('/parent/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
 	}
 
-	if (admin_email_in_use($email, null, (int)$user['id'])) {
-		admin_redirect('/parent/settings.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
-	}
+	// Duplicate enforcement lives on the ADD paths only — self-save must
+	// always go through (same-table conflicts still fail on the UNIQUE
+	// key with a generic message).
 
 	$allowedTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 	if (!in_array($parentType, $allowedTypes, true)) {

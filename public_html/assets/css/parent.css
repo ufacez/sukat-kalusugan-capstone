@@ -2242,3 +2242,13 @@
   .parent-page .parent-child-status { grid-column: 1 / -1; }
   .parent-page .parent-followup { grid-template-columns: auto 1fr; }
 }
+
+/* ---- Reduced motion: instant state changes, static indicators ---- */
+@media (prefers-reduced-motion: reduce) {
+  .parent-page *,
+  .parent-page *::before,
+  .parent-page *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

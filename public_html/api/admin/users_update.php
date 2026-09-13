@@ -78,19 +78,12 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
-// Duplicate checks (exclude current user) — email globally unique.
+// Duplicate enforcement lives on the ADD paths only — edits must always
+// save (same-table conflicts still fail on the UNIQUE keys below with a
+// generic message). Format is still validated here.
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     admin_flash_form_state($_POST, 'email');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
-}
-if (admin_email_in_use($email, $id, null)) {
-    admin_flash_form_state($_POST, 'email');
-    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
-}
-
-if (admin_username_in_use($username, $id)) {
-    admin_flash_form_state($_POST, 'username');
-    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this username already exists.', 'type' => 'error']);
 }
 
 $conn = get_db_connection();

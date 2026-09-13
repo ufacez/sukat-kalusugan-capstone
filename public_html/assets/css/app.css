@@ -214,3 +214,210 @@ select {
   height: 1rem;
   accent-color: var(--primary);
 }
+
+/* =========================================================================
+ *  SK MOTION FOUNDATION — shared by every page (app.css loads everywhere).
+ *  Rules: transform + opacity only, <=300ms, ease-out. Nothing here touches
+ *  layout, endpoints, or timing — pure paint.
+ *  Spec curve: cubic-bezier(0.32, 0.72, 0, 1) (matches toasts/sidebar).
+ * ========================================================================= */
+
+:root {
+  --sk-ease: cubic-bezier(0.32, 0.72, 0, 1);
+  --sk-enter-dur: 260ms;
+  --sk-micro-dur: 150ms;
+}
+
+/* ---- Cross-document view transitions (progressive enhancement) ----
+ * Chrome/Edge animate page-to-page navigations; all other browsers
+ * silently ignore this block and navigate exactly as before. */
+@view-transition {
+  navigation: auto;
+}
+
+/* ---- Global page-enter: every full load fades/rises once ---- */
+@keyframes sk-page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.admin-content,
+.auth-shell,
+.kiosk-shell {
+  animation: sk-page-in var(--sk-enter-dur) var(--sk-ease);
+}
+
+/* ---- Welcome-back emphasis after login (one-shot, set by JS) ---- */
+@keyframes sk-welcome-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.995); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+body.sk-welcome .admin-pageheader {
+  animation: sk-welcome-rise 340ms var(--sk-ease);
+}
+
+/* ---- Stagger utility for card grids (delays via nth-child, cap 6) ---- */
+@keyframes sk-rise-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.sk-stagger > *:nth-child(1) { animation: sk-rise-in 260ms var(--sk-ease) 0ms backwards; }
+.sk-stagger > *:nth-child(2) { animation: sk-rise-in 260ms var(--sk-ease) 50ms backwards; }
+.sk-stagger > *:nth-child(3) { animation: sk-rise-in 260ms var(--sk-ease) 100ms backwards; }
+.sk-stagger > *:nth-child(4) { animation: sk-rise-in 260ms var(--sk-ease) 150ms backwards; }
+.sk-stagger > *:nth-child(5) { animation: sk-rise-in 260ms var(--sk-ease) 200ms backwards; }
+.sk-stagger > *:nth-child(n+6) { animation: sk-rise-in 260ms var(--sk-ease) 240ms backwards; }
+
+/* ---- Table first-paint fade (runs once per load) ---- */
+@keyframes sk-table-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.admin-table tbody {
+  animation: sk-table-in 300ms ease;
+}
+
+/* ---- Skeleton shimmer for async zones ---- */
+@keyframes sk-shimmer-sweep {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+.sk-shimmer {
+  position: relative;
+  overflow: hidden;
+  background: rgba(127, 140, 132, 0.16);
+  border-radius: 8px;
+  min-height: 1em;
+}
+
+.sk-shimmer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(100deg, transparent 20%, rgba(255, 255, 255, 0.45) 50%, transparent 80%);
+  animation: sk-shimmer-sweep 1.4s ease-in-out infinite;
+}
+
+/* ---- Press feedback for primary buttons (visual only) ---- */
+.admin-btn:active:not(:disabled),
+.auth-submit:active:not(:disabled),
+.ai-send-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* ---- Auth exit transition (login success → dashboard) ---- */
+.auth-shell.is-exiting {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.99);
+  transition: opacity 240ms ease, transform 240ms var(--sk-ease);
+  pointer-events: none;
+}
+
+/* =========================================================================
+ *  SK BUSY PRIMITIVE — buffering feedback for slow internet.
+ *  Applied via JS (SKBusy in admin.js): any button/link gets a spinning
+ *  circle + disabled state while its request is in flight. Transform and
+ *  opacity only; colors inherit so it matches every button variant.
+ * ========================================================================= */
+
+@keyframes sk-spin {
+  to { transform: rotate(360deg); }
+}
+
+.sk-btn-spinner {
+  width: 1em;
+  height: 1em;
+  min-width: 1em;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  opacity: 0.85;
+  display: none;
+  animation: sk-spin 0.8s linear infinite;
+}
+
+.is-busy > .sk-btn-spinner,
+.is-busy.sk-btn-spinner {
+  display: inline-block;
+}
+
+.is-busy {
+  cursor: wait;
+}
+
+a.is-busy {
+  opacity: 0.72;
+}
+
+/* ---- Zone loading overlay (audit table swaps, async panels) ---- */
+.sk-zone-loading {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: color-mix(in srgb, var(--surface, #fff) 55%, transparent);
+  color: var(--muted, #5f766c);
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: inherit;
+}
+
+.sk-zone-loading .sk-btn-spinner {
+  display: inline-block;
+  width: 22px;
+  height: 22px;
+  min-width: 22px;
+  border-width: 3px;
+}
+
+.sk-zone-host {
+  position: relative;
+}
+/* ---- Reduced motion: everything instant ---- */
+@media (prefers-reduced-motion: reduce) {
+
+  .admin-content,
+  .auth-shell,
+  .kiosk-shell,
+  body.sk-welcome .admin-pageheader {
+    animation: none;
+  }
+
+  .sk-stagger > * {
+    animation: none;
+  }
+
+  .admin-table tbody {
+    animation: none;
+  }
+
+  .sk-shimmer::after {
+    animation: none;
+  }
+
+  .auth-shell.is-exiting {
+    transition: none;
+  }
+
+  .sk-btn-spinner,
+  .is-busy > .sk-btn-spinner,
+  .sk-zone-loading .sk-btn-spinner {
+    animation: none;
+    border-top-color: currentColor;
+    opacity: 0.5;
+  }
+
+  .admin-btn:active:not(:disabled),
+  .auth-submit:active:not(:disabled),
+  .ai-send-btn:active:not(:disabled) {
+    transform: none;
+  }
+}

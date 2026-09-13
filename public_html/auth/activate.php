@@ -228,9 +228,17 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     if (data.success) {
                         msg.textContent = data.message;
                         msg.className = 'form-message is-success';
-                        setTimeout(function(){
-                            window.location.href = data.redirect_url || 'login.php';
-                        }, 1500);
+                        var target = data.redirect_url || 'login.php';
+                        if (window.SKAuthHandoff) {
+                            // Brief beat so the success message reads, then the shared exit.
+                            setTimeout(function(){
+                                window.SKAuthHandoff.exitTo({ button: btn, url: target, successLabel: 'Account ready' });
+                            }, 900);
+                        } else {
+                            setTimeout(function(){
+                                window.location.href = target;
+                            }, 1500);
+                        }
                     } else {
                         msg.textContent = data.message;
                         msg.className = 'form-message';
@@ -246,6 +254,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
         }
     })();
     </script>
+    <script src="../assets/js/auth-handoff.js"></script>
     <script src="../assets/js/admin-toast.js?v=1"></script>
 </body>
 </html>

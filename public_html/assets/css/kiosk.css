@@ -2679,3 +2679,71 @@ body {
   padding: 16px 24px 20px;
   border-top: 1px solid var(--sk-border-light);
 }
+
+/* ==========================================================================
+ *  LIVELY LAYER (append-only, CSS-only — no JS/endpoint/timing changes).
+ *  - Sensor-ready pop, results stagger, idle attract on welcome.
+ *  - Frozen during measurement/processing: only progress + stability move.
+ * ========================================================================== */
+
+/* ---- Sensor-ready pop when a live status flips to success ---- */
+.kiosk-live-status.is-success {
+  animation: kioskStablePop 0.4s var(--sk-bounce);
+}
+
+/* ---- Results reveal stagger (plays when results screen activates) ---- */
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-child-card {
+  animation: kioskFadeUp 0.45s var(--sk-transition) both;
+}
+
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-row:nth-child(1),
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-status-row:nth-child(1) {
+  animation: kioskFadeUp 0.4s var(--sk-transition) 80ms both;
+}
+
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-row:nth-child(2),
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-status-row:nth-child(2) {
+  animation: kioskFadeUp 0.4s var(--sk-transition) 140ms both;
+}
+
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-row:nth-child(n+3),
+.kiosk-screen[data-kiosk-screen="results"].is-active .kiosk-result-status-row:nth-child(n+3) {
+  animation: kioskFadeUp 0.4s var(--sk-transition) 200ms both;
+}
+
+/* ---- Idle attract: gentle logo float + CTA glow, welcome screen only ---- */
+@keyframes kioskIdleFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes kioskCtaGlow {
+  0%, 100% { box-shadow: 0 8px 24px rgba(11, 110, 79, 0.28); }
+  50% { box-shadow: 0 8px 34px rgba(11, 110, 79, 0.5); }
+}
+
+.kiosk-screen[data-kiosk-screen="welcome"].is-active .kiosk-welcome-logo-img {
+  animation: kioskIdleFloat 4s ease-in-out infinite;
+}
+
+.kiosk-screen[data-kiosk-screen="welcome"].is-active .kiosk-btn-primary {
+  animation: kioskCtaGlow 2.6s ease-in-out infinite;
+}
+
+/* ---- Frozen during measurement/processing: decorative motion off ---- */
+body[data-kiosk-step="measurement"] .kiosk-welcome-logo-img,
+body[data-kiosk-step="processing"] .kiosk-welcome-logo-img,
+body[data-kiosk-step="measurement"] .kiosk-screen[data-kiosk-screen="welcome"].is-active .kiosk-btn-primary,
+body[data-kiosk-step="processing"] .kiosk-screen[data-kiosk-screen="welcome"].is-active .kiosk-btn-primary {
+  animation: none;
+}
+
+/* ---- Reduced motion: fully static kiosk, all states stay legible ---- */
+@media (prefers-reduced-motion: reduce) {
+  .kiosk-shell *,
+  .kiosk-shell *::before,
+  .kiosk-shell *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

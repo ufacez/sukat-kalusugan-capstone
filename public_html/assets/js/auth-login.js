@@ -39,7 +39,12 @@
         throw new Error(payload.message || "Unable to sign in.");
       }
 
-      window.location.href = payload.redirect_url || "../auth/login.php";
+      const redirectUrl = payload.redirect_url || "../auth/login.php";
+      if (window.SKAuthHandoff) {
+        window.SKAuthHandoff.exitTo({ button: submitButton, url: redirectUrl, welcome: true });
+      } else {
+        window.location.href = redirectUrl;
+      }
     } catch (error) {
       message.textContent = error.message || "Unable to sign in.";
       submitButton.disabled = false;

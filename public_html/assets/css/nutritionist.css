@@ -4951,3 +4951,12 @@
 .parent-picker-page-btn:disabled{opacity:.35;cursor:not-allowed}
 @media (max-width:480px){.parent-picker-modal{max-width:100%}}
 @media (prefers-reduced-motion:reduce){.parent-picker-modal{animation:none}.parent-picker-item:hover,.parent-picker-btn:hover{transform:none}}
+/* ---- Reduced motion: instant state changes, static indicators ---- */
+@media (prefers-reduced-motion:reduce){
+  .nutritionist-page *,
+  .nutritionist-page *::before,
+  .nutritionist-page *::after{
+    animation:none !important;
+    transition:none !important;
+  }
+}

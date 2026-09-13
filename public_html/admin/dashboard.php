@@ -157,7 +157,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
 <?php
 /* ─── TOP SUMMARY CARDS ─────────────────────────────────────────────── */
 ?>
-<section class="admin-grid-cards">
+<section class="admin-grid-cards sk-stagger">
     <article class="admin-card admin-card--dashboard">
         <div class="admin-card-row">
             <div class="admin-card-icon">
@@ -165,7 +165,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             </div>
             <div class="admin-card-content">
                 <div class="admin-card-label">Total Users</div>
-                <div class="admin-card-value"><?php echo (int)$totalUsers; ?></div>
+                <div class="admin-card-value" data-count-up><?php echo (int)$totalUsers; ?></div>
                 <div class="admin-card-meta">
                     <span class="admin-card-trend is-up">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
@@ -185,7 +185,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             </div>
             <div class="admin-card-content">
                 <div class="admin-card-label">Kiosk Devices</div>
-                <div class="admin-card-value"><?php echo (int)$devicesTotal; ?></div>
+                <div class="admin-card-value" data-count-up><?php echo (int)$devicesTotal; ?></div>
                 <div class="admin-card-meta">
                     <span class="admin-card-trend is-up">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
@@ -205,7 +205,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             </div>
             <div class="admin-card-content">
                 <div class="admin-card-label">Security Events</div>
-                <div class="admin-card-value"><?php echo (int)$securityEvents; ?></div>
+                <div class="admin-card-value" data-count-up><?php echo (int)$securityEvents; ?></div>
                 <div class="admin-card-meta">
                     <span class="admin-card-trend is-danger">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>

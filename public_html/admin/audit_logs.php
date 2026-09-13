@@ -226,7 +226,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-dropdown-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 </style>
 
-<section class="audit-stats-row">
+<section class="audit-stats-row sk-stagger">
     <article class="audit-stat">
         <div class="audit-stat-icon is-green">
             <span class="audit-live-dot" aria-hidden="true"></span>
@@ -868,15 +868,21 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
     }
 
     function loadInsights(){
-        fetch(api,{credentials:'same-origin'})
+        var controller = ('AbortController' in window) ? new AbortController() : null;
+        var timer = controller ? setTimeout(function(){ controller.abort(); }, 25000) : null;
+        var fetchOpts = {credentials:'same-origin'};
+        if(controller) fetchOpts.signal = controller.signal;
+        fetch(api, fetchOpts)
             .then(function(r){return r.json()})
             .then(function(result){
+                if(timer) clearTimeout(timer);
                 if(result.success && result.category_chart) initChart(result.category_chart);
                 renderInsights(result);
                 renderDetails(result);
                 renderCardStats(result.card_stats);
             })
             .catch(function(){
+                if(timer) clearTimeout(timer);
                 var panel=document.getElementById('audit-ai-panel');
                 if(panel&&!panel.querySelector('.audit-ai-item'))
                     panel.innerHTML='<div class="audit-ai-item">Unable to load insights. Retrying...</div>';
@@ -941,9 +947,18 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
             return;
         }
         var token = ++zoneRequestToken;
-        tableZone.classList.add('is-loading');
+        tableZone.classList.add('is-loading', 'sk-zone-host');
         tableZone.setAttribute('aria-busy','true');
-        fetch(url, {credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'}})
+        var overlay = document.createElement('div');
+        overlay.className = 'sk-zone-loading';
+        overlay.setAttribute('role','status');
+        overlay.innerHTML = '<span class="sk-btn-spinner" aria-hidden="true"></span><span>Loading…</span>';
+        tableZone.appendChild(overlay);
+        var controller = ('AbortController' in window) ? new AbortController() : null;
+        var timer = controller ? setTimeout(function(){ controller.abort(); }, 20000) : null;
+        var fetchOpts = {credentials:'same-origin', headers:{'X-Requested-With':'XMLHttpRequest'}};
+        if(controller) fetchOpts.signal = controller.signal;
+        fetch(url, fetchOpts)
             .then(function(r){
                 if(!r.ok) throw new Error('HTTP ' + r.status);
                 return r.text();
@@ -980,6 +995,10 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 window.location.href = url;
             })
             .finally(function(){
+                // Always clean up THIS request's own overlay/timer, even
+                // when superseded — only the newest request touches content.
+                if(timer) clearTimeout(timer);
+                if(overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
                 if(token !== zoneRequestToken) return;
                 tableZone.classList.remove('is-loading');
                 tableZone.removeAttribute('aria-busy');

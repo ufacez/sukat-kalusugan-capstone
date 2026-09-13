@@ -521,6 +521,31 @@
   display: inline-block;
 }
 
+/* ---- Success morph (set by auth-handoff.js, then we navigate) ---- */
+.auth-submit.is-success {
+  pointer-events: none;
+}
+
+.auth-submit.is-success .button-spinner {
+  display: inline-block;
+  animation: none;
+  border-color: #fff;
+  background: #fff;
+  position: relative;
+}
+
+.auth-submit.is-success .button-spinner::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0.28rem;
+  height: 0.5rem;
+  border: solid var(--primary-strong);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -60%) rotate(45deg);
+}
+
 @keyframes spin {
   to {
     transform: rotate(360deg);
@@ -740,5 +765,16 @@
 
   .auth-tagline {
     font-size: 0.95rem;
+  }
+}
+/* ---- Reduced motion: static auth (exit morph handled in JS fallback) ---- */
+@media (prefers-reduced-motion: reduce) {
+  .auth-shell,
+  .auth-submit,
+  .auth-submit .button-spinner,
+  .auth-theme-toggle-track,
+  .auth-theme-icon {
+    transition: none !important;
+    animation: none !important;
   }
 }

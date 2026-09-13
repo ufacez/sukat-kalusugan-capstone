@@ -131,6 +131,7 @@ if ($token === '') {
         </section>
     </main>
 
+    <script src="../assets/js/auth-handoff.js"></script>
     <script src="../assets/js/auth-reset-password.js"></script>
     <script>
     (function(){

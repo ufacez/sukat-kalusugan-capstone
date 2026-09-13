@@ -132,6 +132,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
         </section>
     </main>
 
+    <script src="../assets/js/auth-handoff.js"></script>
     <script src="../assets/js/auth-login.js"></script>
     <script>
     (function(){
