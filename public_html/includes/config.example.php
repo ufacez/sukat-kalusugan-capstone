@@ -23,6 +23,10 @@ define('DB_PASS', '');
 
 define('APP_ENV', 'development'); // 'development' | 'staging' | 'production'
 
+// Canonical public base URL for links inside emails (e.g. https://sukatkalusugan.app).
+// Leave empty for request-host fallback (dev only).
+define('APP_URL', '');
+
 define('ESP32_DEVICE_KEY', '');
 
 define('FIREBASE_DATABASE_URL', '');

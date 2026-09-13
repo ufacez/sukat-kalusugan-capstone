@@ -1530,8 +1530,14 @@
   border-radius: 12px;
   padding: 0.82rem 0.95rem;
   background: var(--admin-search-bg);
+  color: var(--admin-text);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
   font-size: 0.85rem;
+}
+
+.admin-search::placeholder {
+  color: var(--admin-muted);
+  opacity: 1;
 }
 
 .admin-select {
@@ -3110,18 +3116,50 @@ body.admin-page .audit-chart-x-axis {
   font-size: 0.6rem;
 }
 
+/* --- Audit logs: 3 stat cards always share one horizontal row --- */
 body.admin-page .audit-stats-row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-@media (max-width: 420px) {
+@media (max-width: 800px) {
   body.admin-page .audit-stats-row {
-    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
   }
   body.admin-page .audit-stat {
     padding: 10px 12px;
+    gap: 8px;
+  }
+  body.admin-page .audit-stat-icon {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+  }
+  body.admin-page .audit-stat-icon svg {
+    width: 14px;
+    height: 14px;
   }
   body.admin-page .audit-stat-value {
-    font-size: 1.1rem;
+    font-size: 0.95rem;
+  }
+  body.admin-page .audit-stat-label {
+    font-size: 8px;
+  }
+  body.admin-page .audit-stat-sub {
+    font-size: 9px;
+  }
+}
+@media (max-width: 420px) {
+  body.admin-page .audit-stat {
+    padding: 8px 10px;
+    gap: 6px;
+    border-radius: 8px;
+  }
+  body.admin-page .audit-stat-icon {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+  }
+  body.admin-page .audit-stat-value {
+    font-size: 0.9rem;
   }
 }
 

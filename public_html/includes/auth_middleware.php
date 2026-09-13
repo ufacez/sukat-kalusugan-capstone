@@ -51,6 +51,39 @@ function app_url(string $path = ''): string
     return $basePath . $normalizedPath;
 }
 
+/**
+ * Absolute URL for links placed inside emails (reset, activation).
+ *
+ * Uses the canonical APP_URL when configured (e.g. live Azure), so an
+ * email triggered from localhost/XAMPP still points at the live site.
+ * Falls back to the current request host (with X-Forwarded-Proto support
+ * for Azure App Service) when APP_URL is empty (dev only).
+ */
+function app_absolute_url(string $path = ''): string
+{
+    $relative = app_url($path);
+
+    $configured = defined('APP_URL') ? rtrim((string)APP_URL, '/') : '';
+
+    if ($configured !== '') {
+        return $configured . $relative;
+    }
+
+    $proto = (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '');
+    if ($proto !== '') {
+        $proto = strtolower(trim(explode(',', $proto)[0]));
+    }
+    if ($proto !== 'http' && $proto !== 'https') {
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
+        $proto = $isHttps ? 'https' : 'http';
+    }
+
+    $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
+
+    return $proto . '://' . $host . $relative;
+}
+
 function start_secure_session(?int $lifetimeSeconds = null): void
 {
     if (session_status() === PHP_SESSION_ACTIVE) {

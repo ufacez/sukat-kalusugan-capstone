@@ -26,13 +26,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 
     if ($firstName === '' || !admin_is_valid_name_part($firstName, true)) {
+        admin_flash_form_state($_POST, 'first_name');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Enter a valid first name (letters only, at least 2 characters).', 'type' => 'error']);
     }
     if ($lastName === '' || !admin_is_valid_name_part($lastName, true)) {
+        admin_flash_form_state($_POST, 'last_name');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Enter a valid surname (letters only, at least 2 characters).', 'type' => 'error']);
     }
 
     if (!in_array($role, ['admin', 'nutritionist'], true)) {
+        admin_flash_form_state($_POST, 'role');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Invalid role.', 'type' => 'error']);
     }
 
@@ -43,9 +46,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($method === 'email') {
         $email = $emailRaw !== '' ? $emailRaw : null;
         if ($email === null || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            admin_flash_form_state($_POST, 'email');
             admin_redirect('/admin/invitation_form.php', ['notice' => 'A valid email address is required for email invitations.', 'type' => 'error']);
         }
         if (admin_email_in_use($email)) {
+            admin_flash_form_state($_POST, 'email');
             admin_redirect('/admin/invitation_form.php', ['notice' => 'This email is already registered. Use a different email address.', 'type' => 'error']);
         }
     } else {
@@ -54,12 +59,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $phone = trim((string)($_POST['phone'] ?? ''));
     if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
+        admin_flash_form_state($_POST, 'phone');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Please enter a valid Philippine mobile number (09XXXXXXXXX).', 'type' => 'error']);
     }
     $phone = $phone !== '' ? $phone : null;
 
     $address = trim((string)($_POST['address'] ?? ''));
     if (mb_strlen($address) > 255) {
+        admin_flash_form_state($_POST, 'address');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Address must be 255 characters or less.', 'type' => 'error']);
     }
     $address = $address !== '' ? htmlspecialchars($address, ENT_QUOTES, 'UTF-8') : null;
@@ -75,6 +82,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
     if ($stmt === false) {
+        admin_flash_form_state($_POST);
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Unable to create invitation.', 'type' => 'error']);
     }
     $inviterId = (int)($actor['id'] ?? 0);
@@ -83,6 +91,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     mysqli_stmt_close($stmt);
 
     if (!$ok) {
+        admin_flash_form_state($_POST);
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Failed to create invitation.', 'type' => 'error']);
     }
 
@@ -92,7 +101,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($method === 'email' && $email !== null) {
         try {
             require_once __DIR__ . '/../includes/mailer.php';
-            $activateUrl = app_url('/auth/activate.php?code=' . $code);
+            require_once __DIR__ . '/../includes/email_template.php';
+            // Absolute live URL (APP_URL) so the emailed button/link works
+            // from any host. The ?code= prefills the 6-char code box on the
+            // activation page — the code flow itself is unchanged.
+            $activateUrl = app_absolute_url('/auth/activate.php?code=' . $code);
             $subject = 'Sukat Kalusugan — Activate Your Staff Account';
             $body = sprintf(
                 "Hello %s,\n\n" .
@@ -108,7 +121,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $code,
                 $activateUrl
             );
-            $emailSent = send_mail($email, $subject, $body);
+            $htmlBody = email_template_action(
+                'You have been invited to join Sukat Kalusugan as ' . ucfirst($role) . '.',
+                'Hello ' . $name . ',',
+                'Activate your staff account',
+                [
+                    'An administrator has invited you to join Sukat Kalusugan as a ' . ucfirst($role) . '.',
+                    'Click the button below to open the activation page — your code is already filled in. Just set your password.',
+                ],
+                'Activate account',
+                $activateUrl,
+                'Your activation code',
+                $code,
+                'This code expires in 48 hours. You can also open the sign-in page and click "Have an activation code?" to enter it manually.'
+            );
+            $emailSent = send_mail($email, $subject, $body, $htmlBody);
         } catch (Throwable $e) {
             error_log('[SukatKalusugan] Invitation email failed: ' . $e->getMessage());
         }
@@ -117,8 +144,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $noticeParam = 'Invitation created. ' . ($method === 'manual'
         ? 'Share this code with ' . $name . ': ' . $code
         : ($emailSent ? 'Activation email sent to ' . $email . '.' : 'Invitation created. Share this code with ' . $name . ': ' . $code . ' (email could not be sent — share manually).'));
+    admin_clear_form_state();
     admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);
 }
+
+$formState = admin_take_form_state();
+$old = $formState['old'];
+$formErrorField = $formState['error_field'];
+$formErrorNotice = trim((string)($_GET['notice'] ?? ''));
 
 $barangays = admin_barangay_options();
 $pendingCount = (int)admin_scalar("SELECT COUNT(*) FROM invitations WHERE status = 'pending' AND expires_at > NOW()", '', [], 0);
@@ -145,48 +178,49 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
 
         <div class="admin-field-wide">
             <div class="admin-field-row">
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'first_name' ? ' is-invalid' : ''; ?>">
                     <span>First name<span class="admin-required">*</span></span>
-                    <input id="invite_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Juan" value="<?php echo admin_e((string)($_GET['first_name'] ?? '')); ?>">
-                    <span class="admin-field-message"></span>
+                    <input id="invite_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Juan" value="<?php echo admin_e(admin_old_value($old, 'first_name')); ?>">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'first_name' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
                 <label class="admin-field">
                     <span>Middle name</span>
-                    <input id="invite_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Santos">
+                    <input id="invite_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Santos" value="<?php echo admin_e(admin_old_value($old, 'middle_name')); ?>">
                     <span class="admin-field-message"></span>
                 </label>
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'last_name' ? ' is-invalid' : ''; ?>">
                     <span>Surname<span class="admin-required">*</span></span>
-                    <input id="invite_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Dela Cruz">
-                    <span class="admin-field-message"></span>
+                    <input id="invite_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Dela Cruz" value="<?php echo admin_e(admin_old_value($old, 'last_name')); ?>">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'last_name' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
             </div>
         </div>
 
         <div class="admin-field-wide">
-            <label class="admin-field">
+            <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
                 <span>Email address</span>
-                <div id="invite-email-wrap" style="display:flex;align-items:stretch;border:1px solid var(--admin-border);border-radius:8px;overflow:hidden;background:var(--admin-surface);transition:border-color .15s,box-shadow .15s;">
-                    <input name="email" id="invite-email-input" type="text" placeholder="auto-generated from name" style="flex:1;border:none;padding:10px 14px;background:transparent;font-size:0.85rem;min-width:0;outline:none;">
+                <div id="invite-email-wrap" style="display:flex;align-items:stretch;border:1px solid <?php echo $formErrorField === 'email' ? 'var(--admin-danger)' : 'var(--admin-border)'; ?>;border-radius:8px;overflow:hidden;background:var(--admin-surface);transition:border-color .15s,box-shadow .15s;<?php echo $formErrorField === 'email' ? 'box-shadow:0 0 0 3px var(--admin-danger-glow);' : ''; ?>">
+                    <input name="email" id="invite-email-input" type="text" placeholder="auto-generated from name" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="flex:1;border:none;padding:10px 14px;background:transparent;font-size:0.85rem;min-width:0;outline:none;">
                     <span id="invite-email-domain" style="display:flex;align-items:center;padding:0 14px;color:var(--admin-muted);font-size:0.85rem;white-space:nowrap;background:var(--admin-search-bg);border-left:1px solid var(--admin-border);font-weight:600;letter-spacing:0.02em;">@sukat.kalusugan</span>
                 </div>
-                <span class="admin-field-message"></span>
+                <span class="admin-field-message"><?php echo $formErrorField === 'email' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'This email is already in use. Use a different email address.') : ''; ?></span>
             </label>
         </div>
 
         <div class="admin-field-wide">
             <div class="admin-field-row">
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                     <span>Mobile number</span>
-                    <input name="phone" id="invite-phone" type="tel" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" data-validate="phone-ph">
-                    <span class="admin-field-message"></span>
+                    <input name="phone" id="invite-phone" type="tel" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
                     <span>Role<span class="admin-required">*</span></span>
                     <select name="role" required>
-                        <option value="nutritionist">Nutritionist</option>
-                        <option value="admin">Admin</option>
+                        <option value="nutritionist"<?php echo admin_old_value($old, 'role', 'nutritionist') === 'nutritionist' ? ' selected' : ''; ?>>Nutritionist</option>
+                        <option value="admin"<?php echo admin_old_value($old, 'role', '') === 'admin' ? ' selected' : ''; ?>>Admin</option>
                     </select>
+                    <span class="admin-field-message"><?php echo $formErrorField === 'role' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
             </div>
         </div>
@@ -214,7 +248,7 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
             <div class="admin-address-status" data-psgc-status></div>
             <label class="admin-field" style="margin-top:10px;">
                 <span>Full address</span>
-                <textarea id="invite_address" name="address" maxlength="255" rows="2"></textarea>
+                <textarea id="invite_address" name="address" maxlength="255" rows="2"><?php echo admin_e(admin_old_value($old, 'address')); ?></textarea>
             </label>
         </div>
 
@@ -225,15 +259,15 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
                     <select name="barangay_id">
                         <option value="">-- All barangays --</option>
                         <?php foreach ($barangays as $b): ?>
-                            <option value="<?php echo (int)$b['id']; ?>"><?php echo admin_e($b['name']); ?></option>
+                            <option value="<?php echo (int)$b['id']; ?>"<?php echo admin_old_value($old, 'barangay_id', '') !== '' && (int)admin_old_value($old, 'barangay_id') === (int)$b['id'] ? ' selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
                         <?php endforeach; ?>
                     </select>
                 </label>
                 <label class="admin-field">
                     <span>Delivery method<span class="admin-required">*</span></span>
                     <select name="method" id="invite-method" required>
-                        <option value="manual">Manual (share code in person)</option>
-                        <option value="email">Email</option>
+                        <option value="manual"<?php echo admin_old_value($old, 'method', 'manual') === 'manual' ? ' selected' : ''; ?>>Manual (share code in person)</option>
+                        <option value="email"<?php echo admin_old_value($old, 'method', '') === 'email' ? ' selected' : ''; ?>>Email</option>
                     </select>
                 </label>
             </div>
@@ -287,6 +321,30 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
                 emailInput.placeholder = 'auto-generated from name';
                 emailInput.type = 'text';
                 emailInput.required = false;
+            }
+        });
+        // Sync the email UI with the restored method after a validation
+        // error (e.g. duplicate email sent with method=email).
+        methodSelect.dispatchEvent(new Event('change'));
+    }
+
+    // A server-rendered duplicate-email error stays red until the user
+    // edits the address (this input has no data-validate rule because it
+    // doubles as the manual-mode prefix field). Without this, the submit
+    // guard in admin-form-validate.js would keep blocking the form even
+    // after the address was fixed.
+    if (emailInput) {
+        emailInput.addEventListener('input', function(){
+            var label = emailInput.closest('.admin-field');
+            if (label && label.classList.contains('is-invalid')) {
+                label.classList.remove('is-invalid');
+                var msg = label.querySelector('.admin-field-message');
+                if (msg) msg.textContent = '';
+                var wrap = document.getElementById('invite-email-wrap');
+                if (wrap) {
+                    wrap.style.borderColor = 'var(--admin-border)';
+                    wrap.style.boxShadow = '';
+                }
             }
         });
     }

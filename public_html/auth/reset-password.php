@@ -40,7 +40,9 @@ if ($token === '') {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css">
+    <link rel="stylesheet" href="../assets/css/auth.css?v=5">
+    <link rel="stylesheet" href="../assets/css/admin-toast.css?v=1">
+    <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){
     var t=localStorage.getItem("theme");
@@ -54,21 +56,25 @@ if ($token === '') {
 <body class="auth-page">
     <main class="auth-shell">
         <section class="auth-hero" aria-hidden="true">
-            <div class="auth-brand">
-                <div class="auth-mark">SK</div>
-                <div>
-                    <p class="auth-kicker">Sukat Kalusugan</p>
-                    <h1>Choose a new password.</h1>
+            <svg class="hero-pattern" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">
+                <path d="M0,320 C80,300 120,340 200,260 C260,200 300,220 400,140" />
+                <path d="M0,360 C90,330 140,370 220,300 C280,250 330,270 400,190" />
+                <path d="M0,280 C70,260 110,300 190,220 C250,160 290,180 400,100" />
+            </svg>
+
+            <div class="auth-logo-group">
+                <div class="mark-standalone-icon" aria-hidden="true">
+                    <img src="../assets/img/logo/logo_forlight.svg?v=2" alt="" class="mark-icon-img" data-logo-light="../assets/img/logo/logo_forlight.svg?v=2" data-logo-dark="../assets/img/logo/logo_fordark.svg?v=2">
+                </div>
+
+                <div class="mark-standalone" aria-hidden="true">
+                    <img src="../assets/img/logo/logotext_forlight.svg?v=2" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="../assets/img/logo/logotext_forlight.svg?v=2" data-logo-dark="../assets/img/logo/logotext_fordark.svg?v=2">
+                </div>
+
+                <div class="auth-tagline">
+                   Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.
                 </div>
             </div>
-            <p class="auth-copy">
-                Pick something you haven't used before. Once it's saved, this link
-                stops working and you'll sign in with your new password.
-            </p>
-            <ul class="auth-highlights">
-                <li>At least 8 characters</li>
-                <li>This link can only be used once</li>
-            </ul>
         </section>
 
         <section class="auth-card" aria-labelledby="reset-password-title">
@@ -128,6 +134,13 @@ if ($token === '') {
     <script src="../assets/js/auth-reset-password.js"></script>
     <script>
     (function(){
+        function swapLogos(isDark){
+            document.querySelectorAll('[data-logo-light]').forEach(function(img){
+                img.src = isDark ? img.getAttribute('data-logo-dark') : img.getAttribute('data-logo-light');
+            });
+        }
+        swapLogos(document.documentElement.getAttribute('data-theme') === 'dark');
+
         var toggle = document.querySelector('[data-auth-theme-toggle]');
         if (!toggle) return;
 
@@ -138,9 +151,11 @@ if ($token === '') {
             isDark = !isDark;
             document.documentElement.setAttribute('data-theme', isDark ? 'dark' : 'light');
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
+            swapLogos(isDark);
         });
     })();
     </script>
+    <script src="../assets/js/admin-toast.js?v=1"></script>
 </body>
 
 </html>

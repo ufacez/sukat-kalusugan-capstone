@@ -38,6 +38,29 @@ if ($editingUser === null) {
 
 $editingNameParts = admin_split_full_name($editingUser['name'] ?? '');
 
+// Previously submitted values after a validation error (e.g. duplicate
+// email) win over the DB values so the form is never wiped. Passwords
+// are never flashed and always come back blank.
+$formState = admin_take_form_state();
+$old = $formState['old'];
+$formErrorField = $formState['error_field'];
+$formErrorNotice = trim((string)($_GET['notice'] ?? ''));
+
+if (array_key_exists('first_name', $old) || array_key_exists('middle_name', $old) || array_key_exists('last_name', $old)) {
+    $editingNameParts = [
+        'first' => admin_old_value($old, 'first_name', $editingNameParts['first'] ?? ''),
+        'middle' => admin_old_value($old, 'middle_name', $editingNameParts['middle'] ?? ''),
+        'last' => admin_old_value($old, 'last_name', $editingNameParts['last'] ?? ''),
+    ];
+}
+
+$formEmail = admin_old_value($old, 'email', $editingUser['email'] ?? '');
+$formUsername = admin_old_value($old, 'username', $editingUser['username'] ?? '');
+$formPhone = admin_old_value($old, 'phone', $editingUser['phone'] ?? '');
+$formRole = admin_old_value($old, 'role', $editingUser['role_name'] ?? 'nutritionist');
+$formBarangayId = (int)admin_old_value($old, 'barangay_id', (string)($editingUser['barangay_id'] ?? 0));
+$formStatus = admin_old_value($old, 'status', $editingUser['status'] ?? 'active');
+
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/users.php'))
     . '">' . admin_action_icon('back') . ' Users</a>';
@@ -83,30 +106,31 @@ admin_layout_start(
             </div>
         </div>
 
-        <label class="admin-field">
+        <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
             <span>Email<span class="admin-required">*</span></span>
-            <input id="user_email" type="email" name="email" required data-validate="email" value="<?php echo admin_e($editingUser['email'] ?? ''); ?>" placeholder="jane@example.com">
-            <span class="admin-field-message"></span>
+            <input id="user_email" type="email" name="email" required data-validate="email" data-label="Email" value="<?php echo admin_e($formEmail); ?>" placeholder="jane@example.com">
+            <span class="admin-field-message"><?php echo $formErrorField === 'email' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
         </label>
-        <label class="admin-field">
+        <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
             <span>Username<span class="admin-required">*</span></span>
-            <input id="user_username" name="username" required data-validate="username" value="<?php echo admin_e($editingUser['username'] ?? ''); ?>" placeholder="janedoe">
-            <span class="admin-field-message"></span>
+            <input id="user_username" name="username" required data-validate="username" data-label="Username" value="<?php echo admin_e($formUsername); ?>" placeholder="janedoe">
+            <span class="admin-field-message"><?php echo $formErrorField === 'username' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
         </label>
         <div class="admin-field-wide">
             <div class="admin-field-row">
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                     <span>Mobile number<span class="admin-required">*</span></span>
-                    <input id="user_phone" name="phone" required data-validate="phone-ph" value="<?php echo admin_e($editingUser['phone'] ?? ''); ?>" placeholder="09171234567">
-                    <span class="admin-field-message"></span>
+                    <input id="user_phone" name="phone" required data-validate="phone-ph" data-label="Mobile number" value="<?php echo admin_e($formPhone); ?>" placeholder="09171234567">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'phone' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
-                <label class="admin-field">
+                <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
                     <span>Role<span class="admin-required">*</span></span>
                     <select name="role" required>
                         <?php foreach ($roles as $role): ?>
-                            <option value="<?php echo admin_e($role['name']); ?>" <?php echo (($editingUser['role_name'] ?? 'nutritionist') === $role['name']) ? 'selected' : ''; ?>><?php echo admin_e(ucfirst($role['name'])); ?></option>
+                            <option value="<?php echo admin_e($role['name']); ?>" <?php echo ($formRole === $role['name']) ? 'selected' : ''; ?>><?php echo admin_e(ucfirst($role['name'])); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <span class="admin-field-message"><?php echo $formErrorField === 'role' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
             </div>
         </div>
@@ -115,15 +139,15 @@ admin_layout_start(
             <select name="barangay_id">
                 <option value="">-- All barangays (admin scope) --</option>
                 <?php foreach ($barangays as $barangay): ?>
-                    <option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingUser['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
+                    <option value="<?php echo (int)$barangay['id']; ?>" <?php echo $formBarangayId === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
                 <?php endforeach; ?>
             </select>
         </label>
         <label class="admin-field">
             <span>Status<span class="admin-required">*</span></span>
             <select name="status" required>
-                <option value="active" <?php echo (($editingUser['status'] ?? 'active') === 'active') ? 'selected' : ''; ?>>Active</option>
-                <option value="inactive" <?php echo (($editingUser['status'] ?? 'active') === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
+                <option value="active" <?php echo ($formStatus === 'active') ? 'selected' : ''; ?>>Active</option>
+                <option value="inactive" <?php echo ($formStatus === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
             </select>
         </label>
 

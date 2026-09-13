@@ -57,6 +57,13 @@ define('DB_PASS', env('DB_PASS', ''));
 // ── Application Environment ──────────────────────────────────────────────────
 define('APP_ENV', env('APP_ENV', 'development'));
 
+// ── Canonical public base URL (used for links inside emails) ─────────────────
+// Set APP_URL=https://sukatkalusugan.app on live (Azure App Settings).
+// Email links must never depend on the request host: a reset requested
+// from localhost/XAMPP must still point at the live site, and Azure sits
+// behind a proxy where $_SERVER['HTTPS'] sniffing is unreliable.
+define('APP_URL', rtrim(env('APP_URL', ''), '/'));
+
 // ── ESP32 Kiosk Device Auth ──────────────────────────────────────────────────
 define('ESP32_DEVICE_KEY', env('ESP32_DEVICE_KEY', ''));
 

@@ -97,10 +97,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Create new ones 
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">Invitations</h2>
-            <p class="admin-section-subtitle">Recent staff invitations and their status. <a href="<?php echo admin_e(app_url('/admin/invitation_form.php')); ?>">Create a new invitation</a>.</p>
-        </div>
-        <div class="admin-section-actions">
-            <a class="admin-btn is-create" href="<?php echo admin_e(app_url('/admin/invitation_form.php')); ?>"><?php echo admin_action_icon('add'); ?> New Invitation</a>
+            <p class="admin-section-subtitle">Recent staff invitations and their status.</p>
         </div>
     </div>
 
@@ -204,7 +201,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Create new ones 
 
 <?php if (count($invitations) === 0): ?>
 <section class="admin-section">
-    <p class="admin-section-subtitle" style="margin:0;">No invitations yet. <a href="<?php echo admin_e(app_url('/admin/invitation_form.php')); ?>">Create the first invitation</a>.</p>
+    <p class="admin-section-subtitle" style="margin:0;">No invitations yet. Use the New Invitation button above to create one.</p>
 </section>
 <?php endif; ?>
 

@@ -29,12 +29,14 @@ if (
     || !admin_is_valid_name_part($middleName, false)
     || !admin_is_valid_name_part($lastName, true)
 ) {
+    admin_flash_form_state($_POST, 'first_name');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
 }
 
 $name = admin_combine_name($firstName, $middleName, $lastName);
 
 if ($id <= 0 || $name === '' || $email === '' || $username === '') {
+    admin_flash_form_state($_POST);
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'User id, name, email, and username are required.', 'type' => 'error']);
 }
 
@@ -43,42 +45,51 @@ $isSeededAdmin = ((int)$id === 1);
 if ($isSeededAdmin) {
     $existingRole = admin_fetch_one('SELECT r.name AS role_name FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE u.id = 1 LIMIT 1');
     if ($existingRole !== null && $existingRole['role_name'] !== $roleName) {
+        admin_flash_form_state($_POST, 'role');
         admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'The system administrator role cannot be changed.', 'type' => 'error']);
     }
     if ($status !== 'active') {
+        admin_flash_form_state($_POST);
         admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'The system administrator account cannot be deactivated.', 'type' => 'error']);
     }
 }
 
 if (!admin_is_valid_ph_mobile($phone)) {
+    admin_flash_form_state($_POST, 'phone');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 }
 
 $phone = preg_replace('/[^0-9]/', '', $phone);
 
 if ($password !== '' && !admin_is_strong_password($password)) {
+    admin_flash_form_state($_POST);
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
 }
 
 if ($password !== '' && $password !== $passwordConfirm) {
+    admin_flash_form_state($_POST);
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 }
 
 $roleId = admin_find_role_id($roleName);
 
 if ($roleId <= 0) {
+    admin_flash_form_state($_POST, 'role');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
 // Duplicate checks (exclude current user) — email globally unique.
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    admin_flash_form_state($_POST, 'email');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
 }
 if (admin_email_in_use($email, $id, null)) {
+    admin_flash_form_state($_POST, 'email');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 }
 
 if (admin_username_in_use($username, $id)) {
+    admin_flash_form_state($_POST, 'username');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this username already exists.', 'type' => 'error']);
 }
 
@@ -105,6 +116,7 @@ if ($password !== '') {
 
 if (!mysqli_stmt_execute($stmt)) {
     mysqli_stmt_close($stmt);
+    admin_flash_form_state($_POST, 'email');
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'User could not be updated. Check for duplicate email or username.', 'type' => 'error']);
 }
 
@@ -113,5 +125,6 @@ mysqli_stmt_close($stmt);
 $actor = current_user();
 log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Updated user ' . $email . ' (' . $id . ')');
 
+admin_clear_form_state();
 admin_redirect('/admin/users.php', ['notice' => 'User updated successfully.', 'type' => 'success']);
 

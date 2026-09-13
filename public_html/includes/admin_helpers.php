@@ -654,3 +654,78 @@ function admin_layout_end(): void
     echo '</body>';
     echo '</html>';
 }
+
+/**
+ * Stash submitted form values (+ which field failed) in the session before
+ * an admin_redirect() error, so the form page can re-render with everything
+ * the user already typed instead of wiping the form. Password fields are
+ * never stored — those inputs always come back blank by design.
+ *
+ * Pair with admin_take_form_state() on the form page (consumes the flash).
+ */
+function admin_flash_form_state(array $input, ?string $errorField = null): void
+{
+    $safe = [];
+
+    foreach ($input as $key => $value) {
+        if (!is_scalar($value) && $value !== null) {
+            continue;
+        }
+
+        $name = (string)$key;
+
+        if (stripos($name, 'password') !== false) {
+            continue;
+        }
+
+        $safe[$name] = (string)$value;
+    }
+
+    $_SESSION['_form_old'] = $safe;
+    $_SESSION['_form_error_field'] = $errorField;
+}
+
+/** Discards any pending form flash (call on the success path). */
+function admin_clear_form_state(): void
+{
+    unset($_SESSION['_form_old'], $_SESSION['_form_error_field']);
+}
+
+/**
+ * Reads + clears the flashed form state for a form page.
+ *
+ * @return array{old: array<string,string>, error_field: string|null}
+ */
+function admin_take_form_state(): array
+{
+    $state = ['old' => [], 'error_field' => null];
+
+    if (isset($_SESSION['_form_old']) && is_array($_SESSION['_form_old'])) {
+        foreach ($_SESSION['_form_old'] as $key => $value) {
+            if (is_scalar($value) || $value === null) {
+                $state['old'][(string)$key] = (string)$value;
+            }
+        }
+    }
+
+    if (isset($_SESSION['_form_error_field']) && is_string($_SESSION['_form_error_field'])) {
+        $state['error_field'] = $_SESSION['_form_error_field'];
+    }
+
+    unset($_SESSION['_form_old'], $_SESSION['_form_error_field']);
+
+    return $state;
+}
+
+/**
+ * Previously entered value for a field (flashed via admin_flash_form_state),
+ * falling back to $default (usually the DB value). Escaped for HTML output.
+ */
+function admin_old_value(array $old, string $key, $default = ''): string
+{
+    if (array_key_exists($key, $old)) {
+        return (string)$old[$key];
+    }
+
+    return (string)$default;
+}

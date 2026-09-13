@@ -17,6 +17,8 @@
  */
 
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth_middleware.php';
+require_once __DIR__ . '/email_template.php';
 
 if (!defined('PASSWORD_RESET_TOKEN_TTL_MINUTES')) {
     define('PASSWORD_RESET_TOKEN_TTL_MINUTES', 30);
@@ -132,8 +134,9 @@ function password_reset_create_token(string $accountType, int $accountId): strin
  */
 function password_reset_send_email(string $email, string $name, string $rawToken): void
 {
-    $resetUrl = app_url('/auth/reset-password.php?token=' . urlencode($rawToken));
-    $fullResetUrl = password_reset_absolute_url($resetUrl);
+    // Absolute live URL (APP_URL, e.g. https://sukatkalusugan.app) so the
+    // emailed link works no matter which host triggered the request.
+    $fullResetUrl = app_absolute_url('/auth/reset-password.php?token=' . urlencode($rawToken));
 
     $subject = 'Reset your Sukat Kalusugan password';
     $textBody = "Hi " . $name . ",\n\n"
@@ -143,8 +146,20 @@ function password_reset_send_email(string $email, string $name, string $rawToken
         . "If you didn't request this, you can safely ignore this email — "
         . "your password will not be changed.\n";
 
+    $htmlBody = email_template_action(
+        'Reset your Sukat Kalusugan password — link expires in ' . PASSWORD_RESET_TOKEN_TTL_MINUTES . ' minutes.',
+        'Hi ' . $name . ',',
+        'Reset your password',
+        ['We received a request to reset your Sukat Kalusugan password. Click the button below to choose a new one.'],
+        'Reset password',
+        $fullResetUrl,
+        null,
+        null,
+        'This link expires in ' . PASSWORD_RESET_TOKEN_TTL_MINUTES . ' minutes and can only be used once.'
+    );
+
     if (password_reset_smtp_configured()) {
-        $sent = password_reset_send_via_smtp($email, $name, $subject, $textBody, $fullResetUrl);
+        $sent = password_reset_send_via_smtp($email, $name, $subject, $textBody, $fullResetUrl, $htmlBody);
 
         if ($sent) {
             return;
@@ -161,6 +176,8 @@ function password_reset_send_email(string $email, string $name, string $rawToken
     if (!$sent) {
         // Last-resort dev fallback — most local XAMPP setups have no MTA
         // configured at all, so mail() has nowhere to deliver to.
+        // NOTE: mail() here stays text-only; the HTML version is delivered
+        // whenever SMTP/PHPMailer is available (production).
         error_log('[password_reset] Could not send email (SMTP not configured or failed, mail() also failed). Reset link for '
             . $email . ': ' . $fullResetUrl);
     }
@@ -195,7 +212,7 @@ function password_reset_from_header(): string
  * hasn't been run — this just returns false so the caller falls back to
  * mail().
  */
-function password_reset_send_via_smtp(string $toEmail, string $toName, string $subject, string $textBody, string $resetUrl): bool
+function password_reset_send_via_smtp(string $toEmail, string $toName, string $subject, string $textBody, string $resetUrl, string $htmlBody = ''): bool
 {
     $autoloadPath = __DIR__ . '/../../vendor/autoload.php';
 
@@ -232,8 +249,15 @@ function password_reset_send_via_smtp(string $toEmail, string $toName, string $s
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($toEmail, $toName);
         $mail->Subject = $subject;
-        $mail->isHTML(false);
-        $mail->Body = $textBody;
+
+        if ($htmlBody !== '') {
+            $mail->isHTML(true);
+            $mail->Body = $htmlBody;
+            $mail->AltBody = $textBody;
+        } else {
+            $mail->isHTML(false);
+            $mail->Body = $textBody;
+        }
 
         $mail->send();
 
@@ -247,10 +271,25 @@ function password_reset_send_via_smtp(string $toEmail, string $toName, string $s
 
 /**
  * Turns an app-relative URL (from app_url()) into an absolute one for the
- * email body, using the current request's scheme + host.
+ * email body. Prefers the canonical APP_URL (live domain); falls back to
+ * the current request host. Kept for backward compatibility — new code
+ * should call app_absolute_url() directly.
  */
 function password_reset_absolute_url(string $relativeUrl): string
 {
+    if (function_exists('app_absolute_url')) {
+        // $relativeUrl is already app_url()-relative (leading slash + base
+        // path), so strip to path-only before re-resolving to avoid
+        // double-prefixing the base path.
+        $path = (string)parse_url($relativeUrl, PHP_URL_PATH);
+        $query = (string)parse_url($relativeUrl, PHP_URL_QUERY);
+        if ($path === '') {
+            $path = $relativeUrl;
+            $query = '';
+        }
+        return app_absolute_url($path . ($query !== '' ? '?' . $query : ''));
+    }
+
     $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
         || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
     $scheme = $isHttps ? 'https' : 'http';

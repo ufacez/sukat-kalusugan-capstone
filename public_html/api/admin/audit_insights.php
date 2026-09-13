@@ -60,6 +60,18 @@ $totalLogs = admin_scalar("SELECT COUNT(*) FROM audit_logs");
 $last7 = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)");
 $last30 = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE created_at >= DATE_SUB(NOW(), INTERVAL 30 DAY)");
 
+// Live stat-card numbers (same definitions as the cards on admin/audit_logs.php).
+$onlineWindowMinutes = defined('AUDIT_ONLINE_WINDOW_MINUTES') ? (int)AUDIT_ONLINE_WINDOW_MINUTES : 15;
+$cardStats = [
+    'online_now' => admin_scalar(
+        'SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE user_id IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ' . $onlineWindowMinutes . ' MINUTE)'
+    ),
+    'exports_total' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%'"),
+    'exports_today' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%' AND DATE(created_at) = CURDATE()"),
+    'measurements_total' => admin_scalar("SELECT COUNT(*) FROM measurements"),
+    'measurements_today' => admin_scalar("SELECT COUNT(*) FROM measurements WHERE measurement_date = CURDATE()"),
+];
+
 $actionBreakdown = admin_fetch_all(
     "SELECT action, COUNT(*) AS cnt FROM audit_logs GROUP BY action ORDER BY cnt DESC LIMIT 10"
 );
@@ -74,7 +86,7 @@ $levelBreakdown = admin_fetch_all(
 
 $recentActivity = admin_fetch_all(
     "SELECT a.action, a.level, a.description, a.created_at, COALESCE(u.email, p.email, 'System') AS actor, COALESCE(a.user_type, 'system') AS user_type
-     FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
+     FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id AND (a.user_type IS NULL OR a.user_type != 'parent')
      LEFT JOIN parents p ON p.id = a.user_id AND (a.user_type = 'parent' OR (a.user_type IS NULL AND u.id IS NULL))
      ORDER BY a.created_at DESC LIMIT 15"
 );
@@ -123,6 +135,7 @@ echo json_encode([
     'chart' => $chartData,
     'category_chart' => $categoryData,
     'stats' => ['total' => $totalLogs, 'last_7_days' => $last7, 'last_30_days' => $last30],
+    'card_stats' => $cardStats,
     'action_breakdown' => $actionBreakdown,
     'user_type_breakdown' => $userTypeBreakdown,
     'level_breakdown' => $levelBreakdown,

@@ -2,7 +2,15 @@
 
 require_once __DIR__ . '/config.php';
 
-function send_mail(string $toEmail, string $subject, string $textBody): bool
+/**
+ * Sends an email via SMTP (PHPMailer) with mail() fallback.
+ *
+ * $textBody is always sent (as the whole body for text-only mail, or as
+ * AltBody when $htmlBody is provided). Existing text-only callers keep
+ * working unchanged — pass $htmlBody to get a multipart HTML email with
+ * a button-style CTA plus the plain-text fallback.
+ */
+function send_mail(string $toEmail, string $subject, string $textBody, string $htmlBody = ''): bool
 {
     $autoloadPath = __DIR__ . '/../../vendor/autoload.php';
 
@@ -23,7 +31,7 @@ function send_mail(string $toEmail, string $subject, string $textBody): bool
 
     if ($smtpUser === '' || $smtpPass === '') {
         error_log('[mailer] SMTP_USER / SMTP_PASS not configured — falling back to mail().');
-        return @mail($toEmail, $subject, $textBody);
+        return send_mail_via_php_mail($toEmail, $subject, $textBody, $htmlBody);
     }
 
     $mail = new \PHPMailer\PHPMailer\PHPMailer(true);
@@ -45,8 +53,15 @@ function send_mail(string $toEmail, string $subject, string $textBody): bool
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($toEmail);
         $mail->Subject = $subject;
-        $mail->isHTML(false);
-        $mail->Body = $textBody;
+
+        if ($htmlBody !== '') {
+            $mail->isHTML(true);
+            $mail->Body = $htmlBody;
+            $mail->AltBody = $textBody;
+        } else {
+            $mail->isHTML(false);
+            $mail->Body = $textBody;
+        }
 
         $mail->send();
         return true;
@@ -54,4 +69,35 @@ function send_mail(string $toEmail, string $subject, string $textBody): bool
         error_log('[mailer] SMTP send failed for ' . $toEmail . ': ' . $mail->ErrorInfo);
         return false;
     }
+}
+
+/**
+ * Plain mail() fallback that also supports an HTML body (multipart).
+ * Used when SMTP credentials are not configured (local dev).
+ */
+function send_mail_via_php_mail(string $toEmail, string $subject, string $textBody, string $htmlBody = ''): bool
+{
+    $fromEmail = defined('MAIL_FROM_ADDRESS') && MAIL_FROM_ADDRESS !== '' ? MAIL_FROM_ADDRESS : 'no-reply@sukat.local';
+    $fromName = defined('MAIL_FROM_NAME') && MAIL_FROM_NAME !== '' ? MAIL_FROM_NAME : 'Sukat Kalusugan';
+
+    if ($htmlBody === '') {
+        return @mail($toEmail, $subject, $textBody);
+    }
+
+    $boundary = 'sk_' . bin2hex(random_bytes(16));
+    $headers = 'From: ' . $fromName . ' <' . $fromEmail . ">\r\n"
+        . "MIME-Version: 1.0\r\n"
+        . 'Content-Type: multipart/alternative; boundary="' . $boundary . "\"\r\n";
+
+    $message = "--{$boundary}\r\n"
+        . "Content-Type: text/plain; charset=utf-8\r\n"
+        . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+        . $textBody . "\r\n\r\n"
+        . "--{$boundary}\r\n"
+        . "Content-Type: text/html; charset=utf-8\r\n"
+        . "Content-Transfer-Encoding: 8bit\r\n\r\n"
+        . $htmlBody . "\r\n\r\n"
+        . "--{$boundary}--";
+
+    return @mail($toEmail, $subject, $message, $headers);
 }
