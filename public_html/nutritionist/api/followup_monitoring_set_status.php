@@ -21,6 +21,26 @@ if (!in_array($_SERVER['REQUEST_METHOD'] ?? '', ['GET', 'POST'], true)) {
     exit;
 }
 
+// Plain form POSTs (no-JS fallback) get redirects back to the child page;
+// fetch callers get JSON. Mirrors the forgot-password response pattern.
+function monitoring_respond(bool $success, string $message, int $statusCode, int $childId, array $data = []): void
+{
+    if (wants_json_response()) {
+        http_response_code($statusCode);
+        header('Content-Type: application/json; charset=utf-8');
+        $payload = ['success' => $success, 'message' => $message];
+        if ($data !== []) {
+            $payload['data'] = $data;
+        }
+        echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $param = $success ? 'notice' : 'error';
+    header('Location: ' . app_url('/nutritionist/followup_child.php?id=' . $childId . '&' . $param . '=' . urlencode($message)));
+    exit;
+}
+
 // POST = set status; GET = redirect back to child page (no-op)
 if ($_SERVER['REQUEST_METHOD'] === 'GET') {
     $childId = (int)($_GET['child_id'] ?? 0);
@@ -35,31 +55,24 @@ if (!is_array($input)) {
 
 $childId = (int)($input['child_id'] ?? 0);
 $monitoringStatus = (string)($input['monitoring_status'] ?? 'routine');
-$customIntervalDays = $input['custom_interval_days'] !== null ? (int)$input['custom_interval_days'] : null;
+$customIntervalRaw = $input['custom_interval_days'] ?? null;
+$customIntervalDays = ($customIntervalRaw !== null && $customIntervalRaw !== '') ? (int)$customIntervalRaw : null;
 $customReason = trim((string)($input['custom_reason'] ?? $input['reason'] ?? ''));
 
 if (!in_array($monitoringStatus, ['routine', 'special', 'sick', 'other'], true)) {
-    http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Invalid monitoring status.'], JSON_UNESCAPED_UNICODE);
-    exit;
+    monitoring_respond(false, 'Invalid monitoring status.', 422, $childId);
 }
 
 if ($childId <= 0) {
-    http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Child ID is required.'], JSON_UNESCAPED_UNICODE);
-    exit;
+    monitoring_respond(false, 'Child ID is required.', 422, $childId);
 }
 
 if ($monitoringStatus !== 'routine') {
     if ($customIntervalDays === null || $customIntervalDays < 7) {
-        http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'Custom interval must be at least 7 days.'], JSON_UNESCAPED_UNICODE);
-        exit;
+        monitoring_respond(false, 'Custom interval must be at least 7 days.', 422, $childId);
     }
     if ($customReason === '') {
-        http_response_code(422);
-        echo json_encode(['success' => false, 'message' => 'Reason is required for special monitoring.'], JSON_UNESCAPED_UNICODE);
-        exit;
+        monitoring_respond(false, 'Reason is required for special monitoring.', 422, $childId);
     }
 }
 
@@ -68,9 +81,7 @@ $conn = get_db_connection();
 // Verify child exists and is accessible
 $childCheck = mysqli_prepare($conn, 'SELECT id, barangay_id FROM children WHERE id = ? AND status = ? LIMIT 1');
 if ($childCheck === false) {
-    http_response_code(500);
-    echo json_encode(['success' => false, 'message' => 'Database error.'], JSON_UNESCAPED_UNICODE);
-    exit;
+    monitoring_respond(false, 'Database error.', 500, $childId);
 }
 $activeStatus = 'active';
 mysqli_stmt_bind_param($childCheck, 'is', $childId, $activeStatus);
@@ -80,18 +91,14 @@ $child = $childResult instanceof mysqli_result ? mysqli_fetch_assoc($childResult
 mysqli_stmt_close($childCheck);
 
 if (!is_array($child)) {
-    http_response_code(404);
-    echo json_encode(['success' => false, 'message' => 'Child not found.'], JSON_UNESCAPED_UNICODE);
-    exit;
+    monitoring_respond(false, 'Child not found.', 404, $childId);
 }
 
 // Scope check for nutritionist
 if (($user['role'] ?? '') !== 'admin') {
     $userBarangayId = $user['barangay_id'] ?? null;
     if ($userBarangayId !== null && $userBarangayId !== '' && (int)$userBarangayId !== (int)$child['barangay_id']) {
-        http_response_code(403);
-        echo json_encode(['success' => false, 'message' => 'You can only update children under your assigned barangay.'], JSON_UNESCAPED_UNICODE);
-        exit;
+        monitoring_respond(false, 'You can only update children under your assigned barangay.', 403, $childId);
     }
 }
 
@@ -111,22 +118,7 @@ if ($result['success']) {
     // Re-sync follow-up schedule after monitoring status change
     followup_sync_for_child($childId);
 
-    if (wants_json_response()) {
-        echo json_encode([
-            'success' => true,
-            'message' => 'Monitoring status updated successfully.',
-            'data' => $result,
-        ], JSON_UNESCAPED_UNICODE);
-    } else {
-        header('Location: ' . app_url('/nutritionist/followup_child.php?id=' . $childId));
-        exit;
-    }
+    monitoring_respond(true, 'Monitoring status updated successfully.', 200, $childId, $result);
 } else {
-    http_response_code(500);
-    if (wants_json_response()) {
-        echo json_encode(['success' => false, 'message' => 'Failed to update monitoring status.'], JSON_UNESCAPED_UNICODE);
-    } else {
-        header('Location: ' . app_url('/nutritionist/followup_child.php?id=' . $childId . '&error=1'));
-        exit;
-    }
+    monitoring_respond(false, 'Failed to update monitoring status.', 500, $childId);
 }

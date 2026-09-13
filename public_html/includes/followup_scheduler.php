@@ -695,22 +695,48 @@ function followup_sync_for_scope(array $user): array
 /**
  * Fetches up to $limit follow-up appointments for a child within a date
  * range, joined to their linked measurement for nutritional status.
- * Returns an array of [scheduled_at, intervention_type, intervention_notes,
- * appt_status, nutritional_status].
+ * Every returned row is normalized so these keys always exist (null when
+ * the deployment schema or join has no value): scheduled_at, status,
+ * appt_status, followup_track, followup_category, source_measurement_id,
+ * intervention_type, intervention_notes, nutritional_status, source_type,
+ * measured_on — plus chatbot aliases track, category, next_due.
  */
 function followup_fetch_visits(int $childId, string $fromDate, string $toDate, int $limit = 6): array
 {
 	$conn = get_db_connection();
 
 	// Columns may be absent on deployments whose schema predates the
-	// intervention-tracking migration; the try/catch below degrades to an
-	// empty visit list instead of fataling (on PHP 8 + mysqlnd, prepare()
-	// throws mysqli_sql_exception rather than returning false).
+	// intervention-tracking migration; intersect with the real table so
+	// the query never fatals on old schemas (on PHP 8 + mysqlnd,
+	// prepare() throws mysqli_sql_exception rather than returning false).
+	$apptCols = [];
+
+	try {
+		$colRes = $conn->query("SHOW COLUMNS FROM appointments");
+
+		if ($colRes) {
+			while ($colRow = $colRes->fetch_assoc()) {
+				$apptCols[] = (string)$colRow['Field'];
+			}
+		}
+	} catch (Throwable $e) {
+		error_log('followup_fetch_visits column probe failed: ' . $e->getMessage());
+		return [];
+	}
+
+	$wantAppt = ['status', 'followup_track', 'followup_category', 'source_measurement_id', 'intervention_type', 'intervention_notes'];
+	$haveAppt = array_values(array_intersect($wantAppt, $apptCols));
+
+	// These measurement columns exist in every shipped schema; the
+	// prepare-level try/catch below is the backstop for anything older.
+	$selectAppt = 'a.scheduled_at'
+		. ($haveAppt !== [] ? ', a.' . implode(', a.', $haveAppt) : '');
+	$selectMeas = ', m.nutritional_status, m.source_type AS source_type, m.measurement_date AS measured_on';
+
 	try {
 		$stmt = $conn->prepare(
-			"SELECT a.scheduled_at, a.intervention_type, a.intervention_notes,
-			        a.status AS appt_status,
-			        m.nutritional_status
+			"SELECT {$selectAppt}{$selectMeas},
+			        a.status AS appt_status
 			 FROM appointments a
 			 LEFT JOIN measurements m ON m.id = a.source_measurement_id
 			 WHERE a.child_id = ?
@@ -735,7 +761,40 @@ function followup_fetch_visits(int $childId, string $fromDate, string $toDate, i
 	$rows = $result instanceof mysqli_result ? mysqli_fetch_all($result, MYSQLI_ASSOC) : [];
 	mysqli_stmt_close($stmt);
 
-	return $rows;
+	$defaults = [
+		'scheduled_at' => null,
+		'status' => null,
+		'appt_status' => null,
+		'followup_track' => null,
+		'followup_category' => null,
+		'source_measurement_id' => null,
+		'intervention_type' => null,
+		'intervention_notes' => null,
+		'nutritional_status' => null,
+		'source_type' => null,
+		'measured_on' => null,
+		'track' => null,
+		'category' => null,
+		'next_due' => null,
+	];
+
+	$visits = [];
+
+	foreach ($rows as $row) {
+		$visit = array_merge($defaults, is_array($row) ? $row : []);
+
+		if ($visit['appt_status'] === null && $visit['status'] !== null) {
+			$visit['appt_status'] = $visit['status'];
+		}
+
+		// Chatbot aliases (chat.php reads these with ?? fallbacks).
+		$visit['track'] = $visit['followup_track'];
+		$visit['category'] = $visit['followup_category'];
+		$visit['next_due'] = $visit['scheduled_at'];
+		$visits[] = $visit;
+	}
+
+	return $visits;
 }
 
 /**
@@ -849,28 +908,34 @@ function followup_get_monitoring_status(int $childId): array
 /**
  * Set or update the monitoring status for a child.
  *
+ * Contract matches nutritionist/api/followup_monitoring_set_status.php
+ * (its only caller): (child, status, interval, reason, staff id, staff
+ * name) in, ['success' => bool, ...] out.
+ *
  * @param string $status One of 'routine', 'special', 'sick', 'other'
- * @param int $staffUserId The nutritionist/admin setting this status
  * @param int|null $customIntervalDays Custom interval in days (null = use age-based default)
  * @param string|null $reason Free-text reason for the override
- * @return bool Success
+ * @param int $staffUserId The nutritionist/admin setting this status
+ * @param string|null $staffName Display name for the audit log
+ * @return array{success: bool, message: string}
  */
 function followup_set_monitoring_status(
 	int $childId,
 	string $status,
-	int $staffUserId,
 	?int $customIntervalDays = null,
-	?string $reason = null
-): bool {
+	?string $reason = null,
+	int $staffUserId = 0,
+	?string $staffName = null
+): array {
 	$conn = get_db_connection();
 
 	if (!in_array($status, ['routine', 'special', 'sick', 'other'], true)) {
-		return false;
+		return ['success' => false, 'message' => 'Invalid monitoring status.'];
 	}
 
 	// If routine, remove any custom status row
 	if ($status === 'routine') {
-		admin_execute(
+		$ok = admin_execute(
 			"DELETE FROM child_monitoring_status WHERE child_id = ?",
 			'i',
 			[$childId]
@@ -883,7 +948,7 @@ function followup_set_monitoring_status(
 			sprintf('Child #%d monitoring status reset to routine.', $childId)
 		);
 
-		return true;
+		return ['success' => (bool)$ok, 'message' => $ok ? 'Monitoring status reset to routine.' : 'Could not reset monitoring status.'];
 	}
 
 	// Upsert the monitoring status
@@ -894,7 +959,7 @@ function followup_set_monitoring_status(
 	);
 
 	if ($existing !== null) {
-		admin_execute(
+		$ok = admin_execute(
 			"UPDATE child_monitoring_status
 			 SET monitoring_status = ?,
 			     custom_interval_days = ?,
@@ -906,7 +971,7 @@ function followup_set_monitoring_status(
 			[$status, $customIntervalDays, $reason, $staffUserId, $childId]
 		);
 	} else {
-		admin_execute(
+		$ok = admin_execute(
 			"INSERT INTO child_monitoring_status
 			 (child_id, monitoring_status, custom_interval_days, reason, set_by, created_at, updated_at)
 			 VALUES (?, ?, ?, ?, ?, NOW(), NOW())",
@@ -915,20 +980,25 @@ function followup_set_monitoring_status(
 		);
 	}
 
+	if (!$ok) {
+		return ['success' => false, 'message' => 'Could not save monitoring status.'];
+	}
+
 	log_action(
 		$staffUserId,
 		'MONITORING_STATUS_CHANGED',
 		'info',
 		sprintf(
-			'Child #%d monitoring status set to "%s"%s%s.',
+			'Child #%d monitoring status set to "%s"%s%s%s.',
 			$childId,
 			$status,
 			$customIntervalDays !== null ? ' (interval: ' . $customIntervalDays . ' days)' : '',
-			$reason !== '' && $reason !== null ? ' — Reason: ' . $reason : ''
+			$reason !== '' && $reason !== null ? ' — Reason: ' . $reason : '',
+			$staffName !== null && $staffName !== '' ? ' — By: ' . $staffName : ''
 		)
 	);
 
-	return true;
+	return ['success' => true, 'message' => 'Monitoring status updated successfully.'];
 }
 
 /**

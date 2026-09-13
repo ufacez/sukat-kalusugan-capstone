@@ -130,7 +130,8 @@ if (!$isOverride) {
             'This child is not scheduled for measurement today. '
             . 'Next scheduled measurement: ' . ($dueCheck['next_due'] ?? 'Unknown') . '. '
             . 'Use the Override Measurement form if this is an exceptional case.',
-            422
+            422,
+            ['not_due' => true, 'next_due' => ($dueCheck['next_due'] ?? null)]
         );
     }
 } else {

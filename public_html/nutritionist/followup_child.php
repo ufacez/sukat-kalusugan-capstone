@@ -186,6 +186,16 @@ nutritionist_layout_start(
 <?php if ($measuredToday): ?>
     <div class="admin-flash">Measurement recorded successfully. Follow-up schedule updated.</div>
 <?php endif; ?>
+<?php $pageNotice = trim((string)($_GET['notice'] ?? '')); ?>
+<?php if ($pageNotice !== ''): ?>
+    <div class="admin-flash"><?php echo nutritionist_e($pageNotice); ?></div>
+<?php endif; ?>
+<?php $pageError = trim((string)($_GET['error'] ?? '')); ?>
+<?php if ($pageError !== '' && $pageError !== '1'): ?>
+    <div class="admin-flash is-error"><?php echo nutritionist_e($pageError); ?></div>
+<?php elseif ($pageError === '1'): ?>
+    <div class="admin-flash is-error">Could not update monitoring status. Please try again.</div>
+<?php endif; ?>
 
 <!-- ============ CHILD HEADER ============ -->
 <section class="fc-header">
@@ -344,8 +354,9 @@ nutritionist_layout_start(
     <?php else: ?>
     <ul class="fc-timeline">
         <?php foreach ($visits as $v):
-            $visitDate = new DateTimeImmutable($v['scheduled_at']);
-            $isComplete = ($v['status'] === 'completed');
+            $visitStatus = (string)($v['status'] ?? $v['appt_status'] ?? '');
+            $visitDate = new DateTimeImmutable($v['scheduled_at'] ?? 'now');
+            $isComplete = ($visitStatus === 'completed');
             $isToday = ($visitDate->format('Y-m-d') === $today->format('Y-m-d'));
             $isPast = ($visitDate < $today);
             $dotBg = $isComplete ? '#16a34a' : ($isToday ? '#d97706' : ($isPast ? '#dc2626' : '#64748b'));
@@ -373,9 +384,9 @@ nutritionist_layout_start(
                 </div>
                 <div class="fc-timeline-sub">
                     <?php if ($isComplete): ?>
-                        Measured <?php echo $v['completed_at'] ? date('M j, g:i A', strtotime($v['completed_at'])) : 'unknown time'; ?>
-                        <?php if ($v['source_measurement_id']): ?>
-                            · <?php echo $v['source_type'] ?? 'measurement'; ?>
+                        Measured <?php echo !empty($v['measured_on']) ? date('M j, Y', strtotime((string)$v['measured_on'])) : 'unknown time'; ?>
+                        <?php if (!empty($v['source_measurement_id'])): ?>
+                            · <?php echo nutritionist_e((string)($v['source_type'] ?? 'measurement')); ?>
                         <?php endif; ?>
                     <?php else: ?>
                         <?php if ($isToday): ?>
@@ -383,7 +394,7 @@ nutritionist_layout_start(
                         <?php elseif ($isPast): ?>
                             <strong style="color:#dc2626;">Overdue</strong>
                         <?php else: ?>
-                            <?php echo ucfirst($v['status']); ?>
+                            <?php echo nutritionist_e(ucfirst($visitStatus !== '' ? $visitStatus : 'scheduled')); ?>
                         <?php endif; ?>
                     <?php endif; ?>
                 </div>
@@ -402,7 +413,7 @@ nutritionist_layout_start(
             <button type="button" class="admin-modal-close" onclick="document.getElementById('monitoringModal').style.display='none'">&times;</button>
         </div>
         <div style="padding:16px 20px;">
-            <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/api/followup_monitoring_set_status.php')); ?>">
+            <form method="post" id="monitoringForm" action="<?php echo nutritionist_e(app_url('/nutritionist/api/followup_monitoring_set_status.php')); ?>">
                 <input type="hidden" name="child_id" value="<?php echo $childId; ?>">
                 <div style="margin-bottom:10px;">
                     <label style="display:block;font-size:11px;font-weight:600;color:var(--admin-muted);margin-bottom:3px;" for="monitoring_status">Monitoring Status</label>
@@ -421,8 +432,9 @@ nutritionist_layout_start(
                     <label style="display:block;font-size:11px;font-weight:600;color:var(--admin-muted);margin-bottom:3px;" for="custom_reason">Reason</label>
                     <textarea id="custom_reason" name="custom_reason" placeholder="Reason for special monitoring..." style="width:100%;padding:7px 10px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface);color:var(--admin-text);font-size:12px;font-family:inherit;min-height:50px;resize:vertical;"><?php echo nutritionist_e($monitoringStatus['reason'] ?? ''); ?></textarea>
                 </div>
+                <div class="form-message" id="monitoringMessage" aria-live="polite" style="margin-bottom:10px;"></div>
                 <div style="display:flex;gap:8px;">
-                    <button type="submit" class="admin-btn admin-btn-primary">Save</button>
+                    <button type="submit" class="admin-btn admin-btn-primary" id="monitoringSaveBtn">Save</button>
                     <button type="button" class="admin-btn-secondary" onclick="document.getElementById('monitoringModal').style.display='none'">Cancel</button>
                 </div>
             </form>
@@ -440,6 +452,40 @@ document.getElementById('monitoringModal')?.addEventListener('click', function (
 });
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { var m = document.getElementById('monitoringModal'); if (m) m.style.display = 'none'; }
+});
+
+// Async save (progressive enhancement — the plain form POST still works
+// with JS disabled, landing back here via redirect).
+document.getElementById('monitoringForm')?.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var form = this;
+    var msg = document.getElementById('monitoringMessage');
+    var saveBtn = document.getElementById('monitoringSaveBtn');
+    var status = document.getElementById('monitoring_status')?.value || 'routine';
+    var intervalRaw = document.getElementById('custom_interval_days')?.value || '';
+    var reason = document.getElementById('custom_reason')?.value || '';
+    if (msg) msg.textContent = '';
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Saving…'; }
+    fetch(form.action, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body: JSON.stringify({
+            child_id: <?php echo (int)$childId; ?>,
+            monitoring_status: status,
+            custom_interval_days: intervalRaw === '' ? null : parseInt(intervalRaw, 10),
+            custom_reason: reason
+        })
+    })
+    .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
+    .then(function (json) {
+        if (!json.success) throw new Error(json.message || 'Could not update monitoring status.');
+        window.location.href = '<?php echo nutritionist_e(app_url('/nutritionist/followup_child.php?id=' . $childId)); ?>&notice=' + encodeURIComponent(json.message || 'Monitoring status updated successfully.');
+    })
+    .catch(function (err) {
+        if (msg) msg.textContent = err.message || 'Could not update monitoring status.';
+        if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Save'; }
+    });
 });
 </script>
 

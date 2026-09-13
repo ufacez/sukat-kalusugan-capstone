@@ -113,7 +113,7 @@ $today = new DateTimeImmutable('today');
 $now = new DateTimeImmutable('now');
 
 // ── Tab / pagination ──
-$validTabs = ['open_requests', 'monthly_young', 'monthly_old', 'quarterly'];
+$validTabs = ['open_requests', 'monthly_young', 'monthly_old', 'quarterly', 'special'];
 $activeTab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'open_requests';
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 5;
@@ -127,10 +127,11 @@ $monthLabel = $monthAnchor->format('F Y');
 $prevMonth = $monthAnchor->modify('-1 month')->format('Y-m');
 $nextMonth = $monthAnchor->modify('+1 month')->format('Y-m');
 
-// ── Split monitoring list into 3 groups ──
+// ── Split monitoring list into groups ──
 $groupYoung = [];   // Monthly, 0–23 months
 $groupOld = [];     // Monthly, 24–60 months (abnormal)
 $groupQuarterly = []; // Quarterly, 24–60 months (normal)
+$groupSpecial = []; // Custom track: special / sick / other monitoring
 
 foreach ($monitoringList as $entry) {
 	$track = $entry['schedule_type'] ?? '';
@@ -141,6 +142,8 @@ foreach ($monitoringList as $entry) {
 		$groupOld[] = $entry;
 	} elseif ($track === 'quarterly') {
 		$groupQuarterly[] = $entry;
+	} elseif ($track === 'custom') {
+		$groupSpecial[] = $entry;
 	}
 }
 
@@ -155,9 +158,10 @@ $sortFn = function ($a, $b) {
 usort($groupYoung, $sortFn);
 usort($groupOld, $sortFn);
 usort($groupQuarterly, $sortFn);
+usort($groupSpecial, $sortFn);
 
 // ── Active group + stats ──
-$allGroups = ['open_requests' => $openRequestRows, 'monthly_young' => $groupYoung, 'monthly_old' => $groupOld, 'quarterly' => $groupQuarterly];
+$allGroups = ['open_requests' => $openRequestRows, 'monthly_young' => $groupYoung, 'monthly_old' => $groupOld, 'quarterly' => $groupQuarterly, 'special' => $groupSpecial];
 $activeGroup = $allGroups[$activeTab];
 $totalRows = count($activeGroup);
 $totalPages = max(1, (int)ceil($totalRows / $perPage));
@@ -282,6 +286,7 @@ nutritionist_layout_start('Appointments', 'Track children due for reweighing and
 	<a class="rp-tab <?php echo $activeTab === 'monthly_young' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=monthly_young')); ?>">Monthly (0–23) <span>(<?php echo count($groupYoung); ?>)</span></a>
 	<a class="rp-tab <?php echo $activeTab === 'monthly_old' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=monthly_old')); ?>">Monthly (24–60) <span>(<?php echo count($groupOld); ?>)</span></a>
 	<a class="rp-tab <?php echo $activeTab === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=quarterly')); ?>">Quarterly <span>(<?php echo count($groupQuarterly); ?>)</span></a>
+	<a class="rp-tab <?php echo $activeTab === 'special' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php?tab=special')); ?>">Special <span>(<?php echo count($groupSpecial); ?>)</span></a>
 </div>
 
 <!-- ============ TABLE ============ -->
@@ -289,8 +294,8 @@ nutritionist_layout_start('Appointments', 'Track children due for reweighing and
 <div class="appt-card">
 <?php endif; ?>
 	<?php
-	$tabLabels = ['open_requests' => 'Open Requests (Parent-Requested)', 'monthly_young' => 'Monthly Monitoring (0–23 months)', 'monthly_old' => 'Monthly Monitoring (24–60 months, with problems)', 'quarterly' => 'Quarterly Monitoring (24–60 months, normal)'];
-	$tabSubs = ['open_requests' => 'Appointments requested by parents awaiting your confirmation', 'monthly_young' => 'Infants and toddlers on mandatory monthly reweighing', 'monthly_old' => 'Older children with abnormal WHO indicators on monthly schedule', 'quarterly' => 'Normal older children on quarterly re-check schedule'];
+	$tabLabels = ['open_requests' => 'Open Requests (Parent-Requested)', 'monthly_young' => 'Monthly Monitoring (0–23 months)', 'monthly_old' => 'Monthly Monitoring (24–60 months, with problems)', 'quarterly' => 'Quarterly Monitoring (24–60 months, normal)', 'special' => 'Special Monitoring (custom interval)'];
+	$tabSubs = ['open_requests' => 'Appointments requested by parents awaiting your confirmation', 'monthly_young' => 'Infants and toddlers on mandatory monthly reweighing', 'monthly_old' => 'Older children with abnormal WHO indicators on monthly schedule', 'quarterly' => 'Normal older children on quarterly re-check schedule', 'special' => 'Children on special, sick, or other monitoring with a custom interval'];
 	?>
 	<div class="appt-card-head">
 		<div>
@@ -388,6 +393,9 @@ nutritionist_layout_start('Appointments', 'Track children due for reweighing and
 					<td>
 						<strong><?php echo nutritionist_e($fullName); ?></strong>
 						<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($entry['child_code']); ?></div>
+						<?php if ($activeTab === 'special' && ($entry['custom_interval_days'] || ($entry['monitoring_reason'] ?? ''))): ?>
+							<div style="font-size:10px;color:#7c3aed;">every <?php echo (int)($entry['custom_interval_days'] ?? 0); ?>d<?php echo ($entry['monitoring_reason'] ?? '') !== '' ? ' · ' . nutritionist_e((string)$entry['monitoring_reason']) : ''; ?></div>
+						<?php endif; ?>
 					</td>
 					<td><?php echo $entry['age_months']; ?> mo</td>
 					<td><?php echo nutritionist_e($entry['barangay_name'] ?? ''); ?></td>

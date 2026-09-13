@@ -258,6 +258,21 @@ nutritionist_layout_start(
 
             <div class="flag-banner" id="flag-banner"></div>
 
+            <div id="override-panel" style="display:none;padding:12px 14px;border-radius:8px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.28);margin-bottom:14px;">
+                <div style="font-weight:800;font-size:13px;color:#991b1b;margin-bottom:6px;">Not scheduled — record as override?</div>
+                <p id="override-hint" style="margin:0 0 10px;font-size:12px;color:#7f1d1d;"></p>
+                <label class="admin-field" style="margin-bottom:10px;">
+                    <span>Reason for override *</span>
+                    <textarea id="override-reason" maxlength="255" rows="2" placeholder="e.g. Doctor requested an urgent re-weigh after illness"></textarea>
+                    <span class="admin-field-message"></span>
+                </label>
+                <div class="action-row" style="margin-top:0;">
+                    <button class="admin-btn" type="button" id="override-save-btn">Save as override</button>
+                    <button class="admin-btn-secondary" type="button" id="override-cancel-btn">Cancel</button>
+                </div>
+                <div class="form-message" id="override-message" aria-live="polite"></div>
+            </div>
+
             <div class="action-row">
                 <button class="admin-btn" type="button" id="save-btn" disabled>
                     <?php echo admin_action_icon('save'); ?> Save measurement
@@ -276,6 +291,7 @@ nutritionist_layout_start(
     catch (err) { CHILDREN = []; }
 
     var PREVIEW_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/who_preview.php")); ?>';
+    var OVERRIDE_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/measurements_override.php")); ?>';
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -299,6 +315,29 @@ nutritionist_layout_start(
     var flagBanner = $('flag-banner');
     var saveBtn = $('save-btn');
     var resetBtn = $('reset-btn');
+    var overridePanel = $('override-panel');
+    var overrideHint = $('override-hint');
+    var overrideReason = $('override-reason');
+    var overrideSaveBtn = $('override-save-btn');
+    var overrideCancelBtn = $('override-cancel-btn');
+    var overrideMessage = $('override-message');
+
+    function hideOverridePanel() {
+        if (overridePanel) overridePanel.style.display = 'none';
+        if (overrideReason) overrideReason.value = '';
+        if (overrideMessage) overrideMessage.textContent = '';
+    }
+
+    function showOverridePanel(nextDue) {
+        if (!overridePanel) return;
+        if (overrideHint) {
+            overrideHint.textContent = nextDue
+                ? 'Next scheduled measurement: ' + nextDue + '. Saving now records an exceptional OVERRIDE measurement instead.'
+                : 'Saving now records an exceptional OVERRIDE measurement instead of waiting for the schedule.';
+        }
+        overridePanel.style.display = '';
+        if (overrideReason) overrideReason.focus();
+    }
 
     var previewTimer = null;
     var previewController = null;
@@ -572,7 +611,12 @@ nutritionist_layout_start(
         })
         .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
         .then(function (json) {
-            if (!json.success) throw new Error(json.message || 'Could not save the measurement.');
+            if (!json.success) {
+                var saveErr = new Error(json.message || 'Could not save the measurement.');
+                saveErr.notDue = json.not_due === true;
+                saveErr.nextDue = json.next_due || null;
+                throw saveErr;
+            }
             // The panel already shows these exact values from the live
             // preview; re-render with the authoritative save response.
             renderSavedResult(json.data);
@@ -586,12 +630,68 @@ nutritionist_layout_start(
         })
         .catch(function (err) {
             toastError(err.message || 'Could not save the measurement.');
+            if (err && err.notDue) showOverridePanel(err.nextDue);
         })
         .finally(function () {
             if (saveBtn.innerHTML !== 'Saved!') {
                 saveBtn.disabled = false;
                 saveBtn.innerHTML = originalLabel;
             }
+        });
+    });
+
+    overrideCancelBtn.addEventListener('click', hideOverridePanel);
+
+    overrideSaveBtn.addEventListener('click', function () {
+        if (!selectedChild) { toastError('Please select a child first.'); return; }
+        var w = parseFloat(weightInput.value);
+        var h = parseFloat(heightInput.value);
+        if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
+            overrideMessage.textContent = 'Enter a valid weight and height first.';
+            return;
+        }
+        var reason = (overrideReason.value || '').trim();
+        if (reason === '') {
+            overrideMessage.textContent = 'A reason for the override is required.';
+            overrideReason.focus();
+            return;
+        }
+        overrideSaveBtn.disabled = true;
+        overrideMessage.textContent = '';
+        var saveOriginalLabel = saveBtn.innerHTML;
+        overrideSaveBtn.textContent = 'Saving override…';
+
+        fetch(OVERRIDE_URL, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                child_id: selectedChild.id,
+                measurement_date: dateInput.value,
+                weight_kg: w,
+                height_cm: h,
+                override_reason: reason
+            })
+        })
+        .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
+        .then(function (json) {
+            if (!json.success) throw new Error(json.message || 'Could not save the override measurement.');
+            renderSavedResult(json.data);
+            if (window.AdminToast) AdminToast.success('Override measurement saved for ' + json.data.child_name + ' (' + json.data.child_code + ').');
+            hideOverridePanel();
+            saveBtn.innerHTML = 'Saved!';
+            setTimeout(function () {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = saveOriginalLabel;
+            }, 2000);
+            return;
+        })
+        .catch(function (err) {
+            overrideMessage.textContent = err.message || 'Could not save the override measurement.';
+        })
+        .finally(function () {
+            overrideSaveBtn.disabled = false;
+            overrideSaveBtn.textContent = 'Save as override';
         });
     });
 
@@ -602,6 +702,7 @@ nutritionist_layout_start(
         whoResult.style.display = 'none';
         saveBtn.disabled = true;
         flagBanner.classList.remove('is-visible');
+        hideOverridePanel();
     });
 
 })();
