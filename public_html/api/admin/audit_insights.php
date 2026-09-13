@@ -73,8 +73,9 @@ $levelBreakdown = admin_fetch_all(
 );
 
 $recentActivity = admin_fetch_all(
-    "SELECT a.action, a.level, a.description, a.created_at, COALESCE(u.email, 'System') AS actor, COALESCE(a.user_type, 'system') AS user_type
+    "SELECT a.action, a.level, a.description, a.created_at, COALESCE(u.email, p.email, 'System') AS actor, COALESCE(a.user_type, 'system') AS user_type
      FROM audit_logs a LEFT JOIN users u ON u.id = a.user_id
+     LEFT JOIN parents p ON p.id = a.user_id AND (a.user_type = 'parent' OR (a.user_type IS NULL AND u.id IS NULL))
      ORDER BY a.created_at DESC LIMIT 15"
 );
 

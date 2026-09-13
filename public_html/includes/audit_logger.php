@@ -21,14 +21,30 @@ function log_action(?int $user_id, string $action, string $level, string $descri
     };
     $ipAddress = $_SERVER['REMOTE_ADDR'] ?? null;
 
-    // Auto-detect user_type from session if not provided
+    // Auto-detect user_type from session if not provided.
+    // Session shape is $_SESSION['auth'] = ['type' => 'staff'|'parent', 'role' => ...].
+    // Legacy check of $_SESSION['type'] is kept for any direct-session callers.
     if ($userType === null) {
-        $session = $_SESSION ?? [];
-        $sessionType = $session['type'] ?? '';
-        if ($sessionType === 'staff') {
-            $userType = $session['role'] ?? 'admin';
-        } elseif ($sessionType === 'parent') {
-            $userType = 'parent';
+        $auth = $_SESSION['auth'] ?? null;
+        if (is_array($auth)) {
+            $sessionType = (string)($auth['type'] ?? '');
+            if ($sessionType === 'staff') {
+                $userType = (string)($auth['role'] ?? 'admin');
+                if ($userType !== 'admin' && $userType !== 'nutritionist') {
+                    $userType = 'admin';
+                }
+            } elseif ($sessionType === 'parent') {
+                $userType = 'parent';
+            }
+        }
+        if ($userType === null) {
+            $session = $_SESSION ?? [];
+            $sessionType = (string)($session['type'] ?? '');
+            if ($sessionType === 'staff') {
+                $userType = (string)($session['role'] ?? 'admin');
+            } elseif ($sessionType === 'parent') {
+                $userType = 'parent';
+            }
         }
     }
 

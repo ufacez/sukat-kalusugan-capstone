@@ -379,17 +379,28 @@ nutritionist_layout_start(
 
     function hideContextPanel() {
         $('.ai-layout').classList.remove('is-context-open');
-        dom.contextMenu.setAttribute('aria-expanded', 'false');
+        if (dom.contextMenu && window.matchMedia('(max-width: 720px)').matches) {
+            dom.contextMenu.setAttribute('aria-expanded', 'false');
+        }
         if (!dom.childModal.hasAttribute('hidden')) {
             closeChildModal();
         }
     }
 
     function toggleContextPanel() {
-        if ($('.ai-layout').classList.contains('is-context-open')) {
-            hideContextPanel();
+        // Burger behavior:
+        // - Mobile (<=720px): toggle the sidebar sheet (.is-context-open).
+        // - Desktop: collapse/expand the sidebar (.is-collapsed).
+        // The child picker is opened only via "Analyze child" / picker button.
+        const layout = $('.ai-layout');
+        if (window.matchMedia('(max-width: 720px)').matches) {
+            const open = !layout.classList.contains('is-context-open');
+            layout.classList.toggle('is-context-open', open);
+            if (dom.contextMenu) dom.contextMenu.setAttribute('aria-expanded', String(open));
         } else {
-            revealContextPanel();
+            const collapsed = !layout.classList.contains('is-collapsed');
+            layout.classList.toggle('is-collapsed', collapsed);
+            if (dom.contextMenu) dom.contextMenu.setAttribute('aria-expanded', String(!collapsed));
         }
     }
 

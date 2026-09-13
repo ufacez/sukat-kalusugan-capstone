@@ -92,12 +92,13 @@ admin_layout_start(
                     <span class="admin-field-message"></span>
                 </label>
                 <label class="admin-field">
-                    <span>Relationship<span class="admin-required">*</span></span>
-                    <select name="parent_type" required>
+                    <span>Parent Type<span class="admin-required">*</span></span>
+                    <select id="ap_parent_type" name="parent_type" required data-label="Parent type">
                         <?php foreach ($parentTypes as $type): ?>
                             <option value="<?php echo admin_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo admin_e($type); ?></option>
                         <?php endforeach; ?>
                     </select>
+                    <span class="admin-field-message"></span>
                 </label>
             </div>
         </div>

@@ -97,9 +97,12 @@ if (new DateTimeImmutable($invitation['expires_at']) < new DateTimeImmutable('no
 }
 
 $username = strtolower(preg_replace('/[^a-z0-9]/', '', preg_replace('/\s+/', '', $invitation['invitee_name'])));
+if ($username === '') {
+    $username = 'staff';
+}
 $baseUsername = $username;
 $counter = 1;
-while (admin_fetch_one('SELECT id FROM users WHERE username = ? LIMIT 1', 's', [$username]) !== null) {
+while (admin_username_in_use($username)) {
     $username = $baseUsername . $counter;
     $counter++;
 }
@@ -114,6 +117,11 @@ if ($roleId <= 0) {
 $displayName = trim($invitation['invitee_name']);
 $invitationEmail = trim((string)($invitation['invitee_email'] ?? ''));
 $email = $invitationEmail !== '' ? $invitationEmail : $username . '@sukat.kalusugan';
+if (admin_email_in_use($email)) {
+    http_response_code(409);
+    echo json_encode(['success' => false, 'message' => 'This email is already registered. Please ask your administrator for a new invitation with a different email.']);
+    exit;
+}
 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 $barangayId = !empty($invitation['barangay_id']) ? (int)$invitation['barangay_id'] : null;
 $phone = !empty($invitation['invitee_phone']) ? $invitation['invitee_phone'] : null;

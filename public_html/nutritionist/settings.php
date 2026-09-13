@@ -11,6 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
     $lastName  = trim((string)($_POST['last_name'] ?? ''));
     $name      = admin_combine_name($firstName, '', $lastName);
     $email     = trim((string)($_POST['email'] ?? ''));
+    $username  = trim((string)($_POST['username'] ?? ''));
     $phone     = trim((string)($_POST['phone'] ?? ''));
     $address   = trim((string)($_POST['address'] ?? ''));
     $oldPassword    = (string)($_POST['old_password'] ?? '');
@@ -26,11 +27,21 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
     if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
         admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
     }
+    if ($username === '' || preg_match('/^[A-Za-z0-9._]{3,30}$/', $username) !== 1) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid username (3-30 characters: letters, numbers, dot, or underscore).', 'type' => 'error']);
+    }
     if ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
         admin_redirect('/nutritionist/settings.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
     }
     if ($address !== '' && strlen($address) > 255) {
         admin_redirect('/nutritionist/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
+    }
+
+    if (admin_email_in_use($email, (int)$actor['id'], null)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
+    }
+    if (admin_username_in_use($username, (int)$actor['id'])) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'This username is already taken. Choose a different username.', 'type' => 'error']);
     }
 
     $current = admin_fetch_one('SELECT password_hash, email FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
@@ -54,9 +65,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
         }
     }
 
-    $sql    = 'UPDATE users SET name = ?, email = ?, phone = ?, address = ?';
-    $params = [$name, $email, $phone, $address !== '' ? $address : null];
-    $types  = 'ssss';
+    $sql    = 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, address = ?';
+    $params = [$name, $email, $username, $phone, $address !== '' ? $address : null];
+    $types  = 'sssss';
 
     if ($wantsNewPassword) {
         $sql .= ', password_hash = ?';
@@ -73,16 +84,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
     if ($ok) {
         $_SESSION['auth']['name']  = $name;
         $_SESSION['auth']['email'] = $email;
+        $_SESSION['auth']['username'] = $username;
         $_SESSION['auth']['phone'] = $phone;
         log_action((int)$actor['id'], 'UPDATE_OWN_ACCOUNT', 'info', 'Nutritionist updated their own account details');
     }
 
     admin_redirect('/nutritionist/settings.php', $ok
         ? ['notice' => 'Account updated successfully.', 'type' => 'success']
-        : ['notice' => 'Account could not be updated. Check for a duplicate email.', 'type' => 'error']);
+        : ['notice' => 'Account could not be updated. This email or username may already be in use.', 'type' => 'error']);
 }
 
-$myAccount = admin_fetch_one('SELECT name, email, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+$myAccount = admin_fetch_one('SELECT name, email, username, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
 $fullName = trim((string)($myAccount['name'] ?? ''));
 $nameParts = $fullName === '' ? ['', ''] : preg_split('/\s+/', $fullName);
 if (count($nameParts) === 1) {
@@ -133,6 +145,12 @@ nutritionist_layout_start('Settings', 'Manage your account details.', 'settings'
                 <label class="admin-field admin-field-wide">
                     <span>Email</span>
                     <input id="account_email" type="email" name="email" required data-validate="email" data-label="Email" autocomplete="email" value="<?php echo admin_e($myAccount['email'] ?? ''); ?>">
+                    <span class="admin-field-message"></span>
+                </label>
+
+                <label class="admin-field admin-field-wide">
+                    <span>Username</span>
+                    <input id="account_username" name="username" required data-validate="username" data-label="Username" autocomplete="username" maxlength="30" placeholder="janedoe" value="<?php echo admin_e($myAccount['username'] ?? ''); ?>">
                     <span class="admin-field-message"></span>
                 </label>
 

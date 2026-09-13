@@ -43,11 +43,12 @@ $offset = ($page - 1) * $perPage;
 
 $logs = admin_fetch_all(
     'SELECT a.id, a.action, a.level, a.description, a.ip_address, a.created_at, a.user_type,
-            COALESCE(u.email, "System") AS actor,
-            COALESCE(u.name, "System") AS actor_name,
+            COALESCE(u.email, p.email, "System") AS actor,
+            COALESCE(u.name, p.name, "System") AS actor_name,
             COALESCE(a.user_type, r.name, "system") AS resolved_type
      FROM audit_logs a
      LEFT JOIN users u ON u.id = a.user_id
+     LEFT JOIN parents p ON p.id = a.user_id AND (a.user_type = "parent" OR (a.user_type IS NULL AND u.id IS NULL))
      LEFT JOIN roles r ON r.id = u.role_id
      WHERE 1=1 ' . $filterWhere . '
      ORDER BY a.created_at DESC, a.id DESC

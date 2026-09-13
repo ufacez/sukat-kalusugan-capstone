@@ -111,7 +111,17 @@
 }
 
 @media (min-width: 721px) {
-  /* Sidebar is always visible on desktop */
+  /* Desktop: sidebar visible by default. Burger (.ai-btn-menu) collapses
+     it via .is-collapsed so the chat takes the full width. */
+  .ai-layout.is-collapsed .ai-sidebar {
+    display: none;
+  }
+
+  .ai-layout.is-collapsed .ai-chat {
+    flex: 1 1 100%;
+  }
+
+  /* Legacy overlay state kept for back-compat (no longer set by JS). */
   .ai-layout.is-context-open .ai-sidebar {
     position: absolute;
     top: 0;

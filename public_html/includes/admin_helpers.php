@@ -253,6 +253,83 @@ function admin_find_role_id(string $roleName): int
 }
 
 /**
+ * Global email-uniqueness check across BOTH staff (users) and parents.
+ * Emails are the login identifier for both account types, so a duplicate
+ * in either table would make sign-in ambiguous. Case-insensitive.
+ *
+ * @param string   $email       Email to test (already trimmed by caller).
+ * @param int|null $excludeUserId   Skip this users.id (for updates/settings).
+ * @param int|null $excludeParentId Skip this parents.id (for updates/settings).
+ */
+function admin_email_in_use(string $email, ?int $excludeUserId = null, ?int $excludeParentId = null): bool
+{
+    $email = trim($email);
+    if ($email === '') {
+        return false;
+    }
+
+    if ($excludeUserId !== null && $excludeUserId > 0) {
+        $hit = admin_fetch_one(
+            'SELECT id FROM users WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1',
+            'si',
+            [$email, $excludeUserId]
+        );
+    } else {
+        $hit = admin_fetch_one(
+            'SELECT id FROM users WHERE LOWER(email) = LOWER(?) LIMIT 1',
+            's',
+            [$email]
+        );
+    }
+    if ($hit !== null) {
+        return true;
+    }
+
+    if ($excludeParentId !== null && $excludeParentId > 0) {
+        $hit = admin_fetch_one(
+            'SELECT id FROM parents WHERE LOWER(email) = LOWER(?) AND id != ? LIMIT 1',
+            'si',
+            [$email, $excludeParentId]
+        );
+    } else {
+        $hit = admin_fetch_one(
+            'SELECT id FROM parents WHERE LOWER(email) = LOWER(?) LIMIT 1',
+            's',
+            [$email]
+        );
+    }
+
+    return $hit !== null;
+}
+
+/**
+ * Global username check for staff accounts (users.username is UNIQUE).
+ */
+function admin_username_in_use(string $username, ?int $excludeUserId = null): bool
+{
+    $username = trim($username);
+    if ($username === '') {
+        return false;
+    }
+
+    if ($excludeUserId !== null && $excludeUserId > 0) {
+        $hit = admin_fetch_one(
+            'SELECT id FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1',
+            'si',
+            [$username, $excludeUserId]
+        );
+    } else {
+        $hit = admin_fetch_one(
+            'SELECT id FROM users WHERE LOWER(username) = LOWER(?) LIMIT 1',
+            's',
+            [$username]
+        );
+    }
+
+    return $hit !== null;
+}
+
+/**
  * Best-effort split of a single "name" column into first / middle / last
  * name parts, used to pre-fill the Add/Edit forms when editing a record
  * that only ever stored one combined name string.

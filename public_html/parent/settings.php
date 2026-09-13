@@ -32,6 +32,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 		admin_redirect('/parent/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
 	}
 
+	if (admin_email_in_use($email, null, (int)$user['id'])) {
+		admin_redirect('/parent/settings.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
+	}
+
 	$allowedTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 	if (!in_array($parentType, $allowedTypes, true)) {
 		$parentType = 'Guardian';
@@ -80,7 +84,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 		$_SESSION['auth']['parent_type'] = $parentType;
 	}
 
-	admin_redirect('/parent/settings.php', $ok ? ['notice' => 'Account updated successfully.', 'type' => 'success'] : ['notice' => 'Account could not be updated. Check for a duplicate email.', 'type' => 'error']);
+	admin_redirect('/parent/settings.php', $ok ? ['notice' => 'Account updated successfully.', 'type' => 'success'] : ['notice' => 'Account could not be updated. This email may already be in use.', 'type' => 'error']);
 }
 
 $profile = admin_fetch_one(
@@ -156,14 +160,15 @@ parent_layout_start('Settings', 'Manage your account details.', 'settings', $act
 					<input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo parent_e((string)($profile['phone'] ?? '')); ?>" placeholder="09171234567">
 					<span class="admin-field-message"></span>
 				</label>
-				<label class="admin-field">
-					<span>Parent Type</span>
-					<select name="parent_type">
-						<?php foreach (['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'] as $type): ?>
-							<option value="<?php echo parent_e($type); ?>" <?php echo (($profile['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo parent_e($type); ?></option>
-						<?php endforeach; ?>
-					</select>
-				</label>
+			<label class="admin-field">
+				<span>Parent Type</span>
+				<select id="account_parent_type" name="parent_type" required data-label="Parent type" autocomplete="off">
+					<?php foreach (['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'] as $type): ?>
+						<option value="<?php echo parent_e($type); ?>" <?php echo (($profile['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo parent_e($type); ?></option>
+					<?php endforeach; ?>
+				</select>
+				<span class="admin-field-message"></span>
+			</label>
 				<div class="admin-field admin-field-wide">
 					<span>Address</span>
 					<label class="admin-field" style="margin-top:6px;">

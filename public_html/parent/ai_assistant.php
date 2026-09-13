@@ -197,11 +197,17 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         creatingConversation: false,
         conversationRequestToken: 0,
         pendingMessage: null,
+        autoExplainPending: false,
         childDetail: null,
         childModalPage: 1,
         childModalPageSize: 20,
         childSearch: '',
     };
+
+    // First question Kali asks on the parent's behalf right after a child
+    // is picked — explains the latest result immediately instead of
+    // showing only the intro empty-state.
+    const AUTO_EXPLAIN_PROMPT = 'What does this result mean? Please explain simply.';
 
     // --- DOM refs ---
     const dom = {
@@ -339,6 +345,9 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         if (state.sending) return;
         state.selectedChildId = childId;
         state.conversationId = null;
+        // Explain the latest result immediately on child pick.
+        state.autoExplainPending = !!childId;
+        state.pendingMessage = null;
 
         if (childId) {
             const child = state.children.find(c => Number(c.id) === childId);
@@ -350,7 +359,7 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
             }
         }
 
-        dom.messages.innerHTML = '';
+        dom.messages.innerHTML = '<div class="ai-session-loading">Loading growth result…</div>';
         createConversation(childId);
     }
 
@@ -359,6 +368,8 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         if (state.sending) return;
         state.selectedChildId = null;
         state.conversationId = null;
+        state.autoExplainPending = false;
+        state.pendingMessage = null;
         dom.childPickerLabel.textContent = 'General questions';
         dom.childDetail.style.display = 'none';
         dom.chatTitle.textContent = 'Kali AI';
@@ -424,23 +435,29 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
 
     function hideContextPanel() {
         $('.ai-layout').classList.remove('is-context-open');
-        dom.contextMenu.setAttribute('aria-expanded', 'false');
+        if (dom.contextMenu && window.matchMedia('(max-width: 720px)').matches) {
+            dom.contextMenu.setAttribute('aria-expanded', 'false');
+        }
         if (!dom.childModal.hasAttribute('hidden')) {
             closeChildModal();
         }
     }
 
     function toggleContextPanel() {
-        // Mobile (<=720px): the sidebar is collapsed, so the menu button
-        // opens it as an overlay sheet with the children + recent chats.
-        // Desktop: the sidebar is already visible, so open the picker modal.
+        // Burger behavior:
+        // - Mobile (<=720px): toggle the sidebar sheet (.is-context-open).
+        // - Desktop: collapse/expand the sidebar (.is-collapsed).
+        // The child picker is opened only via "My child" / picker button,
+        // never via the burger.
+        const layout = $('.ai-layout');
         if (window.matchMedia('(max-width: 720px)').matches) {
-            const layout = $('.ai-layout');
             const open = !layout.classList.contains('is-context-open');
             layout.classList.toggle('is-context-open', open);
             if (dom.contextMenu) dom.contextMenu.setAttribute('aria-expanded', String(open));
         } else {
-            revealContextPanel();
+            const collapsed = !layout.classList.contains('is-collapsed');
+            layout.classList.toggle('is-collapsed', collapsed);
+            if (dom.contextMenu) dom.contextMenu.setAttribute('aria-expanded', String(!collapsed));
         }
     }
 
@@ -558,19 +575,28 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
                 // Never fail silently: the queued message is dropped here,
                 // so say so and keep the chat usable.
                 state.pendingMessage = null;
+                state.autoExplainPending = false;
                 console.error('Kali AI: conversations.php:', res.message || 'request failed');
                 appendBubble('system', (res && res.message) || 'Could not start the chat. Please try again.');
                 return;
             }
             state.conversationId = res.data.id;
             loadSessions();
+            const pendingMessage = state.pendingMessage;
+            state.pendingMessage = null;
+            // Child just picked: explain immediately instead of intro.
+            const shouldAutoExplain = state.autoExplainPending && !!childId && !pendingMessage;
+            state.autoExplainPending = false;
+            if (shouldAutoExplain) {
+                dom.messages.innerHTML = '';
+                sendMessage(AUTO_EXPLAIN_PROMPT);
+                return;
+            }
             if (childId) {
                 showEmptySuggestions();
             } else {
                 showGlobalEmpty();
             }
-            const pendingMessage = state.pendingMessage;
-            state.pendingMessage = null;
             if (pendingMessage) sendMessage(pendingMessage);
         })
         .catch((error) => {
@@ -579,6 +605,7 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
             // The queued message is dropped here — say so instead of
             // swallowing it silently.
             state.pendingMessage = null;
+            state.autoExplainPending = false;
             appendBubble('system', isTimeout(error) ? timeoutMessage() : 'Could not reach Kali. Please check your connection and try again.');
         })
         .finally(() => {
@@ -733,6 +760,8 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
 
     function newConversation() {
         state.conversationId = null;
+        state.autoExplainPending = false;
+        state.pendingMessage = null;
         dom.messages.innerHTML = '';
 
         if (state.selectedChildId) {

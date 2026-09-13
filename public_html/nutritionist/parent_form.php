@@ -88,6 +88,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		admin_redirect($redirectBack, ['notice' => 'Name and email are required.', 'type' => 'error']);
 	}
 
+	if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+		admin_redirect($redirectBack, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+	}
+
+	// Global uniqueness: email must not exist in staff or other parents.
+	$excludeParent = ($action === 'update' && $parentId > 0) ? $parentId : null;
+	if (admin_email_in_use($email, null, $excludeParent)) {
+		admin_redirect($redirectBack, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
+	}
+
 	if (!admin_is_valid_ph_mobile($phone)) {
 		admin_redirect($redirectBack, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
 	}
@@ -344,12 +354,13 @@ nutritionist_layout_start(
 					<span class="admin-field-message"></span>
 				</label>
 				<label class="admin-field">
-					<span>Relationship<span class="admin-required">*</span></span>
-					<select name="parent_type" required>
+					<span>Parent Type<span class="admin-required">*</span></span>
+					<select id="np_parent_type" name="parent_type" required data-label="Parent type">
 						<?php foreach ($parentTypes as $type): ?>
 							<option value="<?php echo nutritionist_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo nutritionist_e($type); ?></option>
 						<?php endforeach; ?>
 					</select>
+					<span class="admin-field-message"></span>
 				</label>
 			</div>
 		</div>

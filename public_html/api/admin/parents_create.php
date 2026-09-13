@@ -82,10 +82,12 @@ if ($password !== $passwordConfirm) {
     admin_redirect('/admin/parent_form.php', ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 }
 
-// Duplicate email check
-$existingEmail = admin_fetch_one('SELECT id FROM parents WHERE email = ? LIMIT 1', 's', [$email]);
-if ($existingEmail !== null) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'A parent with this email already exists.', 'type' => 'error']);
+// Duplicate email check — globally unique across staff + parents.
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    admin_redirect('/admin/parent_form.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+}
+if (admin_email_in_use($email)) {
+    admin_redirect('/admin/parent_form.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT);

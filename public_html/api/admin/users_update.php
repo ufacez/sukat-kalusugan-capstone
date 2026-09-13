@@ -70,14 +70,15 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
-// Duplicate checks (exclude current user)
-$existingEmail = admin_fetch_one('SELECT id FROM users WHERE email = ? AND id != ? LIMIT 1', 'si', [$email, $id]);
-if ($existingEmail !== null) {
-    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this email already exists.', 'type' => 'error']);
+// Duplicate checks (exclude current user) — email globally unique.
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+}
+if (admin_email_in_use($email, $id, null)) {
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 }
 
-$existingUsername = admin_fetch_one('SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1', 'si', [$username, $id]);
-if ($existingUsername !== null) {
+if (admin_username_in_use($username, $id)) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'A user with this username already exists.', 'type' => 'error']);
 }
 
