@@ -2330,7 +2330,7 @@
             state.lastBlockedStaleSessionId =
               payloadSessionId;
             console.warn(
-              "[SukatKalusugan] Blocking Firebase terminal status — session mismatch",
+              "[SukatKalusugan] Neutralising Firebase terminal status from stale session",
               {
                 expected: expectedSessionId,
                 received: payloadSessionId,
@@ -2339,7 +2339,20 @@
             );
           }
 
-          return null;
+          // Don't return null — the payload still carries
+          // live sensor values (weight_kg, height_cm) from
+          // the hardware. Pass them through with the status
+          // overridden so applyFirebaseStatus displays the
+          // readings without triggering the result screen.
+          payload = Object.assign(
+            {},
+            payload,
+            {
+              session_id: 0,
+              sessionId: 0,
+              status: "MEASURING"
+            }
+          );
         }
 
         // Live reading from a stale session: pass sensor values through
