@@ -719,6 +719,8 @@
 
     statusRequestInProgress: false,
 
+    lastBlockedStaleSessionId: null,
+
     destroyed: false
   };
 
@@ -2319,14 +2321,23 @@
           payloadStatus === "ERROR" ||
           payloadStatus === "CANCELLED"
         ) {
-          console.warn(
-            "[SukatKalusugan] Blocking Firebase terminal status — session mismatch",
-            {
-              expected: expectedSessionId,
-              received: payloadSessionId,
-              status: payloadStatus
-            }
-          );
+          // Only log once per stale session to avoid
+          // flooding the console every poll cycle.
+          if (
+            state.lastBlockedStaleSessionId !==
+            payloadSessionId
+          ) {
+            state.lastBlockedStaleSessionId =
+              payloadSessionId;
+            console.warn(
+              "[SukatKalusugan] Blocking Firebase terminal status — session mismatch",
+              {
+                expected: expectedSessionId,
+                received: payloadSessionId,
+                status: payloadStatus
+              }
+            );
+          }
 
           return null;
         }
