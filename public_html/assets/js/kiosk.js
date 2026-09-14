@@ -2248,7 +2248,7 @@
         return null;
       }
 
-      const payload =
+      let payload =
         await response
           .json()
           .catch(() => null);
