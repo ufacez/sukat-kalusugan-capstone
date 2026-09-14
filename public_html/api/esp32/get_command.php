@@ -433,6 +433,81 @@ if (
         'MEASURING'
 ) {
 
+    /*
+    |----------------------------------------------------------------
+    | HEARTBEAT: EXTEND THE SESSION WINDOW
+    |----------------------------------------------------------------
+    |
+    | expires_at used to be set ONCE when the ESP32 first claimed the
+    | session (START_REQUESTED -> MEASURING) and never touched again.
+    | That made MEASUREMENT_SESSION_TIMEOUT_SECONDS an upper bound on
+    | the ENTIRE measurement (sampling + waiting for the operator to
+    | click "Process" + averaging + final submit), not just on device
+    | silence. A slow/hesitant operator, or a device that took longer
+    | than usual to settle on a stable reading, could cross that
+    | window with a perfectly good final snapshot in hand -- the
+    | server would auto-expire the session out from under it right as
+    | it tried to submit, so submit_measurement.php was never even
+    | called (isCurrentSessionStillValid() in the firmware sees the
+    | session is gone and silently discards the snapshot).
+    |
+    | Since the ESP32 is polling this endpoint every ~1-2s the whole
+    | time it's measuring (see COMMAND_POLL_INTERVAL /
+    | SESSION_VALIDATE_INTERVAL in the firmware), we can safely turn
+    | this into a heartbeat: every poll while MEASURING pushes
+    | expires_at forward again. Now the timeout only fires if the
+    | device actually goes silent (WiFi drop, crash, unplugged) for
+    | longer than the window -- not because the measurement itself
+    | took a while.
+    |
+    */
+
+    $heartbeatExpiresAt =
+        (new DateTimeImmutable('now'))
+            ->modify(
+                '+' .
+                MEASUREMENT_SESSION_TIMEOUT_SECONDS .
+                ' seconds'
+            )
+            ->format('Y-m-d H:i:s');
+
+    $heartbeatSessionId =
+        (int)(
+            $sessionRow['session_id'] ??
+            0
+        );
+
+    $heartbeatStmt = mysqli_prepare(
+        $conn,
+        'UPDATE measurement_sessions
+         SET
+            expires_at = ?,
+            updated_at = NOW()
+         WHERE id = ?
+           AND status = \'MEASURING\''
+    );
+
+    if ($heartbeatStmt !== false) {
+
+        mysqli_stmt_bind_param(
+            $heartbeatStmt,
+            'si',
+            $heartbeatExpiresAt,
+            $heartbeatSessionId
+        );
+
+        mysqli_stmt_execute(
+            $heartbeatStmt
+        );
+
+        mysqli_stmt_close(
+            $heartbeatStmt
+        );
+
+        $sessionRow['expires_at'] =
+            $heartbeatExpiresAt;
+    }
+
     mysqli_commit(
         $conn
     );
