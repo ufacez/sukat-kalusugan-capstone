@@ -104,7 +104,8 @@ function https_redirect_exempt(): bool
         $path = $uri;
     }
 
-    return str_contains($path, '/api/esp32/');
+    return str_contains($path, '/api/esp32/')
+        || str_contains($path, '/admin/device_form.php');
 }
 
 /**

@@ -21,6 +21,13 @@ if (!file_exists($composerAutoload)) {
 }
 require_once $composerAutoload;
 
+// ── Timezone ─────────────────────────────────────────────────────────────────
+// Force Philippine Standard Time (UTC+8) so PHP date/time functions AND the
+// MySQL session timezone sync in db.php both produce correct local timestamps.
+// Without this, the system inherits the OS default (e.g. Europe/Berlin on the
+// dev machine), causing audit-log timestamps and other dates to be wrong.
+date_default_timezone_set('Asia/Manila');
+
 // ── Load .env ────────────────────────────────────────────────────────────────
 $envPath = __DIR__ . '/../../.env';
 if (file_exists($envPath)) {

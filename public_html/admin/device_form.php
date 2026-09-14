@@ -562,6 +562,15 @@ is optional verification.
             showBanner('error', 'No local IP for this device. Is the ESP32 online?');
             return;
         }
+        // ESP32 only supports plain ws:// (no TLS). If this page is served
+        // over HTTPS, browsers block the ws:// connection as mixed content.
+        if (window.location.protocol === 'https:') {
+            showBanner('error',
+                'Mixed-content blocked: HTTPS pages cannot open ws:// to the ESP32. ' +
+                'Open this page over HTTP instead (e.g. http://' + window.location.host + window.location.pathname + window.location.search + '), ' +
+                'or use the manual offset fields on the Settings tab.');
+            return;
+        }
         showBanner('', 'Connecting to ESP32 at ' + deviceIp + '...');
         el('cal-connect-btn').disabled = true;
 
@@ -599,7 +608,9 @@ is optional verification.
         };
 
         ws.onerror = function() {
-            showBanner('error', 'Could not connect to ESP32. Is it online and on the same network?');
+            showBanner('error',
+                'Could not connect to ESP32. Is it online and on the same network? ' +
+                'The ESP32 only supports plain ws:// — make sure you are on the same LAN.');
             el('cal-connect-btn').disabled = false;
         };
     }
@@ -871,6 +882,15 @@ is optional verification.
             showBanner('error', 'No local IP for this device. Is the ESP32 online?');
             return;
         }
+        // ESP32 only supports plain ws:// (no TLS). If this page is served
+        // over HTTPS, browsers block the ws:// connection as mixed content.
+        if (window.location.protocol === 'https:') {
+            showBanner('error',
+                'Mixed-content blocked: HTTPS pages cannot open ws:// to the ESP32. ' +
+                'Open this page over HTTP instead (e.g. http://' + window.location.host + window.location.pathname + window.location.search + '), ' +
+                'or use the manual offset fields on the Settings tab.');
+            return;
+        }
         showBanner('', 'Connecting to ESP32 at ' + deviceIp + '...');
         el('lcal-connect-btn').disabled = true;
 
@@ -907,7 +927,9 @@ is optional verification.
         };
 
         ws.onerror = function() {
-            showBanner('error', 'Could not connect to ESP32. Is it online and on the same network?');
+            showBanner('error',
+                'Could not connect to ESP32. Is it online and on the same network? ' +
+                'The ESP32 only supports plain ws:// — make sure you are on the same LAN.');
             el('lcal-connect-btn').disabled = false;
         };
     }
