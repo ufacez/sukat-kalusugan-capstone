@@ -234,6 +234,33 @@ mysqli_stmt_close(
 );
 
 // =====================================================
+// TEMP-DIAG CLAIM TRACE (remove once the unclaimed-session
+// investigation closes): if a START_REQUESTED session sits
+// unclaimed while the device keeps polling, log it. Read-only,
+// fires at most once per poll, only for sessions older than 20s
+// (normal claim latency right after Start stays quiet).
+// =====================================================
+
+if (
+    is_array($sessionRow) &&
+    (string)($sessionRow['status'] ?? '') === 'START_REQUESTED'
+) {
+    $traceCreatedAt = strtotime((string)(
+        $sessionRow['started_at'] ?? $sessionRow['created_at'] ?? 'now'
+    ));
+    $traceAge = time() - ($traceCreatedAt ?: time());
+
+    if ($traceAge > 20) {
+        error_log(sprintf(
+            '[SukatKalusugan][claim-trace] device=%s session=%d still START_REQUESTED after %ds (poll arrived, claim branch next)',
+            $deviceCode,
+            (int)($sessionRow['session_id'] ?? 0),
+            $traceAge
+        ));
+    }
+}
+
+// =====================================================
 // EXPIRE SESSION
 // =====================================================
 
@@ -379,6 +406,19 @@ if (
         mysqli_stmt_execute(
             $claimStmt
         );
+
+        // TEMP-DIAG CLAIM TRACE (remove with the block above):
+        // records whether the promote actually persisted.
+        $claimAffected = mysqli_stmt_affected_rows($claimStmt);
+        $claimError = mysqli_stmt_error($claimStmt);
+
+        error_log(sprintf(
+            '[SukatKalusugan][claim-trace] device=%s claim session=%d affected_rows=%d error=%s',
+            $deviceCode,
+            $sessionId,
+            $claimAffected,
+            $claimError !== '' ? $claimError : 'none'
+        ));
 
         mysqli_stmt_close(
             $claimStmt

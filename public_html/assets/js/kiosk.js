@@ -2307,6 +2307,19 @@
         payloadSessionId !==
           expectedSessionId
       ) {
+        // A COMPLETE snapshot for a foreign session is a corpse by
+        // definition: final results only land in the mirror after a
+        // successful submit, so it can never become relevant to this
+        // session. Drop it silently instead of burning a recovery
+        // window on it every 200ms.
+        if (
+          normalizeStatus(
+            payload.status
+          ) === "COMPLETE"
+        ) {
+          return null;
+        }
+
         // Persistent divergence recovers via auto-adopt (same child)
         // or a conflict overlay — never a silent freeze.
         noteSessionMismatch(
