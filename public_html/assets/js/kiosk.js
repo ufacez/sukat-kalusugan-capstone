@@ -26,9 +26,23 @@
   // WEBSOCKET (direct ESP32 connection, same LAN)
   // ============================================================
 
+  // Browsers block plain ws:// from HTTPS pages (mixed content)
+  // and the ESP32 doesn't support wss://, so disable WebSocket
+  // when the kiosk is served over HTTPS — Firebase polling takes
+  // over as the data path.
+  const wsBlockedByHttps =
+    window.location.protocol === "https:";
+
+  if (wsBlockedByHttps && data?.websocket?.enabled) {
+    console.log(
+      "[SukatKalusugan] WebSocket disabled — page served over HTTPS; using Firebase polling"
+    );
+  }
+
   const wsEnabled =
     Boolean(data?.websocket?.enabled) &&
-    Boolean(data?.websocket?.esp32_ip);
+    Boolean(data?.websocket?.esp32_ip) &&
+    !wsBlockedByHttps;
 
   const wsEsp32Ip =
     data?.websocket?.esp32_ip || "";
