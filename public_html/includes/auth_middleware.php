@@ -69,14 +69,21 @@ function app_absolute_url(string $path = ''): string
         return $configured . $relative;
     }
 
-    $proto = (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '');
-    if ($proto !== '') {
-        $proto = strtolower(trim(explode(',', $proto)[0]));
-    }
-    if ($proto !== 'http' && $proto !== 'https') {
-        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
-        $proto = $isHttps ? 'https' : 'http';
+    // Proxy-aware: is_https_request() (force_https.php, loaded via config.php)
+    // honors X-Forwarded-Proto / X-ARR-SSL for Azure. Fall back to the legacy
+    // inline check only if that helper is somehow unavailable.
+    if (function_exists('is_https_request')) {
+        $proto = is_https_request() ? 'https' : 'http';
+    } else {
+        $proto = (string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '');
+        if ($proto !== '') {
+            $proto = strtolower(trim(explode(',', $proto)[0]));
+        }
+        if ($proto !== 'http' && $proto !== 'https') {
+            $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+                || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
+            $proto = $isHttps ? 'https' : 'http';
+        }
     }
 
     $host = (string)($_SERVER['HTTP_HOST'] ?? 'localhost');
@@ -90,8 +97,16 @@ function start_secure_session(?int $lifetimeSeconds = null): void
         return;
     }
 
-    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
+    // Proxy-aware so the "Secure" cookie flag is set correctly when Azure
+    // terminates TLS at the LB/proxy (where $_SERVER['HTTPS'] is empty but
+    // X-Forwarded-Proto: https is present). Without this, browsers may send
+    // the session cookie over HTTP or drop it on HTTPS.
+    if (function_exists('is_https_request')) {
+        $isHttps = is_https_request();
+    } else {
+        $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+            || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
+    }
 
     // Default 12-hour lifetime covers a full clinic day. Callers can pass
     // a custom value (e.g. 30 days for "remember me") before session_start.

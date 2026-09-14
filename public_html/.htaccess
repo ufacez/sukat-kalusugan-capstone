@@ -1,9 +1,32 @@
-# Sukat Kalusugan - LOCAL XAMPP DEVELOPMENT
+# Sukat Kalusugan - webroot (.htaccess)
+# Primary http->https enforcement lives in PHP (includes/force_https.php) so
+# it respects APP_ENV/FORCE_HTTPS and the ESP32 plain-HTTP exception. The
+# Apache block below is defense-in-depth for the live Azure VM only.
 
 RewriteEngine On
 
-# Do NOT force HTTPS during local development.
-# The ESP32 connects using plain HTTP.
+# Do NOT force HTTPS here during local development.
+# The ESP32 connects using plain HTTP, and local XAMPP has no TLS cert.
+# On the Azure VM, PHP already 301/308-redirects http->https when
+# APP_ENV=production (except /api/esp32/*). If you prefer Apache-level
+# redirects as well, uncomment the block below ON THE SERVER ONLY after
+# port 443 + fullchain.pem are verified working:
+# RewriteCond %{REQUEST_URI} !^/api/esp32/ [NC]
+# RewriteCond %{HTTP:X-Forwarded-Proto} !https [NC]
+# RewriteCond %{HTTPS} off
+# RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [R=301,L]
+
+# Security headers (PHP sends the same set; these are a fallback if PHP is
+# bypassed. HSTS sent over plain HTTP is ignored by browsers per RFC 6797,
+# so setting it unconditionally here is safe and keeps this file compatible
+# with older Apache versions without expr= support).
+<IfModule headers_module>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    # No "preload" yet: enable only after a full cycle with clean HTTPS everywhere.
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains"
+</IfModule>
 
 # Never list directory contents.
 Options -Indexes

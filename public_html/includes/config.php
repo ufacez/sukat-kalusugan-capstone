@@ -57,6 +57,13 @@ define('DB_PASS', env('DB_PASS', ''));
 // ── Application Environment ──────────────────────────────────────────────────
 define('APP_ENV', env('APP_ENV', 'development'));
 
+// ── HTTPS enforcement ────────────────────────────────────────────────────────
+// FORCE_HTTPS=1 forces http->https everywhere; FORCE_HTTPS=0 disables it.
+// Empty (default): auto — ON when APP_ENV=production, OFF otherwise so local
+// XAMPP keeps working over plain HTTP. /api/esp32/* is always exempt (the
+// ESP32 firmware only speaks plain HTTP).
+define('FORCE_HTTPS', env('FORCE_HTTPS', ''));
+
 // ── Canonical public base URL (used for links inside emails) ─────────────────
 // Set APP_URL=https://sukatkalusugan.app on live (Azure App Settings).
 // Email links must never depend on the request host: a reset requested
@@ -91,3 +98,15 @@ define('CHATBOT_API_URL', env('CHATBOT_API_URL', ''));
 define('NUTRITIONIST_AI_PROVIDER', env('NUTRITIONIST_AI_PROVIDER', ''));
 define('NUTRITIONIST_AI_KEY', env('NUTRITIONIST_AI_KEY', ''));
 define('NUTRITIONIST_AI_MODEL', env('NUTRITIONIST_AI_MODEL', ''));
+
+// ── Error display control (dev vs production) ────────────────────────────────
+// bootstrap_errors.php was previously orphaned (never required); wire it here
+// so APP_ENV=production hides raw errors on the live Azure VM.
+require_once __DIR__ . '/bootstrap_errors.php';
+
+// ── HTTPS enforcement + security headers ─────────────────────────────────────
+// Proxy-aware (honors X-Forwarded-Proto / X-ARR-SSL for Azure). Runs before
+// any output; no-op on CLI, on HTTPS, when disabled, or for /api/esp32/*.
+require_once __DIR__ . '/force_https.php';
+maybe_enforce_https();
+send_security_headers();
