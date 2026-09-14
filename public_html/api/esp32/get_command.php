@@ -87,59 +87,6 @@ push_device_status($deviceCode, true, [
 
 /*
 |--------------------------------------------------------------------------
-| LIVE SENSOR MIRROR (HTTPS kiosk path)
-|--------------------------------------------------------------------------
-|
-| While MEASURING, the firmware piggybacks its current sensor snapshot on
-| this same heartbeat GET (?live_session_id=&live_height=&live_weight=…
-| &live_weight_stable=&live_height_stable=&final_ready=&final_sequence=
-| &final_weight_kg=&final_height_cm=). Mirror it to /live_readings so
-| HTTPS kiosk browsers — which cannot open the ESP32's plain-ws://
-| socket (Mixed Content) — still get live ticks + final_ready.
-|
-| Firebase-only, validated ranges, silent on garbage: a malformed tick
-| is simply not mirrored. MySQL stays the source of truth; the final
-| authoritative result still arrives via submit_measurement.php.
-|
-*/
-
-$liveSessionId = api_int($_GET['live_session_id'] ?? null, 0);
-
-if ($liveSessionId > 0) {
-    $liveHeight = api_float($_GET['live_height'] ?? null, null);
-    $liveWeight = api_float($_GET['live_weight'] ?? null, null);
-
-    $heightOk = $liveHeight !== null && $liveHeight >= 20 && $liveHeight <= 250;
-    $weightOk = $liveWeight !== null && $liveWeight >= 0 && $liveWeight <= 300;
-
-    if ($heightOk || $weightOk) {
-        $liveFinalReady = api_bool($_GET['final_ready'] ?? false);
-        $liveFinalSeq = api_int($_GET['final_sequence'] ?? null, 0);
-        $liveFinalWeight = api_float($_GET['final_weight_kg'] ?? null, null);
-        $liveFinalHeight = api_float($_GET['final_height_cm'] ?? null, null);
-
-        $finalOk = $liveFinalReady
-            && $liveFinalSeq > 0
-            && $liveFinalWeight !== null && $liveFinalWeight > 0 && $liveFinalWeight <= 300
-            && $liveFinalHeight !== null && $liveFinalHeight >= 20 && $liveFinalHeight <= 250;
-
-        push_live_reading($deviceCode, [
-            'session_id' => $liveSessionId,
-            'status' => 'MEASURING',
-            'height_cm' => $heightOk ? round($liveHeight, 1) : null,
-            'weight_kg' => $weightOk ? round($liveWeight, 2) : null,
-            'weight_stable' => api_bool($_GET['live_weight_stable'] ?? false),
-            'height_stable' => api_bool($_GET['live_height_stable'] ?? false),
-            'final_ready' => $finalOk,
-            'final_sequence' => $finalOk ? $liveFinalSeq : 0,
-            'final_weight_kg' => $finalOk ? round($liveFinalWeight, 2) : null,
-            'final_height_cm' => $finalOk ? round($liveFinalHeight, 1) : null,
-        ]);
-    }
-}
-
-/*
-|--------------------------------------------------------------------------
 | LIVE SENSOR CALIBRATION
 |--------------------------------------------------------------------------
 |
@@ -232,33 +179,6 @@ $sessionRow =
 mysqli_stmt_close(
     $sessionStmt
 );
-
-// =====================================================
-// TEMP-DIAG CLAIM TRACE (remove once the unclaimed-session
-// investigation closes): if a START_REQUESTED session sits
-// unclaimed while the device keeps polling, log it. Read-only,
-// fires at most once per poll, only for sessions older than 20s
-// (normal claim latency right after Start stays quiet).
-// =====================================================
-
-if (
-    is_array($sessionRow) &&
-    (string)($sessionRow['status'] ?? '') === 'START_REQUESTED'
-) {
-    $traceCreatedAt = strtotime((string)(
-        $sessionRow['started_at'] ?? $sessionRow['created_at'] ?? 'now'
-    ));
-    $traceAge = time() - ($traceCreatedAt ?: time());
-
-    if ($traceAge > 20) {
-        error_log(sprintf(
-            '[SukatKalusugan][claim-trace] device=%s session=%d still START_REQUESTED after %ds (poll arrived, claim branch next)',
-            $deviceCode,
-            (int)($sessionRow['session_id'] ?? 0),
-            $traceAge
-        ));
-    }
-}
 
 // =====================================================
 // EXPIRE SESSION
@@ -406,19 +326,6 @@ if (
         mysqli_stmt_execute(
             $claimStmt
         );
-
-        // TEMP-DIAG CLAIM TRACE (remove with the block above):
-        // records whether the promote actually persisted.
-        $claimAffected = mysqli_stmt_affected_rows($claimStmt);
-        $claimError = mysqli_stmt_error($claimStmt);
-
-        error_log(sprintf(
-            '[SukatKalusugan][claim-trace] device=%s claim session=%d affected_rows=%d error=%s',
-            $deviceCode,
-            $sessionId,
-            $claimAffected,
-            $claimError !== '' ? $claimError : 'none'
-        ));
 
         mysqli_stmt_close(
             $claimStmt

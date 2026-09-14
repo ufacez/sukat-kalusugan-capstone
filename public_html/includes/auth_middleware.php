@@ -90,14 +90,8 @@ function start_secure_session(?int $lifetimeSeconds = null): void
         return;
     }
 
-    // Proxy-aware: on Azure the TLS connection terminates at the front-end
-    // proxy, so $_SERVER['HTTPS'] alone always looks like plain HTTP.
-    // request_is_https() (request_security.php, loaded via config.php/db.php)
-    // honors X-Forwarded-Proto first — same approach as app_absolute_url().
-    $isHttps = function_exists('request_is_https')
-        ? request_is_https()
-        : ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-            || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443));
+    $isHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
+        || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
 
     // Default 12-hour lifetime covers a full clinic day. Callers can pass
     // a custom value (e.g. 30 days for "remember me") before session_start.

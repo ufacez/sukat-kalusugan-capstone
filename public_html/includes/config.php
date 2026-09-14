@@ -57,12 +57,6 @@ define('DB_PASS', env('DB_PASS', ''));
 // ── Application Environment ──────────────────────────────────────────────────
 define('APP_ENV', env('APP_ENV', 'development'));
 
-// ── HTTPS enforcement ────────────────────────────────────────────────────────
-// FORCE_HTTPS=1 forces http→https redirects (except /api/esp32/* which the
-// ESP32 needs over plain HTTP). Defaults ON when APP_ENV=production, OFF
-// otherwise, so local XAMPP is unaffected. FORCE_HTTPS=0 disables always.
-define('FORCE_HTTPS', env('FORCE_HTTPS', ''));
-
 // ── Canonical public base URL (used for links inside emails) ─────────────────
 // Set APP_URL=https://sukatkalusugan.app on live (Azure App Settings).
 // Email links must never depend on the request host: a reset requested
@@ -97,8 +91,3 @@ define('CHATBOT_API_URL', env('CHATBOT_API_URL', ''));
 define('NUTRITIONIST_AI_PROVIDER', env('NUTRITIONIST_AI_PROVIDER', ''));
 define('NUTRITIONIST_AI_KEY', env('NUTRITIONIST_AI_KEY', ''));
 define('NUTRITIONIST_AI_MODEL', env('NUTRITIONIST_AI_MODEL', ''));
-
-// ── Request security: http→https redirects (ESP32 endpoints exempt) + HSTS ──
-// Must run before any output. Included here (rather than in db.php) so every
-// entry point — pages and JSON APIs alike — is covered via config.php.
-require_once __DIR__ . '/request_security.php';

@@ -33,7 +33,3 @@ public_html/test/*
 
 # Private Excel/reference files
 public_html/data/*
-
-# Firmware source flashes straight from Arduino IDE, not via deploy —
-# keep local-only so test tunes never ride along with app deploys.
-docs/firmware/*.ino

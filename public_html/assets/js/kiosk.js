@@ -23,23 +23,10 @@
     firebaseBaseUrl !== "";
 
   // ============================================================
-  // WEBSOCKET (direct ESP32 connection, same LAN, HTTP-only)
+  // WEBSOCKET (direct ESP32 connection, same LAN)
   // ============================================================
-  //
-  // The ESP32 serves plain ws:// on its LAN IP (no TLS cert possible).
-  // Browsers block ws:// as Mixed Content on https:// pages, so the
-  // socket is only attempted over http:// (local XAMPP / clinic LAN).
-  // On live HTTPS the kiosk uses Firebase + measurement_status.php
-  // polling instead — same data, slightly slower.
-
-  const pageIsHttps =
-    typeof window !== "undefined" &&
-    window.location &&
-    window.location.protocol ===
-      "https:";
 
   const wsEnabled =
-    !pageIsHttps &&
     Boolean(data?.websocket?.enabled) &&
     Boolean(data?.websocket?.esp32_ip);
 
@@ -63,13 +50,6 @@
   );
 
   const pollIntervalMs = pollSeconds * 1000;
-
-  // Consecutive foreign-session ticks (Firebase poll + live stream
-  // combined) before the kiosk attempts recovery instead of ignoring
-  // them forever. 5 ≈ 1s on the 200ms status poll — fast enough to
-  // rescue an impatient double-Start, slow enough to ride out a
-  // single stale tick during session handover.
-  const SESSION_MISMATCH_THRESHOLD = 5;
 
   const syncSeconds = Math.max(
     2,
@@ -663,21 +643,11 @@
 
     firebaseSessionId: null,
 
-    sessionMismatchCount: 0,
-
-    adoptingSession: false,
-
-    lastRecoveryAt: 0,
-
     lastFirebaseTimestamp: "",
 
     lastFirebaseSignature: "",
 
     firebaseTimer: null,
-
-    liveStream: null,
-
-    liveStreamFailed: false,
 
     statusTimer: null,
 
@@ -2307,31 +2277,18 @@
         payloadSessionId !==
           expectedSessionId
       ) {
-        // A COMPLETE snapshot for a foreign session is a corpse by
-        // definition: final results only land in the mirror after a
-        // successful submit, so it can never become relevant to this
-        // session. Drop it silently instead of burning a recovery
-        // window on it every 200ms.
-        if (
-          normalizeStatus(
-            payload.status
-          ) === "COMPLETE"
-        ) {
-          return null;
-        }
-
-        // Persistent divergence recovers via auto-adopt (same child)
-        // or a conflict overlay — never a silent freeze.
-        noteSessionMismatch(
-          payloadSessionId,
-          expectedSessionId,
-          "poll"
+        console.warn(
+          "[SukatKalusugan] Ignoring Firebase session mismatch",
+          {
+            expected:
+              expectedSessionId,
+            received:
+              payloadSessionId
+          }
         );
 
         return null;
       }
-
-      resetSessionMismatch();
 
       /*
        * If Firebase has a session ID of 0/missing,
@@ -2435,7 +2392,7 @@
   }
 
   function startFirebasePolling() {
-    // Try WebSocket first for local fast updates (no-op on HTTPS).
+    // Always try WebSocket first for local fast updates
     connectWebSocket();
 
     if (!firebaseEnabled) {
@@ -2460,11 +2417,6 @@
 
     stopFirebasePolling();
 
-    // Live HTTPS stream (true push, no per-poll round-trip). The
-    // interval poll below stays as the fallback for browsers without
-    // EventSource and for when the stream drops.
-    startLiveStream();
-
     state.firebaseTimer =
       setInterval(
         () => {
@@ -2485,484 +2437,21 @@
       state.firebaseTimer =
         null;
     }
-
-    stopLiveStream();
   }
 
   // ============================================================
-  // LIVE STREAM — /live_readings over HTTPS (EventSource)
+  // WEBSOCKET — DIRECT ESP32 CONNECTION
   // ============================================================
   //
-  // Firebase Realtime Database supports REST streaming: a GET on the
-  // .json URL with `Accept: text/event-stream` (which EventSource
-  // sends by default) becomes a long-lived push channel. The PHP
-  // backend mirrors each ESP32 heartbeat snapshot to
-  // /live_readings/{device} with the same sensor_data shape the
-  // ESP32's direct socket used, so messages feed the same
-  // handleWsPayload() state machine — including final_ready,
-  // which is what enables the PROCESS button.
-  //
-  // No auth token is attached on purpose: the kiosk tablet is a
-  // shared unauthenticated device, and these nodes are
-  // read-scoped-public in the Firebase rules. Writes stay
-  // server-side-only (PHP secret / service account).
-  //
-
-  function firebaseLiveReadingUrl() {
-    if (!firebaseEnabled) {
-      return "";
-    }
-
-    return (
-      firebaseBaseUrl.replace(
-        /\/$/,
-        ""
-      ) +
-      "/live_readings/" +
-      encodeURIComponent(deviceId) +
-      ".json"
-    );
-  }
-
-  function startLiveStream() {
-    stopLiveStream();
-
-    if (
-      !firebaseEnabled ||
-      typeof EventSource ===
-        "undefined"
-    ) {
-      return;
-    }
-
-    const url =
-      firebaseLiveReadingUrl();
-
-    if (!url) {
-      return;
-    }
-
-    let stream = null;
-
-    try {
-      stream =
-        new EventSource(url);
-    } catch (err) {
-      console.warn(
-        "[SukatKalusugan] Live stream unavailable, using polling",
-        err
-      );
-
-      state.liveStreamFailed =
-        true;
-
-      return;
-    }
-
-    state.liveStream = stream;
-    state.liveStreamFailed =
-      false;
-
-    console.log(
-      "[SukatKalusugan] Live stream connecting to",
-      url
-    );
-
-    stream.onopen =
-      function () {
-        console.log(
-          "[SukatKalusugan] Live stream connected"
-        );
-      };
-
-    stream.onmessage =
-      function (event) {
-        let parsed = null;
-
-        try {
-          parsed = JSON.parse(
-            event.data
-          );
-        } catch (e) {
-          return;
-        }
-
-        // Firebase wraps stream frames as
-        // {path, data}: initial snapshot arrives as
-        // {path:"/", data:{...}}, then per-key patches.
-        // Our node is one flat object, so a full snapshot
-        // is all we need; ignore patch frames and tombstones.
-        let payload = parsed;
-
-        if (
-          parsed &&
-          typeof parsed ===
-            "object" &&
-          typeof parsed.path ===
-            "string" &&
-          "data" in parsed
-        ) {
-          if (parsed.path !== "/") {
-            return;
-          }
-
-          payload = parsed.data;
-        }
-
-        if (
-          !payload ||
-          typeof payload !==
-            "object"
-        ) {
-          return;
-        }
-
-        // Session gate (same rule as the interval Firebase
-        // poll): /live_readings persists the last snapshot,
-        // so a fresh page load replays the previous session's
-        // tick. Never let a stale session light up this
-        // session's readouts or PROCESS button. The backend
-        // (request_process.php, exact id + MEASURING check)
-        // is the final backstop either way.
-        const streamPayloadSessionId =
-          Number(
-            payload.session_id ||
-              payload.sessionId ||
-              0
-          );
-
-        const streamExpectedSessionId =
-          Number(
-            state.firebaseSessionId ||
-              getCurrentSessionId() ||
-              0
-          );
-
-        if (
-          streamExpectedSessionId > 0 &&
-          streamPayloadSessionId > 0 &&
-          streamPayloadSessionId !==
-            streamExpectedSessionId
-        ) {
-          noteSessionMismatch(
-            streamPayloadSessionId,
-            streamExpectedSessionId,
-            "stream"
-          );
-
-          return;
-        }
-
-        resetSessionMismatch();
-
-        handleWsPayload(payload);
-      };
-
-    stream.onerror =
-      function () {
-        console.warn(
-          "[SukatKalusugan] Live stream error, falling back to polling"
-        );
-
-        state.liveStreamFailed =
-          true;
-
-        stopLiveStream();
-      };
-  }
-
-  function stopLiveStream() {
-    if (state.liveStream) {
-      try {
-        state.liveStream.close();
-      } catch (_) {}
-
-      state.liveStream = null;
-    }
-  }
-
-  // ============================================================
-  // SESSION MISMATCH RECOVERY
-  // ============================================================
-  //
-  // The kiosk drops live ticks carrying a foreign session_id (stale
-  // device session after a double-Start or reload mid-flow). Dropping
-  // is correct — but doing it forever freezes the kiosk with no
-  // recourse. After SESSION_MISMATCH_THRESHOLD consecutive drops we
-  // revalidate the device's session through MySQL and:
-  //   same child  → adopt it (measurement continues seamlessly);
-  //   other child → conflict overlay with a way back home.
-  // The backend stays the final backstop: request_process.php and
-  // submit_measurement.php both require the exact session row to be
-  // MEASURING, so a wrongly-adopted session can never submit.
-  //
-
-  function noteSessionMismatch(
-    payloadSessionId,
-    expectedSessionId,
-    source
-  ) {
-    state.sessionMismatchCount += 1;
-
-    if (
-      state.sessionMismatchCount <
-      SESSION_MISMATCH_THRESHOLD
-    ) {
-      if (
-        state.sessionMismatchCount ===
-        1
-      ) {
-        console.warn(
-          "[SukatKalusugan] Ignoring Firebase session mismatch",
-          {
-            expected:
-              expectedSessionId,
-            received:
-              payloadSessionId,
-            source: source || "poll"
-          }
-        );
-      }
-
-      return false;
-    }
-
-    if (
-      state.sessionMismatchCount ===
-      SESSION_MISMATCH_THRESHOLD
-    ) {
-      // Cooldown: a terminal/gone device session re-triggers this
-      // window every ~1s (the stale mirror snapshot never changes).
-      // Retry recovery at most every 30s so the feed and log don't
-      // spam while still self-healing if conditions change.
-      if (
-        Date.now() -
-          state.lastRecoveryAt <
-        30000
-      ) {
-        resetSessionMismatch();
-
-        return false;
-      }
-
-      state.lastRecoveryAt =
-        Date.now();
-
-      console.warn(
-        "[SukatKalusugan] Session mismatch persistent, attempting recovery",
-        {
-          expected:
-            expectedSessionId,
-          received:
-            payloadSessionId,
-          source: source || "poll"
-        }
-      );
-
-      recoverFromSessionMismatch(
-        payloadSessionId
-      );
-    }
-
-    return false;
-  }
-
-  function resetSessionMismatch() {
-    state.sessionMismatchCount = 0;
-  }
-
-  async function recoverFromSessionMismatch(
-    deviceSessionId
-  ) {
-    if (
-      state.adoptingSession ||
-      !deviceSessionId ||
-      deviceSessionId <= 0
-    ) {
-      return;
-    }
-
-    state.adoptingSession = true;
-
-    try {
-      // Revalidate through MySQL — never trust the mirror alone.
-      const endpoint =
-        data?.endpoints
-          ?.measurementStatus ||
-        "../api/kiosk/measurement_status.php";
-
-      const url = new URL(
-        endpoint,
-        window.location.href
-      );
-
-      url.searchParams.set(
-        "device_id",
-        deviceId
-      );
-
-      url.searchParams.set(
-        "session_id",
-        String(deviceSessionId)
-      );
-
-      const response =
-        await fetch(
-          url.toString(),
-          {
-            method: "GET",
-            headers: {
-              Accept:
-                "application/json"
-            },
-            cache: "no-store"
-          }
-        );
-
-      const json =
-        await response
-          .json()
-          .catch(() => ({}));
-
-      const remote =
-        response.ok &&
-        json?.success === true
-          ? json.data || null
-          : null;
-
-      const remoteStatus =
-        remote
-          ? normalizeStatus(
-              remote.status
-            )
-          : "";
-
-      // Device session already terminal (or gone): its ticks will
-      // stop on their own. Clear the counter so the next divergence
-      // gets a fresh recovery window instead of silence.
-      if (
-        !remote ||
-        (remoteStatus !==
-          "MEASURING" &&
-          remoteStatus !==
-            "START_REQUESTED")
-      ) {
-        pushFeed(
-          "Session expired",
-          "Huminto ang sukat sa device. Magsimula muli.",
-          "warn"
-        );
-
-        resetSessionMismatch();
-
-        return;
-      }
-
-      const remoteChildId = Number(
-        remote.child_id || 0
-      );
-
-      const selectedChild =
-        getSelectedChild();
-
-      const selectedChildId =
-        selectedChild
-          ? Number(
-              selectedChild.id || 0
-            )
-          : 0;
-
-      // Same child → adopt the device session and continue.
-      if (
-        selectedChildId > 0 &&
-        remoteChildId > 0 &&
-        selectedChildId ===
-          remoteChildId
-      ) {
-        state.session = remote;
-        state.firebaseSessionId =
-          deviceSessionId;
-
-        // Drop every trace of the superseded session so its locks,
-        // finals, and signature can't leak into the adopted one.
-        // Fresh live ticks relock from here.
-        state.weightLocked = false;
-        state.heightLocked = false;
-        state.lastWeightRaw = null;
-        state.lastHeightRaw = null;
-        state.weightStableCount = 0;
-        state.heightStableCount = 0;
-        state.finalReady = false;
-        state.finalSequence = 0;
-        state.finalWeight = null;
-        state.finalHeight = null;
-        state.measurementReady = false;
-        state.weight = null;
-        state.height = null;
-        state.lastFirebaseSignature = "";
-
-        hideProcessingError();
-        updateSessionInfo(remote);
-        saveSessionToStorage();
-        updateProcessButton();
-        resetSessionMismatch();
-
-        pushFeed(
-          "Session synced",
-          "Tumutuloy sa sukat ng device (session #" +
-            deviceSessionId +
-            ")."
-        );
-
-        return;
-      }
-
-      // Different child (or unknown) → refuse to adopt. Surface the
-      // conflict with a way back; the overlay's button resets home.
-      showProcessingError(
-        "Ang device ay sumusukat sa ibang bata (session #" +
-          deviceSessionId +
-          "). Bumalik sa Home at magsimula muli."
-      );
-
-      pushFeed(
-        "Session conflict",
-        "Device session #" +
-          deviceSessionId +
-          " does not match this kiosk session.",
-        "error"
-      );
-    } catch (error) {
-      console.warn(
-        "[SukatKalusugan] Session recovery failed",
-        error
-      );
-
-      // Retry on the next window instead of going silent forever.
-      resetSessionMismatch();
-    } finally {
-      state.adoptingSession = false;
-    }
-  }
-
-  // ============================================================
-  // WEBSOCKET — DIRECT ESP32 CONNECTION (HTTP-only, same LAN)
-  // ============================================================
-  //
-  // When the kiosk browser is on the same LAN as the ESP32 over plain
-  // HTTP, a WebSocket connection gives us ~50ms push updates instead of
-  // the 200ms+ round-trip of Firebase HTTP polling. On https:// pages
-  // the socket is never attempted (Mixed Content) and Firebase polling
+  // When the kiosk browser is on the same LAN as the ESP32, a
+  // WebSocket connection gives us ~50ms push updates instead of
+  // the 200ms+ round-trip of Firebase HTTP polling. Firebase
   // stays active for remote dashboards; WebSocket is purely a
   // local fast-path.
   //
 
   function wsUrl() {
-    if (
-      pageIsHttps ||
-      !wsEnabled ||
-      !wsEsp32Ip
-    ) {
+    if (!wsEnabled || !wsEsp32Ip) {
       return "";
     }
 
@@ -2976,7 +2465,7 @@
   }
 
   function connectWebSocket() {
-    if (!wsEnabled || pageIsHttps) {
+    if (!wsEnabled) {
       return;
     }
 
@@ -3961,10 +3450,6 @@
 
       state.firebaseSessionId =
         newSessionId;
-
-      resetSessionMismatch();
-
-      state.lastRecoveryAt = 0;
 
       state.awaitingLiveResult =
         true;
@@ -5632,8 +5117,6 @@ function finishResults(
 
     state.firebaseSessionId =
       null;
-
-    resetSessionMismatch();
 
     state.lastFirebaseTimestamp =
       "";

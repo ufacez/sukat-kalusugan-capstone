@@ -96,14 +96,6 @@ $devicePayload = array_map(
 
 $firebaseUrl = trim((string) firebase_database_url());
 
-$requestIsHttps = false;
-if (function_exists('request_is_https')) {
-    $requestIsHttps = request_is_https();
-} else {
-    $requestIsHttps = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')
-        || ((int)($_SERVER['SERVER_PORT'] ?? 0) === 443);
-}
-
 $esp32LocalIp = null;
 $conn = get_db_connection();
 $ipStmt = mysqli_prepare($conn, 'SELECT local_ip FROM devices WHERE device_code = ? LIMIT 1');
@@ -129,11 +121,7 @@ $appData = [
     'demoMode' => false,
     'company' => 'Sukat Kalusugan',
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
-    // Direct ws:// to the ESP32's LAN IP is HTTP-only: browsers block
-    // ws:// as Mixed Content on https:// pages, and a LAN IP can never
-    // present a public TLS cert. On live HTTPS the kiosk falls back to
-    // Firebase + measurement_status.php polling (see kiosk.js).
-    'websocket' => ['enabled' => $esp32LocalIp !== null && !$requestIsHttps, 'esp32_ip' => $esp32LocalIp],
+    'websocket' => ['enabled' => true, 'esp32_ip' => $esp32LocalIp],
     'barangay' => $kioskBarangay,
     'endpoints' => [
         'ping' => '../api/kiosk/device_status.php',
