@@ -558,6 +558,14 @@ is optional verification.
 
     // ── Connection ────────────────────────────────────────────────
     function connectWs() {
+        // Direct ws:// to the ESP32 LAN IP is blocked as Mixed Content on
+        // https:// pages (and a LAN IP can never present a public cert).
+        // Calibrate over local HTTP, or enter the factor manually below.
+        if (window.location && window.location.protocol === 'https:') {
+            showBanner('error', 'Direct ESP32 connection needs local HTTP access — browsers block ws:// on HTTPS pages. Open this page over the clinic LAN via HTTP, or enter the calibration factor manually in the form above.');
+            el('cal-connect-btn').disabled = false;
+            return;
+        }
         if (!deviceIp) {
             showBanner('error', 'No local IP for this device. Is the ESP32 online?');
             return;
@@ -867,6 +875,14 @@ is optional verification.
 
     // ── Connection ────────────────────────────────────────────────
     function connectWs() {
+        // Same HTTPS guard as the scale wizard above: ws:// is Mixed
+        // Content on https:// pages. Use local HTTP or enter the
+        // mounting distance manually below.
+        if (window.location && window.location.protocol === 'https:') {
+            showBanner('error', 'Direct ESP32 connection needs local HTTP access — browsers block ws:// on HTTPS pages. Open this page over the clinic LAN via HTTP, or enter the mounting distance manually in the form above.');
+            el('lcal-connect-btn').disabled = false;
+            return;
+        }
         if (!deviceIp) {
             showBanner('error', 'No local IP for this device. Is the ESP32 online?');
             return;

@@ -23,10 +23,23 @@
     firebaseBaseUrl !== "";
 
   // ============================================================
-  // WEBSOCKET (direct ESP32 connection, same LAN)
+  // WEBSOCKET (direct ESP32 connection, same LAN, HTTP-only)
   // ============================================================
+  //
+  // The ESP32 serves plain ws:// on its LAN IP (no TLS cert possible).
+  // Browsers block ws:// as Mixed Content on https:// pages, so the
+  // socket is only attempted over http:// (local XAMPP / clinic LAN).
+  // On live HTTPS the kiosk uses Firebase + measurement_status.php
+  // polling instead — same data, slightly slower.
+
+  const pageIsHttps =
+    typeof window !== "undefined" &&
+    window.location &&
+    window.location.protocol ===
+      "https:";
 
   const wsEnabled =
+    !pageIsHttps &&
     Boolean(data?.websocket?.enabled) &&
     Boolean(data?.websocket?.esp32_ip);
 
@@ -2392,7 +2405,7 @@
   }
 
   function startFirebasePolling() {
-    // Always try WebSocket first for local fast updates
+    // Try WebSocket first for local fast updates (no-op on HTTPS).
     connectWebSocket();
 
     if (!firebaseEnabled) {
@@ -2440,18 +2453,23 @@
   }
 
   // ============================================================
-  // WEBSOCKET — DIRECT ESP32 CONNECTION
+  // WEBSOCKET — DIRECT ESP32 CONNECTION (HTTP-only, same LAN)
   // ============================================================
   //
-  // When the kiosk browser is on the same LAN as the ESP32, a
-  // WebSocket connection gives us ~50ms push updates instead of
-  // the 200ms+ round-trip of Firebase HTTP polling. Firebase
+  // When the kiosk browser is on the same LAN as the ESP32 over plain
+  // HTTP, a WebSocket connection gives us ~50ms push updates instead of
+  // the 200ms+ round-trip of Firebase HTTP polling. On https:// pages
+  // the socket is never attempted (Mixed Content) and Firebase polling
   // stays active for remote dashboards; WebSocket is purely a
   // local fast-path.
   //
 
   function wsUrl() {
-    if (!wsEnabled || !wsEsp32Ip) {
+    if (
+      pageIsHttps ||
+      !wsEnabled ||
+      !wsEsp32Ip
+    ) {
       return "";
     }
 
@@ -2465,7 +2483,7 @@
   }
 
   function connectWebSocket() {
-    if (!wsEnabled) {
+    if (!wsEnabled || pageIsHttps) {
       return;
     }
 
