@@ -2272,8 +2272,23 @@
         );
 
       /*
-       * If Firebase contains a session ID,
-       * it MUST match our SQL session.
+       * SESSION MISMATCH HANDLING
+       *
+       * After a new session starts, the ESP32 still has the OLD session_id
+       * in Firebase until it polls get_command.php and learns about the new
+       * session. During that transition window, payloadSessionId <
+       * expectedSessionId. We must NOT silently drop those payloads or the
+       * live readout stays stuck at "--.-" indefinitely.
+       *
+       * Strategy:
+       *  - COMPLETE / ERROR / CANCELLED from the wrong session → block.
+       *    These are final states that belong to a different measurement and
+       *    must never drive our result screen.
+       *  - Live states (MEASURING, START_REQUESTED, etc.) from the wrong
+       *    session → pass sensor readings through, but zero out session_id
+       *    so applyFirebaseStatus does not attempt another session check.
+       *    The ESP32 will update Firebase with the correct session_id on its
+       *    next safeFirebaseUpdate() call, after which normal matching resumes.
        */
 
       if (
@@ -2282,17 +2297,43 @@
         payloadSessionId !==
           expectedSessionId
       ) {
+        const payloadStatus =
+          normalizeStatus(payload.status);
+
+        if (
+          payloadStatus === "COMPLETE" ||
+          payloadStatus === "ERROR" ||
+          payloadStatus === "CANCELLED"
+        ) {
+          console.warn(
+            "[SukatKalusugan] Blocking Firebase terminal status — session mismatch",
+            {
+              expected: expectedSessionId,
+              received: payloadSessionId,
+              status: payloadStatus
+            }
+          );
+
+          return null;
+        }
+
+        // Live reading from a stale session: pass sensor values through
+        // but clear the session_id so downstream code treats it as
+        // session-agnostic (firmware will correct this on next push).
         console.warn(
-          "[SukatKalusugan] Ignoring Firebase session mismatch",
+          "[SukatKalusugan] Firebase stale session_id — passing live readings only",
           {
-            expected:
-              expectedSessionId,
-            received:
-              payloadSessionId
+            expected: expectedSessionId,
+            received: payloadSessionId,
+            status: payloadStatus
           }
         );
 
-        return null;
+        payload = Object.assign(
+          {},
+          payload,
+          { session_id: 0, sessionId: 0 }
+        );
       }
 
       /*
