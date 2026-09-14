@@ -151,6 +151,27 @@ float hx711CalFactor = -20892.50f;
 
 HardwareSerial TF_Luna(2);
 
+// Distance-frame unit scale: Benewake TF-Luna reports millimeters
+// (0.1 cm per unit) while the older TFmini reports centimeters
+// (1.0 cm per unit). Both use the same 9-byte 0x59 0x59 frame, so this
+// single constant adapts the whole firmware to the fitted sensor.
+//   TF-Luna fitted: 0.1f | TFmini fitted: 1.0f
+// If a genuine TF-Luna is ever fitted on this kiosk, flip this back to
+// 0.1f and reflash — otherwise every height reads 10x too tall.
+const float LIDAR_CM_PER_UNIT = 1.0f; // TFmini fitted (cm output)
+
+// Minimum reliable signal amplitude of the fitted sensor, out of
+// the sensor's native bit depth (TFmini: 4095, TF-Luna: 1023).
+// Frames below this are noise or a weak/distant reflector and must
+// never become a height. Lower this only after field observation.
+//   TFmini: ~100 | TF-Luna: ~50
+const uint16_t LIDAR_MIN_SIGNAL = 100; // TFmini fitted
+
+// Minimum reliable ranging distance of the fitted sensor. Frames closer
+// than this are below spec and must never become heights.
+//   TF-Luna: 20.0f cm | TFmini: 30.0f cm
+const float LIDAR_MIN_RANGE_CM = 30.0f; // TFmini fitted
+
 // =====================================================
 // HEIGHT
 // =====================================================
@@ -547,6 +568,16 @@ void setupHX711() {
 // TF-LUNA
 // =====================================================
 
+// =====================================================
+// TF-LUNA / TFmini DISTANCE PARSER
+// =====================================================
+
+// Frame-rejection counters (file-scope so `h` can report them
+// for field diagnosis). Reset on reset.
+unsigned long lidarFramesAccepted = 0;
+unsigned long lidarFramesRejectedSignal = 0;
+unsigned long lidarFramesRejectedRange = 0;
+
 bool readTFLunaDistanceCm(
   float& distanceCm
 ) {
@@ -612,14 +643,29 @@ bool readTFLunaDistanceCm(
       continue;
     }
 
-    uint16_t distanceMm =
+    uint16_t distanceRaw =
       buffer[2] |
       ((uint16_t)buffer[3] << 8);
 
+    uint16_t signalRaw =
+      buffer[4] |
+      ((uint16_t)buffer[5] << 8);
+
+    if (signalRaw < LIDAR_MIN_SIGNAL) {
+      lidarFramesRejectedSignal++;
+      continue;
+    }
+
     distanceCm =
-      distanceMm / 10.0f;
+      distanceRaw * LIDAR_CM_PER_UNIT;
+
+    if (distanceCm < LIDAR_MIN_RANGE_CM) {
+      lidarFramesRejectedRange++;
+      continue;
+    }
 
     gotFrame = true;
+    lidarFramesAccepted++;
   }
 
   return gotFrame;
@@ -2493,6 +2539,7 @@ void setup() {
   Serial.println("  t = Tare (zero the scale)");
   Serial.println("  c = Calibrate with known weight");
   Serial.println("  r = Read current weight");
+  Serial.println("  h = Read current height (raw distance + mounting)");
   Serial.println("  p = Print current calibration factor");
   Serial.println("========================================"
   );
@@ -2657,6 +2704,46 @@ void loop() {
         Serial.print(w, 3);
         Serial.println(" kg");
       }
+
+    } else if (input == "h") {
+
+      // Average a few TF-Luna samples so the reading is stable,
+      // then show the full height math (same formula as
+      // getHeightReading): height = mounting - distance + offset.
+      float distSum = 0;
+      int distSamples = 0;
+
+      for (int i = 0; i < 20; i++) {
+        float d = 0;
+        if (readTFLunaDistanceCm(d)) {
+          distSum += d;
+          distSamples++;
+        }
+        delay(50);
+      }
+
+      if (distSamples < 5) {
+        Serial.println("TF-Luna not ready — no distance data.");
+        Serial.println("Check LiDAR wiring and try again.");
+      } else {
+        float avgDist = distSum / distSamples;
+        float h = mountingHeightCm - avgDist + HEIGHT_OFFSET_CM;
+        Serial.print("Raw distance: ");
+        Serial.print(avgDist, 1);
+        Serial.println(" cm");
+        Serial.print("Mounting height: ");
+        Serial.print(mountingHeightCm, 2);
+        Serial.println(" cm");
+        Serial.print("Current height: ");
+        Serial.print(h, 1);
+        Serial.println(" cm");
+      }
+      Serial.print("Frames: ok=");
+      Serial.print(lidarFramesAccepted);
+      Serial.print(" weak=");
+      Serial.print(lidarFramesRejectedSignal);
+      Serial.print(" near=");
+      Serial.println(lidarFramesRejectedRange);
 
     } else if (input == "p") {
 

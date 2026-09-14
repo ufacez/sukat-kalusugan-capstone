@@ -175,14 +175,16 @@ if ($ageMonths >= 60) {
     api_error('This child is ' . $ageMonths . ' months old and has aged out of the eOPT Plus monitoring program (maximum 59 months). Measurements can no longer be recorded.', 422);
 }
 
-$dupStmt = mysqli_prepare($conn, 'SELECT COUNT(*) FROM measurements WHERE child_id = ? AND measurement_date = ?');
+// Duplicate gate counts scheduled rows only: RECHECK verifications never
+// block a ROUTINE/OVERRIDE, and rechecks use measurements_recheck.php.
+$dupStmt = mysqli_prepare($conn, "SELECT COUNT(*) FROM measurements WHERE child_id = ? AND measurement_date = ? AND measurement_type IN ('ROUTINE','OVERRIDE')");
 mysqli_stmt_bind_param($dupStmt, 'is', $childId, $measurementDate);
 mysqli_stmt_execute($dupStmt);
 $dupResult = mysqli_stmt_get_result($dupStmt);
 $dupCount = $dupResult ? (int)mysqli_fetch_row($dupResult)[0] : 0;
 mysqli_stmt_close($dupStmt);
 if ($dupCount > 0) {
-    api_error('A measurement for this child already exists on ' . $measurementDate . '. Please choose a different date or edit the existing record.', 422);
+    api_error('A measurement for this child already exists on ' . $measurementDate . '. Use "Measure again (double-check)" for a verification, or choose a different date.', 422);
 }
 
 $metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $childSex);

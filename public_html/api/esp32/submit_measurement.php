@@ -196,8 +196,24 @@ mysqli_begin_transaction($conn);
 |
 */
 
-$sessionStmt = mysqli_prepare(
-    $conn,
+// is_recheck lives on the session after migration 20260914. Probe once so
+// older deployments (no column) keep submitting as ROUTINE.
+$sessionHasRecheckCol = false;
+try {
+    $sessProbe = $conn->query('SHOW COLUMNS FROM measurement_sessions');
+    if ($sessProbe) {
+        while ($sessCol = $sessProbe->fetch_assoc()) {
+            if ((string)$sessCol['Field'] === 'is_recheck') {
+                $sessionHasRecheckCol = true;
+                break;
+            }
+        }
+    }
+} catch (Throwable $e) {
+    $sessionHasRecheckCol = false;
+}
+
+$sessionSql =
     'SELECT
         s.id AS session_id,
         s.device_id AS device_db_id,
@@ -223,23 +239,20 @@ $sessionStmt = mysqli_prepare(
         s.height_cm AS session_height_cm,
         s.weight_kg AS session_weight_kg,
 
-        s.measurement_id
-
-     FROM measurement_sessions s
-
+        s.measurement_id'
+    . ($sessionHasRecheckCol ? ',
+        s.is_recheck AS session_is_recheck' : '')
+    . ' FROM measurement_sessions s
      INNER JOIN devices d
         ON d.id = s.device_id
-
      INNER JOIN children c
         ON c.id = s.child_id
-
      WHERE s.id = ?
        AND d.device_code = ?
-
      LIMIT 1
+     FOR UPDATE';
 
-     FOR UPDATE'
-);
+$sessionStmt = mysqli_prepare($conn, $sessionSql);
 
 if ($sessionStmt === false) {
 
@@ -815,33 +828,165 @@ $deviceDbId =
         ?? 0
     );
 
-// measurement_type is ENUM('ROUTINE','OVERRIDE'): kiosk submissions are
-// always ROUTINE (the kiosk/manual/mobile distinction lives in
-// source_type). Must be a variable — mysqli_stmt_bind_param() takes
-// every value by reference, so the old 'KIOSK' literal fataled here.
-$measurementType = 'ROUTINE';
+// Recheck sessions save as RECHECK (verification-only, schedule-neutral).
+// Must be a variable — mysqli_stmt_bind_param() takes every value by
+// reference, so literals fatal here.
+$isRecheckSession = $sessionHasRecheckCol && ((int)($sessionRow['session_is_recheck'] ?? 0) === 1);
+$measurementType = $isRecheckSession ? 'RECHECK' : 'ROUTINE';
 
-mysqli_stmt_bind_param(
-    $measurementInsert,
-    'iddiissdddssssisi',
-    $childId,
-    $heightCm,
-    $weightKg,
-    $ageMonths,
-    $ageDays,
-    $sourceType,
-    $measurementType,
-    $waz,
-    $haz,
-    $whz,
-    $status,
-    $wfaStatus,
-    $hfaStatus,
-    $wfhStatus,
-    $isFlagged,
-    $flagReason,
-    $deviceDbId
-);
+// Kiosk rechecks carry an optional reason; default keeps history readable.
+$recheckReasonText = null;
+$recheckOfId = null;
+if ($isRecheckSession) {
+    $rawReason = trim((string)($payload['recheck_reason'] ?? ''));
+    $recheckReasonText = $rawReason !== '' ? substr($rawReason, 0, 255) : 'Kiosk double-check re-measurement';
+    try {
+        $linkRow = admin_fetch_one(
+            "SELECT id FROM measurements WHERE child_id = ? AND measurement_date = CURDATE() ORDER BY id DESC LIMIT 1",
+            'i',
+            [$childId]
+        );
+        if ($linkRow === null) {
+            $linkRow = admin_fetch_one(
+                "SELECT id FROM measurements WHERE child_id = ? ORDER BY measurement_date DESC, id DESC LIMIT 1",
+                'i',
+                [$childId]
+            );
+        }
+        $recheckOfId = $linkRow !== null ? (int)($linkRow['id'] ?? 0) : null;
+        if ($recheckOfId !== null && $recheckOfId <= 0) {
+            $recheckOfId = null;
+        }
+    } catch (Throwable $e) {
+        $recheckOfId = null;
+    }
+}
+
+// measurements table gained recheck columns in migration 20260914; probe
+// so older deployments keep inserting without them.
+$measHasRecheckCols = false;
+try {
+    $measProbe = $conn->query('SHOW COLUMNS FROM measurements');
+    if ($measProbe) {
+        $foundReason = false;
+        $foundOf = false;
+        while ($measCol = $measProbe->fetch_assoc()) {
+            if ((string)$measCol['Field'] === 'recheck_reason') {
+                $foundReason = true;
+            }
+            if ((string)$measCol['Field'] === 'recheck_of_measurement_id') {
+                $foundOf = true;
+            }
+        }
+        $measHasRecheckCols = ($foundReason && $foundOf);
+    }
+} catch (Throwable $e) {
+    $measHasRecheckCols = false;
+}
+
+if ($isRecheckSession && $measHasRecheckCols) {
+    mysqli_stmt_close($measurementInsert);
+    $measurementInsert = mysqli_prepare(
+        $conn,
+        'INSERT INTO measurements
+        (
+            child_id,
+            height_cm,
+            weight_kg,
+            age_months,
+            age_days,
+            measurement_date,
+            source_type,
+            measurement_type,
+            recheck_reason,
+            recheck_of_measurement_id,
+            waz,
+            haz,
+            whz,
+            nutritional_status,
+            wfa_status,
+            hfa_status,
+            wfh_status,
+            is_flagged,
+            flag_reason,
+            device_id
+        )
+        VALUES
+        (
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            CURDATE(),
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?,
+            ?
+        )'
+    );
+
+    if ($measurementInsert === false) {
+        mysqli_rollback($conn);
+        api_error('Could not save measurement.', 500);
+    }
+
+    mysqli_stmt_bind_param(
+        $measurementInsert,
+        'iddiisssiddsssssisi',
+        $childId,
+        $heightCm,
+        $weightKg,
+        $ageMonths,
+        $ageDays,
+        $sourceType,
+        $measurementType,
+        $recheckReasonText,
+        $recheckOfId,
+        $waz,
+        $haz,
+        $whz,
+        $status,
+        $wfaStatus,
+        $hfaStatus,
+        $wfhStatus,
+        $isFlagged,
+        $flagReason,
+        $deviceDbId
+    );
+} else {
+    mysqli_stmt_bind_param(
+        $measurementInsert,
+        'iddiissdddssssisi',
+        $childId,
+        $heightCm,
+        $weightKg,
+        $ageMonths,
+        $ageDays,
+        $sourceType,
+        $measurementType,
+        $waz,
+        $haz,
+        $whz,
+        $status,
+        $wfaStatus,
+        $hfaStatus,
+        $wfhStatus,
+        $isFlagged,
+        $flagReason,
+        $deviceDbId
+    );
+}
 
 if (
     !mysqli_stmt_execute(
@@ -1034,6 +1179,12 @@ $measurementPayload = [
     'source_type' =>
         $sourceType,
 
+    'measurement_type' =>
+        $measurementType,
+
+    'is_recheck' =>
+        $isRecheckSession,
+
     'device_id' =>
         $deviceCode,
 
@@ -1062,13 +1213,16 @@ push_latest_measurement(
 |
 | After a kiosk measurement is committed, immediately materialize the
 | child's next mandatory follow-up based on the new classification.
-| This is what makes "what appointment will they get" reflect on the
-| parent's portal the next time they load it — we no longer wait for a
-| nutritionist to manually open the Appointments page.
+| RECHECK sessions skip this: verification-only readings never complete
+| appointments and never move next_due.
 |
 */
 
-$followupSync = followup_sync_for_child($childId);
+if ($isRecheckSession) {
+    $followupSync = ['generated' => 0, 'completed' => 0, 'recategorized' => 0, 'track' => null, 'category' => ''];
+} else {
+    $followupSync = followup_sync_for_child($childId);
+}
 
 /*
 |--------------------------------------------------------------------------
@@ -1135,6 +1289,12 @@ api_success(
         'source_type' =>
             $sourceType,
 
+        'measurement_type' =>
+            $measurementType,
+
+        'is_recheck' =>
+            $isRecheckSession,
+
         'firebase_synced' =>
             firebase_database_url() !== '',
 
@@ -1146,5 +1306,5 @@ api_success(
             'category' => $followupSync['category'],
         ],
     ],
-    'Measurement saved successfully.'
+    $isRecheckSession ? 'Recheck saved. Due schedule unchanged.' : 'Measurement saved successfully.'
 );

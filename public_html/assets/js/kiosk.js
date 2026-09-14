@@ -143,6 +143,9 @@
   function resetLookup() {
     if (childIdInput) childIdInput.value = "";
     if (clearChildIdBtn) clearChildIdBtn.hidden = true;
+    state.notDueChild = null;
+    var staleRecheckBtn = document.getElementById("notDueRecheckBtn");
+    if (staleRecheckBtn) staleRecheckBtn.hidden = true;
     if (lookupPreview) {
       lookupPreview.hidden = true;
       lookupPreview.innerHTML = "";
@@ -632,6 +635,8 @@
     step: "welcome",
 
     child: null,
+
+    notDueChild: null,
 
     session: null,
 
@@ -3184,9 +3189,10 @@
   // START MEASUREMENT
   // ============================================================
 
-  async function startMeasurementFlow() {
+  async function startMeasurementFlow(opts) {
+    const isRecheckFlow = !!(opts && opts.recheck);
     const child =
-      getSelectedChild();
+      (opts && opts.child) || getSelectedChild();
 
     if (!child) {
       // No child selected yet — go to child lookup
@@ -3201,8 +3207,11 @@
     }
 
     // ============================================================
-    // DUE-DATE PRE-CHECK
+    // DUE-DATE PRE-CHECK (skipped for recheck double-checks — the
+    // backend start_measurement.php bypasses the gate when is_recheck
+    // is set, and submit saves a schedule-neutral RECHECK row)
     // ============================================================
+    if (!isRecheckFlow) {
     try {
       const dueCheckUrl =
         data?.endpoints?.checkDue ||
@@ -3307,6 +3316,33 @@
             ".";
         }
 
+        // Offer anytime double-check: when the child was already
+        // measured today (or the backend says recheck is allowed),
+        // show the "Sukatin Pa Rin" button which restarts the flow
+        // with is_recheck=1 (schedule-neutral RECHECK row).
+        try {
+          state.notDueChild = child;
+          var alreadyMeasured =
+            dueCheckJson?.data?.already_measured_today === true ||
+            /already been recorded/i.test(reason || "");
+          var recheckBtn = document.getElementById("notDueRecheckBtn");
+          if (recheckBtn) {
+            if (alreadyMeasured || dueCheckJson?.data?.can_recheck === true) {
+              recheckBtn.hidden = false;
+              if (
+                alreadyMeasured &&
+                notDueReason &&
+                /already been recorded/i.test(reason || "")
+              ) {
+                notDueReason.textContent =
+                  "Nasukat na ngayong araw. Puwede pa ring mag-double-check nang hindi magbabago ang schedule.";
+              }
+            } else {
+              recheckBtn.hidden = true;
+            }
+          }
+        } catch (_recheckErr) {}
+
         showLookupState("not-due");
 
         state.submitting = false;
@@ -3318,6 +3354,7 @@
       // If the due-check endpoint is unreachable, proceed
       // (the backend start_measurement.php will still block)
     }
+    } // end skip due pre-check for recheck flows
 
     if (
       state.startRequestInProgress
@@ -3325,7 +3362,14 @@
       return false;
     }
 
+    // Restart bypasses the active/processing guards on purpose: the
+    // backend supersedes the old START_REQUESTED/MEASURING session when
+    // the new one is created, so "Ulitin ang sukat" cleanly drops the
+    // shaky reading and starts a fresh live session for the same child.
+    const isRestartFlow = !!(opts && opts.restart);
+
     if (
+      !isRestartFlow &&
       isMeasurementActive()
     ) {
       pushFeed(
@@ -3338,6 +3382,7 @@
     }
 
     if (
+      !isRestartFlow &&
       state.processingStarted
     ) {
       pushFeed(
@@ -3401,7 +3446,10 @@
                 child.id,
 
               location:
-                "Kiosk"
+                "Kiosk",
+
+              is_recheck:
+                isRecheckFlow === true
             }),
 
             cache: "no-store"
@@ -5883,6 +5931,128 @@ function finishResults(
           ) {
             event.preventDefault();
             resetLookup();
+            return;
+          }
+
+          // ====================================================
+          // NOT-DUE: RECHECK (anytime double-check, schedule-neutral)
+          // ====================================================
+
+          if (
+            action === "not-due-recheck"
+          ) {
+            event.preventDefault();
+            const recheckChild =
+              state.notDueChild || getSelectedChild() || foundChild;
+            if (!recheckChild) {
+              pushFeed(
+                "Walang napiling bata",
+                "Maghanap muna ng bata bago mag-double-check.",
+                "warn"
+              );
+              return;
+            }
+            state.child = recheckChild;
+            pushFeed(
+              "Double-check",
+              "Recheck para kay " +
+                (recheckChild.first_name || "") +
+                " " +
+                (recheckChild.last_name || "") +
+                " — hindi magbabago ang schedule."
+            );
+            startMeasurementFlow({
+              recheck: true,
+              child: recheckChild
+            });
+            return;
+          }
+
+          // ====================================================
+          // RESULTS: MEASURE AGAIN (retry after COMPLETE)
+          // ====================================================
+
+          if (
+            action === "measure-again"
+          ) {
+            event.preventDefault();
+            const recheckChild =
+              state.child || getSelectedChild() || foundChild;
+            if (!recheckChild) {
+              pushFeed(
+                "Walang napiling bata",
+                "Maghanap muna ng bata bago mag-double-check.",
+                "warn"
+              );
+              return;
+            }
+            pushFeed(
+              "Sukatin ulit",
+              "Double-check na pagsukat — hindi magbabago ang schedule."
+            );
+            startMeasurementFlow({
+              recheck: true,
+              child: recheckChild
+            });
+            return;
+          }
+
+          // ====================================================
+          // MEASUREMENT: RESTART (ulitín ang live reading habang
+          // sinusukat pa — due man o hindi, same child, fresh session)
+          // ====================================================
+
+          if (
+            action === "restart-measurement"
+          ) {
+            event.preventDefault();
+            const restartChild =
+              state.child || getSelectedChild() || foundChild;
+            if (!restartChild) {
+              pushFeed(
+                "Walang napiling bata",
+                "Maghanap muna ng bata bago umulit ng sukat.",
+                "warn"
+              );
+              return;
+            }
+            // Keep the session kind: a recheck restart stays a recheck.
+            // If PROSESO was already pressed, force recheck so a raced
+            // duplicate save can never complete/move the schedule twice.
+            const restartRecheck = !!(
+              (state.session && state.session.is_recheck) ||
+              state.processingStarted
+            );
+            if (refs.weightReadout) {
+              refs.weightReadout.textContent = "--.--";
+            }
+            if (refs.heightReadout) {
+              refs.heightReadout.textContent = "--.-";
+            }
+            if (refs.weightStatus) {
+              refs.weightStatus.textContent = "Naghihintay...";
+            }
+            if (refs.heightStatus) {
+              refs.heightStatus.textContent = "Naghihintay...";
+            }
+            if (refs.weightBars) {
+              refs.weightBars.innerHTML = "";
+              lastWeightBarsValue = -1;
+            }
+            if (refs.heightBar) {
+              refs.heightBar.style.width = "0%";
+            }
+            pushFeed(
+              "Inulit ang sukat",
+              restartRecheck
+                ? "Bagong double-check session — hindi magbabago ang schedule."
+                : "Bagong pagsukat para sa parehong bata."
+            );
+            startMeasurementFlow({
+              restart: true,
+              recheck: restartRecheck,
+              child: restartChild
+            });
             return;
           }
 

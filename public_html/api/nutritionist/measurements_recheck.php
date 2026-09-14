@@ -3,13 +3,20 @@
 declare(strict_types=1);
 
 /**
- * measurements_override.php
+ * measurements_recheck.php
  *
- * Nutritionist API — records an exceptional (override) measurement outside
- * the normal kiosk schedule. Requires authorization, reason, and creates
- * a measurement with measurement_type = 'OVERRIDE'.
+ * Nutritionist API — records an anytime double-check (recheck) measurement.
  *
- * POST { child_id, height_cm, weight_kg, override_reason, measurement_date }
+ * RECHECK is verification-only:
+ *   - allowed anytime, including the same date as an existing measurement
+ *     (bypasses the due-date gate AND the duplicate-date gate);
+ *   - does NOT complete follow-up appointments and does NOT move next_due
+ *     (followup_sync_for_child() is intentionally NOT called — the
+ *     scheduler only looks at ROUTINE/OVERRIDE rows);
+ *   - keeps history: the previous reading stays, this row links back via
+ *     recheck_of_measurement_id and shows as the verified value.
+ *
+ * POST { child_id, height_cm, weight_kg, recheck_reason, measurement_date? }
  */
 
 require_once __DIR__ . '/../../includes/db.php';
@@ -25,7 +32,7 @@ $user = api_require_staff_session(['admin', 'nutritionist']);
 if (($user['role'] ?? '') !== 'admin') {
     $accessLevel = $user['access_level'] ?? 'full';
     if ($accessLevel === 'readonly') {
-        api_error('You do not have permission to record override measurements.', 403);
+        api_error('You do not have permission to record recheck measurements.', 403);
     }
 }
 
@@ -34,7 +41,7 @@ $payload = api_payload();
 $childId = api_int($payload['child_id'] ?? 0, 0);
 $heightCm = api_float($payload['height_cm'] ?? null, null);
 $weightKg = api_float($payload['weight_kg'] ?? null, null);
-$overrideReason = trim((string)($payload['override_reason'] ?? ''));
+$recheckReason = trim((string)($payload['recheck_reason'] ?? ''));
 
 if ($childId <= 0) {
     api_error('Please select a child.', 422);
@@ -48,12 +55,12 @@ if (!is_finite($heightCm) || !is_finite($weightKg)) {
     api_error('Height and weight must be valid numbers.', 422);
 }
 
-if ($overrideReason === '') {
-    api_error('A reason for the override measurement is required.', 422);
+if ($recheckReason === '') {
+    api_error('A reason for the recheck is required (e.g. child moved during scan, unstable reading).', 422);
 }
 
-if (strlen($overrideReason) > 255) {
-    api_error('Override reason must be 255 characters or fewer.', 422);
+if (strlen($recheckReason) > 255) {
+    api_error('Recheck reason must be 255 characters or fewer.', 422);
 }
 
 $heightCm = round($heightCm, 2);
@@ -78,6 +85,26 @@ if ($parsedDate > $today) {
 }
 
 $conn = get_db_connection();
+
+// Recheck columns require migration 20260914_recheck_measurements.sql.
+$measCols = [];
+try {
+    $colRes = $conn->query('SHOW COLUMNS FROM measurements');
+    if ($colRes) {
+        while ($colRow = $colRes->fetch_assoc()) {
+            $measCols[] = (string)$colRow['Field'];
+        }
+    }
+} catch (Throwable $e) {
+    error_log('[SukatKalusugan] measurements_recheck column probe failed: ' . $e->getMessage());
+}
+
+if (!in_array('measurement_type', $measCols, true)
+    || !in_array('recheck_reason', $measCols, true)
+    || !in_array('recheck_of_measurement_id', $measCols, true)
+) {
+    api_error('Recheck feature needs DB migration 20260914_recheck_measurements.sql applied.', 500);
+}
 
 // Fetch child
 $childStmt = mysqli_prepare(
@@ -136,20 +163,28 @@ if ($ageMonths >= 60) {
     api_error('This child is ' . $ageMonths . ' months old and has aged out of the eOPT Plus monitoring program.', 422);
 }
 
-// Duplicate gate counts scheduled rows only: RECHECK verifications never
-// block an OVERRIDE (and vice versa rechecks bypass this file entirely).
-$dupStmt = mysqli_prepare($conn, "SELECT COUNT(*) FROM measurements WHERE child_id = ? AND measurement_date = ? AND measurement_type IN ('ROUTINE','OVERRIDE')");
-mysqli_stmt_bind_param($dupStmt, 'is', $childId, $measurementDate);
-mysqli_stmt_execute($dupStmt);
-$dupResult = mysqli_stmt_get_result($dupStmt);
-$dupCount = $dupResult ? (int)mysqli_fetch_row($dupResult)[0] : 0;
-mysqli_stmt_close($dupStmt);
+// Link back to the reading being verified: prefer today's latest row
+// (any type), else the latest row overall. History keeps both.
+$recheckOf = admin_fetch_one(
+    "SELECT id FROM measurements WHERE child_id = ? AND measurement_date = ? ORDER BY id DESC LIMIT 1",
+    'is',
+    [$childId, $measurementDate]
+);
 
-if ($dupCount > 0) {
-    api_error('A measurement for this child already exists on ' . $measurementDate . '.', 422);
+if ($recheckOf === null) {
+    $recheckOf = admin_fetch_one(
+        "SELECT id FROM measurements WHERE child_id = ? ORDER BY measurement_date DESC, id DESC LIMIT 1",
+        'i',
+        [$childId]
+    );
 }
 
-// WHO calculations
+$recheckOfId = $recheckOf !== null ? (int)($recheckOf['id'] ?? 0) : null;
+if ($recheckOfId !== null && $recheckOfId <= 0) {
+    $recheckOfId = null;
+}
+
+// WHO calculations (canonical)
 $metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $childSex);
 
 $waz = $metrics['waz'];
@@ -162,9 +197,9 @@ $wfhStatus = $metrics['wfh_status'];
 $isFlagged = $metrics['is_flagged'] ? 1 : 0;
 $flagReason = $metrics['flag_reason'];
 $recordedBy = (int)($user['id'] ?? 0);
-$authorityName = (string)($user['name'] ?? '');
 
-// Insert override measurement
+// Insert recheck measurement. source_type stays 'manual' (kiosk/manual/mobile
+// distinction lives there); measurement_type carries ROUTINE/OVERRIDE/RECHECK.
 $insertStmt = mysqli_prepare(
     $conn,
     "INSERT INTO measurements
@@ -172,30 +207,31 @@ $insertStmt = mysqli_prepare(
             child_id, height_cm, weight_kg, age_months, age_days,
             measurement_date, source_type, measurement_type,
             override_reason, override_authority,
+            recheck_reason, recheck_of_measurement_id,
             waz, haz, whz, nutritional_status,
             wfa_status, hfa_status, wfh_status,
             is_flagged, flag_reason, device_id, recorded_by
         )
      VALUES
-        (?, ?, ?, ?, ?, ?, 'manual', 'OVERRIDE', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)"
+        (?, ?, ?, ?, ?, ?, 'manual', 'RECHECK', NULL, NULL, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?)"
 );
 
 if ($insertStmt === false) {
-    error_log('[SukatKalusugan] measurements_override prepare failed: ' . mysqli_error($conn));
-    api_error('Could not save the override measurement.', 500);
+    error_log('[SukatKalusugan] measurements_recheck prepare failed: ' . mysqli_error($conn));
+    api_error('Could not save the recheck measurement.', 500);
 }
 
 mysqli_stmt_bind_param(
     $insertStmt,
-    'iddiissssdsssssiii',
+    'iddiissidddsssssisi',
     $childId,
     $heightCm,
     $weightKg,
     $ageMonths,
     $ageDays,
     $measurementDate,
-    $overrideReason,
-    $authorityName,
+    $recheckReason,
+    $recheckOfId,
     $waz,
     $haz,
     $whz,
@@ -209,9 +245,9 @@ mysqli_stmt_bind_param(
 );
 
 if (!mysqli_stmt_execute($insertStmt)) {
-    error_log('[SukatKalusugan] measurements_override execute failed: ' . mysqli_stmt_error($insertStmt));
+    error_log('[SukatKalusugan] measurements_recheck execute failed: ' . mysqli_stmt_error($insertStmt));
     mysqli_stmt_close($insertStmt);
-    api_error('Could not save the override measurement.', 500);
+    api_error('Could not save the recheck measurement.', 500);
 }
 
 $measurementId = (int)mysqli_insert_id($conn);
@@ -227,10 +263,10 @@ $childName = trim(
 
 log_action(
     $recordedBy,
-    'MEASUREMENT_OVERRIDE',
+    'MEASUREMENT_RECHECK',
     'info',
     sprintf(
-        'Override measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Reason: %s',
+        'Recheck measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Verifies #%s | Reason: %s (due schedule untouched)',
         $measurementId,
         $childName,
         (string)$child['child_code'],
@@ -241,12 +277,15 @@ log_action(
         $haz,
         $whz,
         (string)$status,
-        $overrideReason
+        $recheckOfId !== null ? (string)$recheckOfId : 'none',
+        $recheckReason
     )
 );
 
-// Trigger follow-up sync to schedule next measurement
-$followupSync = followup_sync_for_child($childId);
+// Intentionally NO followup_sync_for_child() call: rechecks are neutral.
+// Report the current scheduled next_due (from ROUTINE/OVERRIDE only) so the
+// UI can show "due unchanged".
+$dueCheck = followup_is_due_today($childId);
 
 api_success(
     [
@@ -269,17 +308,12 @@ api_success(
         'is_flagged' => $isFlagged === 1,
         'flag_reason' => $flagReason,
         'source_type' => 'manual',
-        'measurement_type' => 'OVERRIDE',
-        'override_reason' => $overrideReason,
-        'override_authority' => $authorityName,
+        'measurement_type' => 'RECHECK',
+        'recheck_reason' => $recheckReason,
+        'recheck_of_measurement_id' => $recheckOfId,
         'recorded_by' => $recordedBy,
-        'followup' => [
-            'generated' => (int)$followupSync['generated'],
-            'completed' => (int)$followupSync['completed'],
-            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
-            'track' => $followupSync['track'],
-            'category' => $followupSync['category'],
-        ],
+        'due_unchanged' => true,
+        'next_due' => $dueCheck['next_due'] ?? null,
     ],
-    'Override measurement saved successfully.'
+    'Recheck saved. Due schedule unchanged.'
 );

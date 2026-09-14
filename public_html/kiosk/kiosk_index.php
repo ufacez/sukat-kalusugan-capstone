@@ -402,6 +402,9 @@ $appData = [
                             <div class="kiosk-lookup-not-due-reason" id="notDueReason"></div>
 
                             <div class="kiosk-lookup-found-actions">
+                                <button class="kiosk-btn kiosk-btn-outline kiosk-btn-block" type="button" data-kiosk-action="not-due-recheck" id="notDueRecheckBtn" hidden>
+                                    Sukatin Pa Rin (double-check)
+                                </button>
                                 <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="lookup-retry">
                                     Hanapin Ulit
                                 </button>
@@ -504,7 +507,6 @@ $appData = [
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="process-measurement" disabled id="processBtn">
                         I-process ang measurement
                     </button>
-
                     <div class="kiosk-step-dots">
                         <span class="kiosk-dot-ind"></span>
                         <span class="kiosk-dot-ind is-active"></span>
@@ -601,7 +603,6 @@ $appData = [
                             <span class="kiosk-status-badge is-normal" data-kiosk-result-wflh-status>Normal</span>
                         </div>
                     </div>
-
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="finish">
                         Done
                     </button>

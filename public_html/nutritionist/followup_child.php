@@ -314,6 +314,7 @@ nutritionist_layout_start(
         <?php foreach ($pageMeasurements as $m):
             $mTypePill = match ($m['measurement_type'] ?? 'ROUTINE') {
                 'OVERRIDE' => '<span class="admin-pill is-delete">Override</span>',
+                'RECHECK' => '<span class="admin-pill is-info">Recheck</span>',
                 'KIOSK' => '<span class="admin-pill is-info">Kiosk</span>',
                 default => '<span class="admin-pill is-muted">Routine</span>',
             };

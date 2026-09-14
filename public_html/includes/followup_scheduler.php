@@ -345,6 +345,10 @@ function followup_sync_for_child(int $childId): array
 {
 	$conn = get_db_connection();
 
+	// RECHECK rows are verification-only and never move the schedule:
+	// the "latest" measurement for sync/due purposes is the latest
+	// ROUTINE or OVERRIDE row. Display/history queries intentionally
+	// keep showing RECHECK as the verified value.
 	$child = admin_fetch_one(
 		'SELECT
 			c.id,
@@ -363,6 +367,7 @@ function followup_sync_for_child(int $childId): array
 		 LEFT JOIN measurements lm ON lm.id = (
 			SELECT m.id FROM measurements m
 			WHERE m.child_id = c.id
+			  AND m.measurement_type IN (\'ROUTINE\',\'OVERRIDE\')
 			ORDER BY m.measurement_date DESC, m.id DESC
 			LIMIT 1
 		 )
@@ -1007,18 +1012,24 @@ function followup_set_monitoring_status(
  * This is the backend authority for whether a kiosk or manual measurement
  * is allowed. It checks:
  *   1. Is the child in eOPT coverage (age <= 59 months)?
- *   2. Has a measurement already been recorded today?
+ *   2. Has a scheduled (ROUTINE/OVERRIDE) measurement already been recorded today?
  *   3. Is today within the grace window of the next scheduled follow-up?
+ *
+ * RECHECK rows are excluded from every step: they neither satisfy the due
+ * nor anchor next_due. Pass $forRecheck=true to skip the already-measured
+ * check for an anytime double-check verification.
  *
  * @return array{is_due: bool, next_due: ?string, reason: string, monitoring_status: string}
  */
-function followup_is_due_today(int $childId, ?DateTimeImmutable $asOf = null): array
+function followup_is_due_today(int $childId, ?DateTimeImmutable $asOf = null, bool $forRecheck = false): array
 {
 	$conn = get_db_connection();
 	$asOf ??= new DateTimeImmutable('today');
 	$todayStr = $asOf->format('Y-m-d');
 
-	// Fetch child with latest measurement and monitoring status
+	// Fetch child with latest SCHEDULED measurement (ROUTINE/OVERRIDE only).
+	// RECHECK rows never anchor the schedule, so they are excluded here.
+	// Display pages keep their own unfiltered "latest" join.
 	$child = admin_fetch_one(
 		'SELECT
 			c.id,
@@ -1035,6 +1046,7 @@ function followup_is_due_today(int $childId, ?DateTimeImmutable $asOf = null): a
 		 LEFT JOIN measurements lm ON lm.id = (
 			SELECT m.id FROM measurements m
 			WHERE m.child_id = c.id
+			  AND m.measurement_type IN (\'ROUTINE\',\'OVERRIDE\')
 			ORDER BY m.measurement_date DESC, m.id DESC
 			LIMIT 1
 		 )
@@ -1065,20 +1077,25 @@ function followup_is_due_today(int $childId, ?DateTimeImmutable $asOf = null): a
 		];
 	}
 
-	// Check if a measurement already exists today
-	$existingToday = admin_fetch_one(
-		"SELECT id FROM measurements WHERE child_id = ? AND measurement_date = ? LIMIT 1",
-		'is',
-		[$childId, $todayStr]
-	);
+	// A scheduled (ROUTINE/OVERRIDE) measurement today satisfies the due.
+	// RECHECK rows are neutral — they neither satisfy the due nor block a
+	// recheck. When $forRecheck is true the caller explicitly wants an
+	// anytime verification, so skip this block entirely.
+	if (!$forRecheck) {
+		$existingToday = admin_fetch_one(
+			"SELECT id FROM measurements WHERE child_id = ? AND measurement_date = ? AND measurement_type IN ('ROUTINE','OVERRIDE') LIMIT 1",
+			'is',
+			[$childId, $todayStr]
+		);
 
-	if ($existingToday !== null) {
-		return [
-			'is_due' => false,
-			'next_due' => null,
-			'reason' => 'A measurement has already been recorded for this child today.',
-			'monitoring_status' => (string)$child['monitoring_status'],
-		];
+		if ($existingToday !== null) {
+			return [
+				'is_due' => false,
+				'next_due' => null,
+				'reason' => 'A measurement has already been recorded for this child today.',
+				'monitoring_status' => (string)$child['monitoring_status'],
+			];
+		}
 	}
 
 	// Classify child and compute next due date
@@ -1166,7 +1183,10 @@ function followup_fetch_monitoring_list(array $user, array $filters = []): array
 	$ageJoin = '';
 	$ageFilter = '';
 
-	// Build the main query with latest measurement + monitoring status
+	// Build the main query with latest measurement + monitoring status.
+	// lm  = latest SCHEDULED (ROUTINE/OVERRIDE) row — anchors next_due.
+	// ld  = latest DISPLAY row of any type — shows the verified value
+	//       when a same-day RECHECK corrected the reading.
 	$rows = admin_fetch_all(
 		"SELECT
 			c.id,
@@ -1179,18 +1199,25 @@ function followup_fetch_monitoring_list(array $user, array $filters = []): array
 			bg.name AS barangay_name,
 			lm.id AS last_measurement_id,
 			lm.measurement_date,
-			lm.height_cm AS last_height,
-			lm.weight_kg AS last_weight,
-			lm.wfa_status,
-			lm.hfa_status,
-			lm.wfh_status,
-			lm.nutritional_status,
+			COALESCE(ld.height_cm, lm.height_cm) AS last_height,
+			COALESCE(ld.weight_kg, lm.weight_kg) AS last_weight,
+			COALESCE(ld.wfa_status, lm.wfa_status) AS wfa_status,
+			COALESCE(ld.hfa_status, lm.hfa_status) AS hfa_status,
+			COALESCE(ld.wfh_status, lm.wfh_status) AS wfh_status,
+			COALESCE(ld.nutritional_status, lm.nutritional_status) AS nutritional_status,
 			COALESCE(cms.monitoring_status, 'routine') AS monitoring_status,
 			cms.custom_interval_days,
 			cms.reason AS monitoring_reason
 		 FROM children c
 		 LEFT JOIN barangays bg ON bg.id = c.barangay_id
 		 LEFT JOIN measurements lm ON lm.id = (
+			SELECT m.id FROM measurements m
+			WHERE m.child_id = c.id
+			  AND m.measurement_type IN ('ROUTINE','OVERRIDE')
+			ORDER BY m.measurement_date DESC, m.id DESC
+			LIMIT 1
+		 )
+		 LEFT JOIN measurements ld ON ld.id = (
 			SELECT m.id FROM measurements m
 			WHERE m.child_id = c.id
 			ORDER BY m.measurement_date DESC, m.id DESC

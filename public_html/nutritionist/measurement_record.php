@@ -273,10 +273,26 @@ nutritionist_layout_start(
                 <div class="form-message" id="override-message" aria-live="polite"></div>
             </div>
 
+            <div id="recheck-panel" style="display:none;padding:12px 14px;border-radius:8px;background:rgba(11,110,79,.06);border:1px solid rgba(11,110,79,.30);margin-bottom:14px;">
+                <div style="font-weight:800;font-size:13px;color:#0b6e4f;margin-bottom:6px;">Double-check — save as recheck?</div>
+                <p style="margin:0 0 10px;font-size:12px;color:#14532d;">Rechecks are allowed anytime (even same day) and never move the due schedule. The previous reading stays in history; this one is marked as the verified value.</p>
+                <label class="admin-field" style="margin-bottom:10px;">
+                    <span>Reason for recheck *</span>
+                    <textarea id="recheck-reason" maxlength="255" rows="2" placeholder="e.g. Child moved during scan, unstable reading — verifying"></textarea>
+                    <span class="admin-field-message"></span>
+                </label>
+                <div class="action-row" style="margin-top:0;">
+                    <button class="admin-btn" type="button" id="recheck-save-btn">Save as recheck</button>
+                    <button class="admin-btn-secondary" type="button" id="recheck-cancel-btn">Cancel</button>
+                </div>
+                <div class="form-message" id="recheck-message" aria-live="polite"></div>
+            </div>
+
             <div class="action-row">
                 <button class="admin-btn" type="button" id="save-btn" disabled>
                     <?php echo admin_action_icon('save'); ?> Save measurement
                 </button>
+                <button class="admin-btn-secondary" type="button" id="recheck-open-btn">Measure again (double-check)</button>
                 <button class="admin-btn-secondary" type="button" id="reset-btn">Clear values</button>
                 <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" id="cancel-link">Cancel</a>
             </div>
@@ -292,6 +308,7 @@ nutritionist_layout_start(
 
     var PREVIEW_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/who_preview.php")); ?>';
     var OVERRIDE_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/measurements_override.php")); ?>';
+    var RECHECK_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/measurements_recheck.php")); ?>';
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -321,6 +338,12 @@ nutritionist_layout_start(
     var overrideSaveBtn = $('override-save-btn');
     var overrideCancelBtn = $('override-cancel-btn');
     var overrideMessage = $('override-message');
+    var recheckPanel = $('recheck-panel');
+    var recheckReason = $('recheck-reason');
+    var recheckSaveBtn = $('recheck-save-btn');
+    var recheckCancelBtn = $('recheck-cancel-btn');
+    var recheckMessage = $('recheck-message');
+    var recheckOpenBtn = $('recheck-open-btn');
 
     function hideOverridePanel() {
         if (overridePanel) overridePanel.style.display = 'none';
@@ -640,7 +663,31 @@ nutritionist_layout_start(
         });
     });
 
+    function hideRecheckPanel() {
+        if (recheckPanel) recheckPanel.style.display = 'none';
+        if (recheckReason) recheckReason.value = '';
+        if (recheckMessage) recheckMessage.textContent = '';
+    }
+
+    function showRecheckPanel() {
+        if (!recheckPanel) return;
+        hideOverridePanel();
+        recheckPanel.style.display = '';
+        if (recheckReason) recheckReason.focus();
+    }
+
     overrideCancelBtn.addEventListener('click', hideOverridePanel);
+    if (recheckCancelBtn) recheckCancelBtn.addEventListener('click', hideRecheckPanel);
+    if (recheckOpenBtn) recheckOpenBtn.addEventListener('click', function () {
+        if (!selectedChild) { toastError('Please select a child first.'); return; }
+        var w = parseFloat(weightInput.value);
+        var h = parseFloat(heightInput.value);
+        if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
+            toastError('Enter the new weight and height first, then Measure again.');
+            return;
+        }
+        showRecheckPanel();
+    });
 
     overrideSaveBtn.addEventListener('click', function () {
         if (!selectedChild) { toastError('Please select a child first.'); return; }
@@ -695,6 +742,59 @@ nutritionist_layout_start(
         });
     });
 
+    if (recheckSaveBtn) recheckSaveBtn.addEventListener('click', function () {
+        if (!selectedChild) { toastError('Please select a child first.'); return; }
+        var w = parseFloat(weightInput.value);
+        var h = parseFloat(heightInput.value);
+        if (isNaN(w) || isNaN(h) || w <= 0 || h <= 0) {
+            recheckMessage.textContent = 'Enter a valid weight and height first.';
+            return;
+        }
+        var reason = (recheckReason.value || '').trim();
+        if (reason === '') {
+            recheckMessage.textContent = 'A reason for the recheck is required.';
+            recheckReason.focus();
+            return;
+        }
+        recheckSaveBtn.disabled = true;
+        recheckMessage.textContent = '';
+        var saveOriginalLabel = saveBtn.innerHTML;
+        recheckSaveBtn.textContent = 'Saving recheck…';
+
+        fetch(RECHECK_URL, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'Content-Type': 'application/json', 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            body: JSON.stringify({
+                child_id: selectedChild.id,
+                measurement_date: dateInput.value,
+                weight_kg: w,
+                height_cm: h,
+                recheck_reason: reason
+            })
+        })
+        .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
+        .then(function (json) {
+            if (!json.success) throw new Error(json.message || 'Could not save the recheck measurement.');
+            renderSavedResult(json.data);
+            if (window.AdminToast) AdminToast.success('Recheck saved for ' + json.data.child_name + ' (' + json.data.child_code + '). Due schedule unchanged.');
+            hideRecheckPanel();
+            saveBtn.innerHTML = 'Saved!';
+            setTimeout(function () {
+                saveBtn.disabled = false;
+                saveBtn.innerHTML = saveOriginalLabel;
+            }, 2000);
+            return;
+        })
+        .catch(function (err) {
+            recheckMessage.textContent = err.message || 'Could not save the recheck measurement.';
+        })
+        .finally(function () {
+            recheckSaveBtn.disabled = false;
+            recheckSaveBtn.textContent = 'Save as recheck';
+        });
+    });
+
     resetBtn.addEventListener('click', function () {
         weightInput.value = '';
         heightInput.value = '';
@@ -703,6 +803,7 @@ nutritionist_layout_start(
         saveBtn.disabled = true;
         flagBanner.classList.remove('is-visible');
         hideOverridePanel();
+        hideRecheckPanel();
     });
 
 })();

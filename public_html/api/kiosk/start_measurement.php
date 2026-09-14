@@ -48,6 +48,16 @@ $location = api_string(
     'Kiosk'
 );
 
+// Anytime double-check: when true, the due-date gate is bypassed and the
+// session is flagged so submit saves measurement_type='RECHECK' (neutral —
+// never moves next_due). Accepts snake_case + camelCase from the kiosk UI.
+$isRecheck = (bool)(
+    ($input['is_recheck'] ?? $input['isRecheck'] ?? $input['recheck'] ?? false)
+    === true
+    || ($input['is_recheck'] ?? $input['isRecheck'] ?? $input['recheck'] ?? 0) === 1
+    || ($input['is_recheck'] ?? $input['isRecheck'] ?? $input['recheck'] ?? '') === '1'
+);
+
 /*
 |--------------------------------------------------------------------------
 | Validate
@@ -261,25 +271,41 @@ try {
     |
     */
 
-    $dueCheck = followup_is_due_today($childId);
-
-    if (!$dueCheck['is_due']) {
+    // Recheck bypasses the due gate (anytime verification). Everything
+    // else — device/child validation, active-session guard — still applies.
+    if ($isRecheck) {
         log_action(
             null,
-            'MEASUREMENT_REJECTED_NOT_DUE',
-            'warning',
+            'MEASUREMENT_RECHECK_START',
+            'info',
             sprintf(
-                'Kiosk measurement rejected for child #%d (%s %s): %s',
+                'Kiosk recheck started for child #%d (%s %s): due gate bypassed (verification-only, schedule untouched).',
                 $childId,
                 $child['first_name'] ?? '',
-                $child['last_name'] ?? '',
-                $dueCheck['reason']
+                $child['last_name'] ?? ''
             )
         );
+    } else {
+        $dueCheck = followup_is_due_today($childId);
 
-        throw new RuntimeException(
-            $dueCheck['reason']
-        );
+        if (!$dueCheck['is_due']) {
+            log_action(
+                null,
+                'MEASUREMENT_REJECTED_NOT_DUE',
+                'warning',
+                sprintf(
+                    'Kiosk measurement rejected for child #%d (%s %s): %s',
+                    $childId,
+                    $child['first_name'] ?? '',
+                    $child['last_name'] ?? '',
+                    $dueCheck['reason']
+                )
+            );
+
+            throw new RuntimeException(
+                $dueCheck['reason']
+            );
+        }
     }
 
     /*
@@ -347,32 +373,82 @@ try {
     |
     */
 
-    $insertStmt = mysqli_prepare(
-        $conn,
-        'INSERT INTO measurement_sessions (
-            device_id,
-            child_id,
-            status,
-            command,
-            started_at,
-            expires_at,
-            created_at,
-            updated_at
-         )
-         VALUES (
-            ?,
-            ?,
-            \'START_REQUESTED\',
-            \'START\',
-            NOW(),
-            DATE_ADD(
+    // is_recheck column exists after migration 20260914; probe so older
+    // deployments keep working (session simply saves as ROUTINE there).
+    $hasRecheckCol = false;
+    try {
+        $probeRes = $conn->query('SHOW COLUMNS FROM measurement_sessions');
+        if ($probeRes) {
+            while ($probeRow = $probeRes->fetch_assoc()) {
+                if ((string)$probeRow['Field'] === 'is_recheck') {
+                    $hasRecheckCol = true;
+                    break;
+                }
+            }
+        }
+    } catch (Throwable $e) {
+        $hasRecheckCol = false;
+    }
+
+    $recheckInt = $isRecheck ? 1 : 0;
+
+    if ($hasRecheckCol) {
+        $insertStmt = mysqli_prepare(
+            $conn,
+            'INSERT INTO measurement_sessions (
+                device_id,
+                child_id,
+                status,
+                command,
+                started_at,
+                expires_at,
+                created_at,
+                updated_at,
+                is_recheck
+             )
+             VALUES (
+                ?,
+                ?,
+                \'START_REQUESTED\',
+                \'START\',
                 NOW(),
-                INTERVAL ? SECOND
-            ),
-            NOW(),
-            NOW()
-         )'
-    );
+                DATE_ADD(
+                    NOW(),
+                    INTERVAL ? SECOND
+                ),
+                NOW(),
+                NOW(),
+                ?
+             )'
+        );
+    } else {
+        $insertStmt = mysqli_prepare(
+            $conn,
+            'INSERT INTO measurement_sessions (
+                device_id,
+                child_id,
+                status,
+                command,
+                started_at,
+                expires_at,
+                created_at,
+                updated_at
+             )
+             VALUES (
+                ?,
+                ?,
+                \'START_REQUESTED\',
+                \'START\',
+                NOW(),
+                DATE_ADD(
+                    NOW(),
+                    INTERVAL ? SECOND
+                ),
+                NOW(),
+                NOW()
+             )'
+        );
+    }
 
     if ($insertStmt === false) {
         throw new RuntimeException(
@@ -380,13 +456,24 @@ try {
         );
     }
 
-    mysqli_stmt_bind_param(
-        $insertStmt,
-        'iii',
-        $deviceDbId,
-        $childId,
-        $timeoutSeconds
-    );
+    if ($hasRecheckCol) {
+        mysqli_stmt_bind_param(
+            $insertStmt,
+            'iiii',
+            $deviceDbId,
+            $childId,
+            $timeoutSeconds,
+            $recheckInt
+        );
+    } else {
+        mysqli_stmt_bind_param(
+            $insertStmt,
+            'iii',
+            $deviceDbId,
+            $childId,
+            $timeoutSeconds
+        );
+    }
 
     if (!mysqli_stmt_execute($insertStmt)) {
 
@@ -486,6 +573,8 @@ try {
     $payload['active'] = true;
 
     $payload['state'] = 'START_REQUESTED';
+
+    $payload['is_recheck'] = $isRecheck;
 
     api_success(
         $payload,

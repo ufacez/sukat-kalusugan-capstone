@@ -67,8 +67,23 @@ if ($deviceCode !== '') {
     }
 }
 
-// Check if child is due for measurement today
+// Check if child is due for measurement today.
+// already_measured_today lets the kiosk offer "Sukatin Ulit" (recheck)
+// instead of a dead-end NOT DUE screen: a recheck is allowed anytime
+// and never moves the due schedule.
 $dueCheck = followup_is_due_today($childId);
+
+$alreadyMeasuredToday = false;
+try {
+    $todayRow = admin_fetch_one(
+        "SELECT id FROM measurements WHERE child_id = ? AND measurement_date = CURDATE() AND measurement_type IN ('ROUTINE','OVERRIDE') LIMIT 1",
+        'i',
+        [$childId]
+    );
+    $alreadyMeasuredToday = ($todayRow !== null);
+} catch (Throwable $e) {
+    $alreadyMeasuredToday = false;
+}
 
 // Audit log rejections (not due)
 if (!$dueCheck['is_due']) {
@@ -89,4 +104,6 @@ api_success([
     'next_due' => $dueCheck['next_due'],
     'reason' => $dueCheck['reason'],
     'monitoring_status' => $dueCheck['monitoring_status'],
+    'already_measured_today' => $alreadyMeasuredToday,
+    'can_recheck' => true,
 ]);
