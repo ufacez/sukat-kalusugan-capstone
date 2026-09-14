@@ -156,8 +156,7 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                                             $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                                             echo admin_e((string)$child['sex']);
                                             echo ' &middot; ';
-                                            echo (int)$age['days']; ?> day<?php echo (int)$age['days'] === 1 ? '' : 's'; ?> · <?php echo (int)$age['months']; ?> mo
-                                        ?>
+                                            echo (int)$age['days']; ?> day<?php echo (int)$age['days'] === 1 ? '' : 's'; ?> · <?php echo (int)$age['months']; ?> months
                                     </div>
                                 </div>
                             </div>
