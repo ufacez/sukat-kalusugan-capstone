@@ -415,7 +415,10 @@
     });
 
     setStatus("Loading CSFP barangays...");
-    fetch("../api/admin/csfp_barangays.php")
+    // Add/Edit Barangay form: list official barangays NOT yet in the
+    // directory (?mode=missing). Other pickers (child/parent forms) keep
+    // using the default active-rows list via initCsfpChildForm below.
+    fetch("../api/admin/csfp_barangays.php?mode=missing")
       .then((response) => {
         if (!response.ok) {
           throw new Error("CSFP barangay API request failed");
@@ -424,6 +427,12 @@
       })
       .then((data) => {
         const barangays = (data.barangays || []).map((name) => ({ code: name, name }));
+        if (barangays.length === 0) {
+          fillSelect(barangaySelect, [], "-- Select barangay --");
+          barangaySelect.disabled = true;
+          setStatus("All 35 official barangays are already in the directory.", false);
+          return;
+        }
         fillSelect(barangaySelect, barangays, "-- Select barangay --");
         const savedName = nameInput.value.trim();
         if (savedName) {

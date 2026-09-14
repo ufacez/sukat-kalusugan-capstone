@@ -66,6 +66,9 @@ admin_layout_start(
                 </label>
             </div>
             <div class="admin-address-status" data-csfp-status></div>
+            <?php if (!$editingBarangay): ?>
+                <div class="admin-field-hint">Only official barangays missing from the directory are listed. Re-adding a previously deleted one restores it as a fresh record (its old local areas must be re-added).</div>
+            <?php endif; ?>
             <input type="hidden" name="name" value="<?php echo admin_e($editingBarangay['name'] ?? ''); ?>">
             <input type="hidden" name="city_municipality" value="<?php echo admin_e($editingBarangay['city_municipality'] ?? 'City of San Fernando, Pampanga'); ?>">
             <?php if ($editingBarangay): ?>
