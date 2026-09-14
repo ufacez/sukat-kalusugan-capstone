@@ -119,7 +119,7 @@ const String SUBMIT_MEASUREMENT_PATH =
 // =====================================================
 
 const String FIREBASE_URL =
-  "https://sukatkalusugan-default-rtdb.firebaseio.com";
+  "https://sukat-kalusugan-default-rtdb.asia-southeast1.firebasedatabase.app/";
 
 const String FIREBASE_AUTH = "";
 

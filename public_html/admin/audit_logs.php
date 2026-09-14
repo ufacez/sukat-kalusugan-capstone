@@ -778,11 +778,18 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         if(!canvas) return;
         var rect = canvas.parentElement.getBoundingClientRect();
         W = rect.width;
+        // Clear inline height so the CSS clamp() re-evaluates on resize,
+        // then read back the actual computed height.
+        canvas.style.height = '';
         var cssH = window.getComputedStyle(canvas).height;
         var parsedH = parseInt(cssH, 10);
         H = (parsedH > 0) ? parsedH : 260;
         canvas.width = W*dpr; canvas.height = H*dpr;
         canvas.style.width = W+'px'; canvas.style.height = H+'px';
+        // Setting canvas.width/height clears the context transform —
+        // re-apply the HiDPI scale (was only in initChart, causing
+        // progressive shrink on every redraw).
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         cW = W - padL - padR;
         cH = H - padT - padB;
         drawAll();
