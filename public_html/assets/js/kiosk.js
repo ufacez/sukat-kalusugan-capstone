@@ -64,6 +64,13 @@
 
   const pollIntervalMs = pollSeconds * 1000;
 
+  // Consecutive foreign-session ticks (Firebase poll + live stream
+  // combined) before the kiosk attempts recovery instead of ignoring
+  // them forever. 5 ≈ 1s on the 200ms status poll — fast enough to
+  // rescue an impatient double-Start, slow enough to ride out a
+  // single stale tick during session handover.
+  const SESSION_MISMATCH_THRESHOLD = 5;
+
   const syncSeconds = Math.max(
     2,
     Number(data?.defaults?.syncSeconds || 5)
@@ -655,6 +662,12 @@
     awaitingLiveResult: false,
 
     firebaseSessionId: null,
+
+    sessionMismatchCount: 0,
+
+    adoptingSession: false,
+
+    lastRecoveryAt: 0,
 
     lastFirebaseTimestamp: "",
 
@@ -2294,18 +2307,18 @@
         payloadSessionId !==
           expectedSessionId
       ) {
-        console.warn(
-          "[SukatKalusugan] Ignoring Firebase session mismatch",
-          {
-            expected:
-              expectedSessionId,
-            received:
-              payloadSessionId
-          }
+        // Persistent divergence recovers via auto-adopt (same child)
+        // or a conflict overlay — never a silent freeze.
+        noteSessionMismatch(
+          payloadSessionId,
+          expectedSessionId,
+          "poll"
         );
 
         return null;
       }
+
+      resetSessionMismatch();
 
       /*
        * If Firebase has a session ID of 0/missing,
@@ -2618,8 +2631,16 @@
           streamPayloadSessionId !==
             streamExpectedSessionId
         ) {
+          noteSessionMismatch(
+            streamPayloadSessionId,
+            streamExpectedSessionId,
+            "stream"
+          );
+
           return;
         }
+
+        resetSessionMismatch();
 
         handleWsPayload(payload);
       };
@@ -2644,6 +2665,270 @@
       } catch (_) {}
 
       state.liveStream = null;
+    }
+  }
+
+  // ============================================================
+  // SESSION MISMATCH RECOVERY
+  // ============================================================
+  //
+  // The kiosk drops live ticks carrying a foreign session_id (stale
+  // device session after a double-Start or reload mid-flow). Dropping
+  // is correct — but doing it forever freezes the kiosk with no
+  // recourse. After SESSION_MISMATCH_THRESHOLD consecutive drops we
+  // revalidate the device's session through MySQL and:
+  //   same child  → adopt it (measurement continues seamlessly);
+  //   other child → conflict overlay with a way back home.
+  // The backend stays the final backstop: request_process.php and
+  // submit_measurement.php both require the exact session row to be
+  // MEASURING, so a wrongly-adopted session can never submit.
+  //
+
+  function noteSessionMismatch(
+    payloadSessionId,
+    expectedSessionId,
+    source
+  ) {
+    state.sessionMismatchCount += 1;
+
+    if (
+      state.sessionMismatchCount <
+      SESSION_MISMATCH_THRESHOLD
+    ) {
+      if (
+        state.sessionMismatchCount ===
+        1
+      ) {
+        console.warn(
+          "[SukatKalusugan] Ignoring Firebase session mismatch",
+          {
+            expected:
+              expectedSessionId,
+            received:
+              payloadSessionId,
+            source: source || "poll"
+          }
+        );
+      }
+
+      return false;
+    }
+
+    if (
+      state.sessionMismatchCount ===
+      SESSION_MISMATCH_THRESHOLD
+    ) {
+      // Cooldown: a terminal/gone device session re-triggers this
+      // window every ~1s (the stale mirror snapshot never changes).
+      // Retry recovery at most every 30s so the feed and log don't
+      // spam while still self-healing if conditions change.
+      if (
+        Date.now() -
+          state.lastRecoveryAt <
+        30000
+      ) {
+        resetSessionMismatch();
+
+        return false;
+      }
+
+      state.lastRecoveryAt =
+        Date.now();
+
+      console.warn(
+        "[SukatKalusugan] Session mismatch persistent, attempting recovery",
+        {
+          expected:
+            expectedSessionId,
+          received:
+            payloadSessionId,
+          source: source || "poll"
+        }
+      );
+
+      recoverFromSessionMismatch(
+        payloadSessionId
+      );
+    }
+
+    return false;
+  }
+
+  function resetSessionMismatch() {
+    state.sessionMismatchCount = 0;
+  }
+
+  async function recoverFromSessionMismatch(
+    deviceSessionId
+  ) {
+    if (
+      state.adoptingSession ||
+      !deviceSessionId ||
+      deviceSessionId <= 0
+    ) {
+      return;
+    }
+
+    state.adoptingSession = true;
+
+    try {
+      // Revalidate through MySQL — never trust the mirror alone.
+      const endpoint =
+        data?.endpoints
+          ?.measurementStatus ||
+        "../api/kiosk/measurement_status.php";
+
+      const url = new URL(
+        endpoint,
+        window.location.href
+      );
+
+      url.searchParams.set(
+        "device_id",
+        deviceId
+      );
+
+      url.searchParams.set(
+        "session_id",
+        String(deviceSessionId)
+      );
+
+      const response =
+        await fetch(
+          url.toString(),
+          {
+            method: "GET",
+            headers: {
+              Accept:
+                "application/json"
+            },
+            cache: "no-store"
+          }
+        );
+
+      const json =
+        await response
+          .json()
+          .catch(() => ({}));
+
+      const remote =
+        response.ok &&
+        json?.success === true
+          ? json.data || null
+          : null;
+
+      const remoteStatus =
+        remote
+          ? normalizeStatus(
+              remote.status
+            )
+          : "";
+
+      // Device session already terminal (or gone): its ticks will
+      // stop on their own. Clear the counter so the next divergence
+      // gets a fresh recovery window instead of silence.
+      if (
+        !remote ||
+        (remoteStatus !==
+          "MEASURING" &&
+          remoteStatus !==
+            "START_REQUESTED")
+      ) {
+        pushFeed(
+          "Session expired",
+          "Huminto ang sukat sa device. Magsimula muli.",
+          "warn"
+        );
+
+        resetSessionMismatch();
+
+        return;
+      }
+
+      const remoteChildId = Number(
+        remote.child_id || 0
+      );
+
+      const selectedChild =
+        getSelectedChild();
+
+      const selectedChildId =
+        selectedChild
+          ? Number(
+              selectedChild.id || 0
+            )
+          : 0;
+
+      // Same child → adopt the device session and continue.
+      if (
+        selectedChildId > 0 &&
+        remoteChildId > 0 &&
+        selectedChildId ===
+          remoteChildId
+      ) {
+        state.session = remote;
+        state.firebaseSessionId =
+          deviceSessionId;
+
+        // Drop every trace of the superseded session so its locks,
+        // finals, and signature can't leak into the adopted one.
+        // Fresh live ticks relock from here.
+        state.weightLocked = false;
+        state.heightLocked = false;
+        state.lastWeightRaw = null;
+        state.lastHeightRaw = null;
+        state.weightStableCount = 0;
+        state.heightStableCount = 0;
+        state.finalReady = false;
+        state.finalSequence = 0;
+        state.finalWeight = null;
+        state.finalHeight = null;
+        state.measurementReady = false;
+        state.weight = null;
+        state.height = null;
+        state.lastFirebaseSignature = "";
+
+        hideProcessingError();
+        updateSessionInfo(remote);
+        saveSessionToStorage();
+        updateProcessButton();
+        resetSessionMismatch();
+
+        pushFeed(
+          "Session synced",
+          "Tumutuloy sa sukat ng device (session #" +
+            deviceSessionId +
+            ")."
+        );
+
+        return;
+      }
+
+      // Different child (or unknown) → refuse to adopt. Surface the
+      // conflict with a way back; the overlay's button resets home.
+      showProcessingError(
+        "Ang device ay sumusukat sa ibang bata (session #" +
+          deviceSessionId +
+          "). Bumalik sa Home at magsimula muli."
+      );
+
+      pushFeed(
+        "Session conflict",
+        "Device session #" +
+          deviceSessionId +
+          " does not match this kiosk session.",
+        "error"
+      );
+    } catch (error) {
+      console.warn(
+        "[SukatKalusugan] Session recovery failed",
+        error
+      );
+
+      // Retry on the next window instead of going silent forever.
+      resetSessionMismatch();
+    } finally {
+      state.adoptingSession = false;
     }
   }
 
@@ -3663,6 +3948,10 @@
 
       state.firebaseSessionId =
         newSessionId;
+
+      resetSessionMismatch();
+
+      state.lastRecoveryAt = 0;
 
       state.awaitingLiveResult =
         true;
@@ -5330,6 +5619,8 @@ function finishResults(
 
     state.firebaseSessionId =
       null;
+
+    resetSessionMismatch();
 
     state.lastFirebaseTimestamp =
       "";
