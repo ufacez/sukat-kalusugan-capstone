@@ -25,11 +25,34 @@ if (!in_array($status, ['active', 'inactive'], true)) {
 
 $cityMunicipalityValue = $cityMunicipality !== '' ? $cityMunicipality : null;
 
-$ok = admin_execute(
-    'UPDATE barangays SET name = ?, city_municipality = ?, status = ? WHERE id = ?',
-    'sssi',
-    [$name, $cityMunicipalityValue, $status, $id]
+// Friendly pre-check (excluding self) so a rename-to-existing shows a red
+// toast instead of a 500. UNIQUE key is case-insensitive, so compare LOWER().
+$duplicate = admin_fetch_one(
+    'SELECT id FROM barangays WHERE LOWER(name) = LOWER(?) AND id != ? LIMIT 1',
+    'si',
+    [$name, $id]
 );
+
+if ($duplicate !== null) {
+    admin_redirect('/admin/barangay_form.php?id=' . $id, ['notice' => "Another barangay already uses the name '" . $name . "'.", 'type' => 'error']);
+}
+
+// admin_execute() returns false on failure, but PHP 8 mysqli throws
+// mysqli_sql_exception (errno 1062) on duplicate instead — catch it for the
+// race where two admins rename to the same name at the same time.
+try {
+    $ok = admin_execute(
+        'UPDATE barangays SET name = ?, city_municipality = ?, status = ? WHERE id = ?',
+        'sssi',
+        [$name, $cityMunicipalityValue, $status, $id]
+    );
+} catch (mysqli_sql_exception $e) {
+    error_log('[SukatKalusugan] barangays_update failed: ' . $e->getMessage());
+    if ((int)$e->getCode() === 1062) {
+        admin_redirect('/admin/barangay_form.php?id=' . $id, ['notice' => "Another barangay already uses the name '" . $name . "'.", 'type' => 'error']);
+    }
+    admin_redirect('/admin/barangay_form.php?id=' . $id, ['notice' => 'Barangay could not be updated right now.', 'type' => 'error']);
+}
 
 if (!$ok) {
     admin_redirect('/admin/barangay_form.php?id=' . $id, ['notice' => 'Barangay could not be updated. The name may already be in use.', 'type' => 'error']);
