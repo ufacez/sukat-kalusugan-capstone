@@ -67,17 +67,24 @@ Example production rules:
 ```json
 {
   "rules": {
+    ".read": false,
+    ".write": false,
     "latest_measurements": {
-      ".read": true,
-      ".write": "auth != null"
+      ".read": true
     },
     "device_status": {
-      ".read": true,
-      ".write": "auth != null"
+      ".read": true
+    },
+    "live_readings": {
+      ".read": true
     }
   }
 }
 ```
+
+Writes are server-side only (PHP secret/service-account bypasses rules),
+so `.write: false` breaks nothing. Reads stay scoped-public per mirror
+path because the kiosk tablet is a shared unauthenticated device.
 
 ## Where data is written
 
@@ -99,6 +106,19 @@ This is written from two PHP endpoints:
   heartbeat has gone stale (no check-in for
   `DEVICE_ONLINE_THRESHOLD_SECONDS`, currently 6 seconds — see
   `public_html/includes/api_helpers.php`).
+
+While MEASURING, the ESP32 piggybacks its live sensor snapshot on the
+same heartbeat (`live_session_id` / `live_weight` / `live_height` /
+`live_*_stable` / `final_ready` / `final_sequence` / `final_weight_kg` /
+`final_height_cm` query params — see `getMeasurementCommand()` in the
+firmware). PHP validates and mirrors each tick to:
+
+`/live_readings/{device_id}.json`
+
+The HTTPS kiosk streams that node via `EventSource` into the same state
+machine the direct WebSocket used — including `final_ready`, which is
+what enables the PROCESS button. The ESP32 itself never PUTs to
+Firebase (`FIREBASE_URL` is intentionally blank in firmware).
 
 MySQL (`devices.status` / `devices.last_seen_at`) stays the source of
 truth; the Firebase node is a live copy for anything that wants to watch

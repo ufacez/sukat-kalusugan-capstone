@@ -115,11 +115,19 @@ const String SUBMIT_MEASUREMENT_PATH =
   "api/esp32/submit_measurement.php";
 
 // =====================================================
-// FIREBASE
+// FIREBASE (direct writes REMOVED — see note)
 // =====================================================
+//
+// The ESP32 no longer PUTs to Firebase directly. Live snapshots ride
+// on the get_command heartbeat (live_* params, appended below) and the
+// PHP backend — the sole Firebase writer, authenticated with a server
+// secret — mirrors them to /live_readings. Direct device writes used
+// no credential, which forced the database rules to stay publicly
+// writable. Kept blank (not deleted) so updateFirebase() stays a
+// harmless no-op and the call sites below need no further edits.
+//
 
-const String FIREBASE_URL =
-  "https://sukatkalusugan-default-rtdb.firebaseio.com";
+const String FIREBASE_URL = "";
 
 const String FIREBASE_AUTH = "";
 
@@ -194,12 +202,12 @@ const int HEIGHT_SAMPLE_WINDOW = 8;
 // STABILITY
 // =====================================================
 
-const int STABLE_SAMPLES_REQUIRED = 8;
+const int STABLE_SAMPLES_REQUIRED = 5; // was 8 -- faster to reach "stable"
 
-const unsigned long FINAL_STABLE_HOLD_MS = 1500;
+const unsigned long FINAL_STABLE_HOLD_MS = 800; // was 1500
 
-const float WEIGHT_STABLE_EPSILON_KG = 0.15f;
-const float HEIGHT_STABLE_EPSILON_CM = 1.0f;
+const float WEIGHT_STABLE_EPSILON_KG = 0.30f; // was 0.15 -- less prone to noise resets
+const float HEIGHT_STABLE_EPSILON_CM = 1.5f;  // was 1.0
 
 // =====================================================
 // STATE
@@ -253,6 +261,35 @@ const int CAL_WS_DIST_REQUIRED = 5;
 
 long currentSessionId = 0;
 long lastSessionId = 0;
+
+// =====================================================
+// HTTPS KIOSK LIVE SNAPSHOT
+// =====================================================
+//
+// Latest sensor readings, refreshed every measuring-loop pass so
+// getMeasurementCommand() below can piggyback them onto the normal
+// 1-2s heartbeat GET (live_session_id / live_weight / live_height /
+// … / final_ready / …). The PHP backend mirrors that snapshot to
+// Firebase /live_readings for HTTPS kiosk browsers, which cannot
+// open the ESP32's plain-ws:// socket (Mixed Content). This snapshot
+// REPLACES the ESP32's old direct Firebase writes (see FIREBASE_URL
+// below, now intentionally blank). Only consumed while `measuring`
+// is true with currentSessionId > 0, so stale values can never leak
+// after a session ends — every session exit clears those guards.
+//
+
+bool gHaveLiveWeight = false;
+float gLiveWeight = -1;
+bool gLiveWeightStable = false;
+
+bool gHaveLiveHeight = false;
+float gLiveHeight = -1;
+bool gLiveHeightStable = false;
+
+bool gLiveFinalReady = false;
+unsigned long gLiveFinalSequence = 0;
+float gLiveFinalWeight = -1;
+float gLiveFinalHeight = -1;
 
 unsigned long lastCommandPoll = 0;
 unsigned long lastFirebaseUpdate = 0;
@@ -727,6 +764,41 @@ bool getMeasurementCommand(
     url += "&local_ip=" + WiFi.localIP().toString();
   }
 
+  // HTTPS kiosk live mirror: piggyback the current sensor snapshot
+  // (refreshed every measuring-loop pass, see the broadcast block in
+  // runMeasurement()) so PHP can mirror it to Firebase /live_readings.
+  // Guarded by measuring + currentSessionId so idle heartbeats stay
+  // short and stale snapshots can never leak after a session ends.
+  // Params are optional server-side: an older backend simply ignores
+  // unknown query keys, so this firmware stays compatible both ways.
+  if (measuring && currentSessionId > 0) {
+    url += "&live_session_id=" + String(currentSessionId);
+
+    if (gHaveLiveWeight && gLiveWeight >= 0) {
+      url += "&live_weight=" + String(gLiveWeight, 2);
+      url += "&live_weight_stable=";
+      url += gLiveWeightStable ? "1" : "0";
+    }
+
+    if (gHaveLiveHeight && gLiveHeight >= 0) {
+      url += "&live_height=" + String(gLiveHeight, 1);
+      url += "&live_height_stable=";
+      url += gLiveHeightStable ? "1" : "0";
+    }
+
+    if (
+      gLiveFinalReady &&
+      gLiveFinalSequence > 0 &&
+      gLiveFinalWeight >= 0 &&
+      gLiveFinalHeight >= 0
+    ) {
+      url += "&final_ready=1";
+      url += "&final_sequence=" + String(gLiveFinalSequence);
+      url += "&final_weight_kg=" + String(gLiveFinalWeight, 2);
+      url += "&final_height_cm=" + String(gLiveFinalHeight, 1);
+    }
+  }
+
   int httpCode;
 
   String response =
@@ -976,6 +1048,14 @@ bool updateFirebase(
 ) {
 
   if (WiFi.status() != WL_CONNECTED) {
+    return false;
+  }
+
+  // Direct Firebase writes are retired (see FIREBASE_URL above):
+  // the PHP backend mirrors heartbeat snapshots instead, so this
+  // stays a fail-closed no-op. All historic callers ignore the
+  // return value already, so nothing else changes.
+  if (FIREBASE_URL.length() == 0) {
     return false;
   }
 
@@ -1741,43 +1821,9 @@ void runMeasurement(
       finalSequence = 0;
     }
 
-    // ================================================
-    // FIREBASE LIVE UPDATE
-    // ================================================
-    //
-    // When WebSocket clients are connected, they receive
-    // data at 10ms intervals directly. Firebase is only
-    // used as a fallback when no WS clients are present
-    // (e.g. remote monitoring).
-    //
-
-    if (
-      ws.count() == 0 &&
-      millis() -
-      lastFirebaseUpdate >=
-      FIREBASE_UPDATE_INTERVAL
-    ) {
-
-      lastFirebaseUpdate =
-        millis();
-
-      float liveWeight = haveLastRawWeight ? lastRawWeight : -1;
-      float liveHeight = haveLastRawHeight ? lastRawHeight : -1;
-
-      safeFirebaseUpdate(
-        sessionId,
-        "MEASURING",
-        liveHeight,
-        liveWeight,
-        weightStable,
-        heightStable,
-        true,
-        finalReady,
-        finalHeightSnapshot,
-        finalWeightSnapshot,
-        finalSequence
-      );
-    }
+    // Live snapshot for the HTTPS mirror is refreshed in the
+    // broadcast block below (gLive* globals); the heartbeat poll
+    // carries them to PHP, which mirrors to Firebase /live_readings.
 
     // ================================================
     // WEBSOCKET LIVE BROADCAST
@@ -1789,6 +1835,22 @@ void runMeasurement(
       WS_BROADCAST_INTERVAL
     ) {
       lastWsBroadcast = millis();
+
+      // Refresh the HTTPS live snapshot consumed by
+      // getMeasurementCommand() on the next heartbeat poll.
+      // Same values as the WS broadcast below, same cadence.
+      gHaveLiveWeight = haveLastRawWeight;
+      gLiveWeight = lastRawWeight;
+      gLiveWeightStable = weightStable;
+
+      gHaveLiveHeight = haveLastRawHeight;
+      gLiveHeight = lastRawHeight;
+      gLiveHeightStable = heightStable;
+
+      gLiveFinalReady = finalReady;
+      gLiveFinalSequence = finalSequence;
+      gLiveFinalWeight = finalWeightSnapshot;
+      gLiveFinalHeight = finalHeightSnapshot;
 
       broadcastSensorData(
         lastRawWeight,

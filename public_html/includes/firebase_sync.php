@@ -24,7 +24,7 @@ function firebase_auth_token(): string
  * Shared by push_latest_measurement() and push_device_status() so there is
  * one place that knows how to talk to Firebase, and one timeout policy.
  */
-function firebase_put(string $path, array $payload): bool
+function firebase_put(string $path, array $payload, int $timeoutSecs = 4, int $connectTimeoutSecs = 3): bool
 {
     $databaseUrl = firebase_database_url();
 
@@ -50,26 +50,45 @@ function firebase_put(string $path, array $payload): bool
         // ESP32's 2s heartbeat request/response cycle (get_command.php) and
         // inside the browser's status poll (device_ping.php). A slow or dead
         // Firebase must never make the kiosk itself feel unresponsive.
-        CURLOPT_TIMEOUT => 4,
-        CURLOPT_CONNECTTIMEOUT => 3,
+        CURLOPT_TIMEOUT => $timeoutSecs,
+        CURLOPT_CONNECTTIMEOUT => $connectTimeoutSecs,
     ]);
 
     $response = curl_exec($ch);
+    $curlError = (string)curl_error($ch);
     $statusCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     curl_close($ch);
 
-    return $statusCode >= 200 && $statusCode < 300 && $response !== false;
+    $ok = $statusCode >= 200 && $statusCode < 300 && $response !== false;
+
+    if (!$ok) {
+        // Non-fatal by design (callers are fire-and-forget), but loud in the
+        // server log: a silent mirror failure looks exactly like "the kiosk
+        // just stopped updating", which is miserable to diagnose. Never
+        // includes the auth token or payload contents.
+        error_log(sprintf(
+            'firebase_put failed: path=%s http=%d curl_error=%s',
+            $path,
+            $statusCode,
+            $curlError !== '' ? $curlError : 'none'
+        ));
+    }
+
+    return $ok;
 }
 
 function push_latest_measurement(string $deviceId, array $measurementData): bool
 {
+    // NOTE: child_name is deliberately NOT mirrored. The kiosk page already
+    // ships the children list (with names) from MySQL and joins it locally
+    // (see kiosk.js result fallbacks), so publishing minors' names to a
+    // publicly-readable mirror node buys nothing and expands exposure.
     $payload = [
         'device_id' => $deviceId,
         'session_id' => $measurementData['session_id'] ?? null,
         'measurement_id' => $measurementData['measurement_id'] ?? null,
         'child_id' => $measurementData['child_id'] ?? null,
         'child_code' => $measurementData['child_code'] ?? null,
-        'child_name' => $measurementData['child_name'] ?? null,
         'height_cm' => $measurementData['height_cm'] ?? null,
         'weight_kg' => $measurementData['weight_kg'] ?? null,
         'age_months' => $measurementData['age_months'] ?? null,
@@ -116,4 +135,41 @@ function firebase_status_response(string $deviceId, array $measurementData = [])
         'last_sync' => $measurementData['timestamp'] ?? gmdate('c'),
         'status' => 'ready',
     ];
+}
+
+/**
+ * Mirrors one live sensor snapshot (carried on the ESP32's 2s heartbeat)
+ * to /live_readings/{deviceId} for HTTPS kiosk browsers.
+ *
+ * The payload shape deliberately matches the ESP32's direct-WebSocket
+ * sensor_data JSON so the kiosk feeds it through the same
+ * applyWsPayload() state machine with zero translation.
+ *
+ * Firebase-only by design: live ticks are ephemeral, MySQL stays the
+ * source of truth for sessions/measurements. Short timeouts — this runs
+ * inside the heartbeat response cycle and must never stall the ESP32.
+ */
+function push_live_reading(string $deviceId, array $live): bool
+{
+    $finalReady = !empty($live['final_ready']);
+    $finalSequence = (int)($live['final_sequence'] ?? 0);
+
+    $payload = [
+        'type' => 'sensor_data',
+        'device_id' => $deviceId,
+        'session_id' => isset($live['session_id']) ? (int)$live['session_id'] : null,
+        'status' => (string)($live['status'] ?? 'MEASURING'),
+        'height_cm' => $live['height_cm'] ?? null,
+        'weight_kg' => $live['weight_kg'] ?? null,
+        'weight_stable' => !empty($live['weight_stable']),
+        'height_stable' => !empty($live['height_stable']),
+        'final_ready' => $finalReady,
+        'final_sequence' => $finalReady ? $finalSequence : 0,
+        'sequence' => isset($live['sequence']) ? (int)$live['sequence'] : (int)(microtime(true) * 1000),
+        'final_weight_kg' => $finalReady ? ($live['final_weight_kg'] ?? null) : null,
+        'final_height_cm' => $finalReady ? ($live['final_height_cm'] ?? null) : null,
+        'timestamp' => gmdate('c'),
+    ];
+
+    return firebase_put('live_readings/' . rawurlencode($deviceId), $payload, 3, 2);
 }

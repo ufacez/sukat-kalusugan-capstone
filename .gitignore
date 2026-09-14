@@ -33,3 +33,5 @@ public_html/test/*
 
 # Private Excel/reference files
 public_html/data/*
+
+public_html/docs/firmware/*.ino

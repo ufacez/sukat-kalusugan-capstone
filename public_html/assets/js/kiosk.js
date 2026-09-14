@@ -662,6 +662,10 @@
 
     firebaseTimer: null,
 
+    liveStream: null,
+
+    liveStreamFailed: false,
+
     statusTimer: null,
 
     processingTimer: null,
@@ -2430,6 +2434,11 @@
 
     stopFirebasePolling();
 
+    // Live HTTPS stream (true push, no per-poll round-trip). The
+    // interval poll below stays as the fallback for browsers without
+    // EventSource and for when the stream drops.
+    startLiveStream();
+
     state.firebaseTimer =
       setInterval(
         () => {
@@ -2449,6 +2458,192 @@
 
       state.firebaseTimer =
         null;
+    }
+
+    stopLiveStream();
+  }
+
+  // ============================================================
+  // LIVE STREAM — /live_readings over HTTPS (EventSource)
+  // ============================================================
+  //
+  // Firebase Realtime Database supports REST streaming: a GET on the
+  // .json URL with `Accept: text/event-stream` (which EventSource
+  // sends by default) becomes a long-lived push channel. The PHP
+  // backend mirrors each ESP32 heartbeat snapshot to
+  // /live_readings/{device} with the same sensor_data shape the
+  // ESP32's direct socket used, so messages feed the same
+  // handleWsPayload() state machine — including final_ready,
+  // which is what enables the PROCESS button.
+  //
+  // No auth token is attached on purpose: the kiosk tablet is a
+  // shared unauthenticated device, and these nodes are
+  // read-scoped-public in the Firebase rules. Writes stay
+  // server-side-only (PHP secret / service account).
+  //
+
+  function firebaseLiveReadingUrl() {
+    if (!firebaseEnabled) {
+      return "";
+    }
+
+    return (
+      firebaseBaseUrl.replace(
+        /\/$/,
+        ""
+      ) +
+      "/live_readings/" +
+      encodeURIComponent(deviceId) +
+      ".json"
+    );
+  }
+
+  function startLiveStream() {
+    stopLiveStream();
+
+    if (
+      !firebaseEnabled ||
+      typeof EventSource ===
+        "undefined"
+    ) {
+      return;
+    }
+
+    const url =
+      firebaseLiveReadingUrl();
+
+    if (!url) {
+      return;
+    }
+
+    let stream = null;
+
+    try {
+      stream =
+        new EventSource(url);
+    } catch (err) {
+      console.warn(
+        "[SukatKalusugan] Live stream unavailable, using polling",
+        err
+      );
+
+      state.liveStreamFailed =
+        true;
+
+      return;
+    }
+
+    state.liveStream = stream;
+    state.liveStreamFailed =
+      false;
+
+    console.log(
+      "[SukatKalusugan] Live stream connecting to",
+      url
+    );
+
+    stream.onopen =
+      function () {
+        console.log(
+          "[SukatKalusugan] Live stream connected"
+        );
+      };
+
+    stream.onmessage =
+      function (event) {
+        let parsed = null;
+
+        try {
+          parsed = JSON.parse(
+            event.data
+          );
+        } catch (e) {
+          return;
+        }
+
+        // Firebase wraps stream frames as
+        // {path, data}: initial snapshot arrives as
+        // {path:"/", data:{...}}, then per-key patches.
+        // Our node is one flat object, so a full snapshot
+        // is all we need; ignore patch frames and tombstones.
+        let payload = parsed;
+
+        if (
+          parsed &&
+          typeof parsed ===
+            "object" &&
+          typeof parsed.path ===
+            "string" &&
+          "data" in parsed
+        ) {
+          if (parsed.path !== "/") {
+            return;
+          }
+
+          payload = parsed.data;
+        }
+
+        if (
+          !payload ||
+          typeof payload !==
+            "object"
+        ) {
+          return;
+        }
+
+        // Session gate (same rule as the interval Firebase
+        // poll): /live_readings persists the last snapshot,
+        // so a fresh page load replays the previous session's
+        // tick. Never let a stale session light up this
+        // session's readouts or PROCESS button. The backend
+        // (request_process.php, exact id + MEASURING check)
+        // is the final backstop either way.
+        const streamPayloadSessionId =
+          Number(
+            payload.session_id ||
+              payload.sessionId ||
+              0
+          );
+
+        const streamExpectedSessionId =
+          Number(
+            state.firebaseSessionId ||
+              getCurrentSessionId() ||
+              0
+          );
+
+        if (
+          streamExpectedSessionId > 0 &&
+          streamPayloadSessionId > 0 &&
+          streamPayloadSessionId !==
+            streamExpectedSessionId
+        ) {
+          return;
+        }
+
+        handleWsPayload(payload);
+      };
+
+    stream.onerror =
+      function () {
+        console.warn(
+          "[SukatKalusugan] Live stream error, falling back to polling"
+        );
+
+        state.liveStreamFailed =
+          true;
+
+        stopLiveStream();
+      };
+  }
+
+  function stopLiveStream() {
+    if (state.liveStream) {
+      try {
+        state.liveStream.close();
+      } catch (_) {}
+
+      state.liveStream = null;
     }
   }
 
