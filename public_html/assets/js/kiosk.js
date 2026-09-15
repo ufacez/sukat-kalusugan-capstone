@@ -721,8 +721,103 @@
 
     lastBlockedStaleSessionId: null,
 
-    destroyed: false
+    destroyed: false,
+
+    childrenRefreshTimer: null,
+
+    childrenLastRefresh: 0,
+
+    thankyouTimer: null
   };
+
+  // ============================================================
+  // CHILDREN LIST LIVE REFRESH
+  // ============================================================
+
+  async function refreshChildrenList() {
+    if (state.childrenRefreshRequestInProgress) {
+      return;
+    }
+
+    state.childrenRefreshRequestInProgress = true;
+
+    try {
+      const endpoint =
+        data?.endpoints?.childrenList ||
+        "../api/kiosk/children_list.php";
+
+      const url = new URL(endpoint, window.location.href);
+      url.searchParams.set("device", deviceId);
+
+      const response = await fetch(url.toString(), {
+        cache: "no-store",
+        headers: { Accept: "application/json" }
+      });
+
+      const json = await response
+        .json()
+        .catch(() => ({}));
+
+      if (!response.ok || json?.success !== true) {
+        return;
+      }
+
+      const incoming = Array.isArray(json.data?.children)
+        ? json.data.children
+        : [];
+
+      if (incoming.length === 0) {
+        return;
+      }
+
+      const existingIds = new Set(
+        (data.children || []).map((c) => c.id)
+      );
+
+      let newCount = 0;
+
+      for (const child of incoming) {
+        if (!existingIds.has(child.id)) {
+          data.children.push(child);
+          newCount++;
+        }
+      }
+
+      state.childrenLastRefresh = Date.now();
+
+      if (newCount > 0) {
+        pushFeed(
+          "Nag-i-update ang listahan",
+          `${newCount} bagong bata nabunuan sa system.`,
+          "info"
+        );
+      }
+    } catch (error) {
+      console.warn(
+        "[SukatKalusugan] Children list refresh failed",
+        error
+      );
+    } finally {
+      state.childrenRefreshRequestInProgress = false;
+    }
+  }
+
+  function startChildrenRefresh() {
+    stopChildrenRefresh();
+
+    state.childrenRefreshTimer = setInterval(() => {
+      refreshChildrenList();
+    }, 10000);
+
+    refreshChildrenList();
+  }
+
+  function stopChildrenRefresh() {
+    if (state.childrenRefreshTimer) {
+      clearInterval(state.childrenRefreshTimer);
+      state.childrenRefreshTimer = null;
+    }
+  }
 
   // ============================================================
   // HELPERS
@@ -1182,6 +1277,13 @@
     // Reset child lookup when entering lookup screen
     if (step === "child-lookup") {
       resetLookup();
+    }
+
+    // Start/stop children list live refresh
+    if (step === "child-lookup" && !state.session) {
+      startChildrenRefresh();
+    } else if (prevStep === "child-lookup") {
+      stopChildrenRefresh();
     }
 
     saveSessionToStorage();
@@ -5218,6 +5320,13 @@ function finishResults(
 
     startDeviceStatusPolling();
 
+    stopChildrenRefresh();
+
+    if (state.thankyouTimer) {
+      clearTimeout(state.thankyouTimer);
+      state.thankyouTimer = null;
+    }
+
     state.statusTimer =
       null;
 
@@ -6278,6 +6387,17 @@ function finishResults(
           ) {
             event.preventDefault();
             setStep("thankyou");
+
+            if (state.thankyouTimer) {
+              clearTimeout(state.thankyouTimer);
+              state.thankyouTimer = null;
+            }
+
+            state.thankyouTimer = setTimeout(() => {
+              state.thankyouTimer = null;
+              resetKioskToIdle();
+            }, 5000);
+
             return;
           }
 

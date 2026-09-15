@@ -133,6 +133,7 @@ $appData = [
         'measurement' => '../api/esp32/submit_measurement.php',
         'checkDue' => '../api/kiosk/check_due.php',
         'cancelSession' => '../api/kiosk/cancel_session.php',
+        'childrenList' => '../api/kiosk/children_list.php',
     ],
     'defaults' => [
         'deviceId' => $deviceCode,
