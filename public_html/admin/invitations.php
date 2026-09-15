@@ -88,6 +88,8 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Create new ones 
                 }
                 ?>
                 <div class="admin-card-value"><?php echo $activatedCount; ?></div>
+                <div class="admin-card-meta">
+                    <span class="admin-card-trend"><?php echo 3 - $activatedCount; ?> used code</span>
             </div>
         </div>
     </article>

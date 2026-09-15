@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/who_reference_import.php';
+require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
 
@@ -116,8 +117,13 @@ function who_reference_height_range_label(string $indicator): string {
 	return match ($indicator) { 'wfl' => '45 – 110 cm', 'whz' => '65 – 120 cm', default => '' };
 }
 
-$exportUrl = app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange]);
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e($exportUrl) . '">' . admin_action_icon('export') . ' Export</a>';
+$exportBase = ['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange];
+$actions = export_dropdown(
+	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query($exportBase),
+	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'csv'])),
+	null,
+	'Save as'
+);
 
 nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
 ?>

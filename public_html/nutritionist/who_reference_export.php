@@ -18,15 +18,18 @@ function who_export_fail(string $indicator, string $sex, string $ageRange, strin
     ]);
 }
 
-// Zip extension is required — on Azure App Service it can be disabled.
-// Fail with a friendly notice instead of a 500.
-if (!class_exists('ZipArchive')) {
-    who_export_fail(
-        (string)($_GET['indicator'] ?? 'waz'),
-        (($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male'),
-        (string)($_GET['range'] ?? 'all'),
-        'Export is unavailable: the PHP zip extension is not enabled on this server. Enable extension=zip and try again.'
-    );
+// Zip is only required for .xlsx — CSV streams directly with no extension.
+// On hosts without extension=zip (e.g. Azure App Service default image) an
+// .xlsx request transparently falls back to CSV so the button never 500s.
+$whoFormat = strtolower(trim((string)($_GET['format'] ?? 'xlsx')));
+if ($whoFormat !== 'csv' && $whoFormat !== 'xlsx') {
+    $whoFormat = 'xlsx';
+}
+$whoFallbackToCsv = false;
+if ($whoFormat === 'xlsx' && !class_exists('ZipArchive')) {
+    error_log('[SukatKalusugan] WHO export: ZipArchive missing, falling back to CSV.');
+    $whoFormat = 'csv';
+    $whoFallbackToCsv = true;
 }
 
 $indicators = [
@@ -130,6 +133,29 @@ $sheetName = strtoupper($indicator) . '_' . $sex;
 
 if (empty($dataRows)) {
     who_export_fail($indicator, $sex, $ageRange, 'No reference rows found for this indicator. The reference table may not be seeded yet.');
+}
+
+if ($whoFormat === 'csv') {
+    if ($whoFallbackToCsv) {
+        error_log('[SukatKalusugan] WHO export served CSV fallback instead of XLSX.');
+    }
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    $csvName = 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.csv';
+    header('Content-Type: text/csv; charset=utf-8');
+    header('Content-Disposition: attachment; filename="' . $csvName . '"');
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
+    $out = fopen('php://output', 'w');
+    fwrite($out, "\xEF\xBB\xBF");
+    fputcsv($out, $header);
+    foreach ($dataRows as $dataRow) {
+        fputcsv($out, $dataRow);
+    }
+    fclose($out);
+    exit;
 }
 
 try {

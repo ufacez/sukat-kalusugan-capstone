@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/followup_scheduler.php';
+require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
 
@@ -287,12 +288,12 @@ foreach ($listCountRows as $cr) {
 }
 $listCounts['0-23'] = (int)$infantCount;
 
-$actions = '<details class="rp-export-menu"><summary class="admin-btn">' . admin_action_icon('export') . ' Export Data</summary>'
-	. '<div class="rp-export-popover">'
-	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))) . '">Export Excel</a>'
-	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))) ) . '">Export CSV</a>'
-	. '<a href="' . nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['consolidation' => 1]))) ) . '">Export for Consolidation</a>'
-	. '</div></details>';
+$actions = export_dropdown(
+	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)),
+	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))),
+	app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)),
+	'Save as'
+);
 
 nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
 ?>
@@ -307,7 +308,6 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-tab{font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-muted);cursor:pointer;transition:all 0.2s cubic-bezier(0.4,0,0.2,1);white-space:nowrap;text-decoration:none}
 .rp-tab:hover{border-color:rgba(11,110,79,0.35);color:var(--admin-primary);transform:translateY(-1px);box-shadow:0 2px 8px rgba(11,110,79,0.12)}
 .rp-tab.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);border-color:rgba(11,110,79,0.35);box-shadow:0 2px 10px rgba(11,110,79,0.18)}
-.rp-export-menu{position:relative;margin-left:8px}.rp-export-menu summary{list-style:none;cursor:pointer}.rp-export-menu summary::-webkit-details-marker{display:none}.rp-export-popover{position:absolute;right:0;top:calc(100% + 6px);z-index:5;min-width:190px;padding:6px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:8px;box-shadow:var(--admin-shadow)}.rp-export-popover a{display:block;padding:8px 10px;color:var(--admin-text);font-size:12px;text-decoration:none;border-radius:5px}.rp-export-popover a:hover{background:var(--admin-surface-alt);color:var(--admin-primary)}
 .rp-panel{display:none}
 .rp-panel.is-active{display:block}
 .rp-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:20px}
@@ -317,9 +317,9 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-stat-value{font-size:24px;font-weight:800;letter-spacing:-0.03em;color:var(--admin-text);line-height:1}
 .rp-stat-meta{font-size:11px;color:var(--admin-muted);margin-top:5px;font-weight:500}
 .rp-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
-.rp-form-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:20px;position:relative;overflow:hidden;transition:all 0.15s ease}
+.rp-form-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:20px;position:relative;overflow:visible;transition:all 0.15s ease}
 .rp-form-card:hover{border-color:var(--admin-primary);box-shadow:0 4px 16px rgba(11,110,79,0.08)}
-.rp-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--admin-primary)}
+.rp-form-card::before{content:'';position:absolute;top:-1px;left:-1px;right:-1px;height:3px;background:var(--admin-primary);border-radius:14px 14px 0 0}
 .rp-form-name{font-size:14px;font-weight:700;color:var(--admin-text);margin-bottom:4px}
 .rp-form-desc{font-size:12px;color:var(--admin-muted);line-height:1.5;margin-bottom:10px}
 .rp-form-meta{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
@@ -370,6 +370,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 <?php
 	$spec = $listCodes[$listParam];
 	$listExportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $listParam]));
+	$listCsvUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $listParam, 'format' => 'csv']));
 	$listPdfUrl = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query(array_merge($filterParams, ['report_type' => 'list', 'list_code' => $listParam]));
 ?>
 <div class="rp-breadcrumb">
@@ -384,8 +385,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 			<div style="font-size:12px;color:var(--admin-muted);"><?php echo nutritionist_e($spec['axis']); ?> &middot; Age <?php echo $spec['age_min']; ?>-<?php echo $spec['age_max']; ?> mo &middot; Year <?php echo $year; ?> &middot; <?php echo count($listRows); ?> children</div>
 		</div>
 		<div style="display:flex;gap:8px;">
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e($listPdfUrl); ?>" style="font-size:12px;min-height:32px;">PDF</a>
-			<a class="admin-btn" href="<?php echo nutritionist_e($listExportUrl); ?>" style="font-size:12px;min-height:32px;"><?php echo admin_action_icon('export'); ?> Excel</a>
+			<?php echo export_dropdown($listExportUrl, $listCsvUrl, $listPdfUrl, 'Save as'); ?>
 		</div>
 	</div>
 	<?php
@@ -512,9 +512,9 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 <?php elseif ($activeTab === 'eopt_forms'): ?>
 <div class="rp-panel is-active" data-panel="eopt_forms">
 	<div class="rp-section"><div class="rp-section-head"><div><div class="rp-section-title">EOPT Forms</div><div class="rp-section-sub">OPT Plus forms generated from the selected reporting period and barangay.</div></div></div><div class="rp-form-grid">
-		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1A</div><div class="rp-form-desc">Master list of preschool children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a'])))); ?>">Excel</a></div></div>
-		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1B</div><div class="rp-form-desc">Consolidated nutrition assessment results.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Consolidated results</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b'])))); ?>">Excel</a></div></div>
-		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1C</div><div class="rp-form-desc">Affected and at-risk children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c'])))); ?>">Excel</a></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1A</div><div class="rp-form-desc">Master list of preschool children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1a', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams)), 'Save as'); ?></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1B</div><div class="rp-form-desc">Consolidated nutrition assessment results.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">Consolidated results</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1b', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams)), 'Save as'); ?></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">OPT Plus Form 1C</div><div class="rp-form-desc">Affected and at-risk children aged 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$affectedCount; ?> children</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'form1c', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams)), 'Save as'); ?></div></div>
 	</div></div>
 </div>
 
@@ -528,6 +528,7 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 				$vLink = app_url('/nutritionist/eopt_reports.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code]));
 				$pLink = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query(array_merge($filterParams, ['report_type' => 'list', 'list_code' => $code]));
 				$eLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code]));
+				$cLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code, 'format' => 'csv']));
 			?>
 				<div class="rp-monitor-card">
 					<div class="rp-monitor-name"><?php echo nutritionist_e($spec['title']); ?></div>
@@ -538,8 +539,7 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 							<span class="admin-pill <?php echo $count > 0 ? 'is-success' : 'is-muted'; ?>" style="font-size:10px;"><?php echo $count > 0 ? 'Ready' : 'Empty'; ?></span>
 							<div class="rp-monitor-actions">
 								<a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e($vLink); ?>"><?php echo admin_action_icon('view'); ?></a>
-								<a class="admin-icon-btn" title="PDF" href="<?php echo nutritionist_e($pLink); ?>"><?php echo admin_action_icon('print'); ?></a>
-								<a class="admin-icon-btn admin-icon-btn-primary" title="Excel" href="<?php echo nutritionist_e($eLink); ?>"><?php echo admin_action_icon('export'); ?></a>
+								<?php echo export_dropdown($eLink, $cLink, $pLink, 'Save as', 'icon'); ?>
 							</div>
 						</div>
 					</div>
@@ -552,8 +552,8 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 <?php elseif ($activeTab === 'nutrition'): ?>
 <div class="rp-panel is-active" data-panel="nutrition">
 	<div class="rp-section"><div class="rp-section-head"><div><div class="rp-section-title">Nutrition Status Reports</div><div class="rp-section-sub">Detailed child status and barangay-level nutrition summaries.</div></div></div><div class="rp-form-grid">
-		<div class="rp-form-card"><div class="rp-form-name">NutStatusTool</div><div class="rp-form-desc">Detailed nutrition-status dataset with child, measurement, and WFA/HFA/WFL-H indicators.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus'])))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>">Excel</a></div></div>
-		<div class="rp-form-card"><div class="rp-form-name">NutStatusBrgy</div><div class="rp-form-desc">Barangay-level sex-disaggregated summary for 0–23 and 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 &amp; 0–59 months</span></div><div class="rp-form-actions"><a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy'])))); ?>">PDF</a><a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>">Excel</a></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">NutStatusTool</div><div class="rp-form-desc">Detailed nutrition-status dataset with child, measurement, and WFA/HFA/WFL-H indicators.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus']))), 'Save as'); ?></div></div>
+		<div class="rp-form-card"><div class="rp-form-name">NutStatusBrgy</div><div class="rp-form-desc">Barangay-level sex-disaggregated summary for 0–23 and 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 &amp; 0–59 months</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy']))), 'Save as'); ?></div></div>
 	</div></div>
 	<?php
 	$summaryRows = admin_fetch_all(
@@ -820,11 +820,13 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 <div class="rp-panel is-active" data-panel="export">
 	<div class="rp-export-grid">
 		<div class="rp-export-card">
-			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook (.xlsx)</div>
-			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format.</div>
-			<a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams))); ?>"><?php echo admin_action_icon('export'); ?> Download Excel Workbook</a>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatusTool Excel</a>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy'])))); ?>"><?php echo admin_action_icon('export'); ?> NutStatusBrgy Excel</a>
+			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook</div>
+			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format. Pick a file type:</div>
+			<div style="display:flex;gap:8px;flex-wrap:wrap;">
+				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)), 'Workbook'); ?>
+				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams)), 'NutStatusTool'); ?>
+				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams)), 'NutStatusBrgy'); ?>
+			</div>
 		</div>
 		<div class="rp-export-card">
 			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">Formal PDF Reports</div>

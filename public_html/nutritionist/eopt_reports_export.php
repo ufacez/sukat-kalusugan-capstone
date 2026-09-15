@@ -1108,15 +1108,51 @@ foreach ($activeSpecs as $listIndex => $spec) {
 	];
 }
 
+$zipAvailable = class_exists('ZipArchive');
 $csvRequested = $exportFormat === 'csv' || isset($_GET['consolidation']);
-if ($csvRequested) {
-	ob_end_clean();
+$xlsxFallbackToCsv = false;
+if (!$csvRequested && !$zipAvailable) {
+	// Live-server safety net (e.g. Azure App Service without extension=zip):
+	// serve the same data as CSV instead of throwing a 500. CSV needs no
+	// PHP extension and Excel opens it natively.
+	$xlsxFallbackToCsv = true;
+	$csvRequested = true;
+	error_log('[SukatKalusugan] EOPT export: ZipArchive missing, falling back to CSV.');
+}
+
+if ($isNutStatus) {
+	$downloadName = 'nutstatustool-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
+} elseif ($isNutStatusBrgy) {
+	$downloadName = 'nutstatusbrgy-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
+} elseif ($isForm1A) {
+	$downloadName = 'eopt-form1a-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
+} elseif ($isForm1B) {
+	$downloadName = 'eopt-form1b-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
+} elseif ($isForm1C) {
+	$downloadName = 'eopt-form1c-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
+} elseif ($isSingleList) {
+	$downloadName = sprintf('eopt-list-%s-%04d-%s', strtolower((string)$listParam), $year, date('Y-m-d'));
+} else {
+	$downloadSlug = $view === 'monthly'
+		? sprintf('monthly-%02d%04d', $month, $year)
+		: sprintf('quarterly-%02d%04d', $checkupMonth, $year);
+	$downloadName = 'eopt-report-' . $downloadSlug . '-' . date('Y-m-d');
+}
+$csvDownloadName = $downloadName . '.csv';
+$xlsxDownloadName = $downloadName . '.xlsx';
+
+$eoptStreamCsv = static function (array $sheets, string $filename): void {
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
 	header('Content-Type: text/csv; charset=utf-8');
-	header('Content-Disposition: attachment; filename="eopt-consolidation-' . date('Y-m-d') . '.csv"');
+	header('Content-Disposition: attachment; filename="' . $filename . '"');
 	header('Cache-Control: no-store');
 	$output = fopen('php://output', 'w');
+	// BOM so Excel detects UTF-8 (names with ñ etc.).
+	fwrite($output, "\xEF\xBB\xBF");
 	foreach ($sheets as $sheet) {
-		fputcsv($output, [$sheet['name']]);
+		fputcsv($output, [(string)($sheet['name'] ?? 'Sheet1')]);
 		foreach ($sheet['rows'] as $row) {
 			fputcsv($output, array_map(static fn($cell) => $cell['v'] ?? '', $row));
 		}
@@ -1124,55 +1160,98 @@ if ($csvRequested) {
 	}
 	fclose($output);
 	exit;
+};
+
+if ($csvRequested) {
+	if ($xlsxFallbackToCsv) {
+		log_action((int)$user['id'], 'EOPT_XLSX_FALLBACK_CSV', 'warning', sprintf('Zip ext missing; served CSV instead of XLSX (%s).', $downloadName));
+	} elseif (isset($_GET['consolidation'])) {
+		log_action((int)$user['id'], 'EOPT_CONSOLIDATION_EXPORT', 'info', sprintf('Exported EOPT consolidation CSV (%s, %s).', $view, $periodLabel));
+	} else {
+		log_action((int)$user['id'], 'EOPT_CSV_EXPORT', 'info', sprintf('Exported EOPT CSV %s (%s, %s).', $downloadName, $view, $periodLabel));
+	}
+	$eoptStreamCsv($sheets, $csvDownloadName);
 }
 
-$tmpBase = tempnam(sys_get_temp_dir(), 'eopt_report_');
+$eoptTmpDir = rtrim((string)sys_get_temp_dir(), "/\\");
+if ($eoptTmpDir === '' || !is_dir($eoptTmpDir) || !is_writable($eoptTmpDir)) {
+	// Azure fallback: sys temp can be locked down; use the app logs dir.
+	$fallbackDir = realpath(__DIR__ . '/../../logs');
+	if ($fallbackDir !== false && is_writable($fallbackDir)) {
+		$eoptTmpDir = $fallbackDir;
+	} else {
+		$eoptTmpDir = sys_get_temp_dir();
+	}
+}
+$tmpBase = tempnam($eoptTmpDir, 'eopt_report_');
+if ($tmpBase === false) {
+	error_log('[SukatKalusugan] EOPT export: tempnam failed, falling back to CSV.');
+	$eoptStreamCsv($sheets, $csvDownloadName);
+}
 $tmpPath = $tmpBase . '.xlsx';
 @unlink($tmpBase);
 
-if (!xlsx_lite_write_workbook($tmpPath, $sheets)) {
+$xlsxOk = false;
+try {
+	$xlsxOk = xlsx_lite_write_workbook($tmpPath, $sheets);
+} catch (Throwable $e) {
+	error_log('[SukatKalusugan] EOPT export write threw: ' . $e->getMessage());
+	$xlsxOk = false;
+}
+
+if (!$xlsxOk) {
+	// Never 500 on a report the user waited for: if we have sheet data,
+	// hand it over as CSV (always available); otherwise redirect w/ notice.
+	if ($sheets !== []) {
+		error_log('[SukatKalusugan] EOPT export: xlsx write failed, falling back to CSV.');
+		log_action((int)$user['id'], 'EOPT_XLSX_FALLBACK_CSV', 'warning', sprintf('XLSX write failed; served CSV instead (%s).', $downloadName));
+		@unlink($tmpPath);
+		$eoptStreamCsv($sheets, $csvDownloadName);
+	}
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
 	$redirectParams = $isSingleList
 		? ['list' => $listParam, 'year' => $year, 'barangay_id' => $barangayFilter, 'notice' => 'The EOPT list could not be generated.', 'type' => 'error']
 		: ['view' => $view, 'year' => $year, 'month' => $month, 'checkup_month' => $checkupMonth, 'barangay_id' => $barangayFilter, 'notice' => 'The EOPT Excel workbook could not be generated.', 'type' => 'error'];
-	$redirectUrl = $isSingleList
-		? app_url('/nutritionist/eopt_reports.php')
-		: app_url('/nutritionist/eopt_reports.php');
+	$redirectUrl = app_url('/nutritionist/eopt_reports.php');
 	admin_redirect($redirectUrl, $redirectParams);
 }
 
 if ($isNutStatus) {
 	log_action((int)$user['id'], 'EOPT_NUTSTATUS_EXPORT', 'info', sprintf('Exported NutStatusTool roster (%s, %s).', $view, $periodLabel));
-	$downloadName = 'nutstatustool-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isNutStatusBrgy) {
 	log_action((int)$user['id'], 'EOPT_NUTSTATUSBRGY_EXPORT', 'info', sprintf('Exported NutStatusBrgy summary (%s, %s).', $view, $periodLabel));
-	$downloadName = 'nutstatusbrgy-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isForm1A) {
 	log_action((int)$user['id'], 'EOPT_FORM1A_EXPORT', 'info', sprintf('Exported Form 1A roster (%s, %s).', $view, $periodLabel));
-	$downloadName = 'eopt-form1a-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isForm1B) {
 	log_action((int)$user['id'], 'EOPT_FORM1B_EXPORT', 'info', sprintf('Exported Form 1B consolidation (%s, %s).', $view, $periodLabel));
-	$downloadName = 'eopt-form1b-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isForm1C) {
 	log_action((int)$user['id'], 'EOPT_FORM1C_EXPORT', 'info', sprintf('Exported Form 1C affected-child list (%s, %s).', $view, $periodLabel));
-	$downloadName = 'eopt-form1c-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d') . '.xlsx';
 } elseif ($isSingleList) {
-	log_action((int)$user['id'], 'EOPT_LIST_EXPORT', 'info', sprintf('Exported EOPT list %s covering %d row(s).', $listParam, count($sheets[0]['rows'])));
-	$downloadName = sprintf('eopt-list-%s-%04d-%s.xlsx', strtolower($listParam), $year, date('Y-m-d'));
+	log_action((int)$user['id'], 'EOPT_LIST_EXPORT', 'info', sprintf('Exported EOPT list %s covering %d row(s).', $listParam, count($sheets[0]['rows'] ?? [])));
 } else {
 	log_action((int)$user['id'], 'EOPT_EXPORT', 'info', sprintf('Exported EOPT workbook (%s, %s) covering %d list sheets.', $view, $periodLabel, count($listsSpec)));
-	$downloadSlug = $view === 'monthly'
-		? sprintf('monthly-%02d%04d', $month, $year)
-		: sprintf('quarterly-%02d%04d', $checkupMonth, $year);
-	$downloadName = 'eopt-report-' . $downloadSlug . '-' . date('Y-m-d') . '.xlsx';
 }
 
-ob_end_clean();
+$fileSize = @filesize($tmpPath);
+if ($fileSize === false || $fileSize <= 0) {
+	error_log('[SukatKalusugan] EOPT export: xlsx file empty, falling back to CSV.');
+	@unlink($tmpPath);
+	$eoptStreamCsv($sheets, $csvDownloadName);
+}
+
+while (ob_get_level() > 0) {
+	ob_end_clean();
+}
 
 header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-header('Content-Disposition: attachment; filename="' . $downloadName . '"');
-header('Content-Length: ' . (string)filesize($tmpPath));
-header('Cache-Control: no-store');
+header('Content-Disposition: attachment; filename="' . $xlsxDownloadName . '"');
+header('Content-Length: ' . (string)$fileSize);
+header('Cache-Control: no-store, no-cache, must-revalidate');
+header('Pragma: no-cache');
+header('Expires: 0');
 
 readfile($tmpPath);
-unlink($tmpPath);
+@unlink($tmpPath);
 exit;
