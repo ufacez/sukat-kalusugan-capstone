@@ -1014,8 +1014,32 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   box-shadow: 0 4px 12px rgba(224, 72, 72, 0.08);
+}
+
+.kiosk-live-error-body {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.kiosk-live-error-body strong {
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.kiosk-live-error-body span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.kiosk-live-error .kiosk-btn {
+  flex-shrink: 0;
 }
 
 .kiosk-live-error[hidden] {
@@ -2681,7 +2705,7 @@ body {
 }
 
 /* ==========================================================================
- *  LIVELY LAYER (append-only, CSS-only — no JS/endpoint/timing changes).
+ *  LIVELY LAYER (append-only, CSS-only ï¿½ no JS/endpoint/timing changes).
  *  - Sensor-ready pop, results stagger, idle attract on welcome.
  *  - Frozen during measurement/processing: only progress + stability move.
  * ========================================================================== */
