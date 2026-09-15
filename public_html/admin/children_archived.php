@@ -50,7 +50,7 @@ $deleteTarget = admin_fetch_one('SELECT id, child_code, first_name FROM children
             <span>Type DELETE to confirm</span>
             <input name="confirm_delete" required pattern="DELETE" placeholder="DELETE" style="max-width:200px;font-family:monospace;font-weight:700;color:var(--admin-danger,#d32f2f);">
         </label>
-        <button class="admin-btn" type="submit" style="background:var(--admin-danger,#d32f2f);color:#fff;" onclick="return confirm('This will permanently delete this child. Are you absolutely sure?');">
+        <button class="admin-btn" type="submit" style="background:var(--admin-danger,#d32f2f);color:#fff;" data-admin-confirm="This will permanently delete this child. Are you absolutely sure?" data-admin-confirm-danger>
             <?php echo admin_action_icon('delete'); ?> Permanently delete
         </button>
         <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/children_archived.php')); ?>">Cancel</a>

@@ -225,7 +225,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
 								<?php endif; ?>
 								<?php if (nutritionist_can_write('parents.delete')): ?>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" onsubmit="return confirm('Delete <?php echo nutritionist_e($parent['name']); ?>?');" style="display:inline;">
+								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" data-admin-confirm="Delete <?php echo nutritionist_e($parent['name']); ?>?" data-admin-confirm-danger style="display:inline;">
 									<input type="hidden" name="action" value="delete">
 									<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
 									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>

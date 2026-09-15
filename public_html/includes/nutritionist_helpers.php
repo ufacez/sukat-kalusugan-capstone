@@ -174,6 +174,8 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<html lang="en">';
     echo '<head>';
     echo '<meta charset="utf-8">';
+    echo '<meta name="color-scheme" content="light dark">';
+    echo '<style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}</style>';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
     echo '<title>' . nutritionist_e($title) . ' | Sukat Kalusugan Nutritionist</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
@@ -294,6 +296,7 @@ function nutritionist_layout_end(): void
     echo '</main>';
     echo '</div>';
     echo '</div>';
+    echo confirm_modal_shell();
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');

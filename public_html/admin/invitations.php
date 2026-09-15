@@ -23,7 +23,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $ok = admin_execute("UPDATE invitations SET status = 'cancelled' WHERE id = ? AND status = 'pending'", 'i', [$cancelId]);
                 if ($ok) {
                     $actor = current_user();
-                    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'info', sprintf('Cancelled invitation for %s (code: %s)', $inv['invitee_name'], $inv['code']));
+                    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'danger', sprintf('Cancelled invitation for %s (code: %s)', $inv['invitee_name'], $inv['code']));
                 }
                 admin_redirect('/admin/invitations.php', ['notice' => $ok ? 'Invitation cancelled.' : 'Could not cancel invitation.', 'type' => $ok ? 'success' : 'error']);
             }
@@ -178,7 +178,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Create new ones 
                         <td>
                             <?php if ($inv['status'] === 'pending'): ?>
                             <div class="admin-actions">
-                                <form method="post" action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>" onsubmit="return confirm('Cancel invitation for <?php echo admin_e($inv['invitee_name']); ?>?');" style="display:inline;">
+                                <form method="post" action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>" data-admin-confirm="Cancel invitation for <?php echo admin_e($inv['invitee_name']); ?>?" style="display:inline;">
                                     <input type="hidden" name="action" value="cancel">
                                     <input type="hidden" name="id" value="<?php echo (int)$inv['id']; ?>">
                                     <button class="admin-icon-btn is-delete" title="Cancel" type="submit" aria-label="Cancel invitation">

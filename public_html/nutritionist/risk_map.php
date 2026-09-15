@@ -309,7 +309,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
 <section class="admin-section" style="margin-top:12px;">
     <div class="admin-section-head">
         <div>
-            <h2 class="admin-section-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;vertical-align:-3px;margin-right:6px;opacity:.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 3.498c.914.27 1.87.411 2.854.414a4.5 4.5 0 004.412-5.577 4.5 4.5 0 00-4.412-5.577 4.5 4.5 0 00-4.412 5.577c0 .914.141 1.87.414 2.854"/></svg>Barangay Risk Map</h2>
+            <h2 class="admin-section-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;vertical-align:-3px;margin-right:6px;opacity:.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 2.499 4.012-3.749a1.125 1.125 0 0 1 1.538-.028l3.499 3.25a1.125 1.125 0 0 1-.05 1.664l-3.499 2a1.125 1.125 0 0 1-1.588-.5V6.75a1.125 1.125 0 0 1 .503-.999Z"/></svg>Barangay Risk Map</h2>
             <p class="admin-section-subtitle">View the distribution of children and nutritional risk status per household in your assigned barangay.</p>
         </div>
         <div class="admin-section-actions">
@@ -904,8 +904,12 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
     function wireSpotDetailEvents(householdId) {
         document.querySelectorAll('[data-action="unassign-parent"]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                if (!confirm('Remove this parent from the household?')) return;
                 var parentId = parseInt(this.dataset.id, 10);
+                var proceed = window.SKConfirm
+                    ? window.SKConfirm('Remove this parent from the household?', { title: 'Remove parent', confirmLabel: 'Remove', danger: true })
+                    : Promise.resolve(confirm('Remove this parent from the household?'));
+                proceed.then(function (ok) {
+                if (!ok) return;
                 var fd = new FormData();
                 fd.append('parent_id', parentId);
                 fetch(BASE_URL + 'api/households/unassign_parent.php', { method: 'POST', body: fd, credentials: 'same-origin' })
@@ -915,6 +919,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                         else AdminToast.error(res.message || 'Failed to unassign.');
                     })
                     .catch(function () { AdminToast.error('Network error.'); });
+                });
             });
         });
 

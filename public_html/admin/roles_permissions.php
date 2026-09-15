@@ -5,24 +5,15 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 start_secure_session();
 require_permission('roles_permissions.view');
 
-$admins = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.status, u.access_level FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = "admin" ORDER BY u.name ASC'
+$staff = admin_fetch_all(
+    'SELECT u.id, u.name, u.email, u.status, u.access_level, r.name AS role_name FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name IN ("admin", "nutritionist") ORDER BY r.name ASC, u.name ASC'
 );
-$nutritionists = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.status, u.access_level FROM users u INNER JOIN roles r ON r.id = u.role_id WHERE r.name = "nutritionist" ORDER BY u.name ASC'
-);
-
-$perPage = 5;
-
-$adminPage = max(1, (int)($_GET['admin_page'] ?? 1));
-$adminTotal = count($admins);
-$adminPages = max(1, (int)ceil($adminTotal / $perPage));
-$adminSlice = array_slice($admins, ($adminPage - 1) * $perPage, $perPage);
-
-$nutriPage = max(1, (int)($_GET['nutri_page'] ?? 1));
-$nutriTotal = count($nutritionists);
-$nutriPages = max(1, (int)ceil($nutriTotal / $perPage));
-$nutriSlice = array_slice($nutritionists, ($nutriPage - 1) * $perPage, $perPage);
+$adminTotal = 0;
+$nutriTotal = 0;
+foreach ($staff as $s) {
+    if (($s['role_name'] ?? '') === 'admin') $adminTotal++;
+    else $nutriTotal++;
+}
 
 $accessLevels = [
     'full'     => ['label' => 'Full Access', 'pill' => 'is-success', 'dot' => '#16a34a'],
@@ -73,39 +64,44 @@ admin_layout_start('Roles & Permissions', 'Manage per-user access levels. Each u
     </article>
 </section>
 
-<?php
-function rp_render_table(string $key, string $label, array $rows, int $currentPage, int $totalPages, int $total): void
-{
-    global $accessLevels;
-?>
 <section class="admin-section">
     <div class="admin-section-head">
         <div>
-            <h2 class="admin-section-title"><?php echo admin_e($label); ?></h2>
-            <p class="admin-section-subtitle"><?php echo $total; ?> account(s)</p>
+            <h2 class="admin-section-title">Staff Accounts</h2>
+            <p class="admin-section-subtitle"><?php echo $adminTotal + $nutriTotal; ?> account(s)</p>
         </div>
-        <div class="admin-toolbar" style="margin:0;">
-            <input class="admin-search" type="search" placeholder="Search <?php echo admin_e(strtolower($label)); ?>" data-admin-filter="#<?php echo admin_e($key); ?>-table">
+        <div class="admin-toolbar" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <div class="rp-role-pills" role="tablist" aria-label="Filter by role">
+                <button type="button" class="rp-role-pill is-active" data-role-pill="" role="tab" aria-selected="true">All</button>
+                <button type="button" class="rp-role-pill" data-role-pill="admin" role="tab" aria-selected="false">Administrators</button>
+                <button type="button" class="rp-role-pill" data-role-pill="nutritionist" role="tab" aria-selected="false">Nutritionists</button>
+            </div>
+            <input class="admin-search" type="search" placeholder="Search staff" data-admin-filter="#staff-roles-table">
         </div>
     </div>
 
     <div class="admin-table-wrap admin-table-wrap--with-pagination">
-        <table class="admin-table" id="<?php echo admin_e($key); ?>-table">
+        <table class="admin-table" id="staff-roles-table">
             <thead>
                 <tr>
                     <th>Name</th>
+                    <th>Role</th>
                     <th>Access</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
-                <?php if (empty($rows)): ?>
-                    <tr><td colspan="4" style="text-align:center;color:var(--admin-muted);padding:24px;">No accounts found.</td></tr>
+                <?php if (empty($staff)): ?>
+                    <tr><td colspan="5" style="text-align:center;color:var(--admin-muted);padding:24px;">No accounts found.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($rows as $user): ?>
-                        <?php $al = $user['access_level'] ?? 'full'; ?>
-                        <tr data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $al)); ?>">
+                    <?php foreach ($staff as $user): ?>
+                        <?php
+                        $al = $user['access_level'] ?? 'full';
+                        $roleName = (string)($user['role_name'] ?? '');
+                        $roleLabel = $roleName === 'admin' ? 'Admin' : 'Nutritionist';
+                        ?>
+                        <tr data-role="<?php echo admin_e($roleName); ?>" data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $roleLabel . ' ' . $al)); ?>">
                             <td>
                                 <div style="display:flex;align-items:center;gap:10px;">
                                     <span class="admin-avatar" style="background:<?php echo admin_e(admin_avatar_color($user['name'])); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_e(admin_initials($user['name'])); ?></span>
@@ -115,6 +111,7 @@ function rp_render_table(string $key, string $label, array $rows, int $currentPa
                                     </div>
                                 </div>
                             </td>
+                            <td><span class="admin-pill <?php echo $roleName === 'admin' ? 'is-danger' : 'is-info'; ?>"><?php echo admin_e($roleLabel); ?></span></td>
                             <td><span class="admin-pill <?php echo admin_e($accessLevels[$al]['pill'] ?? 'is-muted'); ?>" id="access-pill-<?php echo (int)$user['id']; ?>"><?php echo admin_e(ucfirst($al)); ?></span></td>
                             <td><span class="admin-pill is-<?php echo admin_e($user['status'] === 'active' ? 'success' : 'muted'); ?>"><?php echo admin_e(ucfirst($user['status'])); ?></span></td>
                             <td>
@@ -140,76 +137,113 @@ function rp_render_table(string $key, string $label, array $rows, int $currentPa
                 <?php endif; ?>
             </tbody>
         </table>
-
-        <?php if ($totalPages > 1): ?>
-        <div class="admin-pagination">
-            <span class="admin-pagination-status">Page <?php echo $currentPage; ?> of <?php echo $totalPages; ?></span>
-            <div class="admin-pagination-actions">
-                <?php
-                $baseParam = $key === 'admin' ? 'admin_page' : 'nutri_page';
-                $params = $_GET;
-                unset($params[$baseParam]);
-                $qs = http_build_query($params);
-                $prefix = $qs ? $qs . '&' : '';
-                ?>
-                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage - 1)); ?>" <?php echo $currentPage <= 1 ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
-                </a>
-                <div class="admin-pagination-numbers">
-                    <?php for ($i = 1; $i <= $totalPages; $i++): ?>
-                        <a class="admin-page-num<?php echo $i === $currentPage ? ' is-active' : ''; ?>" href="?<?php echo admin_e($prefix . $baseParam . '=' . $i); ?>"><?php echo $i; ?></a>
-                    <?php endfor; ?>
-                </div>
-                <a class="admin-icon-btn" href="?<?php echo admin_e($prefix . $baseParam . '=' . ($currentPage + 1)); ?>" <?php echo $currentPage >= $totalPages ? 'style="pointer-events:none;opacity:.4;"' : ''; ?>>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
-                </a>
-            </div>
-        </div>
-        <?php endif; ?>
     </div>
 </section>
-<?php
-}
-
-rp_render_table('admin', 'Administrators', $adminSlice, $adminPage, $adminPages, $adminTotal);
-rp_render_table('nutritionist', 'Nutritionists', $nutriSlice, $nutriPage, $nutriPages, $nutriTotal);
-?>
 
 <style>
 .rp-dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:9999;padding:4px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .15s}
 .rp-dropdown-menu.is-open{opacity:1;visibility:visible;transform:translateY(0)}
 .rp-dropdown-label{font-size:9px;font-weight:600;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.4px;padding:6px 10px 2px;user-select:none}
+/* Single-row table alignment: pills sit mid-line with the name cell, pill
+columns never wrap, and narrow screens get exactly one horizontal scroll. */
+#staff-roles-table{min-width:640px}
+#staff-roles-table th,#staff-roles-table td{vertical-align:middle}
+#staff-roles-table td:nth-child(2),#staff-roles-table td:nth-child(3),#staff-roles-table td:nth-child(4){white-space:nowrap}
+#staff-roles-table th:last-child,#staff-roles-table td:last-child{text-align:center}
+#staff-roles-table .admin-actions{justify-content:center}
+#staff-roles-table .rp-dropdown-menu.is-floating{position:fixed;top:auto;right:auto;transform:translateY(-4px)}
+#staff-roles-table .rp-dropdown-menu.is-floating.is-open{transform:translateY(0)}
+.admin-section-head{flex-wrap:wrap}
+.admin-section-head .admin-toolbar{flex:1 1 auto;justify-content:flex-end}
+.admin-toolbar .admin-search{flex:1 1 200px;min-width:0}
 .rp-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--admin-text);font-family:Inter,sans-serif;text-align:left;transition:background .1s}
 .rp-dropdown-item:hover{background:var(--admin-surface-alt)}
 .rp-dropdown-item.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);font-weight:600}
 .rp-dropdown-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.rp-role-pills{display:flex;gap:6px;flex-wrap:wrap}
+.rp-role-pill{font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-muted);cursor:pointer;transition:all .15s;white-space:nowrap}
+.rp-role-pill:hover{border-color:rgba(11,110,79,.35);color:var(--admin-primary)}
+.rp-role-pill.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);border-color:rgba(11,110,79,.35)}
 </style>
 
 <script>
-document.addEventListener('click', function(e) {
+function rpCloseMenus() {
     document.querySelectorAll('.rp-dropdown-menu.is-open').forEach(function(m) {
-        if (!m.parentElement.contains(e.target)) m.classList.remove('is-open');
+        m.classList.remove('is-open', 'is-floating');
+        m.style.top = '';
+        m.style.left = '';
+    });
+}
+document.addEventListener('click', function(e) {
+    if (e.target && e.target.closest && e.target.closest('.rp-dropdown-menu')) return;
+    document.querySelectorAll('.rp-dropdown-menu.is-open').forEach(function(m) {
+        if (!m.parentElement.contains(e.target)) rpCloseMenus();
+    });
+});
+// A fixed menu must not linger while the page or table moves under it.
+document.addEventListener('scroll', function() { rpCloseMenus(); }, true);
+window.addEventListener('resize', function() { rpCloseMenus(); });
+
+// Role pills: gate the shared admin.js table filter (data-role-filter on
+// the table + data-role on rows), then re-run it via the search box.
+document.querySelectorAll('[data-role-pill]').forEach(function(pill) {
+    pill.addEventListener('click', function() {
+        document.querySelectorAll('[data-role-pill]').forEach(function(p) {
+            p.classList.remove('is-active');
+            p.setAttribute('aria-selected', 'false');
+        });
+        pill.classList.add('is-active');
+        pill.setAttribute('aria-selected', 'true');
+        var table = document.getElementById('staff-roles-table');
+        var search = document.querySelector('[data-admin-filter="#staff-roles-table"]');
+        if (table) {
+            if (pill.getAttribute('data-role-pill')) table.setAttribute('data-role-filter', pill.getAttribute('data-role-pill'));
+            else table.removeAttribute('data-role-filter');
+        }
+        if (search) search.dispatchEvent(new Event('input', { bubbles: true }));
     });
 });
 
 document.querySelectorAll('.rp-dropdown-trigger').forEach(function(btn) {
     btn.addEventListener('click', function(e) {
         e.stopPropagation();
-        var menu = this.closest('div[style]').querySelector('.rp-dropdown-menu');
+        var cell = this.closest('td');
+        var menu = cell ? cell.querySelector('.rp-dropdown-menu') : null;
+        if (!menu) return;
         var wasOpen = menu.classList.contains('is-open');
-        document.querySelectorAll('.rp-dropdown-menu.is-open').forEach(function(m) { m.classList.remove('is-open'); });
-        if (!wasOpen) menu.classList.add('is-open');
+        rpCloseMenus();
+        if (wasOpen) return;
+        // Float above the table scroll box so the menu is never clipped.
+        menu.classList.add('is-floating', 'is-open');
+        var rect = btn.getBoundingClientRect();
+        var mw = menu.offsetWidth || 190;
+        var mh = menu.offsetHeight || 150;
+        var left = Math.round(rect.left + rect.width / 2 - mw / 2);
+        left = Math.max(8, Math.min(left, window.innerWidth - mw - 8));
+        var below = Math.round(rect.bottom + 4);
+        // Flip upward when there is no room below the button.
+        var top = (below + mh + 8 > window.innerHeight)
+            ? Math.max(8, Math.round(rect.top - mh - 4))
+            : below;
+        menu.style.left = left + 'px';
+        menu.style.top = top + 'px';
     });
 });
 
 document.querySelectorAll('.rp-dropdown-item').forEach(function(item) {
     item.addEventListener('click', function(e) {
         e.stopPropagation();
+        rpCloseMenus();
         var userId = parseInt(this.dataset.userId);
         var level = this.dataset.level;
         if (!userId || !level) return;
 
-        if (!confirm('Change this user\'s access to ' + level.charAt(0).toUpperCase() + level.slice(1) + '?')) return;
+        var levelLabel = level.charAt(0).toUpperCase() + level.slice(1);
+        var proceed = window.SKConfirm
+            ? window.SKConfirm('Change this user\'s access to ' + levelLabel + '?', { title: 'Change access', confirmLabel: 'Change access' })
+            : Promise.resolve(confirm('Change this user\'s access to ' + levelLabel + '?'));
+        proceed.then(function (ok) {
+        if (!ok) return;
 
         var apiUrl = '<?php echo admin_e(app_url("/api/admin/user_access_level.php")); ?>';
         fetch(apiUrl, {
@@ -226,6 +260,7 @@ document.querySelectorAll('.rp-dropdown-item').forEach(function(item) {
             }
         })
         .catch(function() { AdminToast.error('Network error. Please try again.'); });
+        });
     });
 });
 </script>

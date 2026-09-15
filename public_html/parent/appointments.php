@@ -248,7 +248,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 				<p class="appt-modal-notes-text" id="modalNotes"></p>
 			</div>
 			<div class="appt-modal-cancel" id="modalCancelSection">
-				<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" onsubmit="return confirm('Cancel this appointment?');">
+				<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" data-admin-confirm="Cancel this appointment?">
 					<input type="hidden" name="action" value="cancel">
 					<input type="hidden" name="id" id="modalCancelId">
 					<button class="admin-btn-secondary appt-modal-cancel-btn" type="submit">Cancel Appointment</button>

@@ -899,7 +899,12 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
     });
 
     on(dom.archiveBtn, 'click', () => {
-        if (!state.sessions.length || !window.confirm('Delete all your chats with Kali?')) return;
+        if (!state.sessions.length) return;
+        var proceed = window.SKConfirm
+            ? window.SKConfirm('Delete all your chats with Kali?', { title: 'Delete chats', confirmLabel: 'Delete all', danger: true })
+            : Promise.resolve(window.confirm('Delete all your chats with Kali?'));
+        proceed.then(confirmed => {
+        if (!confirmed) return;
 
         fetchWithTimeout(API + 'conversations.php', {
             method: 'POST',
@@ -916,6 +921,7 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
             createConversation(null);
         })
         .catch(error => appendBubble('system', error.message));
+        });
     });
 
     on(dom.sendBtn, 'click', () => {

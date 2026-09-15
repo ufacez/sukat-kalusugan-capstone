@@ -149,7 +149,7 @@ admin_layout_start('Auto-Archive', 'Automatically archive children who have reac
 
 <?php if (count($eligible) > 0): ?>
 <div style="margin-bottom:18px;">
-	<form method="post" action="<?php echo admin_e(app_url('/admin/auto_archive.php')); ?>" onsubmit="return confirm('Archive <?php echo count($eligible); ?> children who are 60+ months old? This will exclude them from all tracking, reports, and exports.');">
+	<form method="post" action="<?php echo admin_e(app_url('/admin/auto_archive.php')); ?>" data-admin-confirm="Archive <?php echo count($eligible); ?> children who are 60+ months old? This will exclude them from all tracking, reports, and exports." data-admin-confirm-danger>
 		<input type="hidden" name="action" value="run_archive">
 		<button class="admin-btn-primary" type="submit"><?php echo admin_action_icon('cancel'); ?> Archive <?php echo count($eligible); ?> Aged-Out Child(ren)</button>
 	</form>

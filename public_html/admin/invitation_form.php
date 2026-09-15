@@ -20,6 +20,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $lastName = trim((string)($_POST['last_name'] ?? ''));
     $name = admin_combine_name($firstName, $middleName, $lastName);
     $emailRaw = trim((string)($_POST['email'] ?? ''));
+    $usernameRaw = trim((string)($_POST['username'] ?? ''));
     $role = trim((string)($_POST['role'] ?? ''));
     $method = trim((string)($_POST['method'] ?? 'manual'));
     $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
@@ -37,6 +38,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!in_array($role, ['admin', 'nutritionist'], true)) {
         admin_flash_form_state($_POST, 'role');
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Invalid role.', 'type' => 'error']);
+    }
+
+    // Optional staff username (3-30 chars). Blank = auto-generated at
+    // activation. Must be unique across existing staff accounts.
+    $username = $usernameRaw !== '' ? $usernameRaw : null;
+    if ($username !== null) {
+        if (preg_match('/^[A-Za-z0-9._]{3,30}$/', $username) !== 1) {
+            admin_flash_form_state($_POST, 'username');
+            admin_redirect('/admin/invitation_form.php', ['notice' => 'Enter a valid username (3-30 characters: letters, numbers, dot, or underscore).', 'type' => 'error']);
+        }
+        if (admin_username_in_use($username)) {
+            admin_flash_form_state($_POST, 'username');
+            admin_redirect('/admin/invitation_form.php', ['notice' => 'This username is already taken. Use a different username.', 'type' => 'error']);
+        }
     }
 
     if (!in_array($method, ['email', 'manual'], true)) {
@@ -81,14 +96,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $code = strtoupper(bin2hex(random_bytes(3)));
     $expiresAt = date('Y-m-d H:i:s', time() + (48 * 60 * 60));
 
-    $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    // The invitee_username column arrives via db/20260915_invitation_username.sql.
+    // Build the INSERT to match the live schema so invitations keep working
+    // even if the migration has not been applied yet (username is then
+    // auto-generated at activation as before).
+    $hasUsernameCol = (int)admin_scalar(
+        "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_username'",
+        '',
+        [],
+        0
+    );
+    if ($hasUsernameCol > 0) {
+        $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_username, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    } else {
+        $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+    }
     if ($stmt === false) {
         admin_flash_form_state($_POST);
         admin_redirect('/admin/invitation_form.php', ['notice' => 'Unable to create invitation.', 'type' => 'error']);
     }
     $inviterId = (int)($actor['id'] ?? 0);
-    mysqli_stmt_bind_param($stmt, 'issssissss', $inviterId, $name, $email, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
-    $ok = mysqli_stmt_execute($stmt);
+    if ($hasUsernameCol > 0) {
+        mysqli_stmt_bind_param($stmt, 'isssssissss', $inviterId, $name, $email, $username, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
+    } else {
+        if ($username !== null) {
+            error_log('[SukatKalusugan] Invitation username dropped (migration not applied): ' . $username);
+        }
+        mysqli_stmt_bind_param($stmt, 'issssissss', $inviterId, $name, $email, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
+    }
+    try {
+        $ok = mysqli_stmt_execute($stmt);
+    } catch (mysqli_sql_exception $e) {
+        error_log('[SukatKalusugan] Invitation create failed: ' . $e->getMessage());
+        $ok = false;
+    }
     mysqli_stmt_close($stmt);
 
     if (!$ok) {
@@ -169,7 +210,7 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">Invite Staff</h2>
-            <p class="admin-section-subtitle">Generate an activation code for a new staff member. Codes expire after 48 hours.</p>
+            <p class="admin-section-subtitle">Generate an activation code for a new staff member. Codes expire after 48 hours. <span class="admin-required">*</span> Required field.</p>
         </div>
     </div>
 
@@ -199,7 +240,7 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
 
         <div class="admin-field-wide">
             <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
-                <span>Email address</span>
+                <span>Email address<span id="invite-email-required" class="admin-required" style="display:none;">*</span></span>
                 <div id="invite-email-wrap" style="display:flex;align-items:stretch;border:1px solid <?php echo $formErrorField === 'email' ? 'var(--admin-danger)' : 'var(--admin-border)'; ?>;border-radius:8px;overflow:hidden;background:var(--admin-surface);transition:border-color .15s,box-shadow .15s;<?php echo $formErrorField === 'email' ? 'box-shadow:0 0 0 3px var(--admin-danger-glow);' : ''; ?>">
                     <input name="email" id="invite-email-input" type="text" placeholder="auto-generated from name" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="flex:1;border:none;padding:10px 14px;background:transparent;font-size:0.85rem;min-width:0;outline:none;">
                     <span id="invite-email-domain" style="display:flex;align-items:center;padding:0 14px;color:var(--admin-muted);font-size:0.85rem;white-space:nowrap;background:var(--admin-search-bg);border-left:1px solid var(--admin-border);font-weight:600;letter-spacing:0.02em;">@sukat.kalusugan</span>
@@ -210,10 +251,10 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
 
         <div class="admin-field-wide">
             <div class="admin-field-row">
-                <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
-                    <span>Mobile number</span>
-                    <input name="phone" id="invite-phone" type="tel" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
-                    <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
+                <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
+                    <span>Username</span>
+                    <input name="username" id="invite-username" type="text" maxlength="30" autocomplete="off" placeholder="e.g. juandelacruz (blank = auto-generated)" data-validate="username" data-label="Username" value="<?php echo admin_e(admin_old_value($old, 'username')); ?>">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'username' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'This username is already taken. Use a different username.') : ''; ?></span>
                 </label>
                 <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
                     <span>Role<span class="admin-required">*</span></span>
@@ -222,6 +263,16 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
                         <option value="admin"<?php echo admin_old_value($old, 'role', '') === 'admin' ? ' selected' : ''; ?>>Admin</option>
                     </select>
                     <span class="admin-field-message"><?php echo $formErrorField === 'role' ? admin_e($formErrorNotice) : ''; ?></span>
+                </label>
+            </div>
+        </div>
+
+        <div class="admin-field-wide">
+            <div class="admin-field-row">
+                <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
+                    <span>Mobile number</span>
+                    <input name="phone" id="invite-phone" type="tel" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                    <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
             </div>
         </div>
@@ -311,17 +362,20 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
     }
 
     if (methodSelect && emailDomain && emailInput) {
+        var emailMarker = document.getElementById('invite-email-required');
         methodSelect.addEventListener('change', function(){
             if (methodSelect.value === 'email') {
                 emailDomain.style.display = 'none';
                 emailInput.placeholder = 'e.g. juan@gmail.com';
                 emailInput.type = 'email';
                 emailInput.required = true;
+                if (emailMarker) emailMarker.style.display = '';
             } else {
                 emailDomain.style.display = '';
                 emailInput.placeholder = 'auto-generated from name';
                 emailInput.type = 'text';
                 emailInput.required = false;
+                if (emailMarker) emailMarker.style.display = 'none';
             }
         });
         // Sync the email UI with the restored method after a validation

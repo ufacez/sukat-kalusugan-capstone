@@ -31,6 +31,6 @@ if (!admin_execute('DELETE FROM barangays WHERE id = ?', 'i', [$id])) {
 }
 
 $actor = current_user();
-log_action($actor['id'] ?? null, 'DELETE_BARANGAY', 'warning', 'Deleted barangay ' . $target['name'] . ' (' . $id . ')');
+log_action($actor['id'] ?? null, 'DELETE_BARANGAY', 'danger', 'Deleted barangay ' . $target['name'] . ' (' . $id . ')');
 
 admin_redirect('/admin/barangays.php', ['notice' => 'Barangay deleted. Linked records were unassigned, not removed.', 'type' => 'success']);

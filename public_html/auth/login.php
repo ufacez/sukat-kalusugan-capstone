@@ -25,13 +25,15 @@ $notice = trim((string)($_GET['notice'] ?? ''));
 
 <head>
     <meta charset="utf-8">
+    <meta name="color-scheme" content="light dark">
+    <style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}</style>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Sukat Kalusugan | Sign In</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css?v=5">
+    <link rel="stylesheet" href="../assets/css/auth.css?v=6">
     <link rel="stylesheet" href="../assets/css/admin-toast.css?v=1">
     <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
@@ -131,6 +133,15 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </p>
         </section>
     </main>
+
+    <div class="auth-loader" id="authLoader" hidden>
+        <div class="auth-loader-card" role="status" aria-live="polite">
+            <span class="auth-loader-spinner" aria-hidden="true"></span>
+            <div class="auth-loader-title" id="authLoaderTitle">Signing you in…</div>
+            <div class="auth-loader-bar" aria-hidden="true"><span></span></div>
+            <div class="auth-loader-sub">Please wait — do not close this window.</div>
+        </div>
+    </div>
 
     <script src="../assets/js/auth-handoff.js"></script>
     <script src="../assets/js/auth-login.js"></script>

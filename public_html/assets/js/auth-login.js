@@ -2,9 +2,20 @@
   const form = document.getElementById("loginForm");
   const message = document.getElementById("formMessage");
   const submitButton = form ? form.querySelector(".auth-submit") : null;
+  const loader = document.getElementById("authLoader");
+  const loaderTitle = document.getElementById("authLoaderTitle");
 
   if (!form || !message || !submitButton) {
     return;
+  }
+
+  function showLoader(title) {
+    if (loaderTitle && title) loaderTitle.textContent = title;
+    if (loader) loader.hidden = false;
+  }
+
+  function hideLoader() {
+    if (loader) loader.hidden = true;
   }
 
   form.addEventListener("submit", async function (event) {
@@ -14,6 +25,7 @@
     message.textContent = "";
     submitButton.disabled = true;
     submitButton.classList.add("is-loading");
+    showLoader("Signing you in…");
 
     try {
       const response = await fetch(form.action, {
@@ -40,6 +52,7 @@
       }
 
       const redirectUrl = payload.redirect_url || "../auth/login.php";
+      showLoader("Welcome back…");
       if (window.SKAuthHandoff) {
         window.SKAuthHandoff.exitTo({ button: submitButton, url: redirectUrl, welcome: true });
       } else {
@@ -47,6 +60,7 @@
       }
     } catch (error) {
       message.textContent = error.message || "Unable to sign in.";
+      hideLoader();
       submitButton.disabled = false;
       submitButton.classList.remove("is-loading");
     }

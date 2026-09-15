@@ -1442,7 +1442,7 @@ function pdf_generate_dqc(array $f): TCPDF {
 	}
 
 	$accuracyRows = [
-		['A', '% Children with flagged measurement based on z-scores', $dqFlaggedPct . '%'],
+		['A', '% Children with biologically implausible measurements (WHO flag cutoffs)', $dqFlaggedPct . '%'],
 		['B', 'Digit preference score for anthropometric data', $dqDigitPref . '%'],
 		['C', 'Skewness of weight-for-height/length z-score', $dqSkewness],
 		['D', 'Kurtosis of weight-for-height/length z-score', $dqKurtosis],

@@ -168,20 +168,20 @@ $flash = admin_flash_message();
                                         data-active="<?php echo (int)$area['is_active']; ?>"
                                     ><?php echo admin_action_icon('edit'); ?></button>
                                     <?php if ((int)$area['is_active'] === 0): ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" onsubmit="return confirm('Reactivate <?php echo admin_e($area['area_name']); ?>? It will appear for new registrations again.');" style="display:inline;">
+                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Reactivate <?php echo admin_e($area['area_name']); ?>? It will appear for new registrations again." style="display:inline;">
                                             <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
                                             <input type="hidden" name="is_active" value="1">
                                             <input type="hidden" name="_method" value="PATCH">
                                             <button class="admin-icon-btn admin-icon-btn-primary" title="Activate" type="submit"><?php echo admin_action_icon('add'); ?></button>
                                         </form>
                                     <?php elseif ((int)$area['linked_count'] === 0): ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" onsubmit="return confirm('Delete <?php echo admin_e($area['area_name']); ?>? This cannot be undone.');" style="display:inline;">
+                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Delete <?php echo admin_e($area['area_name']); ?>? This cannot be undone." data-admin-confirm-danger style="display:inline;">
                                             <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
                                             <input type="hidden" name="_method" value="DELETE">
                                             <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
                                         </form>
                                     <?php else: ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" onsubmit="return confirm('Deactivate <?php echo admin_e($area['area_name']); ?>? It will no longer appear for new registrations.');" style="display:inline;">
+                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Deactivate <?php echo admin_e($area['area_name']); ?>? It will no longer appear for new registrations." style="display:inline;">
                                             <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
                                             <input type="hidden" name="is_active" value="0">
                                             <input type="hidden" name="_method" value="PATCH">

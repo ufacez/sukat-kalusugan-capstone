@@ -825,7 +825,12 @@ nutritionist_layout_start(
     });
 
     dom.archiveBtn.addEventListener('click', () => {
-        if (!state.sessions.length || !window.confirm('Archive all assistant conversations?')) return;
+        if (!state.sessions.length) return;
+        var proceed = window.SKConfirm
+            ? window.SKConfirm('Archive all assistant conversations?', { title: 'Archive chats', confirmLabel: 'Archive all', danger: true })
+            : Promise.resolve(window.confirm('Archive all assistant conversations?'));
+        proceed.then(confirmed => {
+        if (!confirmed) return;
 
         fetch(API + 'conversations.php', {
             method: 'POST',
@@ -842,6 +847,7 @@ nutritionist_layout_start(
             createConversation(null);
         })
         .catch(error => appendBubble('system', error.message));
+        });
     });
 
     // Send on button click

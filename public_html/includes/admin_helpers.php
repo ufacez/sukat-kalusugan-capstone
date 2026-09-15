@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/auth_middleware.php';
 require_once __DIR__ . '/audit_logger.php';
+require_once __DIR__ . '/confirm_modal.php';
 
 function admin_e(string $value): string
 {
@@ -333,6 +334,46 @@ function admin_username_in_use(string $username, ?int $excludeUserId = null): bo
 }
 
 /**
+ * Duplicate-child identity check used by every staff registration path.
+ *
+ * Same rule as the DQC "repeated name and birthdate" finder: same first +
+ * last name (case-insensitive) + same birthdate among ACTIVE children.
+ * Middle name, parent, and sex are ignored on purpose so the DQC duplicate
+ * count can never grow from new registrations. Returns the existing row
+ * (id, child_code, names) or null when free to register.
+ */
+function child_duplicate_identity(string $firstName, string $lastName, string $birthdate, ?int $excludeChildId = null): ?array
+{
+    $firstName = trim($firstName);
+    $lastName = trim($lastName);
+    $birthdate = trim($birthdate);
+
+    if ($firstName === '' || $lastName === '' || $birthdate === '') {
+        return null;
+    }
+
+    if ($excludeChildId !== null && $excludeChildId > 0) {
+        $hit = admin_fetch_one(
+            "SELECT id, child_code, first_name, middle_name, last_name, birthdate FROM children
+              WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)
+                AND birthdate = ? AND status = 'active' AND id != ? LIMIT 1",
+            'sssi',
+            [$firstName, $lastName, $birthdate, $excludeChildId]
+        );
+    } else {
+        $hit = admin_fetch_one(
+            "SELECT id, child_code, first_name, middle_name, last_name, birthdate FROM children
+              WHERE LOWER(first_name) = LOWER(?) AND LOWER(last_name) = LOWER(?)
+                AND birthdate = ? AND status = 'active' LIMIT 1",
+            'sss',
+            [$firstName, $lastName, $birthdate]
+        );
+    }
+
+    return $hit;
+}
+
+/**
  * Best-effort split of a single "name" column into first / middle / last
  * name parts, used to pre-fill the Add/Edit forms when editing a record
  * that only ever stored one combined name string.
@@ -531,6 +572,8 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<html lang="en">';
     echo '<head>';
     echo '<meta charset="utf-8">';
+    echo '<meta name="color-scheme" content="light dark">';
+    echo '<style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}</style>';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
     echo '<title>' . admin_e($title) . ' | Sukat Kalusugan Admin</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
@@ -649,6 +692,7 @@ function admin_layout_end(): void
     echo '</main>';
     echo '</div>';
     echo '</div>';
+    echo confirm_modal_shell();
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';

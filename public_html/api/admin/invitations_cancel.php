@@ -33,7 +33,7 @@ $ok = admin_execute("UPDATE invitations SET status = 'cancelled' WHERE id = ? AN
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'info', sprintf(
+    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'danger', sprintf(
         'Cancelled invitation for %s (code: %s)',
         $invitation['invitee_name'],
         $invitation['code']

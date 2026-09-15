@@ -250,7 +250,7 @@ if ($method === 'DELETE') {
     admin_execute("DELETE FROM local_areas WHERE id = ?", 'i', [$id]);
 
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'DELETE_LOCAL_AREA', 'info',
+    log_action($actor['id'] ?? null, 'DELETE_LOCAL_AREA', 'danger',
         "Deleted local area \"{$existing['area_name']}\" (#{$id})");
 
     api_success([], 'Local area deleted.');

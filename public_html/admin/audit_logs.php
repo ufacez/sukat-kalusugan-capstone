@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
+require_once __DIR__ . '/../includes/export_dropdown.php';
 
 start_secure_session();
 require_permission('audit_logs.view');
@@ -431,6 +432,18 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 </a>
             </div>
         </div>
+        <?php
+        $auditExportParams = [];
+        if ($actionFilter !== '') $auditExportParams['action'] = $actionFilter;
+        if ($levelFilter !== '') $auditExportParams['level'] = $levelFilter;
+        if ($userFilter !== '') $auditExportParams['user'] = $userFilter;
+        echo export_dropdown(
+            app_url('/admin/audit_logs_export.php') . ($auditExportParams !== [] ? '?' . http_build_query($auditExportParams) : ''),
+            app_url('/admin/audit_logs_export.php') . '?' . http_build_query(array_merge($auditExportParams, ['format' => 'csv'])),
+            app_url('/admin/audit_logs_export.php') . '?' . http_build_query(array_merge($auditExportParams, ['format' => 'pdf'])),
+            'Save as'
+        );
+        ?>
     </div>
 
     <div id="audit-table-zone">
@@ -959,7 +972,12 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         var overlay = document.createElement('div');
         overlay.className = 'sk-zone-loading';
         overlay.setAttribute('role','status');
-        overlay.innerHTML = '<span class="sk-btn-spinner" aria-hidden="true"></span><span>Loading…</span>';
+        overlay.innerHTML = '<span class="sk-skel-block" aria-hidden="true" style="width:min(560px,86%);">'
+            + '<span class="sk-skel-bar is-title"></span>'
+            + '<span class="sk-skel-bar is-full"></span>'
+            + '<span class="sk-skel-bar is-mid"></span>'
+            + '<span class="sk-skel-bar is-full"></span>'
+            + '<span class="sk-skel-bar is-short"></span></span><span style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);">Loading…</span>';
         tableZone.appendChild(overlay);
         var controller = ('AbortController' in window) ? new AbortController() : null;
         var timer = controller ? setTimeout(function(){ controller.abort(); }, 20000) : null;

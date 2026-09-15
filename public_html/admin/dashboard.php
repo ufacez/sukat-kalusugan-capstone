@@ -371,7 +371,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <input class="admin-search" type="search" placeholder="Search users..." data-admin-filter="#staff-users-table" style="flex:1; min-width:180px;">
             <?php if (has_permission('users.create')): ?>
-            <a class="admin-btn" href="<?php echo admin_e(app_url('/admin/user_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add user</a>
+            <a class="admin-btn" href="<?php echo admin_e(app_url('/admin/invitation_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Invite staff</a>
             <?php endif; ?>
         </div>
     </div>

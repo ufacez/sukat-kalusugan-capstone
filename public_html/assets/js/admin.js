@@ -238,15 +238,167 @@
     btn.remove();
   });
 
-  document.querySelectorAll("[data-admin-confirm]").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      const message = button.getAttribute("data-admin-confirm");
+  /* Shared in-UI confirm + progress modals (replaces window.confirm).
+   * The overlay shells are printed by confirm_modal_shell() in every portal
+   * layout; if a page lacks them we fall back to the native dialog so the
+   * action is never silently swallowed. */
+  var SKConfirm = (function () {
+    var lastFocus = null;
 
-      if (message && !window.confirm(message)) {
-        event.preventDefault();
+    function shell() {
+      var overlay = document.getElementById("sk-confirm-overlay");
+      if (!overlay) return null;
+      return {
+        overlay: overlay,
+        title: document.getElementById("sk-confirm-title"),
+        msg: document.getElementById("sk-confirm-msg"),
+        ok: overlay.querySelector("[data-sk-confirm-ok]"),
+      };
+    }
+
+    function close(result) {
+      var s = shell();
+      if (s) s.overlay.hidden = true;
+      if (lastFocus && typeof lastFocus.focus === "function") {
+        try { lastFocus.focus(); } catch (error) { /* focus restore is best-effort */ }
+      }
+      var cb = close._pending;
+      close._pending = null;
+      if (typeof cb === "function") cb(result === true);
+    }
+
+    function onKey(e) {
+      if (e.key === "Escape") {
+        e.stopPropagation();
+        close(false);
+      } else if (e.key === "Enter" && document.activeElement && document.activeElement.hasAttribute("data-sk-confirm-cancel")) {
+        close(false);
+      }
+    }
+
+    function confirm(message, opts) {
+      var o = opts || {};
+      return new Promise(function (resolve) {
+        var s = shell();
+        if (!s || !s.ok) {
+          resolve(window.confirm(message || "Are you sure?"));
+          return;
+        }
+        close._pending = resolve;
+        lastFocus = document.activeElement;
+        if (s.title) s.title.textContent = o.title || "Please confirm";
+        if (s.msg) s.msg.textContent = message || "Are you sure?";
+        s.ok.textContent = o.confirmLabel || "Confirm";
+        s.ok.classList.toggle("is-danger", o.danger === true);
+        s.overlay.hidden = false;
+        try { s.ok.focus(); } catch (error) { /* focus is best-effort */ }
+      });
+    }
+
+    document.addEventListener("keydown", function (e) {
+      var s = shell();
+      if (s && !s.overlay.hidden && (e.key === "Escape")) onKey(e);
+    });
+    document.addEventListener("click", function (e) {
+      var s = shell();
+      if (!s || s.overlay.hidden) return;
+      var t = e.target;
+      if (t && t.hasAttribute && t.hasAttribute("data-sk-confirm-cancel")) { close(false); return; }
+      if (t && t.hasAttribute && t.hasAttribute("data-sk-confirm-ok")) { close(true); return; }
+      if (t === s.overlay) close(false);
+    });
+
+    return confirm;
+  })();
+
+  var SKProgress = (function () {
+    var failsafe = null;
+
+    function shell() {
+      var overlay = document.getElementById("sk-progress-overlay");
+      if (!overlay) return null;
+      return {
+        overlay: overlay,
+        title: document.getElementById("sk-progress-title"),
+        msg: document.getElementById("sk-progress-msg"),
+      };
+    }
+
+    function show(message, title) {
+      var s = shell();
+      if (!s) return;
+      if (s.title) s.title.textContent = title || "Please waitâ€¦";
+      if (s.msg) s.msg.textContent = message || "Working â€” please don't close this window.";
+      s.overlay.hidden = false;
+      if (failsafe) window.clearTimeout(failsafe);
+      failsafe = window.setTimeout(hide, 30000);
+    }
+
+    function hide() {
+      var s = shell();
+      if (s) s.overlay.hidden = true;
+      if (failsafe) { window.clearTimeout(failsafe); failsafe = null; }
+    }
+
+    window.addEventListener("pagehide", hide);
+
+    return { show: show, hide: hide };
+  })();
+
+  window.SKConfirm = SKConfirm;
+  window.SKProgress = SKProgress;
+
+  function progressMessageFor(form, submitter) {
+    var custom = form.getAttribute("data-progress") ||
+      (submitter && submitter.getAttribute && submitter.getAttribute("data-progress"));
+    if (custom) return custom;
+    var label = submitter ? (submitter.value || submitter.textContent || "") : "";
+    label = String(label).replace(/\s+/g, " ").trim();
+    if (label.length > 80) label = label.slice(0, 77) + "â€¦";
+    if (label) return label + " â€” please don't close this window.";
+    return "Working â€” please don't close this window.";
+  }
+
+  function wireConfirms(scope) {
+    (scope || document).querySelectorAll("[data-admin-confirm]").forEach(function (el) {
+      if (el.dataset.skConfirmWired === "1") return;
+      el.dataset.skConfirmWired = "1";
+      var message = el.getAttribute("data-admin-confirm") || "Are you sure?";
+      var danger = el.hasAttribute("data-admin-confirm-danger");
+      if (el.tagName === "FORM") {
+        el.addEventListener("submit", function (e) {
+          if (el.dataset.skConfirmed === "1") { delete el.dataset.skConfirmed; return; }
+          if (typeof el.checkValidity === "function" && !el.checkValidity()) {
+            if (typeof el.reportValidity === "function") el.reportValidity();
+            return;
+          }
+          e.preventDefault();
+          e.stopPropagation();
+          SKConfirm(message, { danger: danger }).then(function (ok) {
+            if (!ok) return;
+            el.dataset.skConfirmed = "1";
+            if (typeof el.requestSubmit === "function") el.requestSubmit();
+            else el.submit();
+          });
+        });
+      } else {
+        el.addEventListener("click", function (e) {
+          if (el.dataset.skConfirmed === "1") { delete el.dataset.skConfirmed; return; }
+          e.preventDefault();
+          e.stopPropagation();
+          SKConfirm(message, { danger: danger }).then(function (ok) {
+            if (!ok) return;
+            if (el.tagName === "A" && el.getAttribute("href")) {
+              window.location.href = el.href;
+              return;
+            }
+            el.dataset.skConfirmed = "1";
+            el.click();
+          });
+        }, true);
       }
     });
-  });
+  }
 
   const paginatedTables = document.querySelectorAll("table.admin-table:not([data-no-paginate]), table.nutritionist-table:not([data-no-paginate]), table.parent-table:not([data-no-paginate])");
   const pageSize = 10;
@@ -325,7 +477,12 @@
     if (filterInput) {
       filterInput.addEventListener("input", () => {
         const term = filterInput.value.trim().toLowerCase();
+        // Optional per-table role gate: pills set data-role-filter on the
+        // table ("", "admin", "nutritionist", â€¦); rows carry data-role.
+        // Clearing the attribute ("All") lifts the gate.
+        const roleGate = (table.getAttribute("data-role-filter") || "").toLowerCase();
         filteredRows = rows.filter((row) => {
+          if (roleGate && (row.getAttribute("data-role") || "").toLowerCase() !== roleGate) return false;
           const text = row.getAttribute("data-filter-text") || row.textContent || "";
           return text.toLowerCase().includes(term);
         });
@@ -474,14 +631,14 @@
 
   /* One-shot welcome emphasis after login (flag planted by auth-handoff.js).
    * Adds body.sk-welcome for the header rise, then consumes the flag so a
-   * refresh never replays it. Paint only — no navigation or data involved. */
+   * refresh never replays it. Paint only ï¿½ no navigation or data involved. */
   try {
     if (window.sessionStorage && window.sessionStorage.getItem("sk-welcome") === "1") {
       window.sessionStorage.removeItem("sk-welcome");
       document.body.classList.add("sk-welcome");
     }
   } catch (error) {
-    // sessionStorage unavailable (private mode) — skip silently.
+    // sessionStorage unavailable (private mode) ï¿½ skip silently.
   }
 
   /* Count-up for dashboard stat numbers. Opt-in via data-count-up on an
@@ -529,7 +686,7 @@
 (function () {
   "use strict";
 
-  /* SKBusy — shared buffering feedback for slow internet.
+  /* SKBusy ï¿½ shared buffering feedback for slow internet.
    * Paint only: spins the trigger and blocks double-activation while a
    * request is in flight. Never changes URLs, payloads, or timing. */
   var BUSY_FAILSAFE_MS = 60000;
@@ -575,9 +732,10 @@
     return function () {};
   }
 
-  /* Full-page POST forms: spin the submitter. Runs after validators
-   * (setTimeout 0) so blocked submits never spin. Page unload on success
-   * clears everything naturally; the failsafe covers fetch-handled forms. */
+  /* Full-page POST forms: spin the submitter + show the progress modal.
+   * Runs after validators (setTimeout 0) so blocked submits never spin.
+   * Page unload on success clears everything naturally; the failsafe and
+   * pagehide handler cover fetch-handled forms. */
   function wireForms(scope) {
     (scope || document).querySelectorAll("form[data-validate-form]").forEach(function (form) {
       if (form.dataset.skBusyWired === "1") return;
@@ -587,6 +745,9 @@
         window.setTimeout(function () {
           if (e.defaultPrevented) return;
           setBusy(submitter, true);
+          if (!form.hasAttribute("data-no-progress")) {
+            SKProgress.show(progressMessageFor(form, submitter));
+          }
         }, 0);
       });
     });
@@ -594,7 +755,7 @@
 
   /* File-download links: the page never unloads, so clear on refocus
    * (save dialog blurs the window) plus a failsafe. Scoped to known
-   * export endpoints only — never navigation links. */
+   * export endpoints only ï¿½ never navigation links. */
   var DOWNLOAD_SELECTOR = "a[href*=\"eopt_reports_export.php\"], a[href*=\"who_reference_export.php\"], a[href*=\"eopt_pdf_generate.php\"]";
 
   function wireDownloads(scope) {
@@ -632,6 +793,7 @@
   window.addEventListener("offline", announceOffline);
 
   function init(scope) {
+    wireConfirms(scope);
     wireForms(scope);
     wireDownloads(scope);
   }

@@ -52,6 +52,10 @@ function send_mail(string $toEmail, string $subject, string $textBody, string $h
 
         $mail->setFrom($fromEmail, $fromName);
         $mail->addAddress($toEmail);
+        // UTF-8 everywhere: without this PHPMailer defaults to iso-8859-1
+        // and multibyte characters (em-dash, ñ) arrive as mojibake (â€”).
+        $mail->CharSet = 'UTF-8';
+        $mail->Encoding = 'base64';
         $mail->Subject = $subject;
 
         if ($htmlBody !== '') {
@@ -80,8 +84,17 @@ function send_mail_via_php_mail(string $toEmail, string $subject, string $textBo
     $fromEmail = defined('MAIL_FROM_ADDRESS') && MAIL_FROM_ADDRESS !== '' ? MAIL_FROM_ADDRESS : 'no-reply@sukat.local';
     $fromName = defined('MAIL_FROM_NAME') && MAIL_FROM_NAME !== '' ? MAIL_FROM_NAME : 'Sukat Kalusugan';
 
+    // Encode the subject so UTF-8 characters survive 7-bit transport.
+    $encodedSubject = function_exists('mb_encode_mimeheader')
+        ? mb_encode_mimeheader($subject, 'UTF-8', 'B', "\r\n")
+        : '=?UTF-8?B?' . base64_encode($subject) . '?=';
+
     if ($htmlBody === '') {
-        return @mail($toEmail, $subject, $textBody);
+        $headers = 'From: ' . $fromName . ' <' . $fromEmail . ">\r\n"
+            . "MIME-Version: 1.0\r\n"
+            . "Content-Type: text/plain; charset=utf-8\r\n"
+            . "Content-Transfer-Encoding: 8bit\r\n";
+        return @mail($toEmail, $encodedSubject, $textBody, $headers);
     }
 
     $boundary = 'sk_' . bin2hex(random_bytes(16));
@@ -99,5 +112,5 @@ function send_mail_via_php_mail(string $toEmail, string $subject, string $textBo
         . $htmlBody . "\r\n\r\n"
         . "--{$boundary}--";
 
-    return @mail($toEmail, $subject, $message, $headers);
+    return @mail($toEmail, $encodedSubject, $message, $headers);
 }

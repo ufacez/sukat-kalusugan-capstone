@@ -51,9 +51,17 @@ if ($password !== $passwordConfirm) {
     exit;
 }
 
+$hasUsernameCol = (int)admin_scalar(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_username'",
+    '',
+    [],
+    0
+);
 $stmt = mysqli_prepare(
     $conn,
-    "SELECT id, inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, method, status, expires_at
+    "SELECT id, inviter_user_id, invitee_name, invitee_email, "
+    . ($hasUsernameCol > 0 ? "invitee_username, " : "")
+    . "invitee_phone, invitee_address, barangay_id, role, method, status, expires_at
      FROM invitations
      WHERE code = ?
      LIMIT 1"
@@ -96,9 +104,17 @@ if (new DateTimeImmutable($invitation['expires_at']) < new DateTimeImmutable('no
     exit;
 }
 
-$username = strtolower(preg_replace('/[^a-z0-9]/', '', preg_replace('/\s+/', '', $invitation['invitee_name'])));
-if ($username === '') {
-    $username = 'staff';
+// Prefer the username the admin set on the invitation form; fall back to
+// the name-based generator when blank, invalid, or the column predates
+// the migration. The uniqueness loop below covers takeovers in between.
+$storedUsername = trim((string)($invitation['invitee_username'] ?? ''));
+if ($storedUsername !== '' && preg_match('/^[A-Za-z0-9._]{3,30}$/', $storedUsername) === 1) {
+    $username = $storedUsername;
+} else {
+    $username = strtolower(preg_replace('/[^a-z0-9]/', '', preg_replace('/\s+/', '', $invitation['invitee_name'])));
+    if ($username === '') {
+        $username = 'staff';
+    }
 }
 $baseUsername = $username;
 $counter = 1;

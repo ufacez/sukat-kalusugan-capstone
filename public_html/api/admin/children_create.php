@@ -43,6 +43,15 @@ if (
     admin_redirect('/admin/child_form.php', ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
 }
 
+// Hard block on re-registering the same child (same first + last name +
+// birthdate, case-insensitive). Identity is checked before anything else
+// so the DQC duplicate count can never grow from new registrations.
+$duplicateChild = child_duplicate_identity($firstName, $lastName, $birthdate);
+if ($duplicateChild !== null) {
+    $existingCode = (string)($duplicateChild['child_code'] ?? '');
+    admin_redirect('/admin/child_form.php', ['notice' => 'This child is already registered' . ($existingCode !== '' ? ' (' . $existingCode . ')' : '') . '. Open the existing record instead of registering again.', 'type' => 'error']);
+}
+
 $parent = admin_fetch_one('SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
 
 if (!$parent) {

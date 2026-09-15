@@ -728,7 +728,7 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
 					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
 					<tbody>
-						<tr><td><strong>A</strong></td><td>% Children with flagged measurement based on z-scores</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
+						<tr><td><strong>A</strong></td><td>% Children with biologically implausible measurements (WHO flag cutoffs: WAZ outside −6…+5, HAZ outside −6…+6, WHZ outside −5…+5)</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
 						<tr><td><strong>B</strong></td><td>Digit preference score for anthropometric data</td><td style="text-align:right;font-weight:600;"><?php echo $dqDigitPref . '%'; ?></td></tr>
 						<tr><td><strong>C</strong></td><td>Skewness of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqSkewStr; ?></td></tr>
 						<tr><td><strong>D</strong></td><td>Kurtosis of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqKurtStr; ?></td></tr>

@@ -75,6 +75,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         );
     }
 
+    if ($action === 'create') {
+        // Hard block on re-registering the same child (same first + last
+        // name + birthdate, case-insensitive) so the DQC duplicate count
+        // can never grow from new registrations. Updates are exempt —
+        // name corrections must always save.
+        $duplicateChild = child_duplicate_identity($firstName, $lastName, $birthdate);
+        if ($duplicateChild !== null) {
+            $existingCode = (string)($duplicateChild['child_code'] ?? '');
+            admin_redirect(
+                $errorBackUrl,
+                [
+                    'notice' => 'This child is already registered' . ($existingCode !== '' ? ' (' . $existingCode . ')' : '') . '. Open the existing record instead of registering again.',
+                    'type' => 'error'
+                ]
+            );
+        }
+    }
+
     $parent = admin_fetch_one(
         'SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1',
         'i',
