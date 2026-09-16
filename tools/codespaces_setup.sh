@@ -35,13 +35,24 @@ DBN="${DB_NAME:-sukat_staging}"
 DBU="${DB_USER:-sukat}"
 DBP="${DB_PASS:-}"
 
-if [ -z "$DBP" ]; then
-  echo "ERROR: DB_PASS is empty. Set it in .env (Codespaces Secret, staging-only)."
+if [ ! -f .env ]; then
+  echo "ERROR: .env missing. Run: cp env.codespaces.example .env  (then fill secrets)"
   exit 1
 fi
 
-if [ ! -f .env ]; then
-  echo "ERROR: .env missing. Run: cp env.codespaces.example .env  (then fill secrets)"
+# Single source of truth: fill any still-empty DB_* from .env (explicitly
+# exported values keep precedence). postCreate runs unattended with no
+# DBP prefix, so without this the script would abort on a fresh rebuild.
+env_from_file() {
+  grep -E "^$1=" .env 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d "\"'" | xargs
+}
+[ -z "$DBH" ] && DBH="$(env_from_file DB_HOST)"; DBH="${DBH:-db}"
+[ -z "$DBN" ] && DBN="$(env_from_file DB_NAME)"; DBN="${DBN:-sukat_staging}"
+[ -z "$DBU" ] && DBU="$(env_from_file DB_USER)"; DBU="${DBU:-sukat}"
+[ -z "$DBP" ] && DBP="$(env_from_file DB_PASS)"
+
+if [ -z "$DBP" ]; then
+  echo "ERROR: DB_PASS is empty. Set it in .env (Codespaces Secret, staging-only)."
   exit 1
 fi
 
