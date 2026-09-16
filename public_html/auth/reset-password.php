@@ -36,6 +36,7 @@ if ($token === '') {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Sukat Kalusugan | Reset Password</title>
+    <meta name="description" content="Set a new Sukat Kalusugan password (Group A4Tech capstone). Use the link from your email.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -94,6 +95,8 @@ if ($token === '') {
                 <p class="muted">Enter and confirm your new password below.</p>
             </div>
 
+            <div class="flash flash-notice" role="status">Group A4Tech capstone. Only use the reset link sent to your email. <a class="link" href="../contact.php">Contact us</a> if you did not request this.</div>
+
             <?php if ($error !== ''): ?>
                 <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
@@ -128,6 +131,7 @@ if ($token === '') {
                     <a class="link" href="login.php">&larr; Back to sign in</a>
                 </div>
             </form>
+            <p class="auth-card-footer"><span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span></p>
         </section>
     </main>
 

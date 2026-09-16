@@ -1,0 +1,17 @@
+User-agent: *
+Allow: /$
+Allow: /about.php
+Allow: /privacy.php
+Allow: /terms.php
+Allow: /contact.php
+Allow: /auth/login.php
+Allow: /auth/forgot-password.php
+Disallow: /api/
+Disallow: /admin/
+Disallow: /nutritionist/
+Disallow: /parent/
+Disallow: /kiosk/
+Disallow: /auth/activate.php
+Disallow: /auth/reset-password.php
+
+Sitemap: https://sukatkalusugan.app/sitemap.xml
