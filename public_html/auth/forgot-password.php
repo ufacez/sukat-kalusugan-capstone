@@ -26,6 +26,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Sukat Kalusugan | Forgot Password</title>
+    <meta name="description" content="Reset your Sukat Kalusugan password (Group A4Tech capstone). Authorized accounts only. Contact espirituean@gmail.com.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -84,6 +85,8 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                 <p class="muted">We'll email you a link to choose a new one.</p>
             </div>
 
+            <div class="flash flash-notice" role="status">Group A4Tech capstone. Authorized accounts only. We never ask for your password by email. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>
+
             <?php if ($error !== ''): ?>
                 <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
@@ -109,6 +112,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                     <a class="link" href="login.php">&larr; Back to sign in</a>
                 </div>
             </form>
+            <p class="auth-card-footer"><span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span></p>
         </section>
     </main>
 

@@ -29,6 +29,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
     <style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}</style>
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Sukat Kalusugan | Sign In</title>
+    <meta name="description" content="Sign in to Sukat Kalusugan, a student capstone by Group A4Tech (OLFU). Authorized staff and parent accounts only. No public registration. Contact espirituean@gmail.com, Philippines.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -87,6 +88,8 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                 <p class="muted">Use your staff username/email or parent email and password.</p>
             </div>
 
+            <div class="flash flash-notice" role="status">Sukat Kalusugan is a student capstone by <strong>Group A4Tech</strong> (OLFU). Authorized accounts only — no public sign-up. Accounts are issued by the project team. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>
+
             <?php if ($error !== ''): ?>
                 <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
             <?php endif; ?>
@@ -129,7 +132,9 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             </form>
 
             <p class="auth-card-footer">
-                New staff? <a class="link" href="activate.php">Activate your account</a>
+                New staff? <a class="link" href="activate.php">Activate your account</a><br>
+                <span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; Capstone project — not an official OLFU system.<br>
+                <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span>
             </p>
         </section>
     </main>

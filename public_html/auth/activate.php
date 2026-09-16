@@ -21,6 +21,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Sukat Kalusugan | Activate Account</title>
+    <meta name="description" content="Activate your Sukat Kalusugan staff account (Group A4Tech capstone) with your invitation code. Authorized accounts only.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
@@ -68,6 +69,8 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 <h2 id="activate-title">Activate your account</h2>
                 <p class="muted">Enter the 6-character code from your administrator and set your password.</p>
             </div>
+
+            <div class="flash flash-notice" role="status">Group A4Tech capstone. Codes are issued by your administrator only. Never share codes or passwords. <a class="link" href="../contact.php">Contact us</a>.</div>
 
             <div class="flash flash-notice" id="globalNotice" style="display:none;" role="status"></div>
 
@@ -117,6 +120,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     <a class="link" href="login.php">Back to sign in</a>
                 </p>
             </form>
+            <p class="auth-card-footer"><span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span></p>
         </section>
     </main>
 
