@@ -133,9 +133,9 @@ $notice = trim((string)($_GET['notice'] ?? ''));
 
             <p class="auth-card-footer">
                 New staff? <a class="link" href="activate.php">Activate your account</a><br>
-                <span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; Capstone project — not an official OLFU system.<br>
-                <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span>
+                <span style="font-size:.78rem;"><a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span>
             </p>
+            <div style="text-align:center;margin-top:.9rem;font-size:.75rem;color:#94a3b8;">Group A4Tech &middot; Capstone project &mdash; not an official OLFU system.</div>
         </section>
     </main>
 

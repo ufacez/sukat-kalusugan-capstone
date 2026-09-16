@@ -120,7 +120,8 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     <a class="link" href="login.php">Back to sign in</a>
                 </p>
             </form>
-            <p class="auth-card-footer"><span style="font-size:.78rem;">Group A4Tech (OLFU Capstone) &middot; <a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span></p>
+            <p class="auth-card-footer"><span style="font-size:.78rem;"><a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span></p>
+            <div style="text-align:center;margin-top:.9rem;font-size:.75rem;color:#94a3b8;">Group A4Tech &middot; Capstone project &mdash; not an official OLFU system.</div>
         </section>
     </main>
 
