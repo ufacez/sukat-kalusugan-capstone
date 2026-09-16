@@ -17,6 +17,19 @@ set -euo pipefail
 
 MYSQL="mysql --skip-ssl"
 
+echo "== 0/5 composer dependencies =="
+if [ ! -x /usr/local/bin/composer ]; then
+  # apt's composer conflicts with this image's PHP; use the official installer.
+  php -r "copy('https://getcomposer.org/installer', '/tmp/composer-setup.php');"
+  php /tmp/composer-setup.php --install-dir=/usr/local/bin --filename=composer
+  rm -f /tmp/composer-setup.php
+fi
+if [ ! -f vendor/autoload.php ]; then
+  composer install --no-interaction --prefer-dist
+else
+  echo "vendor present"
+fi
+
 DBH="${DB_HOST:-db}"
 DBN="${DB_NAME:-sukat_staging}"
 DBU="${DB_USER:-sukat}"
