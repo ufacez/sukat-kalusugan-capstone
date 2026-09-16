@@ -74,7 +74,7 @@ $seedUsers = [
 ];
 foreach ($seedUsers as [$name, $email, $uname, $roleId]) {
     $phone = '09170000001';
-    $stmt->bind_param('sssssiis', $name, $email, $uname, $hash, $phone, $roleId, $brgyId);
+    $stmt->bind_param('sssssii', $name, $email, $uname, $hash, $phone, $roleId, $brgyId);
     if (!$stmt->execute()) {
         fwrite(STDERR, "USER_FAIL $email :: {$stmt->error}\n");
         exit(1);
