@@ -12,15 +12,12 @@ services:
     working_dir: /workspace
     ports:
       - "8080:80"
+    # NOTE: only literals live here. Everything else comes from /workspace/.env
+    # (phpdotenv is immutable: a container-level empty var would shadow the
+    # .env value, which is exactly how staging once lost its DB/gate password).
     environment:
-      DB_HOST: db
-      DB_NAME: ${DB_NAME:-sukat_staging}
-      DB_USER: ${DB_USER:-sukat}
-      DB_PASS: ${DB_PASS:-stagingpass}
       APP_ENV: staging
       FORCE_HTTPS: "0"
-      STAGING_PASSWORD: ${STAGING_PASSWORD:-}
-      APP_URL: ${APP_URL:-}
   db:
     image: mysql:8.0
     command: --default-authentication-plugin=mysql_native_password --character-set-server=utf8mb4 --collation-server=utf8mb4_general_ci
