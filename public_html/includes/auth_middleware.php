@@ -281,3 +281,10 @@ function has_permission(string $code): bool
 
     return user_has_access_for_code($accessLevel, $code);
 }
+
+// ── Staging gate (no-op unless APP_ENV=staging) ──────────────────────────────
+// Runs here because every page and api_helpers.php loads this file, so one
+// call covers browser pages AND JSON APIs. API clients can send header
+// X-Staging-Key instead of using the browser gate form.
+require_once __DIR__ . '/staging_guards.php';
+staging_require_gate();

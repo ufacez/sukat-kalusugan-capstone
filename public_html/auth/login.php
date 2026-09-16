@@ -48,6 +48,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
 </head>
 
 <body class="auth-page">
+    <?php if (function_exists('staging_banner')) staging_banner(); ?>
     <main class="auth-shell">
         <section class="auth-hero" aria-hidden="true">
             <svg class="hero-pattern" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">

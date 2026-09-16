@@ -78,6 +78,9 @@ define('FORCE_HTTPS', env('FORCE_HTTPS', ''));
 // behind a proxy where $_SERVER['HTTPS'] sniffing is unreliable.
 define('APP_URL', rtrim(env('APP_URL', ''), '/'));
 
+// ── Staging gate password (Codespaces QA only; empty everywhere else) ────────
+define('STAGING_PASSWORD', env('STAGING_PASSWORD', ''));
+
 // ── ESP32 Kiosk Device Auth ──────────────────────────────────────────────────
 define('ESP32_DEVICE_KEY', env('ESP32_DEVICE_KEY', ''));
 
@@ -117,3 +120,7 @@ require_once __DIR__ . '/bootstrap_errors.php';
 require_once __DIR__ . '/force_https.php';
 maybe_enforce_https();
 send_security_headers();
+
+// ── Staging protections (no-op unless APP_ENV=staging) ───────────────────────
+require_once __DIR__ . '/staging_guards.php';
+staging_send_noindex();

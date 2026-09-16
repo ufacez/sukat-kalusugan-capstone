@@ -47,6 +47,7 @@ if ($user !== null) {
     </script>
 </head>
 <body class="auth-page">
+    <?php if (function_exists('staging_banner')) staging_banner(); ?>
     <main class="auth-shell">
         <section class="auth-hero">
             <div class="auth-logo-group">

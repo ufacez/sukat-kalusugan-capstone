@@ -1,0 +1,23 @@
+// Sukat Kalusugan — Codespaces staging devcontainer (QA + pen-test, NOT prod).
+// Azure is untouched: this only affects GitHub Codespaces opened from the
+// `codespace`/`staging` branch. Test data only — never import prod dumps here.
+{
+  "name": "Sukat Kalusugan staging",
+  "dockerComposeFile": ["docker-compose.yml"],
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+
+  // App on 8080 = the ONLY public-forwarded port (teacher pen-test URL).
+  // DB stays private inside the Codespace.
+  "forwardPorts": [8080],
+  "portsAttributes": {
+    "8080": { "label": "staging web (public for pen-test window only)", "onAutoForward": "notify" }
+  },
+
+  "postCreateCommand": "composer install --no-interaction --prefer-dist && bash tools/codespaces_setup.sh",
+
+  "customizations": {
+    "vscode": { "extensions": ["bmewburn.vscode-intelephense-client"] }
+  }
+}
