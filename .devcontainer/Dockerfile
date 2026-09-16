@@ -3,7 +3,10 @@
 FROM php:8.2-apache
 
 # mysqli for get_db_connection(); rewrite+headers for public_html/.htaccess.
-RUN docker-php-ext-install mysqli && docker-php-ext-enable mysqli \
+# libzip-dev+unzip: composer needs a zip source to unpack dist packages.
+RUN apt-get update && apt-get install -y --no-install-recommends git nano libzip-dev unzip mariadb-client \
+    && rm -rf /var/lib/apt/lists/* \
+    && docker-php-ext-install mysqli zip && docker-php-ext-enable mysqli zip \
     && a2enmod rewrite headers
 
 # Serve public_html/ directly (repo root stays out of the docroot).
