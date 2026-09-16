@@ -10,7 +10,7 @@ prod). Azure/prod is out of scope here — everything below is Codespaces only.
 2. Wait for `tools/codespaces_setup.sh` (postCreate): `composer install`,
    `db/schema.sql` + migrations, `db/seeders/seed_staging.php`.
 3. Create `.env` once per Codespace:
-   `cp .env.codespaces.example .env` then fill `DB_PASS`, `STAGING_PASSWORD`
+   `cp env.codespaces.example .env` then fill `DB_PASS`, `STAGING_PASSWORD`
    (Codespaces Secrets, staging-only — never prod values) and `APP_URL`
    (the forwarded 8080 URL, set after step 4).
 4. Ports panel → port `8080` → Visibility **Public** (only for the test

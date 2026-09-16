@@ -5,8 +5,17 @@
 #
 # Prerequisites (provided by .devcontainer/docker-compose.yml):
 #   - MySQL 8 service on host "db" (override with DB_HOST)
-#   - .env present (copied from .env.codespaces.example, secrets filled in)
+#   - .env present (copied from env.codespaces.example, secrets filled in)
+#
+# Notes:
+#   - Base dump is db/sukat_kalusugan_clean_baseline.sql (PII-free: only
+#     @sukat.local rows). NEVER use db/schema.sql here (stale demo INSERT that
+#     fails + carries a real name/address) nor db/baseline.sql (real gmails).
+#   - --skip-ssl: the bundled MariaDB client rejects MySQL 8's self-signed
+#     cert; the compose network is private to this box, so plain is fine.
 set -euo pipefail
+
+MYSQL="mysql --skip-ssl"
 
 DBH="${DB_HOST:-db}"
 DBN="${DB_NAME:-sukat_staging}"
@@ -19,13 +28,13 @@ if [ -z "$DBP" ]; then
 fi
 
 if [ ! -f .env ]; then
-  echo "ERROR: .env missing. Run: cp .env.codespaces.example .env  (then fill secrets)"
+  echo "ERROR: .env missing. Run: cp env.codespaces.example .env  (then fill secrets)"
   exit 1
 fi
 
 echo "== 1/5 waiting for MySQL on $DBH =="
 for i in $(seq 1 30); do
-  if mysql -h "$DBH" -u "$DBU" -p"$DBP" -e "SELECT 1" >/dev/null 2>&1; then
+  if $MYSQL -h "$DBH" -u "$DBU" -p"$DBP" -e "SELECT 1" >/dev/null 2>&1; then
     echo "mysql up"
     break
   fi
@@ -33,15 +42,15 @@ for i in $(seq 1 30); do
   sleep 2
 done
 
-echo "== 2/5 importing db/schema.sql into $DBN =="
-mysql -h "$DBH" -u "$DBU" -p"$DBP" -e "CREATE DATABASE IF NOT EXISTS \`$DBN\` CHARACTER SET utf8mb4;"
-mysql -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" < db/schema.sql
-echo "schema ok"
+echo "== 2/5 importing PII-free clean baseline into $DBN (fresh rebuild) =="
+$MYSQL -h "$DBH" -u "$DBU" -p"$DBP" -e "DROP DATABASE IF EXISTS \`$DBN\`; CREATE DATABASE \`$DBN\` CHARACTER SET utf8mb4;"
+$MYSQL -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" < db/sukat_kalusugan_clean_baseline.sql
+echo "baseline ok"
 
 echo "== 3/5 applying timestamped migrations (tolerant: logs, continues) =="
 > /tmp/staging_migrations.log
 for f in $(ls db/20*.sql db/*_migration.sql 2>/dev/null | sort -u); do
-  if mysql --force -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" < "$f" >>/tmp/staging_migrations.log 2>&1; then
+  if $MYSQL --force -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" < "$f" >>/tmp/staging_migrations.log 2>&1; then
     echo "  applied: $f"
   else
     echo "  NOTE (already applied or skipped, see log): $f"
@@ -52,7 +61,7 @@ echo "== 4/5 seeding TEST data only =="
 php db/seeders/seed_staging.php
 
 echo "== 5/5 verifying =="
-mysql -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" -e "SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM parents) AS parents, (SELECT COUNT(*) FROM children) AS children;"
+$MYSQL -h "$DBH" -u "$DBU" -p"$DBP" "$DBN" -e "SELECT (SELECT COUNT(*) FROM users) AS users, (SELECT COUNT(*) FROM parents) AS parents, (SELECT COUNT(*) FROM children) AS children;"
 php -l public_html/index.php >/dev/null && echo "lint index ok"
 php -l public_html/auth/login.php >/dev/null && echo "lint login ok"
 
