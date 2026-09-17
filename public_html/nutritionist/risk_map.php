@@ -772,14 +772,6 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         }
     }
 
-    function formatAge(months) {
-        if (!months && months !== 0) return '';
-        if (months < 12) return months + ' mo';
-        var years = Math.floor(months / 12);
-        var rem = months % 12;
-        return rem === 0 ? years + ' yr' : years + ' yr ' + rem + ' mo';
-    }
-
     function openSpotPanel(spot) {
         var panel = document.getElementById('spot-panel');
         var body = document.getElementById('spot-panel-body');
@@ -876,7 +868,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             html += '<div class="admin-spotmap-person-list">';
             children.forEach(function (ch) {
                 var dotColor = STATUS_DOT_COLORS[ch.status] || '#94a3b8';
-                var meta = (ch.sex || '') + (ch.age_months ? ' · ' + formatAge(ch.age_months) : '');
+                var meta = (ch.sex || '');
                 if (ch.code) meta += ' · ' + ch.code;
                 html += '<div class="admin-spotmap-person" data-child-id="' + ch.id + '">';
                 html += '<div class="admin-spotmap-person-info">';
@@ -960,7 +952,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 res.data.forEach(function (p) {
                     var meta = '';
                     if (type === 'children') {
-                        meta = (p.sex || '') + (p.age_months ? ' · ' + formatAge(p.age_months) : '') + (p.parent_name ? ' · Guardian: ' + p.parent_name : '');
+                        meta = (p.sex || '') + (p.parent_name ? ' · Guardian: ' + p.parent_name : '');
                     } else {
                         meta = p.parent_type || 'Guardian';
                         if (p.phone) meta += ' · ' + p.phone;

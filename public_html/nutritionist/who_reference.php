@@ -45,6 +45,9 @@ $indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
 if (!isset($indicators[$indicator])) $indicator = 'waz';
 $sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
 $search = trim((string)($_GET['q'] ?? ''));
+if ($search !== '' && preg_match('/^\d+(\.\d+)?$/', $search) !== 1) {
+	$search = '';
+}
 
 $activeTab = 'wfa';
 foreach ($tabMap as $tabKey => $tabDef) {
@@ -72,6 +75,18 @@ if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months
 	$types .= 'ii';
 	$params[] = $low;
 	$params[] = $high;
+}
+
+// Exact-match jump: a numeric search goes straight to the month / day / cm row.
+if ($search !== '') {
+	$sql .= " AND {$config['column']} = ?";
+	if ($config['column'] === 'height_cm') {
+		$types .= 'd';
+		$params[] = (float)$search;
+	} else {
+		$types .= 'i';
+		$params[] = (int)$search;
+	}
 }
 
 /*
@@ -118,10 +133,11 @@ function who_reference_height_range_label(string $indicator): string {
 }
 
 $exportBase = ['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange];
+if ($search !== '') $exportBase['q'] = $search;
 $actions = export_dropdown(
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query($exportBase),
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'csv'])),
-	null,
+	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'pdf'])),
 	'Save as'
 );
 
@@ -241,7 +257,34 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 			<div class="who-ref-table-card">
 				<div class="who-ref-table-header">
 					<h3 class="who-ref-table-title">WHO Reference Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
-					<div class="who-ref-filters">
+					<div class="who-ref-filters who-ref-toolbar">
+						<form class="who-ref-filter-group who-ref-search" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>">
+							<label class="who-ref-filter-label" for="who-ref-q">Find <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?></label>
+							<span class="who-ref-search-row">
+								<input type="hidden" name="indicator" value="<?php echo nutritionist_e($indicator); ?>">
+								<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
+								<input type="hidden" name="range" value="<?php echo nutritionist_e($ageRange); ?>">
+								<input
+									id="who-ref-q"
+									class="who-ref-search-input"
+									type="text"
+									name="q"
+									inputmode="decimal"
+									autocomplete="off"
+									placeholder="<?php echo $config['column'] === 'height_cm' ? 'e.g. 65' : ($isDayView ? 'e.g. 730' : 'e.g. 24'); ?>"
+									value="<?php echo nutritionist_e($search); ?>"
+								>
+								<button class="who-ref-search-btn" type="submit" title="Search" aria-label="Search">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+								</button>
+								<?php if ($search !== ''): ?>
+									<a class="who-ref-clear" href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange)); ?>">Clear</a>
+								<?php endif; ?>
+							</span>
+						</form>
+
+						<span class="who-ref-tb-sep" aria-hidden="true"></span>
+
 						<div class="who-ref-filter-group">
 							<label class="who-ref-filter-label">Sex</label>
 							<select class="who-ref-select" onchange="window.location.href=this.value">
@@ -251,15 +294,9 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 						</div>
 
 						<?php if (in_array($config['column'], ['age_months', 'age_days'], true)): ?>
+						<span class="who-ref-tb-sep" aria-hidden="true"></span>
 						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Unit</label>
-							<select class="who-ref-select" disabled>
-								<option><?php echo nutritionist_e($config['unit']); ?></option>
-							</select>
-						</div>
-
-						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Age (Completed)</label>
+							<label class="who-ref-filter-label">Age</label>
 							<div class="who-ref-toggle-group">
 								<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz-days' ? 'waz' : 'haz', $sex, $ageRange, $search)); ?>"
 								   class="who-ref-toggle <?php echo !$isDayView ? 'is-active' : ''; ?>">Months</a>
