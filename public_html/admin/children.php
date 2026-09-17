@@ -38,6 +38,7 @@ $children = admin_fetch_all(
         c.parent_id,
         p.name AS parent_name,
         lm.measurement_date,
+        lm.created_at AS measured_at,
         lm.height_cm,
         lm.weight_kg,
         lm.nutritional_status
@@ -56,8 +57,6 @@ $children = admin_fetch_all(
 
 $archivedCountRow = admin_fetch_one("SELECT COUNT(*) AS cnt FROM children WHERE status = 'inactive'");
 $archivedCount = (int)($archivedCountRow['cnt'] ?? 0);
-
-$totalAtRisk = count(array_filter($children, static fn(array $c): bool => in_array(strtolower((string)($c['nutritional_status'] ?? '')), ['severely underweight', 'severely stunted', 'severely wasted', 'moderately underweight', 'moderately stunted', 'moderately wasted'], true)));
 
 $barangays = admin_fetch_all("SELECT id, name FROM barangays WHERE status = 'active' ORDER BY name ASC");
 
@@ -79,20 +78,6 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                 <div class="admin-card-value"><?php echo count($children); ?></div>
                 <div class="admin-card-meta">
                     <span class="admin-card-trend is-up">Currently active profiles</span>
-                </div>
-            </div>
-        </div>
-    </article>
-    <article class="admin-card">
-        <div class="admin-card-row">
-            <div class="admin-card-icon is-danger">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-            </div>
-            <div class="admin-card-content">
-                <div class="admin-card-label">At Risk</div>
-                <div class="admin-card-value"><?php echo $totalAtRisk; ?></div>
-                <div class="admin-card-meta">
-                    <span class="admin-card-trend">Moderate to severe malnutrition</span>
                 </div>
             </div>
         </div>
@@ -166,8 +151,9 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                         <td>
                             <?php if (!empty($child['measurement_date'])): ?>
                                 <?php $md = (string)$child['measurement_date']; ?>
+                                <?php $measuredAt = !empty($child['measured_at']) ? (string)$child['measured_at'] : null; ?>
                                 <div style="font-weight:600;font-size:0.82rem;"><?php echo admin_e(date('M j Y', strtotime($md))); ?></div>
-                                <div class="admin-mini"><?php echo admin_e(date('H:i', strtotime($md))); ?></div>
+                                <div class="admin-mini"><?php echo $measuredAt !== null ? admin_e(date('H:i', strtotime($measuredAt))) : '—'; ?></div>
                             <?php else: ?>
                                 <span style="color:var(--admin-muted);">n/a</span>
                             <?php endif; ?>

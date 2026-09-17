@@ -6,7 +6,6 @@ start_secure_session();
 require_permission('parents.delete');
 
 $restoreId = (int)($_GET['restore'] ?? 0);
-$deleteId = (int)($_GET['delete'] ?? 0);
 
 $parents = admin_fetch_all(
     "SELECT
@@ -29,35 +28,8 @@ $parents = admin_fetch_all(
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parents.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
 
-admin_layout_start('Archived Parents', 'Restore or permanently delete archived parent accounts.', 'parents', $actions, 'Archived');
+admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'parents', $actions, 'Archived');
 ?>
-
-<?php if ($deleteId > 0): ?>
-<?php
-$deleteTarget = admin_fetch_one('SELECT id, name, email FROM parents WHERE id = ? AND status = \'inactive\' LIMIT 1', 'i', [$deleteId]);
-?>
-<?php if ($deleteTarget !== null): ?>
-<section class="admin-section" style="margin-bottom:20px;">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title" style="color:var(--admin-danger,#d32f2f);">Permanent Deletion</h2>
-            <p class="admin-section-subtitle">Type <strong>DELETE</strong> below to permanently remove <?php echo admin_e($deleteTarget['name']); ?>. This action cannot be undone.</p>
-        </div>
-    </div>
-    <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_hard_delete.php')); ?>" style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;">
-        <input type="hidden" name="id" value="<?php echo (int)$deleteTarget['id']; ?>">
-        <label class="admin-field" style="margin:0;">
-            <span>Type DELETE to confirm</span>
-            <input name="confirm_delete" required pattern="DELETE" placeholder="DELETE" style="max-width:200px;font-family:monospace;font-weight:700;color:var(--admin-danger,#d32f2f);">
-        </label>
-        <button class="admin-btn" type="submit" style="background:var(--admin-danger,#d32f2f);color:#fff;" data-admin-confirm="This will permanently delete this parent. Are you absolutely sure?" data-admin-confirm-danger>
-            <?php echo admin_action_icon('delete'); ?> Permanently delete
-        </button>
-        <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/parents_archived.php')); ?>">Cancel</a>
-    </form>
-</section>
-<?php endif; ?>
-<?php endif; ?>
 
 <section class="admin-section">
     <div class="admin-section-head">
@@ -105,9 +77,6 @@ $deleteTarget = admin_fetch_one('SELECT id, name, email FROM parents WHERE id = 
                                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
                                         </button>
                                     </form>
-                                    <a class="admin-icon-btn admin-icon-btn-danger" title="Delete permanently" href="<?php echo admin_e(app_url('/admin/parents_archived.php?delete=' . (int)$parent['id'])); ?>">
-                                        <?php echo admin_action_icon('delete'); ?>
-                                    </a>
                                 </div>
                             </td>
                         </tr>
