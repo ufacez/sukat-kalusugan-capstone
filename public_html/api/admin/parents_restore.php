@@ -28,9 +28,22 @@ if ($target['status'] !== 'inactive') {
 
 $ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', ['active', $id]);
 
+// Cascade: restoring a parent restores its archived children too, so the
+// whole family comes back together.
+$restoredKids = 0;
 if ($ok) {
-    $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Restored parent ' . $target['email'] . ' (' . $id . ')');
+    $restoredKids = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ? AND status = "inactive"', 'i', [$id]);
+    if ($restoredKids > 0) {
+        $kidsOk = admin_execute('UPDATE children SET status = "active" WHERE parent_id = ? AND status = "inactive"', 'i', [$id]);
+        if (!$kidsOk) {
+            error_log('[SukatKalusugan] parents_restore.php: parent ' . $id . ' restored but children cascade failed.');
+        }
+    }
 }
 
-admin_redirect('/admin/parents_archived.php', ['notice' => $ok ? 'Parent restored successfully.' : 'Parent could not be restored.', 'type' => $ok ? 'success' : 'error']);
+if ($ok) {
+    $actor = current_user();
+    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Restored parent ' . $target['email'] . ' (' . $id . ') with ' . $restoredKids . ' child(ren)');
+}
+
+admin_redirect('/admin/parents_archived.php', ['notice' => $ok ? 'Parent restored successfully' . ($restoredKids > 0 ? ' with ' . $restoredKids . ' child(ren).' : '.') : 'Parent could not be restored.', 'type' => $ok ? 'success' : 'error']);

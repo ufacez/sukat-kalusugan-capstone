@@ -161,7 +161,20 @@
         strengthLabel.textContent = label;
       }
 
-      setState(input, optional || isStrongPassword(value), "Password doesn't meet all the requirements below.");
+      // Dynamic message: name only what's missing so the user knows
+    // exactly what to fix (e.g. "Password must have a number").
+    var missing = [];
+    if (!rules.length) missing.push("8+ characters");
+    if (!rules.lower) missing.push("one lowercase letter");
+    if (!rules.upper) missing.push("one uppercase letter");
+    if (!rules.number) missing.push("a number");
+    if (!rules.special) missing.push("a special character");
+
+    setState(
+      input,
+      optional || isStrongPassword(value),
+      missing.length > 0 ? "Password must have " + missing.join(", ") : ""
+    );
 
       // Re-check confirm password whenever the password changes
       const confirmInput = document.querySelector('[data-match="' + input.id + '"]');

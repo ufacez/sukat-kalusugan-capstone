@@ -11,7 +11,7 @@ $user = nutritionist_require_access();
 $localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
 $page = max(1, (int)($_GET['page'] ?? 1));
 $perPage = 10;
-$validTabs = ['active', 'graduated'];
+$validTabs = ['active', 'graduated', 'archived'];
 $tab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'active';
 
 $childrenParams = [];
@@ -28,12 +28,14 @@ if ($localAreaFilter > 0) {
 }
 $where[] = 'c.status = ?';
 $types .= 's';
-$filterParams[] = 'active';
+$filterParams[] = $tab === 'archived' ? 'inactive' : 'active';
 if ($tab === 'graduated') {
     $where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) >= 60';
-} else {
+} elseif ($tab === 'active') {
     $where[] = 'TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
 }
+// Archived has no age filter: it includes manually archived records and
+// 60+ month children auto-archived by the auto-archive tool.
 $whereSql = implode(' AND ', $where);
 
 /*
@@ -104,6 +106,12 @@ $countGraduatedRows = admin_fetch_all(
     $childrenParams
 );
 $countGraduated = (int)(($countGraduatedRows[0]['cnt'] ?? 0));
+$countArchivedRows = admin_fetch_all(
+    "SELECT COUNT(*) AS cnt FROM children c WHERE c.status = 'inactive' AND {$childrenScope}",
+    str_repeat('i', count($childrenParams)),
+    $childrenParams
+);
+$countArchived = (int)(($countArchivedRows[0]['cnt'] ?? 0));
 
 /*
  * Local area list for the filter dropdown. The list is restricted to
@@ -162,7 +170,7 @@ function nchild_short_address(?string $localArea, ?string $barangay): string
 $actions = '<div class="admin-actions">'
     . '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('clipboard') . ' Measurements</a>'
     . (nutritionist_can_write('children.create')
-        ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/child_form.php')) . '">' . admin_action_icon('add') . ' Add child</a>'
+        ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>'
         : '')
     . '</div>';
 
@@ -281,8 +289,9 @@ nutritionist_layout_start(
     </div>
 
     <div class="rp-tabs">
-        <a class="rp-tab <?php echo $tab === 'active' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['page' => 1])); ?>">Active (0–59 mo) <span>(<?php echo (int)$countActive; ?>)</span></a>
+        <a class="rp-tab <?php echo $tab === 'active' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['tab' => 'active', 'page' => 1])); ?>">Active (0–59 mo) <span>(<?php echo (int)$countActive; ?>)</span></a>
         <a class="rp-tab <?php echo $tab === 'graduated' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['tab' => 'graduated', 'page' => 1])); ?>">Graduated (60+ mo) <span>(<?php echo (int)$countGraduated; ?>)</span></a>
+        <a class="rp-tab <?php echo $tab === 'archived' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_children_url(['tab' => 'archived', 'page' => 1])); ?>">Archived <span>(<?php echo (int)$countArchived; ?>)</span></a>
     </div>
 
     <div class="nutritionist-table-wrap">
@@ -307,11 +316,14 @@ nutritionist_layout_start(
                                 <div class="empty-title">No children registered yet</div>
                                 <div class="empty-sub">Your scope doesn't have any registered children. Once children are added, they will appear in this list.</div>
                                 <?php if (nutritionist_can_write('children.create')): ?>
-                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
+                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/family_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
                                 <?php endif; ?>
                             <?php elseif ($tab === 'graduated'): ?>
                                 <div class="empty-title">No graduated children</div>
                                 <div class="empty-sub">No children in your scope have reached 60+ months of age yet.</div>
+                            <?php elseif ($tab === 'archived'): ?>
+                                <div class="empty-title">No archived children</div>
+                                <div class="empty-sub">Manually archived records and 60+ month auto-archived children in your scope will appear here.</div>
                             <?php else: ?>
                                 <div class="empty-title">No children in this view</div>
                                 <div class="empty-sub">Your current local area filter doesn't include any of the <?php echo (int)$totalAll; ?> children in your scope. Clear the filter to see all of them.</div>

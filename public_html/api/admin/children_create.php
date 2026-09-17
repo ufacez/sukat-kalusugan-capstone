@@ -93,7 +93,7 @@ $childCode = admin_next_child_code_api();
 $ok = admin_execute(
     'INSERT INTO children (child_code, first_name, middle_name, last_name, birthdate, sex, barangay_id, local_area_id, is_ip, has_disability, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
     'ssssssssiii',
-    [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? 0, $isIp, $hasDisability, $parentId]
+    [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId]
 );
 
 if ($ok) {

@@ -600,7 +600,9 @@ if (count($aiBullets) === 0) {
 }
 
 $actions = implode(' ', [
-	'<a class="admin-btn" style="background:var(--admin-valid);border-color:var(--admin-valid);" href="' . nutritionist_e(app_url('/nutritionist/risk_map.php')) . '">' . admin_action_icon('map') . ' Risk Map</a>',
+	(nutritionist_can_write('children.create')
+		? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add Family</a>'
+		: ''),
 	'<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports.php')) . '">' . admin_action_icon('document') . ' EOPT Reports</a>',
 ]);
 

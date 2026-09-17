@@ -14,7 +14,7 @@ function nutritionist_nav_items(): array
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php')],
         ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php')],
         ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
-        ['key' => 'who_reference', 'label' => 'WHO Reference', 'href' => app_url('/nutritionist/who_reference.php')],
+        ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php')],
         ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
@@ -38,7 +38,7 @@ function nutritionist_grouped_nav_items(): array
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php'), 'icon' => 'children'],
                 ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php'), 'icon' => 'clipboard'],
                 ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
-                ['key' => 'who_reference', 'label' => 'WHO Reference', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
+                ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
             ],
         ],
         [

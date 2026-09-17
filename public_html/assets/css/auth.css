@@ -869,3 +869,43 @@
 .auth-cta-center .auth-submit {
   margin-inline: auto;
 }
+
+/* ---- Info pages (about / privacy / terms / contact): centered single column ----
+   Scoped to .info-page so the sign-in / register split layout is untouched. */
+.auth-page.info-page .auth-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(880px, 100%);
+  gap: 1rem;
+}
+
+.auth-page.info-page .auth-hero {
+  width: 100%;
+  align-items: center;
+  text-align: center;
+  padding: 1.75rem 1.5rem 1.5rem;
+}
+
+.auth-page.info-page .auth-logo-group {
+  margin: 0;
+}
+
+.auth-page.info-page .auth-tagline {
+  margin-top: 0.75rem;
+}
+
+.auth-page.info-page .auth-footer-row {
+  margin-top: 1rem;
+}
+
+.auth-page.info-page .auth-card {
+  width: 100%;
+  max-width: 880px;
+}
+
+@media (max-width: 560px) {
+  .auth-page.info-page .auth-hero {
+    padding: 1.25rem 1rem 1rem;
+  }
+}

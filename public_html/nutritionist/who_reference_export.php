@@ -22,7 +22,7 @@ function who_export_fail(string $indicator, string $sex, string $ageRange, strin
 // On hosts without extension=zip (e.g. Azure App Service default image) an
 // .xlsx request transparently falls back to CSV so the button never 500s.
 $whoFormat = strtolower(trim((string)($_GET['format'] ?? 'xlsx')));
-if ($whoFormat !== 'csv' && $whoFormat !== 'xlsx') {
+if ($whoFormat !== 'csv' && $whoFormat !== 'xlsx' && $whoFormat !== 'pdf') {
     $whoFormat = 'xlsx';
 }
 $whoFallbackToCsv = false;
@@ -54,6 +54,13 @@ if (!in_array($ageRange, ['young', 'old', 'all'], true)) {
 	$ageRange = 'all';
 }
 
+// Optional exact-match search (month / day / cm value). Non-numeric input
+// is ignored so the export always matches what the on-screen table shows.
+$search = trim((string)($_GET['q'] ?? ''));
+if ($search !== '' && preg_match('/^\d+(\.\d+)?$/', $search) !== 1) {
+	$search = '';
+}
+
 $rangeBounds = [
 	'young' => [
 		'age_months' => [0, 23],
@@ -77,6 +84,17 @@ if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months
 	$types .= 'ii';
 	$params[] = $low;
 	$params[] = $high;
+}
+
+if ($search !== '') {
+	$sql .= " AND {$config['column']} = ?";
+	if ($config['column'] === 'height_cm') {
+		$types .= 'd';
+		$params[] = (float)$search;
+	} else {
+		$types .= 'i';
+		$params[] = (int)$search;
+	}
 }
 
 $sql .= " ORDER BY {$config['column']} ASC";
@@ -132,7 +150,52 @@ $tmpPath = $tmpDir . DIRECTORY_SEPARATOR . 'who_export_' . bin2hex(random_bytes(
 $sheetName = strtoupper($indicator) . '_' . $sex;
 
 if (empty($dataRows)) {
-    who_export_fail($indicator, $sex, $ageRange, 'No reference rows found for this indicator. The reference table may not be seeded yet.');
+    who_export_fail($indicator, $sex, $ageRange, 'No standard rows found for this indicator. The standard table may not be seeded yet.');
+}
+
+if ($whoFormat === 'pdf') {
+    require_once __DIR__ . '/../includes/pdf_generator.php';
+
+    $rangeText = 'All rows';
+    if ($ageRange === 'young') {
+        $rangeText = '0-2y (0-23 mo / 0-729 d)';
+    } elseif ($ageRange === 'old') {
+        $rangeText = '2-5y (24-60 mo / 730-1856 d)';
+    }
+
+    $pdf = pdf_base('WHO Standard - ' . $config['label'] . ' - ' . $sex, 'Landscape');
+    $pdf->AddPage();
+    $pdf->SetFont('helvetica', 'B', 12);
+    $pdf->Cell(0, 7, 'WHO CHILD GROWTH STANDARDS (2006)', 0, 1, 'C');
+    $pdf->SetFont('helvetica', 'B', 10);
+    $pdf->Cell(0, 6, strtoupper($config['label']) . ' - ' . strtoupper($sex), 0, 1, 'C');
+    $pdf->SetFont('helvetica', '', 8);
+    $pdf->Cell(0, 5, 'Range: ' . $rangeText . '  |  Find: ' . ($search !== '' ? $search : '-') . '  |  Generated: ' . date('F j, Y g:i A') . '  |  ' . count($dataRows) . ' row(s)', 0, 1, 'C');
+    $pdf->Ln(3);
+
+    // A4 landscape usable width is 273mm after the base 12mm margins.
+    $pdfCols = [$config['columnLabel'], 'L', 'M', 'S', '-3SD', '-2SD', '-1SD', 'Median', '+1SD', '+2SD', '+3SD'];
+    $pdfWidths = [27, 22, 26, 26, 24, 24, 24, 25, 25, 25, 25];
+    pdf_table_header($pdf, $pdfCols, $pdfWidths, '106E4F', 6);
+    $pdf->SetFont('helvetica', '', 6);
+    $pdfRows = array_slice($dataRows, 0, 1000);
+    foreach ($pdfRows as $ri => $pdfRow) {
+        $pdf->SetFillColor($ri % 2 === 0 ? 240 : 255, $ri % 2 === 0 ? 248 : 255, $ri % 2 === 0 ? 244 : 255);
+        foreach (array_values($pdfRow) as $ci => $cell) {
+            $pdf->Cell($pdfWidths[$ci], 6, (string)$cell, 1, 0, $ci === 0 ? 'L' : 'R', true);
+        }
+        $pdf->Ln();
+    }
+    if (count($dataRows) > 1000) {
+        $pdf->Ln(2);
+        $pdf->SetFont('helvetica', 'I', 7);
+        $pdf->Cell(0, 5, 'Showing the first 1,000 of ' . count($dataRows) . ' rows — use XLSX/CSV for the full table.', 0, 1, 'C');
+    }
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    $pdf->Output('who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.pdf', 'D');
+    exit;
 }
 
 if ($whoFormat === 'csv') {
