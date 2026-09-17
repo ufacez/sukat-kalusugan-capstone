@@ -28,18 +28,8 @@ if ($target['status'] !== 'inactive') {
 
 $ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', ['active', $id]);
 
-// Cascade: restoring a parent restores its archived children too, so the
-// whole family comes back together.
-$restoredKids = 0;
-if ($ok) {
-    $restoredKids = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ? AND status = "inactive"', 'i', [$id]);
-    if ($restoredKids > 0) {
-        $kidsOk = admin_execute('UPDATE children SET status = "active" WHERE parent_id = ? AND status = "inactive"', 'i', [$id]);
-        if (!$kidsOk) {
-            error_log('[SukatKalusugan] parents_restore.php: parent ' . $id . ' restored but children cascade failed.');
-        }
-    }
-}
+// Cascade: restoring a parent restores its archived children too.
+$restoredKids = $ok ? admin_cascade_parent_status($id, 'active') : 0;
 
 if ($ok) {
     $actor = current_user();

@@ -28,18 +28,8 @@ if ($target['status'] !== 'active') {
 
 $ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', ['inactive', $id]);
 
-// Cascade: archiving a parent archives all of its active children too,
-// so no orphaned active children linger on the kiosk or Children list.
-$archivedKids = 0;
-if ($ok) {
-    $archivedKids = admin_scalar('SELECT COUNT(*) FROM children WHERE parent_id = ? AND status = "active"', 'i', [$id]);
-    if ($archivedKids > 0) {
-        $kidsOk = admin_execute('UPDATE children SET status = "inactive" WHERE parent_id = ? AND status = "active"', 'i', [$id]);
-        if (!$kidsOk) {
-            error_log('[SukatKalusugan] parents_delete.php: parent ' . $id . ' archived but children cascade failed.');
-        }
-    }
-}
+// Cascade: archiving a parent archives all of its active children too.
+$archivedKids = $ok ? admin_cascade_parent_status($id, 'inactive') : 0;
 
 if ($ok) {
     $actor = current_user();

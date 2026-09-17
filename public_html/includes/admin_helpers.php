@@ -374,6 +374,50 @@ function child_duplicate_identity(string $firstName, string $lastName, string $b
 }
 
 /**
+ * Cascade a parent status change to every linked child.
+ *
+ * Archiving a parent archives all of its children in the opposite status
+ * too, so no orphaned active children linger on the kiosk, Children list,
+ * or measurements. Restoring brings the whole family back together.
+ *
+ * Single source of truth — every archive/restore path (admin endpoints,
+ * nutritionist pages, edit-form status flips) must go through this.
+ *
+ * @return int Number of children flipped (0 when none or on failure).
+ */
+function admin_cascade_parent_status(int $parentId, string $newStatus): int
+{
+    $newStatus = $newStatus === 'active' ? 'active' : 'inactive';
+
+    if ($parentId <= 0) {
+        return 0;
+    }
+
+    $count = admin_scalar(
+        'SELECT COUNT(*) FROM children WHERE parent_id = ? AND status != ?',
+        'is',
+        [$parentId, $newStatus]
+    );
+
+    if ($count <= 0) {
+        return 0;
+    }
+
+    $ok = admin_execute(
+        'UPDATE children SET status = ? WHERE parent_id = ? AND status != ?',
+        'sis',
+        [$newStatus, $parentId, $newStatus]
+    );
+
+    if (!$ok) {
+        error_log('[SukatKalusugan] admin_cascade_parent_status failed for parent ' . $parentId . ' -> ' . $newStatus);
+        return 0;
+    }
+
+    return $count;
+}
+
+/**
  * Best-effort split of a single "name" column into first / middle / last
  * name parts, used to pre-fill the Add/Edit forms when editing a record
  * that only ever stored one combined name string.

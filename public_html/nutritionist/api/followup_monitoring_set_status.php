@@ -15,6 +15,13 @@ if ($user === null || !in_array($user['role'] ?? '', ['admin', 'nutritionist'], 
     exit;
 }
 
+// Read-only tier may view but never modify.
+if (($user['access_level'] ?? 'full') === 'readonly') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Read-only accounts cannot modify data.'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
 if (!in_array($_SERVER['REQUEST_METHOD'] ?? '', ['GET', 'POST'], true)) {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed.'], JSON_UNESCAPED_UNICODE);

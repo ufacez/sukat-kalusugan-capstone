@@ -12,6 +12,50 @@ if ($editId > 0) {
     );
 }
 
+// Archive / restore (same behavior as the admin endpoints, but scoped to
+// the nutritionist's barangay and gated by parents.delete like admin).
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string)($_POST['action'] ?? '');
+    $parentId = (int)($_POST['id'] ?? 0);
+
+    if (($action === 'archive' || $action === 'restore') && $parentId > 0) {
+        nutritionist_require_write('parents.delete');
+
+        $target = admin_fetch_one('SELECT id, email, barangay_id, status FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+
+        if ($target === null) {
+            admin_redirect('/nutritionist/parents.php', ['notice' => 'Parent not found.', 'type' => 'error']);
+        }
+
+        if (($user['role'] ?? '') !== 'admin' && (int)($target['barangay_id'] ?? 0) !== (int)($user['barangay_id'] ?? 0)) {
+            admin_redirect('/nutritionist/parents.php', ['notice' => 'You can only manage parents within your assigned barangay.', 'type' => 'error']);
+        }
+
+        $newStatus = $action === 'archive' ? 'inactive' : 'active';
+
+        if (($target['status'] ?? '') === $newStatus) {
+            admin_redirect('/nutritionist/parents.php', ['notice' => $action === 'archive' ? 'Parent is already archived.' : 'Parent is already active.', 'type' => 'error']);
+        }
+
+        $ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', [$newStatus, $parentId]);
+        $kids = $ok ? admin_cascade_parent_status($parentId, $newStatus) : 0;
+
+        if ($ok) {
+            $actor = current_user();
+            $actionLabel = $newStatus === 'inactive' ? 'Archived' : 'Restored';
+            log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', $actionLabel . ' parent ' . $target['email'] . ' (' . $parentId . ') with ' . $kids . ' child(ren)');
+        }
+
+        $backTab = $newStatus === 'inactive' ? '?tab=archived' : '';
+        admin_redirect(
+            '/nutritionist/parents.php' . $backTab,
+            $ok
+                ? ['notice' => 'Parent ' . ($newStatus === 'inactive' ? 'archived' : 'restored') . ' successfully' . ($kids > 0 ? ' with ' . $kids . ' child(ren).' : '.')]
+                : ['notice' => 'Parent could not be updated.', 'type' => 'error']
+        );
+    }
+}
+
 $tab = (($_GET['tab'] ?? 'active') === 'archived') ? 'archived' : 'active';
 
 $childScopeParams = [];
@@ -213,6 +257,21 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
 								<?php if (nutritionist_can_write('parents.update')): ?>
 								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+								<?php endif; ?>
+								<?php if (nutritionist_can_write('parents.delete')): ?>
+									<?php if ($tab === 'archived'): ?>
+									<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" data-admin-confirm="Restore <?php echo nutritionist_e($parent['name']); ?> with all linked children?" style="display:inline;">
+										<input type="hidden" name="action" value="restore">
+										<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
+										<button class="admin-icon-btn" title="Restore with children" type="submit" style="color:var(--admin-primary,#0b6e4f);"><?php echo admin_action_icon('sync'); ?></button>
+									</form>
+									<?php else: ?>
+									<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" data-admin-confirm="Archive <?php echo nutritionist_e($parent['name']); ?> with all linked children?" data-admin-confirm-danger style="display:inline;">
+										<input type="hidden" name="action" value="archive">
+										<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
+										<button class="admin-icon-btn admin-icon-btn-danger" title="Archive with children" type="submit"><?php echo admin_action_icon('archive'); ?></button>
+									</form>
+									<?php endif; ?>
 								<?php endif; ?>
 							</div>
 						</td>

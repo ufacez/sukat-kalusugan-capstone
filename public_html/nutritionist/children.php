@@ -14,6 +14,49 @@ $perPage = 10;
 $validTabs = ['active', 'graduated', 'archived'];
 $tab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'active';
 
+// Archive / restore a single child (same behavior as the admin endpoints,
+// but scoped to the nutritionist's barangay).
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $action = (string)($_POST['action'] ?? '');
+    $childId = (int)($_POST['id'] ?? 0);
+
+    if (($action === 'archive' || $action === 'restore') && $childId > 0) {
+        nutritionist_require_write('children.delete');
+
+        $target = admin_fetch_one('SELECT id, child_code, barangay_id, status FROM children WHERE id = ? LIMIT 1', 'i', [$childId]);
+
+        if ($target === null) {
+            admin_redirect('/nutritionist/children.php', ['notice' => 'Child not found.', 'type' => 'error']);
+        }
+
+        if (($user['role'] ?? '') !== 'admin' && (int)($target['barangay_id'] ?? 0) !== (int)($user['barangay_id'] ?? 0)) {
+            admin_redirect('/nutritionist/children.php', ['notice' => 'You can only manage children within your assigned barangay.', 'type' => 'error']);
+        }
+
+        $newStatus = $action === 'archive' ? 'inactive' : 'active';
+
+        if (($target['status'] ?? '') === $newStatus) {
+            admin_redirect('/nutritionist/children.php', ['notice' => $action === 'archive' ? 'Child is already archived.' : 'Child is already active.', 'type' => 'error']);
+        }
+
+        $ok = admin_execute('UPDATE children SET status = ? WHERE id = ?', 'si', [$newStatus, $childId]);
+
+        if ($ok) {
+            $actor = current_user();
+            $actionLabel = $newStatus === 'inactive' ? 'Archived' : 'Restored';
+            log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'warning', $actionLabel . ' child ' . $target['child_code'] . ' (' . $childId . ')');
+        }
+
+        $backTab = $newStatus === 'inactive' ? '?tab=archived' : '';
+        admin_redirect(
+            '/nutritionist/children.php' . $backTab,
+            $ok
+                ? ['notice' => 'Child ' . ($newStatus === 'inactive' ? 'archived' : 'restored') . ' successfully.']
+                : ['notice' => 'Child could not be updated.', 'type' => 'error']
+        );
+    }
+}
+
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
 
@@ -398,6 +441,21 @@ nutritionist_layout_start(
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
                                 <?php if (nutritionist_can_write('children.update')): ?>
                                 <a class="admin-icon-btn" title="Edit profile" href="<?php echo $editUrl; ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <?php endif; ?>
+                                <?php if (nutritionist_can_write('children.delete')): ?>
+                                    <?php if ($tab === 'archived'): ?>
+                                    <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" data-admin-confirm="Restore <?php echo nutritionist_e($fullName); ?>?" style="display:inline;" onclick="event.stopPropagation();">
+                                        <input type="hidden" name="action" value="restore">
+                                        <input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
+                                        <button class="admin-icon-btn" title="Restore" type="submit" style="color:var(--admin-primary,#0b6e4f);"><?php echo admin_action_icon('sync'); ?></button>
+                                    </form>
+                                    <?php else: ?>
+                                    <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" data-admin-confirm="Archive <?php echo nutritionist_e($fullName); ?>?" data-admin-confirm-danger style="display:inline;" onclick="event.stopPropagation();">
+                                        <input type="hidden" name="action" value="archive">
+                                        <input type="hidden" name="id" value="<?php echo (int)$child['id']; ?>">
+                                        <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit"><?php echo admin_action_icon('archive'); ?></button>
+                                    </form>
+                                    <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                         </td>

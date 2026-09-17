@@ -10,6 +10,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 	$action = (string)($_POST['action'] ?? '');
 	$appointmentId = (int)($_POST['id'] ?? 0);
 
+	// Scope every appointment write to the nutritionist's barangay (the
+	// list views are scoped; without this a forged id could touch another
+	// barangay's appointments).
+	if (in_array($action, ['complete_followup', 'confirm_request', 'cancel_request', 'complete_request'], true) && $appointmentId > 0 && ($user['role'] ?? '') !== 'admin') {
+		$scopeCheck = admin_fetch_one(
+			'SELECT c.barangay_id FROM appointments a INNER JOIN children c ON c.id = a.child_id WHERE a.id = ? LIMIT 1',
+			'i',
+			[$appointmentId]
+		);
+		if ($scopeCheck !== null && (int)($scopeCheck['barangay_id'] ?? 0) !== (int)($user['barangay_id'] ?? 0)) {
+			admin_redirect('/nutritionist/appointments.php', ['notice' => 'You can only manage appointments within your assigned barangay.', 'type' => 'error']);
+		}
+	}
+
 	if ($action === 'complete_followup' && $appointmentId > 0) {
 		nutritionist_require_write();
 

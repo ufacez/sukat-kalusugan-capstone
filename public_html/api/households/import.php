@@ -16,6 +16,14 @@ if (($user['type'] ?? '') !== 'staff' || !in_array($user['role'] ?? '', ['admin'
     exit;
 }
 
+// Read-only tier may view but never modify (UI hides the buttons;
+// this is the backend enforcement for forged requests).
+if (($user['access_level'] ?? 'full') === 'readonly') {
+    http_response_code(403);
+    echo json_encode(['success' => false, 'message' => 'Read-only accounts cannot modify data.']);
+    exit;
+}
+
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
     echo json_encode(['success' => false, 'message' => 'Method not allowed.']);

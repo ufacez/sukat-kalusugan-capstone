@@ -133,7 +133,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	$existingParent = null;
 	if ($action === 'update') {
 		$existingParent = admin_fetch_one(
-			'SELECT id, barangay_id, local_area_id FROM parents WHERE id = ? LIMIT 1',
+			'SELECT id, barangay_id, local_area_id, status FROM parents WHERE id = ? LIMIT 1',
 			'i',
 			[$parentId]
 		);
@@ -216,6 +216,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 		}
 
 		if ($ok) {
+			// Status flip via Edit cascades to children, same as Archive/Restore.
+			if ($status !== (string)($existingParent['status'] ?? 'active')) {
+				admin_cascade_parent_status($parentId, $status);
+			}
 			$actor = current_user();
 			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent ' . $email . ' (' . $parentId . ')');
 		}
