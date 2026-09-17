@@ -4,44 +4,6 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
 $user = nutritionist_require_access();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-	$action = (string)($_POST['action'] ?? '');
-	$parentId = (int)($_POST['id'] ?? 0);
-
-	/*
-	 * DELETE
-	 */
-	if ($action === 'delete' && $parentId > 0) {
-
-		nutritionist_require_write('parents.delete');
-
-		$target = admin_fetch_one('SELECT id, email, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
-
-		if ($target === null) {
-			admin_redirect('/nutritionist/parents.php', ['notice' => 'Parent not found.', 'type' => 'error']);
-		}
-
-		// Scope check: nutritionists can only archive parents in their assigned barangay
-		$userBarangayId = $user['barangay_id'] ?? null;
-		if (($user['role'] ?? '') !== 'admin' && $userBarangayId !== null && $userBarangayId !== '' && (int)$target['barangay_id'] !== (int)$userBarangayId) {
-			admin_redirect('/nutritionist/parents.php', ['notice' => 'You can only manage parents within your assigned barangay.', 'type' => 'error']);
-		}
-
-		// Archive instead of hard delete
-		$newStatus = ($target['status'] ?? 'active') === 'active' ? 'inactive' : 'active';
-		$ok = admin_execute('UPDATE parents SET status = ? WHERE id = ?', 'si', [$newStatus, $parentId]);
-
-		if ($ok) {
-			$actor = current_user();
-			$actionLabel = $newStatus === 'inactive' ? 'Archived' : 'Restored';
-			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', $actionLabel . ' parent ' . $target['email'] . ' (' . $parentId . ')');
-		}
-
-		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent ' . ($newStatus === 'inactive' ? 'archived' : 'restored') . ' successfully.'] : ['notice' => 'Parent could not be updated.', 'type' => 'error']);
-	}
-
-}
-
 $editId = (int)($_GET['edit'] ?? 0);
 
 if ($editId > 0) {
@@ -49,6 +11,8 @@ if ($editId > 0) {
         '/nutritionist/parent_form.php?id=' . $editId
     );
 }
+
+$tab = (($_GET['tab'] ?? 'active') === 'archived') ? 'archived' : 'active';
 
 $childScopeParams = [];
 $childScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childScopeParams);
@@ -97,6 +61,17 @@ $totalChildren = array_sum(array_map(static fn(array $parent): int => (int)$pare
 $totalAppointments = array_sum(array_map(static fn(array $parent): int => (int)$parent['appointment_count'], $parents));
 $atRiskCount = count(array_filter($parents, static fn(array $parent): bool => (int)$parent['follow_up_count'] > 0));
 
+// Tab slice: active vs archived, all within the user's barangay scope.
+$tabParents = array_values(array_filter($parents, static fn(array $parent): bool => $tab === 'archived' ? (string)$parent['status'] !== 'active' : (string)$parent['status'] === 'active'));
+$countActive = $activeCount;
+$countArchived = count($parents) - $activeCount;
+
+function nutritionist_parents_url(string $tab): string
+{
+    $base = app_url('/nutritionist/parents.php');
+    return $tab === 'active' ? $base : $base . '?tab=archived';
+}
+
 $actions = nutritionist_can_write('children.create')
 	? '<a class="admin-btn" href="'
 		. nutritionist_e(app_url('/nutritionist/family_form.php'))
@@ -105,6 +80,13 @@ $actions = nutritionist_can_write('children.create')
 
 nutritionist_layout_start('Parents', 'Linked guardians and household contact information.', 'parents', $actions);
 ?>
+<style>
+.rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 14px}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
+.rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
+.rp-tab span{font-size:11px;opacity:.6}
+</style>
 <section class="admin-grid-cards">
 	<article class="admin-card">
 		<div class="admin-card-row">
@@ -173,6 +155,11 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 		<input class="admin-search" data-admin-filter="#parents-table" type="search" placeholder="Search parents" style="min-width:240px;">
 	</div>
 
+	<div class="rp-tabs">
+		<a class="rp-tab <?php echo $tab === 'active' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_parents_url('active')); ?>">Active <span>(<?php echo (int)$countActive; ?>)</span></a>
+		<a class="rp-tab <?php echo $tab === 'archived' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_parents_url('archived')); ?>">Archived <span>(<?php echo (int)$countArchived; ?>)</span></a>
+	</div>
+
 	<div class="nutritionist-table-wrap">
 		<table class="nutritionist-table" id="parents-table">
 			<thead>
@@ -189,7 +176,10 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ($parents as $parent): ?>
+				<?php if ($tabParents === []): ?>
+					<tr><td colspan="9" style="color:var(--admin-muted);text-align:center;padding:24px;"><?php echo $tab === 'archived' ? 'No archived parents in your scope.' : 'No active parents in your scope yet.'; ?></td></tr>
+				<?php endif; ?>
+				<?php foreach ($tabParents as $parent): ?>
 					<tr
 						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'])); ?>"
 						data-parent-id="<?php echo (int)$parent['id']; ?>"
@@ -223,13 +213,6 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
 								<?php if (nutritionist_can_write('parents.update')): ?>
 								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
-								<?php endif; ?>
-								<?php if (nutritionist_can_write('parents.delete')): ?>
-								<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" data-admin-confirm="Delete <?php echo nutritionist_e($parent['name']); ?>?" data-admin-confirm-danger style="display:inline;">
-									<input type="hidden" name="action" value="delete">
-									<input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
-									<button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-								</form>
 								<?php endif; ?>
 							</div>
 						</td>

@@ -14,13 +14,13 @@ if ($user !== null) { header('Location: ' . redirect_for_current_user($user)); e
     <link rel="canonical" href="https://sukatkalusugan.app/about.php">
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=6">
+    <link rel="stylesheet" href="assets/css/auth.css?v=7">
     <link rel="icon" type="image/svg+xml" href="assets/img/logo/logo_forlight.svg?v=2">
 </head>
-<body class="auth-page">
+<body class="auth-page info-page">
 <main class="auth-shell">
 <section class="auth-hero"><div class="auth-logo-group">
-<img src="assets/img/logo/logo_forlight.svg?v=2" alt="Sukat Kalusugan logo" class="mark-icon-img" style="width:140px;height:140px;object-fit:contain;">
+<img src="assets/img/logo/logo_forlight.svg?v=2" alt="Sukat Kalusugan logo" class="mark-icon-img" style="width:180px;height:180px;object-fit:contain;">
 <p class="auth-tagline">Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.</p>
 </div>
 <div class="auth-footer-row"><span class="auth-partner-badge"><span class="badge-dot badge-dot-alt"></span><span>Group A4Tech &middot; OLFU Capstone</span></span></div>

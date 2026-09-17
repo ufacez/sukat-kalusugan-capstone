@@ -89,7 +89,7 @@ $childCode = (string)($current['child_code'] ?? 'CHD-0000');
 $ok = admin_execute(
     'UPDATE children SET child_code = ?, first_name = ?, middle_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, local_area_id = ?, is_ip = ?, has_disability = ?, parent_id = ? WHERE id = ?',
     'ssssssssiiii',
-    [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? 0, $isIp, $hasDisability, $parentId, $id]
+    [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId, $id]
 );
 
 if ($ok) {

@@ -305,7 +305,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
 
         $parentBarangayId = (int)$pBarangayId;
-        $parentLocalAreaId = ($pLocalAreaId !== null && $pLocalAreaId > 0) ? (int)$pLocalAreaId : 0;
+        // NULL (never 0): children.local_area_id has an FK to local_areas,
+        // so 0 would fail with errno 1452 when no purok is chosen.
+        $parentLocalAreaId = ($pLocalAreaId !== null && $pLocalAreaId > 0) ? (int)$pLocalAreaId : null;
         $parentHouseholdId = ($pHouseholdId !== null && $pHouseholdId > 0) ? (int)$pHouseholdId : null;
         $parentLabel = $pEmail;
         } else {
@@ -330,19 +332,19 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if ($parentBarangayId <= 0) {
             throw new RuntimeException('Ang napiling parent ay walang barangay. I-update muna ang parent record.');
         }
-        $parentLocalAreaId = (int)($prow['local_area_id'] ?? 0);
+        $parentLocalAreaId = isset($prow['local_area_id']) && $prow['local_area_id'] !== null && (int)$prow['local_area_id'] > 0 ? (int)$prow['local_area_id'] : null;
         $parentHouseholdId = isset($prow['household_id']) && $prow['household_id'] !== null ? (int)$prow['household_id'] : null;
         $parentLabel = (string)($prow['name'] ?? $prow['email'] ?? ('#' . $parentId));
 
-        // Inherited spots may have gone inactive — fall back, never error.
-        if ($parentLocalAreaId > 0) {
+        // Inherited spots may have gone inactive — fall back to NULL, never error.
+        if ($parentLocalAreaId !== null && $parentLocalAreaId > 0) {
             $areaCheck = admin_fetch_one(
                 'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
                 'ii',
                 [$parentLocalAreaId, $parentBarangayId]
             );
             if (!$areaCheck) {
-                $parentLocalAreaId = 0;
+                $parentLocalAreaId = null;
             }
         }
         if ($parentHouseholdId !== null && $parentHouseholdId > 0) {
