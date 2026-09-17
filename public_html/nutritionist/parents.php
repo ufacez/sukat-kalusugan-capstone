@@ -97,10 +97,10 @@ $totalChildren = array_sum(array_map(static fn(array $parent): int => (int)$pare
 $totalAppointments = array_sum(array_map(static fn(array $parent): int => (int)$parent['appointment_count'], $parents));
 $atRiskCount = count(array_filter($parents, static fn(array $parent): bool => (int)$parent['follow_up_count'] > 0));
 
-$actions = nutritionist_can_write('parents.create')
+$actions = nutritionist_can_write('children.create')
 	? '<a class="admin-btn" href="'
-		. nutritionist_e(app_url('/nutritionist/parent_form.php'))
-		. '">' . admin_action_icon('add') . ' Add parent</a>'
+		. nutritionist_e(app_url('/nutritionist/family_form.php'))
+		. '">' . admin_action_icon('add') . ' Add family</a>'
 	: '';
 
 nutritionist_layout_start('Parents', 'Linked guardians and household contact information.', 'parents', $actions);

@@ -209,7 +209,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         admin_redirect(
             $errorBackUrl,
             [
-                'notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger — WHO growth references only cover 0-5 years.',
+                'notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger — WHO growth standards only cover 0-5 years.',
                 'type' => 'error'
             ]
         );

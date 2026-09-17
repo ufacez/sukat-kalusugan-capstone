@@ -640,6 +640,59 @@
   color: #fff;
 }
 
+/* --- Compact filter row: search + fit-content controls --- */
+.who-ref-filter-group {
+  flex: 0 0 auto;
+}
+
+.who-ref-search-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.who-ref-search-input {
+  width: 110px;
+  padding: 7px 10px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--admin-text);
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+}
+
+.who-ref-search-input:focus {
+  outline: none;
+  border-color: var(--admin-primary);
+}
+
+.who-ref-search-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: #fff;
+  background: var(--admin-primary);
+  border: 1px solid var(--admin-primary);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.who-ref-clear {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--admin-danger, #dc2626);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.who-ref-clear:hover {
+  text-decoration: underline;
+}
+
 /* --- Table --- */
 .who-ref-table-wrap {
   overflow-x: auto;
@@ -1088,6 +1141,16 @@
   .who-ref-filters {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .who-ref-filter-group {
+    flex: 1 1 auto;
+  }
+
+  .who-ref-select,
+  .who-ref-search-input {
+    width: 100%;
+    max-width: none;
   }
 
   .who-ref-class-grid {
@@ -4698,12 +4761,13 @@
   }
 }
 
-/* --- WHO reference table & filter bar --- */
+/* --- WHO reference table & filter bar (compact, content-sized) --- */
 .nutritionist-page .who-ref-filters,
 .admin-page .who-ref-filters {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  align-items: flex-end;
+  gap: 8px 10px;
   width: 100%;
   max-width: 100%;
   min-width: 0;
@@ -4711,7 +4775,7 @@
 
 .nutritionist-page .who-ref-filter-group,
 .admin-page .who-ref-filter-group {
-  flex: 1 1 140px;
+  flex: 0 0 auto;
   min-width: 0;
   max-width: 100%;
 }
@@ -4720,8 +4784,14 @@
 .admin-page .who-ref-filter-group .who-ref-select,
 .nutritionist-page .who-ref-filter-group select,
 .admin-page .who-ref-filter-group select {
-  width: 100%;
-  max-width: 100%;
+  width: auto;
+  max-width: 130px;
+}
+
+.nutritionist-page .who-ref-search-input,
+.admin-page .who-ref-search-input {
+  width: 110px;
+  max-width: none;
 }
 
 @media (max-width: 720px) {
@@ -4764,6 +4834,104 @@
     text-align: center;
     padding-left: 8px;
     padding-right: 8px;
+  }
+}
+
+/* --- WHO joined filter toolbar: one connected bar sized to content --- */
+.nutritionist-page .who-ref-filters.who-ref-toolbar,
+.admin-page .who-ref-filters.who-ref-toolbar {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 6px;
+  width: max-content;
+  max-width: 100%;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  padding: 6px 10px;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-filter-group,
+.admin-page .who-ref-toolbar .who-ref-filter-group {
+  flex: 0 0 auto;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-filter-label,
+.admin-page .who-ref-toolbar .who-ref-filter-label {
+  margin: 0;
+  white-space: nowrap;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-select,
+.admin-page .who-ref-toolbar .who-ref-select {
+  width: auto;
+  max-width: 104px;
+  padding: 6px 26px 6px 9px;
+  font-size: 0.78rem;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-search-input,
+.admin-page .who-ref-toolbar .who-ref-search-input {
+  width: 88px;
+  padding: 6px 9px;
+  font-size: 0.78rem;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-search-btn,
+.admin-page .who-ref-toolbar .who-ref-search-btn {
+  width: 30px;
+  height: 30px;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-toggle-group,
+.admin-page .who-ref-toolbar .who-ref-toggle-group {
+  width: auto;
+}
+
+.nutritionist-page .who-ref-toolbar .who-ref-toggle,
+.admin-page .who-ref-toolbar .who-ref-toggle {
+  flex: none;
+  padding: 6px 10px;
+  font-size: 0.76rem;
+}
+
+.who-ref-tb-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 24px;
+  background: var(--admin-border);
+  margin: 2px 4px;
+  flex: none;
+}
+
+@media (max-width: 720px) {
+  .nutritionist-page .who-ref-filters.who-ref-toolbar,
+  .admin-page .who-ref-filters.who-ref-toolbar {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .nutritionist-page .who-ref-toolbar .who-ref-filter-group,
+  .admin-page .who-ref-toolbar .who-ref-filter-group {
+    flex: 1 1 auto;
+  }
+
+  .nutritionist-page .who-ref-toolbar .who-ref-select,
+  .admin-page .who-ref-toolbar .who-ref-select,
+  .nutritionist-page .who-ref-toolbar .who-ref-search-input,
+  .admin-page .who-ref-toolbar .who-ref-search-input {
+    width: 100%;
+    max-width: none;
+  }
+
+  .who-ref-tb-sep {
+    display: none;
   }
 }
 

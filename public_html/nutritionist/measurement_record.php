@@ -87,11 +87,12 @@ nutritionist_layout_start(
 );
 ?>
 <style>
-.record-shell{display:grid;grid-template-columns:minmax(0,720px);justify-content:center;gap:14px;align-items:start}
+.record-shell{display:grid;grid-template-columns:minmax(0,720px);justify-content:center;gap:16px;align-items:start}
+.record-shell > div{display:grid;gap:16px;align-items:start;min-width:0}
 
-.step-card{padding:18px}
+.step-card{padding:22px}
 .step-num{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:var(--admin-primary);color:#fff;font-size:11px;font-weight:700;margin-right:8px}
-.step-title{font-size:13px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:10px;display:flex;align-items:center}
+.step-title{font-size:13px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:14px;display:flex;align-items:center}
 
 .child-picker{position:relative}
 .child-picker input[type="search"]{width:100%;padding:10px 12px;border:1px solid var(--admin-border);border-radius:10px;background:var(--admin-surface);color:var(--admin-text);font-size:13px;font-family:inherit}
@@ -113,14 +114,16 @@ nutritionist_layout_start(
 .child-summary .row .value{font-weight:600;color:var(--admin-text)}
 .child-summary .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 
-.measurement-form{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px}
-.measurement-form .admin-field{margin:0;display:flex;flex-direction:column;gap:4px}
+.measurement-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
+.measurement-form .admin-field{margin:0;display:flex;flex-direction:column;gap:6px}
 .measurement-form .admin-field > span{font-size:11px;color:var(--admin-muted);font-weight:600}
-.measurement-form .admin-field > input{padding:9px 12px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface);color:var(--admin-text);font-size:13px;font-family:inherit}
+.measurement-form .admin-field > input{padding:12px 14px;border:1px solid var(--admin-border);border-radius:10px;background:var(--admin-surface);color:var(--admin-text);font-size:14px;font-family:inherit}
 .measurement-form .admin-field > input:focus{outline:none;border-color:var(--admin-primary)}
+.measurement-form .admin-field-wide{grid-column:1 / -1}
+@media(max-width:560px){.measurement-form{grid-template-columns:1fr}}
 .measurement-form .admin-field.is-disabled > input{background:var(--admin-surface-alt);color:var(--admin-muted);cursor:not-allowed}
 
-.who-result{margin-top:14px;background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:14px}
+.who-result{margin-top:18px;background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:16px}
 .who-result .who-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
 .who-result .who-header .title{font-size:12px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:0.04em}
 .who-result .zgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
@@ -136,7 +139,7 @@ nutritionist_layout_start(
 
 .who-summary{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--admin-primary-soft);color:var(--admin-text);font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 
-.action-row{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}
+.action-row{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
 
 .flag-banner{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(224,49,49,0.08);color:#E03131;font-size:12px;font-weight:600}
 .flag-banner.is-visible{display:block}
@@ -204,10 +207,6 @@ nutritionist_layout_start(
         <article class="nutritionist-panel step-card">
             <div class="step-title"><span class="step-num">2</span> Enter values</div>
 
-            <div style="padding:10px 14px;border-radius:8px;background:rgba(217,119,6,.08);border:1px solid rgba(217,119,6,.25);margin-bottom:14px;font-size:12px;color:#92400e;">
-                <strong>Due-date enforced:</strong> Routine manual measurements are only allowed when the child is due for follow-up. If the child is not due, the system will reject the measurement.
-            </div>
-
             <form
                 id="new-measurement-form"
                 data-endpoint="<?php echo nutritionist_e(app_url('/api/nutritionist/measurements_create.php')); ?>"
@@ -221,7 +220,7 @@ nutritionist_layout_start(
                         <span>Height (cm) *</span>
                         <input type="number" name="height_cm" id="height-input" step="0.01" min="40" max="140" inputmode="decimal" placeholder="e.g. 95.50" required>
                     </label>
-                    <label class="admin-field">
+                    <label class="admin-field admin-field-wide">
                         <span>Measurement date</span>
                         <input type="date" name="measurement_date" id="date-input" value="<?php echo nutritionist_e(date('Y-m-d')); ?>" max="<?php echo nutritionist_e(date('Y-m-d')); ?>" required>
                     </label>

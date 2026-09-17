@@ -45,6 +45,9 @@ $indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
 if (!isset($indicators[$indicator])) $indicator = 'waz';
 $sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
 $search = trim((string)($_GET['q'] ?? ''));
+if ($search !== '' && preg_match('/^\d+(\.\d+)?$/', $search) !== 1) {
+	$search = '';
+}
 
 $activeTab = 'wfa';
 foreach ($tabMap as $tabKey => $tabDef) {
@@ -72,6 +75,18 @@ if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months
 	$types .= 'ii';
 	$params[] = $low;
 	$params[] = $high;
+}
+
+// Exact-match jump: a numeric search goes straight to the month / day / cm row.
+if ($search !== '') {
+	$sql .= " AND {$config['column']} = ?";
+	if ($config['column'] === 'height_cm') {
+		$types .= 'd';
+		$params[] = (float)$search;
+	} else {
+		$types .= 'i';
+		$params[] = (int)$search;
+	}
 }
 
 /*
@@ -118,14 +133,15 @@ function who_reference_height_range_label(string $indicator): string {
 }
 
 $exportBase = ['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange];
+if ($search !== '') $exportBase['q'] = $search;
 $actions = export_dropdown(
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query($exportBase),
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'csv'])),
-	null,
+	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'pdf'])),
 	'Save as'
 );
 
-nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
+nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
 ?>
 
 <div class="who-ref-layout">
@@ -137,7 +153,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 			<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
 			<div class="who-ref-import-title">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-				<span>Import reference data</span>
+				<span>Import standard data</span>
 			</div>
 			<div class="who-ref-import-body">
 				<div class="who-ref-import-meta">
@@ -193,7 +209,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 						<span class="who-ref-about-meta-value">0 – 60 months · Boys & Girls</span>
 					</div>
 					<div class="who-ref-about-meta-item">
-						<span class="who-ref-about-meta-label">Reference</span>
+						<span class="who-ref-about-meta-label">Standard</span>
 						<span class="who-ref-about-meta-value">WHO Child Growth Standards, Methods and Development (2006)</span>
 					</div>
 				</div>
@@ -240,8 +256,35 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 		<div class="who-ref-table-section">
 			<div class="who-ref-table-card">
 				<div class="who-ref-table-header">
-					<h3 class="who-ref-table-title">WHO Reference Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
-					<div class="who-ref-filters">
+					<h3 class="who-ref-table-title">WHO Standard Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
+					<div class="who-ref-filters who-ref-toolbar">
+						<form class="who-ref-filter-group who-ref-search" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>">
+							<label class="who-ref-filter-label" for="who-ref-q">Find <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?></label>
+							<span class="who-ref-search-row">
+								<input type="hidden" name="indicator" value="<?php echo nutritionist_e($indicator); ?>">
+								<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
+								<input type="hidden" name="range" value="<?php echo nutritionist_e($ageRange); ?>">
+								<input
+									id="who-ref-q"
+									class="who-ref-search-input"
+									type="text"
+									name="q"
+									inputmode="decimal"
+									autocomplete="off"
+									placeholder="<?php echo $config['column'] === 'height_cm' ? 'e.g. 65' : ($isDayView ? 'e.g. 730' : 'e.g. 24'); ?>"
+									value="<?php echo nutritionist_e($search); ?>"
+								>
+								<button class="who-ref-search-btn" type="submit" title="Search" aria-label="Search">
+									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
+								</button>
+								<?php if ($search !== ''): ?>
+									<a class="who-ref-clear" href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange)); ?>">Clear</a>
+								<?php endif; ?>
+							</span>
+						</form>
+
+						<span class="who-ref-tb-sep" aria-hidden="true"></span>
+
 						<div class="who-ref-filter-group">
 							<label class="who-ref-filter-label">Sex</label>
 							<select class="who-ref-select" onchange="window.location.href=this.value">
@@ -251,15 +294,9 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 						</div>
 
 						<?php if (in_array($config['column'], ['age_months', 'age_days'], true)): ?>
+						<span class="who-ref-tb-sep" aria-hidden="true"></span>
 						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Unit</label>
-							<select class="who-ref-select" disabled>
-								<option><?php echo nutritionist_e($config['unit']); ?></option>
-							</select>
-						</div>
-
-						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Age (Completed)</label>
+							<label class="who-ref-filter-label">Age</label>
 							<div class="who-ref-toggle-group">
 								<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz-days' ? 'waz' : 'haz', $sex, $ageRange, $search)); ?>"
 								   class="who-ref-toggle <?php echo !$isDayView ? 'is-active' : ''; ?>">Months</a>
@@ -371,7 +408,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 			<div class="who-ref-sidebar-card who-ref-sidebar-details">
 				<h4 class="who-ref-sidebar-title">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-					Reference Details
+					Standard Details
 				</h4>
 				<div class="who-ref-detail-rows">
 					<div class="who-ref-detail-row">
@@ -398,7 +435,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 					<?php endif; ?>
 					<div class="who-ref-detail-row">
 						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg></span>
-						<span class="who-ref-detail-label">Reference</span>
+						<span class="who-ref-detail-label">Standard</span>
 						<span class="who-ref-detail-value">WHO Child Growth Standards, Methods and Development (2006)</span>
 					</div>
 				</div>
@@ -429,8 +466,8 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 
 <?php else: ?>
 	<div class="admin-flash is-error">
-		<strong>No reference data available.</strong>
-		<br>Upload WHO LMS reference data using the import form at the top.
+		<strong>No standard data available.</strong>
+		<br>Upload WHO LMS standard data using the import form at the top.
 	</div>
 <?php endif; ?>
 </div>
