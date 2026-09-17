@@ -2167,7 +2167,11 @@
         setWeight(finalWeight, "Huling timbang na stable");
         setHeight(finalHeight, "Huling taas na stable");
         markMeasurementReady();
-      } else if (!state.finalReady) {
+      } else {
+        // Sync with ESP32: it clears finalReady on any jitter
+        // (stableSince=0). Never latch a stale snapshot or the
+        // next PROCESS will hit "FINAL SNAPSHOT IS NOT READY".
+        state.finalReady = false;
         state.finalSequence = 0;
         state.finalWeight = null;
         state.finalHeight = null;
@@ -2997,7 +3001,11 @@
         );
 
         markMeasurementReady();
-      } else if (!state.finalReady) {
+      } else {
+        // Sync with ESP32: it clears finalReady on any jitter
+        // (stableSince=0). Never latch a stale snapshot or the
+        // next PROCESS will hit "FINAL SNAPSHOT IS NOT READY".
+        state.finalReady = false;
         state.finalSequence = 0;
         state.finalWeight = null;
         state.finalHeight = null;
@@ -3698,6 +3706,11 @@
       state.measurementReady =
         false;
 
+      state.finalReady = false;
+      state.finalSequence = 0;
+      state.finalWeight = null;
+      state.finalHeight = null;
+
       state.weight =
         null;
 
@@ -4045,25 +4058,15 @@
       !isValidWeight(state.finalWeight) ||
       !isValidHeight(state.finalHeight)
     ) {
-      // Dual-mode: allow processing with one sensor if other is manual
-      const hasHeightManual = state.autoHeight && !state.autoWeight && state.manualWeightInput != null;
-      const hasWeightManual = state.autoWeight && !state.autoHeight && state.manualHeightInput != null;
-      const hasOneLive = (isValidHeight(state.finalHeight) || isValidWeight(state.finalWeight));
-
-      if (!state.autoHeight && isValidHeight(state.finalHeight) && state.manualWeightInput != null) {
-        // Height from ESP32, weight entered manually — allow
-      } else if (!state.autoWeight && isValidWeight(state.finalWeight) && state.manualHeightInput != null) {
-        // Weight from ESP32, height entered manually — allow
-      } else if (hasOneLive && (state.manualWeightInput != null || state.manualHeightInput != null)) {
-        // At least one live + at least one manual entry — allow
-      } else {
-        pushFeed(
-          "Processing blocked",
-          "Weight and height are not ready.",
-          "warn"
-        );
-        return;
-      }
+      // Strict: firmware requires both sensors stable with a frozen
+      // snapshot ("No manual fallback"). Sending PROCESS early makes
+      // the ESP32 go ERROR with "FINAL SNAPSHOT IS NOT READY".
+      pushFeed(
+        "Processing blocked",
+        "Weight and height are not ready.",
+        "warn"
+      );
+      return;
     }
 
     if (!state.session) {
@@ -5392,6 +5395,11 @@ function finishResults(
 
     state.measurementReady =
       false;
+
+    state.finalReady = false;
+    state.finalSequence = 0;
+    state.finalWeight = null;
+    state.finalHeight = null;
 
     state.processingStarted =
       false;
