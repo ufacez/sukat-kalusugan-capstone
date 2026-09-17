@@ -150,7 +150,7 @@ $tmpPath = $tmpDir . DIRECTORY_SEPARATOR . 'who_export_' . bin2hex(random_bytes(
 $sheetName = strtoupper($indicator) . '_' . $sex;
 
 if (empty($dataRows)) {
-    who_export_fail($indicator, $sex, $ageRange, 'No reference rows found for this indicator. The reference table may not be seeded yet.');
+    who_export_fail($indicator, $sex, $ageRange, 'No standard rows found for this indicator. The standard table may not be seeded yet.');
 }
 
 if ($whoFormat === 'pdf') {
@@ -163,7 +163,7 @@ if ($whoFormat === 'pdf') {
         $rangeText = '2-5y (24-60 mo / 730-1856 d)';
     }
 
-    $pdf = pdf_base('WHO Reference - ' . $config['label'] . ' - ' . $sex, 'Landscape');
+    $pdf = pdf_base('WHO Standard - ' . $config['label'] . ' - ' . $sex, 'Landscape');
     $pdf->AddPage();
     $pdf->SetFont('helvetica', 'B', 12);
     $pdf->Cell(0, 7, 'WHO CHILD GROWTH STANDARDS (2006)', 0, 1, 'C');

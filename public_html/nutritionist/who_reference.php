@@ -141,7 +141,7 @@ $actions = export_dropdown(
 	'Save as'
 );
 
-nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
+nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
 ?>
 
 <div class="who-ref-layout">
@@ -153,7 +153,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 			<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
 			<div class="who-ref-import-title">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
-				<span>Import reference data</span>
+				<span>Import standard data</span>
 			</div>
 			<div class="who-ref-import-body">
 				<div class="who-ref-import-meta">
@@ -209,7 +209,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 						<span class="who-ref-about-meta-value">0 – 60 months · Boys & Girls</span>
 					</div>
 					<div class="who-ref-about-meta-item">
-						<span class="who-ref-about-meta-label">Reference</span>
+						<span class="who-ref-about-meta-label">Standard</span>
 						<span class="who-ref-about-meta-value">WHO Child Growth Standards, Methods and Development (2006)</span>
 					</div>
 				</div>
@@ -256,7 +256,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 		<div class="who-ref-table-section">
 			<div class="who-ref-table-card">
 				<div class="who-ref-table-header">
-					<h3 class="who-ref-table-title">WHO Reference Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
+					<h3 class="who-ref-table-title">WHO Standard Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
 					<div class="who-ref-filters who-ref-toolbar">
 						<form class="who-ref-filter-group who-ref-search" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>">
 							<label class="who-ref-filter-label" for="who-ref-q">Find <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?></label>
@@ -408,7 +408,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 			<div class="who-ref-sidebar-card who-ref-sidebar-details">
 				<h4 class="who-ref-sidebar-title">
 					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-					Reference Details
+					Standard Details
 				</h4>
 				<div class="who-ref-detail-rows">
 					<div class="who-ref-detail-row">
@@ -435,7 +435,7 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 					<?php endif; ?>
 					<div class="who-ref-detail-row">
 						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg></span>
-						<span class="who-ref-detail-label">Reference</span>
+						<span class="who-ref-detail-label">Standard</span>
 						<span class="who-ref-detail-value">WHO Child Growth Standards, Methods and Development (2006)</span>
 					</div>
 				</div>
@@ -466,8 +466,8 @@ nutritionist_layout_start('WHO Reference', 'WHO Child Growth Standards (0–5 ye
 
 <?php else: ?>
 	<div class="admin-flash is-error">
-		<strong>No reference data available.</strong>
-		<br>Upload WHO LMS reference data using the import form at the top.
+		<strong>No standard data available.</strong>
+		<br>Upload WHO LMS standard data using the import form at the top.
 	</div>
 <?php endif; ?>
 </div>
