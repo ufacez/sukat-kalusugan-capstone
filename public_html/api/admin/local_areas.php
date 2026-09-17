@@ -85,7 +85,19 @@ if ($method === 'POST') {
         api_error('A local area with this name already exists in this barangay.', 409);
     }
 
-    $codeValue = $areaCode !== '' ? $areaCode : null;
+    $codeValue = $areaCode !== '' ? $areaCode : admin_next_local_area_code($barangayId, $areaType);
+
+    if ($areaCode !== '' && $codeValue !== null) {
+        $dup = admin_fetch_one(
+            "SELECT id FROM local_areas WHERE barangay_id = ? AND area_code = ? LIMIT 1",
+            'is',
+            [$barangayId, $areaCode]
+        );
+        if ($dup) {
+            api_error('Another local area with this code already exists in this barangay.', 409);
+        }
+    }
+
     $descValue = $description !== '' ? $description : null;
 
     $ok = admin_execute(

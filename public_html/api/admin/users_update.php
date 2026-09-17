@@ -56,10 +56,10 @@ if ($isSeededAdmin) {
 
 if (!admin_is_valid_ph_mobile($phone)) {
     admin_flash_form_state($_POST, 'phone');
-    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
 }
 
-$phone = preg_replace('/[^0-9]/', '', $phone);
+$phone = (string)admin_normalize_ph_mobile($phone);
 
 if ($password !== '' && !admin_is_strong_password($password)) {
     admin_flash_form_state($_POST);

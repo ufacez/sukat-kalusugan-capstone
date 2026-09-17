@@ -25,9 +25,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 	if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
 		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
 	}
-	if ($phone !== '' && !preg_match('/^09\d{9}$/', $phone)) {
-		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+	if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
+		admin_redirect('/parent/settings.php', ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
 	}
+	$phone = $phone !== '' ? (string)admin_normalize_ph_mobile($phone) : '';
 	if ($address !== '' && strlen($address) > 255) {
 		admin_redirect('/parent/settings.php', ['notice' => 'Address is too long (max 255 characters).', 'type' => 'error']);
 	}

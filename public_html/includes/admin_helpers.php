@@ -27,7 +27,7 @@ function admin_nav_items(): array
 function admin_sidebar_icon(string $key): string
 {
     $icons = [
-        'dashboard' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m2.25 12 8.954-8.955a1.126 1.126 0 0 1 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>',
+        'dashboard' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6A2.25 2.25 0 0 1 6 3.75h2.25A2.25 2.25 0 0 1 10.5 6v2.25a2.25 2.25 0 0 1-2.25 2.25H6a2.25 2.25 0 0 1-2.25-2.25V6ZM3.75 15.75A2.25 2.25 0 0 1 6 13.5h2.25a2.25 2.25 0 0 1 2.25 2.25V18a2.25 2.25 0 0 1-2.25 2.25H6A2.25 2.25 0 0 1 3.75 18v-2.25ZM13.5 6a2.25 2.25 0 0 1 2.25-2.25H18A2.25 2.25 0 0 1 20.25 6v2.25A2.25 2.25 0 0 1 18 10.5h-2.25a2.25 2.25 0 0 1-2.25-2.25V6ZM13.5 15.75a2.25 2.25 0 0 1 2.25-2.25H18a2.25 2.25 0 0 1 2.25 2.25V18A2.25 2.25 0 0 1 18 20.25h-2.25A2.25 2.25 0 0 1 13.5 18v-2.25Z"/></svg>',
         'users' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>',
         'parents' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>',
         'barangays' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>',
@@ -474,14 +474,36 @@ function admin_is_valid_name_part(string $value, bool $required = true): bool
 }
 
 /**
- * Philippine mobile numbers: 11 digits, always starting with 09
- * (e.g. 0917xxxxxxx). Spaces/dashes are stripped before checking.
+ * Philippine mobile numbers: 11 digits starting with 09.
+ * Accepts 09XXXXXXXXX, +639XXXXXXXXX, and 639XXXXXXXXX (spaces and
+ * dashes are ignored). Returns the canonical 09XXXXXXXXX form, or
+ * null when the input is not a valid PH mobile number.
+ */
+function admin_normalize_ph_mobile(string $phone): ?string
+{
+    $trimmed = trim($phone);
+    $hasPlus = str_starts_with($trimmed, '+');
+    $digitsOnly = (string)preg_replace('/[^0-9]/', '', $trimmed);
+
+    if ($hasPlus && !str_starts_with($digitsOnly, '63')) {
+        return null;
+    }
+
+    if (str_starts_with($digitsOnly, '63')) {
+        $digitsOnly = '0' . substr($digitsOnly, 2);
+    }
+
+    return preg_match('/^09\d{9}$/', $digitsOnly) === 1 ? $digitsOnly : null;
+}
+
+/**
+ * Philippine mobile validation. Accepts 09XXXXXXXXX as well as the
+ * +639XXXXXXXXX / 639XXXXXXXXX equivalents (e.g. +639171234567).
+ * Spaces/dashes are stripped before checking.
  */
 function admin_is_valid_ph_mobile(string $phone): bool
 {
-    $digitsOnly = preg_replace('/[^0-9]/', '', $phone);
-
-    return (bool)preg_match('/^09\d{9}$/', (string)$digitsOnly);
+    return admin_normalize_ph_mobile($phone) !== null;
 }
 
 /**
@@ -498,6 +520,82 @@ function admin_is_strong_password(string $password): bool
         && preg_match('/[A-Z]/', $password) === 1
         && preg_match('/[0-9]/', $password) === 1
         && preg_match('/[^A-Za-z0-9]/', $password) === 1;
+}
+
+function admin_local_area_type_letter(string $areaType): string
+{
+    return match (strtolower(trim($areaType))) {
+        'purok' => 'PRK',
+        'sitio' => 'STO',
+        'subdivision' => 'SBD',
+        'village' => 'VLG',
+        'zone' => 'ZNE',
+        'phase' => 'PHS',
+        default => 'OTH',
+    };
+}
+
+function admin_local_area_prefix(int $barangayId): string
+{
+    if ($barangayId <= 0) {
+        return 'BRGY';
+    }
+
+    $row = admin_fetch_one(
+        "SELECT name FROM barangays WHERE id = ? LIMIT 1",
+        'i',
+        [$barangayId]
+    );
+
+    $name = (string)($row['name'] ?? '');
+    $name = (string)preg_replace('/\s*\([^)]*\)\s*/', ' ', $name);
+    $words = preg_split('/\s+/', trim($name)) ?: [];
+
+    $letters = '';
+    foreach ($words as $word) {
+        $word = (string)preg_replace('/[^A-Za-z]/', '', $word);
+        if ($word !== '') {
+            $letters .= strtoupper($word[0]);
+        }
+    }
+
+    if ($letters === '') {
+        $alnum = strtoupper((string)preg_replace('/[^A-Za-z0-9]/', '', $name));
+        $letters = substr($alnum, 0, 3) ?: 'BRGY';
+    }
+
+    return substr($letters, 0, 5);
+}
+
+function admin_next_local_area_code(int $barangayId, string $areaType): ?string
+{
+    if ($barangayId <= 0) {
+        return null;
+    }
+
+    $prefix = admin_local_area_prefix($barangayId);
+    $letter = admin_local_area_type_letter($areaType);
+    $pattern = '/^' . preg_quote($prefix . '-' . $letter, '/') . '(\d+)$/';
+
+    $rows = admin_fetch_all(
+        "SELECT area_code FROM local_areas
+         WHERE barangay_id = ? AND area_code IS NOT NULL AND area_code != ''",
+        'i',
+        [$barangayId]
+    );
+
+    $max = 0;
+    foreach ($rows as $row) {
+        $code = (string)($row['area_code'] ?? '');
+        if (preg_match($pattern, $code, $matches) === 1) {
+            $n = (int)$matches[1];
+            if ($n > $max) {
+                $max = $n;
+            }
+        }
+    }
+
+    return $prefix . '-' . $letter . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
 }
 
 /**

@@ -38,10 +38,10 @@ if ($name === '' || $email === '' || $username === '' || $password === '') {
 }
 
 if (!admin_is_valid_ph_mobile($phone)) {
-    admin_redirect('/admin/user_form.php', ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+    admin_redirect('/admin/user_form.php', ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
 }
 
-$phone = preg_replace('/[^0-9]/', '', $phone);
+$phone = (string)admin_normalize_ph_mobile($phone);
 
 if (!admin_is_strong_password($password)) {
     admin_redirect('/admin/user_form.php', ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);

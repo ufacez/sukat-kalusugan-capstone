@@ -75,9 +75,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $phone = trim((string)($_POST['phone'] ?? ''));
     if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
         admin_flash_form_state($_POST, 'phone');
-        admin_redirect('/admin/invitation_form.php', ['notice' => 'Please enter a valid Philippine mobile number (09XXXXXXXXX).', 'type' => 'error']);
+        admin_redirect('/admin/invitation_form.php', ['notice' => 'Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
     }
-    $phone = $phone !== '' ? $phone : null;
+    $phone = $phone !== '' ? (string)admin_normalize_ph_mobile($phone) : null;
 
     $address = trim((string)($_POST['address'] ?? ''));
     if (mb_strlen($address) > 255) {

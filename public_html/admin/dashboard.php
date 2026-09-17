@@ -509,7 +509,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         var mapEl = document.getElementById('user-map');
         if (!mapEl || typeof L === 'undefined') return;
 
-        var map = L.map(mapEl, { scrollWheelZoom: false, zoomControl: false }).setView([15.034, 120.686], 12);
+        var map = L.map(mapEl, { scrollWheelZoom: true, zoomControl: false }).setView([15.034, 120.686], 12);
         L.control.zoom({ position: 'bottomright' }).addTo(map);
 
         var baseLayers = {

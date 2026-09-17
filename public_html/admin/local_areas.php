@@ -202,12 +202,12 @@ $flash = admin_flash_message();
 
 
 <div class="admin-modal-overlay" data-area-modal-overlay style="display:none;">
-    <div class="admin-modal" style="max-width:480px;">
+    <div class="admin-modal" style="max-width:480px; padding:24px;">
         <div class="admin-modal-head">
             <h3 data-area-modal-title>Add Local Area</h3>
             <button class="admin-modal-close" data-area-modal-close type="button">&times;</button>
         </div>
-        <form id="area-form" class="admin-form-grid" style="padding:0;">
+        <form id="area-form" class="admin-form-grid">
             <input type="hidden" name="barangay_id" value="<?php echo (int)$barangayId; ?>">
             <input type="hidden" name="area_id" value="" data-area-id-field>
 
@@ -227,11 +227,6 @@ $flash = admin_flash_message();
             <label class="admin-field">
                 <span>Name <span class="admin-required">*</span></span>
                 <input type="text" name="area_name" required maxlength="150" placeholder="e.g. Purok 3, Villa Maria Subdivision">
-            </label>
-
-            <label class="admin-field">
-                <span>Area Code <small style="color:var(--admin-muted);font-weight:400;">(optional)</small></span>
-                <input type="text" name="area_code" maxlength="30" placeholder="e.g. DPN-P001">
             </label>
 
             <label class="admin-field">
@@ -256,6 +251,7 @@ $flash = admin_flash_message();
     const submitBtn = document.querySelector('[data-area-modal-submit]');
     const idField = document.querySelector('[data-area-id-field]');
     const addBtn = document.querySelector('[data-add-area-btn]');
+    const apiUrl = '<?php echo admin_e(app_url("/api/admin/local_areas.php")); ?>';
 
     function openModal() {
         overlay.style.display = 'flex';
@@ -286,7 +282,6 @@ $flash = admin_flash_message();
             idField.value = btn.dataset.id;
             form.area_type.value = btn.dataset.type;
             form.area_name.value = btn.dataset.name;
-            form.area_code.value = btn.dataset.code;
             form.description.value = btn.dataset.description;
             title.textContent = 'Edit Local Area';
             submitBtn.textContent = 'Save Changes';
@@ -299,15 +294,13 @@ $flash = admin_flash_message();
 
         const areaId = idField.value;
         const isEdit = areaId !== '';
-        const url = '<?php echo admin_e(app_url("/api/admin/local_areas.php")); ?>';
-
         const body = new FormData(form);
         if (isEdit) {
             body.set('id', areaId);
             body.set('_method', 'PUT');
         }
 
-        fetch(url, {
+        fetch(apiUrl, {
             method: 'POST',
             body: body
         })

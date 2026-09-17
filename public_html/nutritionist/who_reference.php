@@ -163,8 +163,14 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 					<label class="admin-btn-secondary" style="cursor:pointer;margin:0;white-space:nowrap;">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m6.75 12-3-3m0 0-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/></svg>
 						Choose .xlsx
-						<input type="file" name="who_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required style="display:none;">
+						<input type="file" id="whoFileInput" name="who_file" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" required style="display:none;">
 					</label>
+					<span class="who-ref-file-chip" id="whoFileChip" hidden>
+						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Zm3.75 11.625-3 3m0 0-3-3m3 3V10.5"/></svg>
+						<span class="who-ref-file-name" id="whoFileName"></span>
+						<span class="who-ref-file-size" id="whoFileSize"></span>
+						<button type="button" class="who-ref-file-clear" id="whoFileClear" aria-label="Remove selected file">&times;</button>
+					</span>
 					<button type="submit" class="admin-btn" style="white-space:nowrap;">
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>
 						Import
@@ -471,5 +477,45 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 	</div>
 <?php endif; ?>
 </div>
+
+<script>
+(function () {
+	var input = document.getElementById('whoFileInput');
+	var chip = document.getElementById('whoFileChip');
+	var nameEl = document.getElementById('whoFileName');
+	var sizeEl = document.getElementById('whoFileSize');
+	var clearBtn = document.getElementById('whoFileClear');
+	if (!input || !chip || !nameEl || !sizeEl) return;
+
+	function fmtSize(bytes) {
+		if (!bytes && bytes !== 0) return '';
+		if (bytes < 1024) return bytes + ' B';
+		if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+		return (bytes / 1048576).toFixed(2) + ' MB';
+	}
+
+	input.addEventListener('change', function () {
+		var file = input.files && input.files[0];
+		if (!file) {
+			chip.hidden = true;
+			return;
+		}
+		var valid = /\.xlsx$/i.test(file.name);
+		nameEl.textContent = file.name;
+		nameEl.title = file.name;
+		sizeEl.textContent = valid ? fmtSize(file.size) : 'must be .xlsx';
+		chip.classList.toggle('is-invalid', !valid);
+		chip.hidden = false;
+	});
+
+	if (clearBtn) {
+		clearBtn.addEventListener('click', function () {
+			input.value = '';
+			chip.hidden = true;
+			chip.classList.remove('is-invalid');
+		});
+	}
+})();
+</script>
 
 <?php nutritionist_layout_end(); ?>

@@ -205,9 +205,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 
     if (!admin_is_valid_ph_mobile($pPhone)) {
-        admin_redirect($backUrl, ['notice' => 'Enter a valid 11-digit PH mobile number starting with 09.', 'type' => 'error']);
+        admin_redirect($backUrl, ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
     }
-    $pPhone = (string)preg_replace('/[^0-9]/', '', $pPhone);
+    $pPhone = (string)admin_normalize_ph_mobile($pPhone);
 
     // Email: blank = auto-generate; supplied = validate + uniqueness.
     if ($pEmail === '') {
@@ -502,9 +502,11 @@ nutritionist_layout_start(
 .ff-col-sub{font-size:11px;color:var(--admin-muted);margin:0 0 14px}
 .ff-ico{display:inline-flex;width:18px;height:18px;color:var(--admin-primary);flex-shrink:0}
 .ff-ico svg{width:18px;height:18px}
-.ff-mode{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
-.ff-mode-opt{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--admin-border);border-radius:9px;padding:9px 14px;font-size:13px;cursor:pointer;background:var(--admin-surface);color:var(--admin-text)}
-.ff-mode-opt:has(input:checked){border-color:var(--admin-primary);background:var(--admin-surface-alt);font-weight:700}
+.rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 18px}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
+.rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
+.ff-mode-sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .ff-picked{display:flex;align-items:center;gap:10px;border:1px solid var(--admin-border);border-radius:10px;padding:10px 12px;background:var(--admin-surface-alt);margin-top:10px}
 .ff-picked .avatar{width:34px;height:34px;border-radius:50%;background:var(--admin-primary);color:#fff;font-weight:800;font-size:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .parent-picker-btn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface);padding:10px 12px;font-size:13px;color:var(--admin-text);cursor:pointer}
@@ -549,11 +551,16 @@ nutritionist_layout_start(
     </div>
 
     <?php if ($canCreateParent): ?>
-    <div class="ff-mode" role="radiogroup" aria-label="Registration mode">
-        <label class="ff-mode-opt"><input type="radio" name="mode" value="new" form="ff-form" <?php echo $mode === 'new' ? 'checked' : ''; ?>> <strong>New Family</strong></label>
-        <label class="ff-mode-opt"><input type="radio" name="mode" value="existing" form="ff-form" <?php echo $mode === 'existing' ? 'checked' : ''; ?>> <strong>Existing parent</strong></label>
+    <div class="rp-tabs" role="tablist" aria-label="Registration mode">
+        <a class="rp-tab <?php echo $mode === 'new' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $mode === 'new' ? 'true' : 'false'; ?>" data-ff-tab="new" href="<?php echo nutritionist_e(app_url('/nutritionist/family_form.php')); ?>">New Family</a>
+        <a class="rp-tab <?php echo $mode === 'existing' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $mode === 'existing' ? 'true' : 'false'; ?>" data-ff-tab="existing" href="<?php echo nutritionist_e(app_url('/nutritionist/family_form.php?mode=existing')); ?>">Existing parent</a>
     </div>
+    <input class="ff-mode-sr" type="radio" name="mode" value="new" form="ff-form" data-ff-mode="new" <?php echo $mode === 'new' ? 'checked' : ''; ?> tabindex="-1" aria-hidden="true">
+    <input class="ff-mode-sr" type="radio" name="mode" value="existing" form="ff-form" data-ff-mode="existing" <?php echo $mode === 'existing' ? 'checked' : ''; ?> tabindex="-1" aria-hidden="true">
     <?php else: ?>
+    <div class="rp-tabs" role="tablist" aria-label="Registration mode">
+        <span class="rp-tab is-active" role="tab" aria-selected="true">Existing parent</span>
+    </div>
     <input type="hidden" name="mode" value="existing" form="ff-form">
     <?php endif; ?>
 
@@ -949,16 +956,47 @@ nutritionist_layout_start(
         loadAreas(scopedBarangayId);
     }
 
-    /* ---------- mode toggle: new family vs existing parent ---------- */
-    var modeNew = document.querySelector('input[name="mode"][value="new"]');
-    var modeExisting = document.querySelector('input[name="mode"][value="existing"]');
+    /* ---------- mode tabs: Appointments-style rp-tabs with URL sync ---------- */
+    var modeNew = document.querySelector('[data-ff-mode="new"]');
+    var modeExisting = document.querySelector('[data-ff-mode="existing"]');
+    var modeTabs = Array.prototype.slice.call(document.querySelectorAll('[data-ff-tab]'));
     var parentCol = document.getElementById('ff-parent-col');
     var existingCard = document.getElementById('ff-existing-card');
     var colsWrap = document.getElementById('ff-cols');
     var parentInputs = parentCol ? parentCol.querySelectorAll('input,select,textarea') : [];
 
+    function ffModeValue() {
+        // No-permission shape: only a hidden mode=existing input, no tabs/radios.
+        if (!modeNew && !modeExisting) {
+            var hiddenMode = form ? form.querySelector('input[type="hidden"][name="mode"]') : null;
+            if (hiddenMode && hiddenMode.value === 'existing') return 'existing';
+            var fallback = document.querySelector('input[type="hidden"][name="mode"][value="existing"]');
+            return fallback ? 'existing' : 'new';
+        }
+        return (modeExisting && modeExisting.checked) ? 'existing' : 'new';
+    }
+
+    function ffModeUrl(value) {
+        try {
+            var url = new URL(window.location.href);
+            if (value === 'existing') {
+                url.searchParams.set('mode', 'existing');
+            } else {
+                url.searchParams.delete('mode');
+            }
+            return url.toString();
+        } catch (err) {
+            return value === 'existing' ? '?mode=existing' : window.location.pathname;
+        }
+    }
+
     function applyMode() {
-        var isNew = !modeExisting || !modeExisting.checked;
+        var isNew = ffModeValue() !== 'existing';
+        modeTabs.forEach(function(tab) {
+            var active = (tab.getAttribute('data-ff-tab') === 'existing') !== isNew;
+            tab.classList.toggle('is-active', active);
+            tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        });
         if (parentCol) parentCol.hidden = !isNew;
         if (existingCard) existingCard.hidden = isNew;
         if (colsWrap) colsWrap.classList.toggle('is-single', !isNew);
@@ -977,6 +1015,34 @@ nutritionist_layout_start(
     }
     if (modeNew) modeNew.addEventListener('change', applyMode);
     if (modeExisting) modeExisting.addEventListener('change', applyMode);
+    modeTabs.forEach(function(tab) {
+        tab.addEventListener('click', function(e) {
+            e.preventDefault();
+            var value = tab.getAttribute('data-ff-tab') === 'existing' ? 'existing' : 'new';
+            var target = value === 'existing' ? modeExisting : modeNew;
+            if (target) target.checked = true;
+            applyMode();
+            try {
+                window.history.pushState({ ffMode: value }, '', ffModeUrl(value));
+            } catch (err) {}
+        });
+    });
+    window.addEventListener('popstate', function() {
+        var params;
+        try {
+            params = new URLSearchParams(window.location.search);
+        } catch (err) {
+            return;
+        }
+        var value = params.get('mode') === 'existing' ? 'existing' : 'new';
+        var target = value === 'existing' ? modeExisting : modeNew;
+        if (target && !target.checked) {
+            target.checked = true;
+            applyMode();
+        } else {
+            applyMode();
+        }
+    });
 
     /* ---------- existing-parent picker: searchable, 5 per page ---------- */
     var parentInput = document.getElementById('ff-parent-id-input');
@@ -1091,7 +1157,7 @@ nutritionist_layout_start(
                 if (d.querySelector(':invalid')) d.open = true;
             } catch (err) {}
         });
-        var isNew = !modeExisting || !modeExisting.checked;
+        var isNew = ffModeValue() !== 'existing';
         if (!isNew && parentInput && (!parentInput.value || parseInt(parentInput.value, 10) <= 0)) {
             e.preventDefault();
             if (window.AdminToast) AdminToast.error('Pumili muna ng parent/guardian.');

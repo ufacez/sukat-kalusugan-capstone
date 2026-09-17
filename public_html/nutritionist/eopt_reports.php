@@ -319,7 +319,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
 .rp-form-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:20px;position:relative;overflow:visible;transition:all 0.15s ease}
 .rp-form-card:hover{border-color:var(--admin-primary);box-shadow:0 4px 16px rgba(11,110,79,0.08)}
-.rp-form-card::before{content:'';position:absolute;top:-1px;left:-1px;right:-1px;height:3px;background:var(--admin-primary);border-radius:14px 14px 0 0}
+.rp-form-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--admin-primary);border-radius:13px 13px 0 0;overflow:visible}
 .rp-form-name{font-size:14px;font-weight:700;color:var(--admin-text);margin-bottom:4px}
 .rp-form-desc{font-size:12px;color:var(--admin-muted);line-height:1.5;margin-bottom:10px}
 .rp-form-meta{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap}
