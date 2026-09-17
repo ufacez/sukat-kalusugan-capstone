@@ -92,7 +92,7 @@ $children = admin_fetch_all(
          LIMIT 1
      )
      WHERE {$whereSql}
-     ORDER BY COALESCE(lm.measurement_date, '0000-00-00') DESC, c.last_name ASC, c.first_name ASC",
+      ORDER BY COALESCE(lm.measurement_date, '0000-00-00') DESC, COALESCE(lm.id, 0) DESC, c.last_name ASC, c.first_name ASC",
     $types,
     $filterParams
 );
@@ -431,7 +431,7 @@ nutritionist_layout_start(
                                 <div class="empty-title">No children registered yet</div>
                                 <div class="empty-sub">Your scope doesn't have any registered children. Once children are added, you'll see their latest measurement here.</div>
                                 <?php if (nutritionist_can_write('children.create')): ?>
-                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
+                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/family_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
                                 <?php endif; ?>
                             <?php else: ?>
                                 <div class="empty-title">No children in this view</div>

@@ -162,7 +162,7 @@ function nchild_short_address(?string $localArea, ?string $barangay): string
 $actions = '<div class="admin-actions">'
     . '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('clipboard') . ' Measurements</a>'
     . (nutritionist_can_write('children.create')
-        ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/child_form.php')) . '">' . admin_action_icon('add') . ' Add child</a>'
+        ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>'
         : '')
     . '</div>';
 
@@ -307,7 +307,7 @@ nutritionist_layout_start(
                                 <div class="empty-title">No children registered yet</div>
                                 <div class="empty-sub">Your scope doesn't have any registered children. Once children are added, they will appear in this list.</div>
                                 <?php if (nutritionist_can_write('children.create')): ?>
-                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/child_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
+                                    <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/family_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Add the first child</a>
                                 <?php endif; ?>
                             <?php elseif ($tab === 'graduated'): ?>
                                 <div class="empty-title">No graduated children</div>
