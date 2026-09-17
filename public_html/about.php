@@ -38,7 +38,7 @@ if ($user !== null) { header('Location: ' . redirect_for_current_user($user)); e
 </ul>
 <h3>Contact</h3>
 <p style="font-size:.92rem;">Group A4Tech<br>Email: <a class="link" href="mailto:espirituean@gmail.com">espirituean@gmail.com</a><br>Phone: 09614730364<br>Philippines</p>
-<p><a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a></p>
+<p class="auth-cta-center"><a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a></p>
 <p class="auth-card-footer"><a class="link" href="./">Home</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="terms.php">Terms</a> &middot; <a class="link" href="contact.php">Contact</a></p>
 </section>
 </main>

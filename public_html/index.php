@@ -32,7 +32,7 @@ if ($user !== null) {
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/auth.css?v=6">
+    <link rel="stylesheet" href="assets/css/auth.css?v=7">
     <link rel="icon" type="image/svg+xml" href="assets/img/logo/logo_forlight.svg?v=2">
     <script type="application/ld+json">
     {"@context":"https://schema.org","@type":"Organization","name":"Group A4Tech - Sukat Kalusugan","description":"OLFU student capstone project for child growth monitoring. Not an official OLFU system.","url":"https://sukatkalusugan.app/","email":"espirituean@gmail.com","telephone":"+63-961-473-0364","address":{"@type":"PostalAddress","addressCountry":"PH"}}
@@ -75,7 +75,7 @@ if ($user !== null) {
                 <li>Separate staff and parent access with role checks</li>
                 <li>Philippines Data Privacy Act (RA 10173) notice in <a class="link" href="privacy.php">Privacy</a></li>
             </ul>
-            <p style="display:flex;gap:.6rem;flex-wrap:wrap;margin:12px 0;">
+            <p style="display:flex;gap:.6rem;flex-wrap:wrap;margin:12px 0;justify-content:center;">
                 <a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a>
                 <a class="link" style="align-self:center;" href="about.php">Learn more</a>
             </p>

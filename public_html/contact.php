@@ -31,7 +31,7 @@ if ($user !== null) { header('Location: ' . redirect_for_current_user($user)); e
 <p class="muted">For account help, privacy requests (access/correction/deletion under RA 10173), or reporting a problem.</p>
 <p style="font-size:.95rem;line-height:1.7;">Email: <a class="link" href="mailto:espirituean@gmail.com">espirituean@gmail.com</a><br>Phone: 09614730364<br>Location: Philippines<br>Project: Sukat Kalusugan — OLFU student capstone (not an official OLFU system)</p>
 <div class="flash flash-notice" role="status">Do not send passwords. We will never ask for your password by email or phone.</div>
-<p><a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a></p>
+<p class="auth-cta-center"><a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a></p>
 <p class="auth-card-footer"><a class="link" href="./">Home</a> &middot; <a class="link" href="about.php">About</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="terms.php">Terms</a></p>
 </section>
 </main>

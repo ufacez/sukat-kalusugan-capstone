@@ -860,3 +860,12 @@
     animation: none;
   }
 }
+
+/* ---- Centered Sign in CTA (home + info pages) ---- */
+.auth-cta-center {
+  text-align: center;
+}
+
+.auth-cta-center .auth-submit {
+  margin-inline: auto;
+}
