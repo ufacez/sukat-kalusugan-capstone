@@ -608,8 +608,8 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         },
         wfhl: {
             'Normal': 'Normal',
-            'Moderately Wasted': 'MW',
-            'Severely Wasted': 'SW',
+            'Moderately Wasted': 'MW/MAM',
+            'Severely Wasted': 'SW/SAM',
             'Overweight': 'OW',
             'Obese': 'Ob'
         }

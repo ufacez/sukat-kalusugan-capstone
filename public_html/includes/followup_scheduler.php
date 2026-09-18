@@ -75,8 +75,10 @@ function followup_category_label(string $category): string
 		'MUW' => 'Moderately Underweight',
 		'SSt' => 'Severely Stunted',
 		'MSt' => 'Moderately Stunted',
-		'SW' => 'Severely Wasted',
-		'MW' => 'Moderately Wasted',
+		'SW' => 'Severely Wasted / SAM',
+		'SW/SAM' => 'Severely Wasted / SAM',
+		'MW' => 'Moderately Wasted / MAM',
+		'MW/MAM' => 'Moderately Wasted / MAM',
 		'OW' => 'Overweight',
 		'Ob' => 'Obese',
 	];
@@ -110,7 +112,11 @@ function followup_abnormal_codes(?string $wfa, ?string $hfa, ?string $wfh): arra
 			$codes[] = $value;
 		} elseif ($axis === 'hfa' && in_array($value, ['SSt', 'MSt'], true)) {
 			$codes[] = $value;
-		} elseif ($axis === 'wfh' && in_array($value, ['SW', 'MW', 'OW', 'Ob'], true)) {
+		} elseif ($axis === 'wfh' && in_array($value, ['SW', 'SW/SAM', 'MW', 'MW/MAM', 'OW', 'Ob'], true)) {
+			// Normalize display variants back to stored codes so downstream
+			// SQL/category logic keeps working on SW/MW.
+			if ($value === 'SW/SAM') $value = 'SW';
+			if ($value === 'MW/MAM') $value = 'MW';
 			$codes[] = $value;
 		}
 	}

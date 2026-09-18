@@ -1,13 +1,14 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/followup_scheduler.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 
 $statusToStyle = [
 	'Normal' => 'cell_green', 'MUW' => 'cell_yellow', 'SUW' => 'cell_red',
 	'MSt' => 'cell_yellow', 'SSt' => 'cell_red',
-	'MW' => 'cell_yellow', 'SW' => 'cell_red',
+	'MW' => 'cell_yellow', 'MW/MAM' => 'cell_yellow', 'SW' => 'cell_red', 'SW/SAM' => 'cell_red',
 	'OW' => 'cell_orange', 'Ob' => 'cell_orange', 'Tall' => 'cell_blue',
 	'Use the WFL/H column' => 'cell_gray', 'Use WFL/H column' => 'cell_gray',
 ];
@@ -381,7 +382,7 @@ if ($isForm1C) {
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
 		$wfa = $row['wfa_status'] === 'Refer to WFL/H' ? 'Use the WFL/H column' : (string)($row['wfa_status'] ?? 'Normal');
 		$hfa = (string)($row['hfa_status'] ?? 'Normal');
-		$wfh = (string)($row['wfh_status'] ?? 'Normal');
+		$wfh = wfh_display_short($row['wfh_status'] ?? 'Normal');
 		$form1cRowsOut[] = [
 			['v' => (string)($row['address'] ?? ''), 's' => 'cell'],
 			['v' => (string)($row['parent_name'] ?? ''), 's' => 'cell'],
@@ -804,7 +805,7 @@ if ($isNutStatus) {
 			['v' => (int)$row['age_days'], 's' => 'cell_num'],
 			['v' => $wfaStatus, 's' => xlsx_status_style($wfaStatus)],
 			['v' => (string)($row['hfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['hfa_status'] ?? ''))],
-			['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
+			['v' => wfh_display_short($row['wfh_status'] ?? ''), 's' => xlsx_status_style(wfh_display_short($row['wfh_status'] ?? ''))],
 			['v' => !empty($row['has_disability']) ? 'YES' : 'NO', 's' => 'cell_center'],
 		];
 	}
@@ -1014,7 +1015,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 				['v' => (int)$row['age_months'], 's' => 'cell_num'],
 				['v' => (int)$row['age_days'], 's' => 'cell_num'],
-				['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
+				['v' => wfh_display_short($row['wfh_status'] ?? ''), 's' => xlsx_status_style(wfh_display_short($row['wfh_status'] ?? ''))],
 				['v' => !empty($row['has_disability']) ? 'YES' : 'NO', 's' => 'cell_center'],
 			]
 			: [
@@ -1028,7 +1029,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
 				['v' => (string)($row['wfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfa_status'] ?? ''))],
 				['v' => (string)($row['hfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['hfa_status'] ?? ''))],
-				['v' => (string)($row['wfh_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfh_status'] ?? ''))],
+				['v' => wfh_display_short($row['wfh_status'] ?? ''), 's' => xlsx_status_style(wfh_display_short($row['wfh_status'] ?? ''))],
 			];
 
 		if ($isInfantSheet && !$isForm1A) {

@@ -447,8 +447,8 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 				<div class="who-classification-table">
 					<div class="who-ct-head"><span></span><span>Classification</span><span>Count</span><span>Percentage</span></div>
 					<div class="who-ct-row"><span class="who-dot is-green"></span><span>Normal</span><span><?php echo $wfhNormal; ?></span><span><?php echo $total > 0 ? round(($wfhNormal/$total)*100,1) : 0; ?>%</span></div>
-					<div class="who-ct-row"><span class="who-dot is-yellow"></span><span>MW</span><span><?php echo $wfhMW; ?></span><span><?php echo $total > 0 ? round(($wfhMW/$total)*100,1) : 0; ?>%</span></div>
-					<div class="who-ct-row"><span class="who-dot is-red"></span><span>SW</span><span><?php echo $wfhSW; ?></span><span><?php echo $total > 0 ? round(($wfhSW/$total)*100,1) : 0; ?>%</span></div>
+					<div class="who-ct-row"><span class="who-dot is-yellow"></span><span>MW/MAM</span><span><?php echo $wfhMW; ?></span><span><?php echo $total > 0 ? round(($wfhMW/$total)*100,1) : 0; ?>%</span></div>
+					<div class="who-ct-row"><span class="who-dot is-red"></span><span>SW/SAM</span><span><?php echo $wfhSW; ?></span><span><?php echo $total > 0 ? round(($wfhSW/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-orange"></span><span>OW</span><span><?php echo $wfhOW; ?></span><span><?php echo $total > 0 ? round(($wfhOW/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-row"><span class="who-dot is-orange-dark"></span><span>Ob</span><span><?php echo $wfhOb; ?></span><span><?php echo $total > 0 ? round(($wfhOb/$total)*100,1) : 0; ?>%</span></div>
 					<div class="who-ct-total"><span></span><span>Total</span><span><?php echo $total; ?></span><span>100%</span></div>
@@ -456,7 +456,7 @@ nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of asse
 			</div>
 			<div class="who-info-bar">
 				<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-				<span>WFL/H: MW (Moderately Wasting), SW (Severely Wasting), OW (Overweight), Ob (Obese)</span>
+				<span>WFL/H: MW/MAM (Moderately Wasting/MAM), SW/SAM (Severely Wasting/SAM), OW (Overweight), Ob (Obese)</span>
 			</div>
 		</div>
 	</div>
@@ -528,7 +528,7 @@ window.WHO_DATA = {
 		wasted: [
 			{ label:'Moderately Wasted\n(MW/MAM)', count:<?php echo $prevWasted_MW; ?>, color:'#f59e0b' },
 			{ label:'Severely Wasted\n(SW/SAM)', count:<?php echo $prevWasted_SW; ?>, color:'#ef4444' },
-			{ label:'Wasted\n(MW or SW)', count:<?php echo $prevWasted_Total; ?>, color:'#f97316' }
+			{ label:'Wasted\n(MW/MAM or SW/SAM)', count:<?php echo $prevWasted_Total; ?>, color:'#f97316' }
 		],
 		stunted: [
 			{ label:'Moderately Stunted\n(MSt)', count:<?php echo $prevStunted_MSt; ?>, color:'#f59e0b' },
@@ -560,10 +560,10 @@ window.WHO_DATA = {
 			{ label:'Underweight\nand/or Stunted', count:<?php echo $prevUwStunted_Total; ?>, color:'#ef4444' }
 		],
 		stuntWaste: [
-			{ label:'MSt & MW', count:<?php echo $prevStuntedWasted_MStMW; ?>, color:'#2563eb' },
-			{ label:'MSt & SW', count:<?php echo $prevStuntedWasted_MStSW; ?>, color:'#2563eb' },
-			{ label:'SSt & MW', count:<?php echo $prevStuntedWasted_SstMW; ?>, color:'#2563eb' },
-			{ label:'SSt & SW', count:<?php echo $prevStuntedWasted_SstSW; ?>, color:'#2563eb' },
+			{ label:'MSt & MW/MAM', count:<?php echo $prevStuntedWasted_MStMW; ?>, color:'#2563eb' },
+			{ label:'MSt & SW/SAM', count:<?php echo $prevStuntedWasted_MStSW; ?>, color:'#2563eb' },
+			{ label:'SSt & MW/MAM', count:<?php echo $prevStuntedWasted_SstMW; ?>, color:'#2563eb' },
+			{ label:'SSt & SW/SAM', count:<?php echo $prevStuntedWasted_SstSW; ?>, color:'#2563eb' },
 			{ label:'Stunted and/or\nWasted', count:<?php echo $prevStuntedWasted_Total; ?>, color:'#ef4444' }
 		]
 	}

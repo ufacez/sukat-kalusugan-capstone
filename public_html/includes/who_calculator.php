@@ -409,6 +409,46 @@ function classify_wfh_status(float $whz): string
 }
 
 /**
+ * Display-layer mapping for Weight-for-Length/Height codes.
+ * Stored values stay 'SW'/'MW' (DB ENUM + all SQL filters untouched);
+ * these helpers render the SAM/MAM-annotated labels everywhere the eye
+ * sees a WFH code:
+ *   SW -> SW/SAM (Severe Acute Malnutrition, WHZ < -3)
+ *   MW -> MW/MAM (Moderate Acute Malnutrition, WHZ -3..-2)
+ * Accepts stored codes as well as already-mapped labels (case-insensitive)
+ * so double-mapping is a no-op.
+ */
+function wfh_display_short(?string $code): string
+{
+	$s = strtolower(trim((string)$code));
+	if ($s === 'sw' || $s === 'sw/sam' || $s === 'sw(sam)' || $s === 'sam') {
+		return 'SW/SAM';
+	}
+	if ($s === 'mw' || $s === 'mw/mam' || $s === 'mw(mam)' || $s === 'mam') {
+		return 'MW/MAM';
+	}
+	if ($code === null || $code === '') {
+		return '';
+	}
+	return (string)$code;
+}
+
+function wfh_display_long(?string $code): string
+{
+	$s = strtolower(trim((string)$code));
+	if ($s === 'sw' || $s === 'sw/sam' || $s === 'sw(sam)' || $s === 'sam' || str_contains($s, 'severely wasted')) {
+		return 'Severely Wasted / SAM';
+	}
+	if ($s === 'mw' || $s === 'mw/mam' || $s === 'mw(mam)' || $s === 'mam' || str_contains($s, 'moderately wasted')) {
+		return 'Moderately Wasted / MAM';
+	}
+	if ($code === null || $code === '') {
+		return '';
+	}
+	return (string)$code;
+}
+
+/**
  * Flags a measurement as biologically implausible -- almost always a data
  * entry or device error, not a real child. WHO Anthro standard thresholds:
  * WAZ outside -6..5, HAZ outside -6..6, WHZ outside -5..5. We let WAZ go

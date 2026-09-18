@@ -460,14 +460,15 @@ nutritionist_layout_start(
 
                     // Each axis status is rendered as its own pill so
                     // empty / Normal / SUW / MUW / OW / SSt / MSt /
-                    // Tall / SW / MW / Ob are all distinguishable at a
-                    // glance.
+                    // Tall / SW/SAM / MW/MAM / Ob are all distinguishable at a
+                    // glance. WFH codes use the SAM/MAM-annotated display
+                    // labels (stored values stay SW/MW).
                     $wfaDisplay = $wfa !== '' ? $wfa : '—';
                     $hfaDisplay = $hfa !== '' ? $hfa : '—';
-                    $wfhDisplay = $wfh !== '' ? $wfh : '—';
+                    $wfhDisplay = $wfh !== '' ? wfh_display_short($wfh) : '—';
                     $wfaPill = $wfa !== '' ? nutritionist_status_class($wfa) : 'is-muted';
                     $hfaPill = $hfa !== '' ? nutritionist_status_class($hfa) : 'is-muted';
-                    $wfhPill = $wfh !== '' ? nutritionist_status_class($wfh) : 'is-muted';
+                    $wfhPill = $wfhDisplay !== '—' ? nutritionist_status_class($wfhDisplay) : 'is-muted';
                     $parentAddress = (string)($child['parent_address'] ?? '');
                     ?>
                     <tr
@@ -482,7 +483,7 @@ nutritionist_layout_start(
                         data-child-status-class="<?php echo nutritionist_e($pillClass); ?>"
                         data-child-wfa="<?php echo nutritionist_e($wfa); ?>"
                         data-child-hfa="<?php echo nutritionist_e($hfa); ?>"
-                        data-child-wfh="<?php echo nutritionist_e($wfh); ?>"
+                        data-child-wfh="<?php echo nutritionist_e($wfhDisplay !== '—' ? $wfhDisplay : $wfh); ?>"
                         data-child-waz="<?php echo nutritionist_e(number_format((float)($child['waz'] ?? 0), 2)); ?>"
                         data-child-haz="<?php echo nutritionist_e(number_format((float)($child['haz'] ?? 0), 2)); ?>"
                         data-child-whz="<?php echo nutritionist_e(number_format((float)($child['whz'] ?? 0), 2)); ?>"
@@ -669,12 +670,20 @@ nutritionist_layout_start(
     var currentHistory = [];
     var currentMetric = 'waz';
 
+    // Mirror of PHP wfh_display_short(): stored SW/MW render as SW/SAM + MW/MAM.
+    function wfhDisplayShort(code) {
+        var x = String(code || '').toLowerCase().trim();
+        if (x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam') return 'SW/SAM';
+        if (x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam') return 'MW/MAM';
+        return String(code || '');
+    }
+
     function statusPillClass(s) {
         var x = String(s || '').toLowerCase();
         if (x === 'normal' || x === 'tall') return 'is-success';
         if (x === 'overweight' || x === 'obese' || x === 'ow' || x === 'ob') return 'is-orange';
-        if (x.indexOf('moderately') !== -1 || x === 'muw' || x === 'mst' || x === 'mw') return 'is-warn';
-        if (x === 'suw' || x === 'sst' || x === 'sw' || x.indexOf('severely') !== -1) return 'is-danger';
+        if (x.indexOf('moderately') !== -1 || x.indexOf('mam') !== -1 || x === 'muw' || x === 'mst' || x === 'mw' || x === 'mw/mam' || x === 'mw(mam)') return 'is-warn';
+        if (x === 'suw' || x === 'sst' || x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam' || x.indexOf('severely') !== -1) return 'is-danger';
         // WFA overflow: WAZ > +2 is a redirect, not a real WFA label.
         if (x.indexOf('refer') !== -1 || x === 'ref') return 'is-info';
         if (!x) return 'is-muted';
@@ -779,7 +788,7 @@ nutritionist_layout_start(
             var waz = num(m.waz), haz = num(m.haz), whz = num(m.whz);
             var wfa = String(m.wfa_status || 'Normal');
             var hfa = String(m.hfa_status || 'Normal');
-            var wfh = String(m.wfh_status || 'Normal');
+            var wfh = wfhDisplayShort(m.wfh_status || 'Normal');
             var abn = [];
             if (wfa !== 'Normal') abn.push(wfa);
             if (hfa !== 'Normal' && hfa !== 'Tall') abn.push(hfa);

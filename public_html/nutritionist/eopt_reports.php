@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/followup_scheduler.php';
 require_once __DIR__ . '/../includes/export_dropdown.php';
 
@@ -73,13 +74,13 @@ $filterParams = ['view' => $view, 'year' => $year, 'month' => $month, 'checkup_m
 
 $listCodes = [
 	'0-23' => ['title' => 'List_0-23 — Children 0-23 Months', 'desc' => 'All children below 24 months weighed monthly.', 'axis' => 'All children', 'cond' => '1=1', 'age_min' => 0, 'age_max' => 23],
-	'MW' => ['title' => 'List_MW — Moderately Wasted (MAM)', 'desc' => 'WFH status MW (11.5-12.4 cm).', 'axis' => 'Weight-for-Height', 'cond' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59],
-	'SW' => ['title' => 'List_SW — Severely Wasted (SAM)', 'desc' => 'WFH status SW (<11.5 cm).', 'axis' => 'Weight-for-Height', 'cond' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
+	'MW' => ['title' => 'List_MW — Moderately Wasted (MW/MAM)', 'desc' => 'WFH status MW/MAM (WHZ -3..-2).', 'axis' => 'Weight-for-Height', 'cond' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59],
+	'SW' => ['title' => 'List_SW — Severely Wasted (SW/SAM)', 'desc' => 'WFH status SW/SAM (WHZ <-3).', 'axis' => 'Weight-for-Height', 'cond' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt' => ['title' => 'List_MSt&SSt — Stunted', 'desc' => 'HFA below -2SD.', 'axis' => 'Height-for-Age', 'cond' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 	'OW_Ob' => ['title' => 'List_OW&Ob — Overweight/Obese', 'desc' => 'WFA OW or WFH OW/Ob.', 'axis' => 'WFA/WFH', 'cond' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
 	'MUW' => ['title' => 'List_MUW — Moderately Underweight', 'desc' => 'WFA status MUW.', 'axis' => 'Weight-for-Age', 'cond' => "lm.wfa_status = 'MUW'", 'age_min' => 0, 'age_max' => 59],
 	'MUW_SUW_MSt_SSt' => ['title' => 'List_MUW,SUW,MSt&SSt — Underweight+Stunted', 'desc' => 'MUW or SUW with MSt/SSt.', 'axis' => 'WFA + HFA', 'cond' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
-	'MSt_SSt_MW_SW' => ['title' => 'List_MSt,SSt,MW&SW — Stunted+Wasted', 'desc' => 'MSt/SSt with MW/SW.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
+	'MSt_SSt_MW_SW' => ['title' => 'List_MSt,SSt,MW&SW — Stunted+Wasted', 'desc' => 'MSt/SSt with MW/MAM or SW/SAM.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt_OW_Ob' => ['title' => 'List_MSt,SSt,OW&Ob — Stunted+OW/Ob', 'desc' => 'MSt/SSt with OW/Ob.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 ];
 
@@ -417,7 +418,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 							<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '—'; ?></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></span></td>
 							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfh_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfh_status'] ?? '—')); ?></span></td>
+							<td><span class="admin-pill <?php echo nutritionist_status_class(!empty($row['wfh_status']) ? wfh_display_short($row['wfh_status']) : ''); ?>"><?php echo nutritionist_e(!empty($row['wfh_status']) ? wfh_display_short($row['wfh_status']) : '—'); ?></span></td>
 							<?php if ($isInfantList): ?>
 								<?php
 								$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
@@ -655,7 +656,7 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 		if (in_array($wfa, ['MUW', 'SUW'], true) || in_array($hfa, ['MSt', 'SSt'], true)) $pc['uw_or_stunted']++;
 		if (in_array($hfa, ['MSt', 'SSt'], true) || ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $pc['stunted_or_owob']++;
 	}
-	$indicators = [['Wasted (MW + SW)', $pc['wasted']], ['Stunted (MSt + SSt)', $pc['stunted']], ['Overweight / Obese', $pc['ow_ob']], ['Underweight (MUW + SUW)', $pc['underweight']], ['Underweight and/or Stunted', $pc['uw_or_stunted']], ['Stunted and/or OW/Obese', $pc['stunted_or_owob']]];
+	$indicators = [['Wasted (MW/MAM + SW/SAM)', $pc['wasted']], ['Stunted (MSt + SSt)', $pc['stunted']], ['Overweight / Obese', $pc['ow_ob']], ['Underweight (MUW + SUW)', $pc['underweight']], ['Underweight and/or Stunted', $pc['uw_or_stunted']], ['Stunted and/or OW/Obese', $pc['stunted_or_owob']]];
 	?>
 	<div class="rp-table-section">
 		<div class="rp-table-title">Community-Level Prevalence (0–59 months)</div>

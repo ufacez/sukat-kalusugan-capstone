@@ -139,7 +139,7 @@ api_success([
 	'indicators' => [
 		[
 			'code' => 'wasted',
-			'label' => 'Wasted (MW + SW)',
+			'label' => 'Wasted (MW/MAM + SW/SAM)',
 			'count' => $wastedCount,
 			'prevalence' => $pct($wastedCount, $totalPop),
 		],

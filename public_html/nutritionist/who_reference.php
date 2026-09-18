@@ -243,8 +243,8 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 				</div>
 				<div class="who-ref-class-col">
 					<div class="who-ref-class-col-header who-ref-class-wflh">WEIGHT-FOR-LENGTH/HEIGHT (WFL/H)</div>
-					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-red"></span><strong>SW</strong> <span class="who-ref-class-range">Z &lt; −3</span></div>
-					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-yellow"></span><strong>MW</strong> <span class="who-ref-class-range">−3 ≤ Z &lt; −2</span></div>
+					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-red"></span><strong>SW/SAM</strong> <span class="who-ref-class-range">Z &lt; −3 · SAM</span></div>
+					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-yellow"></span><strong>MW/MAM</strong> <span class="who-ref-class-range">−3 ≤ Z &lt; −2 · MAM</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-green"></span><strong>Normal</strong> <span class="who-ref-class-range">−2 &lt; Z &lt; +2</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-orange"></span><strong>OW</strong> <span class="who-ref-class-range">+2 ≤ Z &lt; +3</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-orange"></span><strong>Ob</strong> <span class="who-ref-class-range">Z ≥ +3</span></div>

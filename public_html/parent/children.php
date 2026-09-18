@@ -107,7 +107,9 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 	$dohLabels = [
 		'SUW' => 'Severely underweight', 'MUW' => 'Moderately underweight', 'Normal' => 'Normal',
 		'SSt' => 'Severely stunted', 'MSt' => 'Moderately stunted', 'Tall' => 'Tall for age',
-		'SW' => 'Severe wasting (SAM)', 'MW' => 'Moderate wasting (MAM)', 'OW' => 'Overweight', 'Ob' => 'Obese',
+		'SW' => 'SW/SAM — Severe wasting (SAM)', 'SW/SAM' => 'SW/SAM — Severe wasting (SAM)',
+		'MW' => 'MW/MAM — Moderate wasting (MAM)', 'MW/MAM' => 'MW/MAM — Moderate wasting (MAM)',
+		'OW' => 'Overweight', 'Ob' => 'Obese',
 	];
 
 	$childrenJson = [];

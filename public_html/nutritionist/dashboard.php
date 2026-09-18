@@ -302,8 +302,8 @@ $axisLabels = [
 /**
  * Classify a single axis status into a {label, level, axis, full} tuple.
  * level is 'normal' | 'moderate' | 'severe' | 'refer'.
- * label   is the short pill code (N, MUW, MSt, MW, OW, SUW, SSt, SW, Ob, REF).
- * full    is the human-readable WHO description.
+ * label   is the short pill code (N, MUW, MSt, MW/MAM, OW, SUW, SSt, SW/SAM, Ob, REF).
+ * full    is the human-readable WHO description (WFH wasting labels carry SAM/MAM).
  *
  * WFA no longer classifies overweight/obese: any WAZ > +2 is the "Refer
  * to WFL/H" pill (DOH eOPT Plus rule), and the operator reads the actual
@@ -318,12 +318,12 @@ function classifyAxisStatus(string $axis, string $raw): array {
 	// Severe bucket
 	if ($s === 'suw') return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
 	if ($s === 'sst') return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
-	if ($s === 'sw')  return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+	if ($s === 'sw' || $s === 'sw/sam' || $s === 'sw(sam)' || $s === 'sam')  return ['label' => 'SW/SAM',  'full' => 'Severely Wasted / SAM',        'level' => 'severe', 'axis' => 'wflh'];
 	if ($s === 'ob')  return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
 	// Moderate bucket
 	if ($s === 'muw') return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
 	if ($s === 'mst') return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
-	if ($s === 'mw')  return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+	if ($s === 'mw' || $s === 'mw/mam' || $s === 'mw(mam)' || $s === 'mam')  return ['label' => 'MW/MAM',  'full' => 'Moderately Wasted / MAM',      'level' => 'moderate', 'axis' => 'wflh'];
 	// OW is now WFL/H only -- WFA shows the "Refer" pill instead.
 	if ($s === 'ow')  return ['label' => 'OW',  'full' => 'Overweight',             'level' => 'moderate', 'axis' => 'wflh'];
 	// Tall is reported as a separate HFA pill so the operator can spot
@@ -340,14 +340,14 @@ function classifyAxisStatus(string $axis, string $raw): array {
 	if (str_contains($s, 'severe')) {
 		if (str_contains($s, 'underweight')) return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
 		if (str_contains($s, 'stunted'))      return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
-		if (str_contains($s, 'wasted'))       return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+		if (str_contains($s, 'wasted') || str_contains($s, 'sam'))       return ['label' => 'SW/SAM',  'full' => 'Severely Wasted / SAM',        'level' => 'severe', 'axis' => 'wflh'];
 		if (str_contains($s, 'obese'))        return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
 		return ['label' => 'S', 'full' => 'Severe', 'level' => 'severe', 'axis' => $axis];
 	}
 	if (str_contains($s, 'moderate')) {
 		if (str_contains($s, 'underweight')) return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
 		if (str_contains($s, 'stunted'))      return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
-		if (str_contains($s, 'wasted'))       return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+		if (str_contains($s, 'wasted') || str_contains($s, 'mam'))       return ['label' => 'MW/MAM',  'full' => 'Moderately Wasted / MAM',      'level' => 'moderate', 'axis' => 'wflh'];
 		return ['label' => 'M', 'full' => 'Moderate', 'level' => 'moderate', 'axis' => $axis];
 	}
 	// Long-form Overweight / Obese -- WFL/H axis only now.
@@ -549,11 +549,11 @@ if ($totalSevere > 0) {
 	$parts = [];
 	if ($suw) $parts[] = "$suw SUW";
 	if ($sst) $parts[] = "$sst SSt";
-	if ($sw)  $parts[] = "$sw SW";
+	if ($sw)  $parts[] = "$sw SW/SAM";
 	if ($ob)  $parts[] = "$ob Ob";
 	$aiBullets[] = '<strong>Severe burden.</strong> ' . implode(', ', $parts) . ' on the latest growth snapshot — ' . $pctSevere . '% of all WFA / HFA / WFH classifications land in the severe bucket.';
 } else {
-	$aiBullets[] = '<strong>No severe malnutrition flagged.</strong> Latest WFA / HFA / WFH snapshot shows zero SUW, SSt, SW or Ob classifications across ' . $totalMeasured . ' measured children.';
+	$aiBullets[] = '<strong>No severe malnutrition flagged.</strong> Latest WFA / HFA / WFH snapshot shows zero SUW, SSt, SW/SAM or Ob classifications across ' . $totalMeasured . ' measured children.';
 }
 
 // Insight 2 — Stunting trend (HFA focus).
@@ -575,8 +575,8 @@ if ($muw + $suw + $refWfa > 0) {
 // Insight 4 — Weight-for-Height/Length. OW lives on this axis now.
 if ($mw + $sw + $ob + $owWflh > 0) {
 	$wfhParts = [];
-	if ($mw) $wfhParts[] = "$mw MW";
-	if ($sw) $wfhParts[] = "$sw SW";
+	if ($mw) $wfhParts[] = "$mw MW/MAM";
+	if ($sw) $wfhParts[] = "$sw SW/SAM";
 	if ($owWflh) $wfhParts[] = "$owWflh OW";
 	if ($ob) $wfhParts[] = "$ob Ob";
 	$aiBullets[] = '<strong>Weight-for-Height/Length (WFH).</strong> ' . implode(', ', $wfhParts) . ' visible on the WFH axis in the chart — represents the moderate + severe range of the WFH series.';
@@ -748,11 +748,11 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 					<div class="stat-count" data-axis-count="wflh" data-axis-key="Normal"><?php echo (int)$axisCounts['wflh']['Normal']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisCounts['wflh']['Normal'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Moderately Wasted</strong> <span class="stat-code">MW</span></span></div>
+					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Moderately Wasted / MAM</strong> <span class="stat-code">MW/MAM</span></span></div>
 					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW"><?php echo (int)$axisPillCounts['wflh']['MW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Severely Wasted</strong> <span class="stat-code">SW</span></span></div>
+					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Severely Wasted / SAM</strong> <span class="stat-code">SW/SAM</span></span></div>
 					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW"><?php echo (int)$axisPillCounts['wflh']['SW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
@@ -945,10 +945,10 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						$fullName = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
 						$wfaClass = $m['wfa_status'] !== null ? nutritionist_status_class($m['wfa_status']) : 'is-muted';
 						$hfaClass = $m['hfa_status'] !== null ? nutritionist_status_class($m['hfa_status']) : 'is-muted';
-						$wfhClass = $m['wfh_status'] !== null ? nutritionist_status_class($m['wfh_status']) : 'is-muted';
+						$wfhClass = $m['wfh_status'] !== null ? nutritionist_status_class(wfh_display_short($m['wfh_status'])) : 'is-muted';
 						$wfaDisplay = !empty($m['wfa_status']) ? $m['wfa_status'] : '—';
 						$hfaDisplay = !empty($m['hfa_status']) ? $m['hfa_status'] : '—';
-						$wfhDisplay = !empty($m['wfh_status']) ? $m['wfh_status'] : '—';
+						$wfhDisplay = !empty($m['wfh_status']) ? wfh_display_short($m['wfh_status']) : '—';
 					?>
 					<tr>
 						<td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($m['child_code'] ?? ''); ?></td>

@@ -70,9 +70,9 @@ function parent_status_class(?string $status): string
 
     return match ($normalized) {
         'normal', 'confirmed', 'completed', 'active', 'n', 't', 'tall' => 'is-success',
-        'moderately underweight', 'moderately stunted', 'moderately wasted', 'muw', 'mst', 'mw' => 'is-warn',
+        'moderately underweight', 'moderately stunted', 'moderately wasted', 'moderately wasted / mam', 'muw', 'mst', 'mw', 'mw/mam', 'mw(mam)', 'mam' => 'is-warn',
         'overweight', 'obese', 'ow', 'ob' => 'is-orange',
-        'suw', 'sst', 'sw', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
+        'suw', 'sst', 'sw', 'sw/sam', 'sw(sam)', 'sam', 'severely underweight', 'severely stunted', 'severely wasted', 'severely wasted / sam' => 'is-danger',
         'pending' => 'is-muted',
         'cancelled', 'inactive' => 'is-danger',
         default => 'is-muted',
@@ -122,12 +122,12 @@ function parent_classify_axis_status(string $axis, string $raw): array {
     // Severe bucket
     if ($s === 'suw') return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
     if ($s === 'sst') return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
-    if ($s === 'sw')  return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+    if ($s === 'sw' || $s === 'sw/sam' || $s === 'sw(sam)' || $s === 'sam')  return ['label' => 'SW/SAM',  'full' => 'Severely Wasted / SAM',        'level' => 'severe', 'axis' => 'wflh'];
     if ($s === 'ob')  return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
     // Moderate bucket
     if ($s === 'muw') return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
     if ($s === 'mst') return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
-    if ($s === 'mw')  return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+    if ($s === 'mw' || $s === 'mw/mam' || $s === 'mw(mam)' || $s === 'mam')  return ['label' => 'MW/MAM',  'full' => 'Moderately Wasted / MAM',      'level' => 'moderate', 'axis' => 'wflh'];
     if ($s === 'ow')  return ['label' => 'OW',  'full' => 'Overweight',             'level' => 'moderate', 'axis' => 'wflh'];
     if ($s === 'tall' || $s === 't') {
         return ['label' => 'Tall', 'full' => 'Tall', 'level' => 'normal', 'axis' => 'hfa'];
@@ -138,14 +138,14 @@ function parent_classify_axis_status(string $axis, string $raw): array {
     if (str_contains($s, 'severe')) {
         if (str_contains($s, 'underweight')) return ['label' => 'SUW', 'full' => 'Severely Underweight', 'level' => 'severe', 'axis' => 'wfa'];
         if (str_contains($s, 'stunted'))      return ['label' => 'SSt', 'full' => 'Severely Stunted',       'level' => 'severe', 'axis' => 'hfa'];
-        if (str_contains($s, 'wasted'))       return ['label' => 'SW',  'full' => 'Severely Wasted',        'level' => 'severe', 'axis' => 'wflh'];
+        if (str_contains($s, 'wasted') || str_contains($s, 'sam'))       return ['label' => 'SW/SAM',  'full' => 'Severely Wasted / SAM',        'level' => 'severe', 'axis' => 'wflh'];
         if (str_contains($s, 'obese'))        return ['label' => 'Ob',  'full' => 'Obese',                  'level' => 'severe', 'axis' => 'wflh'];
         return ['label' => 'S', 'full' => 'Severe', 'level' => 'severe', 'axis' => $axis];
     }
     if (str_contains($s, 'moderate')) {
         if (str_contains($s, 'underweight')) return ['label' => 'MUW', 'full' => 'Moderately Underweight', 'level' => 'moderate', 'axis' => 'wfa'];
         if (str_contains($s, 'stunted'))      return ['label' => 'MSt', 'full' => 'Moderately Stunted',     'level' => 'moderate', 'axis' => 'hfa'];
-        if (str_contains($s, 'wasted'))       return ['label' => 'MW',  'full' => 'Moderately Wasted',      'level' => 'moderate', 'axis' => 'wflh'];
+        if (str_contains($s, 'wasted') || str_contains($s, 'mam'))       return ['label' => 'MW/MAM',  'full' => 'Moderately Wasted / MAM',      'level' => 'moderate', 'axis' => 'wflh'];
         return ['label' => 'M', 'full' => 'Moderate', 'level' => 'moderate', 'axis' => $axis];
     }
     if (str_contains($s, 'overweight')) return ['label' => 'OW', 'full' => 'Overweight', 'level' => 'moderate', 'axis' => 'wflh'];

@@ -179,6 +179,7 @@ nutritionist_layout_start(
                 <div class="row"><span class="label">Age at measurement</span><span class="value" id="cs-age">—</span></div>
                 <div class="row"><span class="label">Age in days</span><span class="value" id="cs-age-days">—</span></div>
                 <div class="row"><span class="label">Barangay</span><span class="value" id="cs-barangay"><?php echo $preselectedChild !== null ? nutritionist_e((string)($preselectedChild['barangay'] ?? '—')) : ''; ?></span></div>
+                <div class="row"><span class="label">Measurement date</span><span class="value" id="cs-measurement-date">—</span></div>
                 <div class="pills" id="cs-pills"></div>
 
                 <?php if ($lastMeasurement !== null): ?>
@@ -191,8 +192,8 @@ nutritionist_layout_start(
                             'Severely Underweight' => 'SUW',
                             'Moderately Stunted' => 'MSt',
                             'Severely Stunted' => 'SSt',
-                            'Moderately Wasted' => 'MW',
-                            'Severely Wasted' => 'SW',
+                            'Moderately Wasted' => 'MW/MAM',
+                            'Severely Wasted' => 'SW/SAM',
                             'Overweight' => 'OW',
                             'Obese' => 'Ob',
                         ];
@@ -428,11 +429,7 @@ nutritionist_layout_start(
         $('cs-birthdate').textContent = match.birthdate;
         $('cs-barangay').textContent = match.barangay || '—';
 
-        var ageMonths = computeAgeMonths(match.birthdate, dateInput.value);
-        $('cs-age').textContent = ageMonths !== null ? (ageMonths + ' months') : '—';
-
-        var ageDays = computeAgeDays(match.birthdate, dateInput.value);
-        $('cs-age-days').textContent = ageDays !== null ? (ageDays + ' days') : '—';
+        updateChildAgeDisplay();
 
         var pills = [];
         if (match.sex) pills.push('<span class="admin-pill is-muted">' + escapeHtml(match.sex) + '</span>');
@@ -468,16 +465,54 @@ nutritionist_layout_start(
         return diff < 0 ? 0 : diff;
     }
 
+    function formatDisplayDate(iso) {
+        if (!iso) return '—';
+        var d = new Date(String(iso) + 'T00:00:00');
+        if (isNaN(d.getTime())) return '—';
+        var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+        return months[d.getMonth()] + ' ' + d.getDate() + ', ' + d.getFullYear();
+    }
+
+    /*
+     * Single source of truth for the Step 1 card's dynamic rows.
+     * Recomputes Age at measurement / Age in days / Measurement date
+     * from the selected child's birthdate + current date input, so
+     * changing the date in Step 2 updates Step 1 instantly.
+     * Invalid dates (empty / unparsable / before birthdate) show '—';
+     * the server (who_preview.php) remains the authority for errors.
+     */
+    function updateChildAgeDisplay() {
+        if (!selectedChild) return;
+        var ageMonths = computeAgeMonths(selectedChild.birthdate, dateInput.value);
+        var ageDays = computeAgeDays(selectedChild.birthdate, dateInput.value);
+        var birth = selectedChild.birthdate ? new Date(selectedChild.birthdate + 'T00:00:00') : null;
+        var current = dateInput.value ? new Date(dateInput.value + 'T00:00:00') : null;
+        var valid = ageMonths !== null && ageDays !== null && birth && !isNaN(birth.getTime())
+            && current && !isNaN(current.getTime()) && current >= birth;
+        $('cs-age').textContent = valid ? (ageMonths + ' months') : '—';
+        $('cs-age-days').textContent = valid ? (ageDays + ' days') : '—';
+        var dateEl = $('cs-measurement-date');
+        if (dateEl) dateEl.textContent = valid ? formatDisplayDate(dateInput.value) : '—';
+    }
+
     function formatZ(v) {
         if (v === null || v === undefined || isNaN(v)) return '—';
         return (v > 0 ? '+' : '') + v.toFixed(2);
+    }
+
+    function wfhDisplayShort(code) {
+        var x = String(code || '').toLowerCase().trim();
+        if (x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam') return 'SW/SAM';
+        if (x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam') return 'MW/MAM';
+        return String(code || '');
     }
 
     function statusPillClass(status) {
         if (status === 'Normal') return 'is-success';
         if (status.indexOf('Refer') !== -1) return 'is-info';
         if (status.indexOf('Tall') !== -1 || status.indexOf('OW') !== -1 || status.indexOf('Ob') !== -1) return 'is-orange';
-        if (status.indexOf('MUW') !== -1 || status.indexOf('MSt') !== -1 || status.indexOf('MW') !== -1) return 'is-warn';
+        if (status.indexOf('MUW') !== -1 || status.indexOf('MSt') !== -1 || status.indexOf('MW') !== -1 || status.indexOf('MAM') !== -1) return 'is-warn';
+        if (status.indexOf('SAM') !== -1) return 'is-danger';
         if (!status || status === '—') return 'is-muted';
         return 'is-danger';
     }
@@ -547,7 +582,12 @@ nutritionist_layout_start(
 
     weightInput.addEventListener('input', recomputeWho);
     heightInput.addEventListener('input', recomputeWho);
-    dateInput.addEventListener('change', recomputeWho);
+    function handleDateChange() {
+        updateChildAgeDisplay();
+        recomputeWho();
+    }
+    dateInput.addEventListener('change', handleDateChange);
+    dateInput.addEventListener('input', handleDateChange);
 
     /*
      * If a child is preselected via ?child=ID, populate the summary.
@@ -579,10 +619,11 @@ nutritionist_layout_start(
         whoWhz.className = 'value ' + (Math.abs(whz) > 2 ? 'is-warn' : 'is-ok');
 
         // Derive combined display status from the three DOH axes (abbreviations).
-        // Exclude Normal; show all abnormal axes together.
+        // Exclude Normal; show all abnormal axes together. WFH uses the
+        // SAM/MAM-annotated display labels (stored values stay SW/MW).
         var wfa = String(data.wfa_status || 'Normal');
         var hfa = String(data.hfa_status || 'Normal');
-        var wfh = String(data.wfh_status || 'Normal');
+        var wfh = wfhDisplayShort(data.wfh_status || 'Normal');
         var abnParts = [];
         if (wfa !== 'Normal') abnParts.push(wfa);
         if (hfa !== 'Normal' && hfa !== 'Tall') abnParts.push(hfa);
@@ -798,6 +839,7 @@ nutritionist_layout_start(
         weightInput.value = '';
         heightInput.value = '';
         dateInput.value = new Date().toISOString().slice(0, 10);
+        updateChildAgeDisplay();
         whoResult.style.display = 'none';
         saveBtn.disabled = true;
         flagBanner.classList.remove('is-visible');

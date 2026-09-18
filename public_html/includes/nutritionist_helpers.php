@@ -342,9 +342,9 @@ function nutritionist_status_class(?string $status): string
 
     return match ($normalized) {
         'normal', 'confirmed', 'completed', 'active', 'n', 't', 'tall' => 'is-success',
-        'moderately underweight', 'moderately stunted', 'moderately wasted', 'muw', 'mst', 'mw' => 'is-warn',
+        'moderately underweight', 'moderately stunted', 'moderately wasted', 'moderately wasted / mam', 'muw', 'mst', 'mw', 'mw/mam', 'mw(mam)', 'mam' => 'is-warn',
         'overweight', 'obese', 'ow', 'ob' => 'is-orange',
-        'suw', 'sst', 'sw', 'severely underweight', 'severely stunted', 'severely wasted' => 'is-danger',
+        'suw', 'sst', 'sw', 'sw/sam', 'sw(sam)', 'sam', 'severely underweight', 'severely stunted', 'severely wasted', 'severely wasted / sam' => 'is-danger',
         // WFA overflow: WAZ > +2 is a redirect, not a real WFA label.
         'refer to wfl/h', 'refer to wflh', 'refer', 'ref' => 'is-info',
         'pending' => 'is-muted',

@@ -269,8 +269,8 @@ Tall = Tall for age
 Weight-for-height:
 
 Normal
-MW = Moderately Wasted / Moderate Acute Malnutrition (MAM)
-SW = Severely Wasted / Severe Acute Malnutrition (SAM)
+MW/MAM = Moderately Wasted / Moderate Acute Malnutrition (MAM)
+SW/SAM = Severely Wasted / Severe Acute Malnutrition (SAM)
 OW = Overweight
 Ob = Obese
 
@@ -1331,7 +1331,7 @@ CLASSIFICATIONS:
 WAZ = Weight-for-Age Z-score | HAZ = Height-for-Age Z-score | WHZ = Weight-for-Height Z-score.
 WFA: Normal | MUW (Moderately Underweight) | SUW (Severely Underweight).
 HFA: Normal | MSt (Moderately Stunted) | SSt (Severely Stunted) | Tall.
-WFH: Normal | MW (Moderately Wasted/MAM) | SW (Severely Wasted/SAM) | OW (Overweight) | Ob (Obese).
+WFH: Normal | MW/MAM (Moderately Wasted/MAM) | SW/SAM (Severely Wasted/SAM) | OW (Overweight) | Ob (Obese).
 
 {$knowledge}
 
@@ -1484,7 +1484,7 @@ CLASSIFICATIONS:
 WAZ = Weight-for-Age | HAZ = Height-for-Age | WHZ = Weight-for-Height.
 WFA: Normal | MUW (Moderately Underweight) | SUW (Severely Underweight).
 HFA: Normal | MSt (Moderately Stunted) | SSt (Severely Stunted) | Tall.
-WFH: Normal | MW (Moderately Wasted) | SW (Severely Wasted) | OW (Overweight) | Ob (Obese).
+WFH: Normal | MW/MAM (Moderately Wasted) | SW/SAM (Severely Wasted) | OW (Overweight) | Ob (Obese).
 
 {$knowledge}
 

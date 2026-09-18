@@ -73,7 +73,9 @@ function pdf_status_fill(string $code): ?array {
 		'MSt'    => [254, 249, 231],
 		'SSt'    => [250, 219, 216],
 		'MW'     => [254, 249, 231],
+		'MW/MAM' => [254, 249, 231],
 		'SW'     => [250, 219, 216],
+		'SW/SAM' => [250, 219, 216],
 		'OW'     => [253, 235, 208],
 		'Ob'     => [253, 235, 208],
 		'Tall'   => [211, 228, 253],
@@ -307,12 +309,12 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
 			(string)($row['wfa_status'] ?? ''),
 			(string)($row['hfa_status'] ?? ''),
-			(string)($row['wfh_status'] ?? ''),
+			wfh_display_short($row['wfh_status'] ?? ''),
 		];
 
 		$wfaCode = (string)($row['wfa_status'] ?? '');
 		$hfaCode = (string)($row['hfa_status'] ?? '');
-		$wfhCode = (string)($row['wfh_status'] ?? '');
+		$wfhCode = wfh_display_short($row['wfh_status'] ?? '');
 		$cellFills = [];
 		$wfaFill = pdf_status_fill($wfaCode);
 		$hfaFill = pdf_status_fill($hfaCode);
@@ -403,7 +405,7 @@ function pdf_generate_form1a(array $f): TCPDF {
 		}
 
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
-		$wfhCode = (string)($row['wfh_status'] ?? '');
+		$wfhCode = wfh_display_short($row['wfh_status'] ?? '');
 		$cellFills = [];
 		$wfhFill = pdf_status_fill($wfhCode);
 		if ($wfhFill) {
@@ -493,7 +495,7 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 			$wfaStatus = 'Use WFL/H column';
 		}
 		$hfaStatus = (string)($row['hfa_status'] ?? '');
-		$wfhStatus = (string)($row['wfh_status'] ?? '');
+		$wfhStatus = wfh_display_short($row['wfh_status'] ?? '');
 
 		$cellFills = [];
 		$wfaFill = pdf_status_fill($wfaStatus);
@@ -1078,7 +1080,7 @@ function pdf_generate_form1c(array $f): TCPDF {
 		$fullName = trim(($row['last_name'] ?? '') . ', ' . ($row['first_name'] ?? '') . ' ' . ($row['middle_name'] ?? ''));
 		$wfa = $row['wfa_status'] === 'Refer to WFL/H' ? 'Use the WFL/H column' : (string)($row['wfa_status'] ?? 'Normal');
 		$hfa = (string)($row['hfa_status'] ?? 'Normal');
-		$wfh = (string)($row['wfh_status'] ?? 'Normal');
+		$wfh = wfh_display_short($row['wfh_status'] ?? 'Normal');
 		$cellFills = [];
 		$wfaFill = pdf_status_fill($wfa);
 		$hfaFill = pdf_status_fill($hfa);
@@ -1192,7 +1194,7 @@ function pdf_generate_prevalence(array $f): TCPDF {
 	$pct = $total > 0 ? fn(int $n): string => number_format(($n / $total) * 100, 1) . '%' : fn(int $n): string => '0.0%';
 
 	$indicators = [
-		['Wasted (MW + SW)', $counts['wasted']],
+		['Wasted (MW/MAM + SW/SAM)', $counts['wasted']],
 		['Stunted (MSt + SSt)', $counts['stunted']],
 		['Overweight / Obese', $counts['ow_ob']],
 		['Underweight (MUW + SUW)', $counts['underweight']],

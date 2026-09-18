@@ -12,9 +12,9 @@ function chatbot_compile_knowledge_base(): string
 CLASSIFICATIONS: WAZ=Weight-for-Age, HAZ=Height-for-Age, WHZ=Weight-for-Height.
 WFA: Normal | MUW (Moderately Underweight) | SUW (Severely Underweight).
 HFA: Normal | MSt (Moderately Stunted) | SSt (Severely Stunted) | Tall.
-WFH: Normal | MW (Moderately Wasted/MAM) | SW (Severely Wasted/SAM) | OW (Overweight) | Ob (Obese).
+WFH: Normal | MW/MAM (Moderately Wasted/MAM) | SW/SAM (Severely Wasted/SAM) | OW (Overweight) | Ob (Obese).
 
-INTERVENTIONS: Normal = continue feeding. MUW = increase feeding frequency, nutrient-dense foods (egg, fish, lugaw). SUW = REFER to health facility. MSt/SSt = diversified diet, address infections. MW = energy-dense foods, treat illness, re-measure in 2-4 weeks. SW = REFER IMMEDIATELY (OTP with RUTF). OW/Ob = balanced diet, physical activity.
+INTERVENTIONS: Normal = continue feeding. MUW = increase feeding frequency, nutrient-dense foods (egg, fish, lugaw). SUW = REFER to health facility. MSt/SSt = diversified diet, address infections. MW/MAM = energy-dense foods, treat illness, re-measure in 2-4 weeks. SW/SAM = REFER IMMEDIATELY (OTP with RUTF). OW/Ob = balanced diet, physical activity.
 
 e-OPT PLUS: Monthly = ALL 0-23mo + malnourished 24-59mo. Quarterly = Normal 24-59mo (April/July/October).
 
