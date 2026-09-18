@@ -95,7 +95,7 @@ $parents = admin_fetch_all(
 	 )
 	 WHERE {$parentScope}
 	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
-	 ORDER BY p.name ASC",
+	 ORDER BY p.id DESC",
 	str_repeat('i', count($childScopeParams) + count($parentScopeParams)),
 	array_merge($childScopeParams, $parentScopeParams)
 );

@@ -24,7 +24,7 @@ $children = admin_fetch_all(
      INNER JOIN parents p ON p.id = c.parent_id
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
      WHERE c.status = 'inactive'
-     ORDER BY c.last_name ASC, c.first_name ASC"
+     ORDER BY c.id DESC"
 );
 
 $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/children.php')) . '">' . admin_action_icon('back') . ' Active children</a>';

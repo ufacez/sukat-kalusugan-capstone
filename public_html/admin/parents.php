@@ -28,7 +28,7 @@ $parents = admin_fetch_all(
      LEFT JOIN children c ON c.parent_id = p.id AND c.status = 'active'
      WHERE p.status = 'active'
      GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, b.name, p.status
-     ORDER BY p.name ASC"
+     ORDER BY p.id DESC"
 );
 
 $totalChildren = 0;

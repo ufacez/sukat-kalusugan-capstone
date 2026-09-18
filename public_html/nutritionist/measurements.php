@@ -9,8 +9,6 @@ $user = nutritionist_require_access();
  * Filter / view params
  */
 $localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
-$page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 10;
 
 $childrenParams = [];
 $childrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childrenParams);
@@ -92,7 +90,7 @@ $children = admin_fetch_all(
          LIMIT 1
      )
      WHERE {$whereSql}
-      ORDER BY COALESCE(lm.measurement_date, '0000-00-00') DESC, COALESCE(lm.id, 0) DESC, c.last_name ASC, c.first_name ASC",
+     ORDER BY c.id DESC",
     $types,
     $filterParams
 );
@@ -144,13 +142,14 @@ foreach ($historyRows as $row) {
 }
 
 /*
- * Pagination
+ * No server-side pagination here on purpose: the full filtered list is
+ * rendered and assets/js/admin.js paginates client-side (10/page) so the
+ * search box filters across ALL rows, not just the current page.
+ * Newest child (highest id / latest child_code like CH0015) is first
+ * via ORDER BY c.id DESC above — with or without a measurement.
  */
 $totalAll = count($children);
-$totalPages = max(1, (int)ceil($totalAll / $perPage));
-$page = min($page, $totalPages);
-$offset = ($page - 1) * $perPage;
-$pageChildren = array_slice($children, $offset, $perPage);
+$pageChildren = $children;
 
 /*
  * Local area list for the filter dropdown, scoped to the user's
@@ -390,10 +389,10 @@ nutritionist_layout_start(
             id="local-area-filter"
             onchange="window.location.href=this.value"
         >
-            <option value="<?php echo nutritionist_e(nutritionist_measurements_url(['page' => 1])); ?>">All local areas</option>
+            <option value="<?php echo nutritionist_e(nutritionist_measurements_url([])); ?>">All local areas</option>
             <?php foreach ($localAreaList as $la): ?>
                 <option
-                    value="<?php echo nutritionist_e(nutritionist_measurements_url(['local_area_id' => (int)$la['id'], 'page' => 1])); ?>"
+                    value="<?php echo nutritionist_e(nutritionist_measurements_url(['local_area_id' => (int)$la['id']])); ?>"
                     <?php echo $localAreaFilter === (int)$la['id'] ? 'selected' : ''; ?>
                 ><?php
                     $label = ucfirst((string)$la['area_type']) . ': ' . $la['area_name'];
@@ -550,36 +549,7 @@ nutritionist_layout_start(
         </table>
     </div>
 
-    <?php if ($totalPages > 1): ?>
-        <?php
-        $prevPage = max(1, $page - 1);
-        $nextPage = min($totalPages, $page + 1);
-        $firstItem = $offset + 1;
-        $lastItem = min($totalAll, $offset + $perPage);
-        ?>
-        <div class="children-pagination">
-            <span class="status">Showing <?php echo (int)$firstItem; ?>–<?php echo (int)$lastItem; ?> of <?php echo (int)$totalAll; ?> children</span>
-            <div class="pages">
-                <a class="page-btn<?php echo $page <= 1 ? ' is-disabled' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_measurements_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $prevPage])); ?>">‹ Prev</a>
-                <?php
-                $start = max(1, $page - 2);
-                $end = min($totalPages, $page + 2);
-                if ($start > 1) {
-                    echo '<a class="page-btn" href="' . nutritionist_e(nutritionist_measurements_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => 1])) . '">1</a>';
-                    if ($start > 2) echo '<span class="status" style="padding:0 4px;">…</span>';
-                }
-                for ($i = $start; $i <= $end; $i++) {
-                    echo '<a class="page-btn' . ($i === $page ? ' is-active' : '') . '" href="' . nutritionist_e(nutritionist_measurements_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $i])) . '">' . $i . '</a>';
-                }
-                if ($end < $totalPages) {
-                    if ($end < $totalPages - 1) echo '<span class="status" style="padding:0 4px;">…</span>';
-                    echo '<a class="page-btn" href="' . nutritionist_e(nutritionist_measurements_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $totalPages])) . '">' . $totalPages . '</a>';
-                }
-                ?>
-                <a class="page-btn<?php echo $page >= $totalPages ? ' is-disabled' : ''; ?>" href="<?php echo nutritionist_e(nutritionist_measurements_url(['local_area_id' => $localAreaFilter > 0 ? $localAreaFilter : null, 'page' => $nextPage])); ?>">Next ›</a>
-            </div>
-        </div>
-    <?php endif; ?>
+    <?php /* Pagination + global search handled client-side by assets/js/admin.js (10/page). */ ?>
 </section>
 
 <!--

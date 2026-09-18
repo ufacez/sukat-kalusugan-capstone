@@ -50,7 +50,7 @@ $children = admin_fetch_all(
         ORDER BY m.measurement_date DESC, m.id DESC LIMIT 1
      )
      $where
-     ORDER BY c.last_name ASC, c.first_name ASC",
+     ORDER BY c.id DESC",
     $types,
     $params
 );
