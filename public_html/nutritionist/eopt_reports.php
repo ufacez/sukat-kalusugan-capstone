@@ -8,7 +8,7 @@ require_once __DIR__ . '/../includes/export_dropdown.php';
 $user = nutritionist_require_access();
 
 $view = (string)($_GET['view'] ?? 'monthly');
-if (!in_array($view, ['monthly', 'quarterly'], true)) {
+if (!in_array($view, ['monthly', 'quarterly', 'yearly'], true)) {
 	$view = 'monthly';
 }
 
@@ -52,7 +52,10 @@ if ($userBarangayId > 0) {
 $barangays = $assignedBarangay !== null ? [$assignedBarangay] : admin_barangay_options();
 
 try {
-	$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->modify('last day of this month');
+	// v1 whole-year: year-end snapshot (Dec 31). Monthly/quarterly path untouched.
+	$anchorDate = $view === 'yearly'
+		? (new DateTimeImmutable(sprintf('%04d-12-01', $year)))->modify('last day of this month')
+		: (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->modify('last day of this month');
 } catch (Exception) {
 	$anchorDate = new DateTimeImmutable('today');
 }
@@ -62,7 +65,9 @@ $roundsList = [4 => 'April Round', 7 => 'July Round', 10 => 'October Round'];
 
 $periodLabel = $view === 'monthly'
 	? $monthsList[$month] . ' ' . $year
-	: $roundsList[$checkupMonth] . ' ' . $year;
+	: ($view === 'quarterly'
+		? $roundsList[$checkupMonth] . ' ' . $year
+		: 'Year ' . $year . ' · Annual');
 
 $activeTab = (string)($_GET['tab'] ?? 'overview');
 $validTabs = ['overview', 'eopt_forms', 'nutrition', 'monitoring', 'dqc'];
@@ -97,7 +102,8 @@ $listParam = $isSingleList ? $listCodeLowerMap[$listParamKey] : $listParamRaw;
 if ($isSingleList) {
 	$spec = $listCodes[$listParam];
 	$listRows = [];
-	$listAnchor = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $month)))->modify('last day of this month');
+	$listAnchorMonth = $view === 'yearly' ? 12 : $month;
+	$listAnchor = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $listAnchorMonth)))->modify('last day of this month');
 	$listParams = array_merge($scopeParams, [$listAnchor->format('Y-m-d')]);
 	$listRows = admin_fetch_all(
 		"SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name,
@@ -444,6 +450,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 		<label>View<select name="view" onchange="this.form.submit()">
 			<option value="monthly" <?php echo $view === 'monthly' ? 'selected' : ''; ?>>Monthly</option>
 			<option value="quarterly" <?php echo $view === 'quarterly' ? 'selected' : ''; ?>>Quarterly</option>
+			<option value="yearly" <?php echo $view === 'yearly' ? 'selected' : ''; ?>>Yearly</option>
 		</select></label>
 		<?php if ($view === 'monthly'): ?>
 			<label>Month<select name="month" onchange="this.form.submit()">
@@ -451,7 +458,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 					<option value="<?php echo $mNo; ?>" <?php echo $month === $mNo ? 'selected' : ''; ?>><?php echo nutritionist_e($mName); ?></option>
 				<?php endforeach; ?>
 			</select></label>
-		<?php else: ?>
+		<?php elseif ($view === 'quarterly'): ?>
 			<label>Round<select name="checkup_month" onchange="this.form.submit()">
 				<?php foreach ($roundsList as $rNo => $rName): ?>
 					<option value="<?php echo $rNo; ?>" <?php echo $checkupMonth === $rNo ? 'selected' : ''; ?>><?php echo nutritionist_e($rName); ?></option>

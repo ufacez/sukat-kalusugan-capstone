@@ -163,7 +163,7 @@ function pdf_scope_and_filter(): array {
 
 	$year = (int)($_GET['year'] ?? date('Y'));
 	$view = (string)($_GET['view'] ?? 'monthly');
-	if (!in_array($view, ['monthly', 'quarterly'], true)) {
+	if (!in_array($view, ['monthly', 'quarterly', 'yearly'], true)) {
 		$view = 'monthly';
 	}
 
@@ -205,7 +205,9 @@ function pdf_scope_and_filter(): array {
 	}
 
 	try {
-		$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $view === 'monthly' ? $month : $checkupMonth)))->modify('last day of this month');
+		// v1 whole-year: year-end snapshot (Dec 31). Monthly/quarterly path untouched.
+		$anchorMonthPdf = $view === 'monthly' ? $month : ($view === 'quarterly' ? $checkupMonth : 12);
+		$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $anchorMonthPdf)))->modify('last day of this month');
 	} catch (Exception) {
 		$anchorDate = new DateTimeImmutable('today');
 	}
@@ -215,7 +217,9 @@ function pdf_scope_and_filter(): array {
 
 	$periodLabel = $view === 'monthly'
 		? strtoupper($monthsList[$month] . ' ' . $year . ' MONTHLY MONITORING')
-		: ($roundsList[$checkupMonth] . ' ' . $year . ' QUARTERLY CHECK-UP');
+		: ($view === 'quarterly'
+			? ($roundsList[$checkupMonth] . ' ' . $year . ' QUARTERLY CHECK-UP')
+			: ('YEAR ' . $year . ' ANNUAL MONITORING (JAN-DEC)'));
 
 	return [
 		'year' => $year,

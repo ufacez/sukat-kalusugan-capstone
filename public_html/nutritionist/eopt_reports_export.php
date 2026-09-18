@@ -39,7 +39,7 @@ $user = nutritionist_require_access();
  */
 
 $view = (string)($_GET['view'] ?? 'monthly');
-if (!in_array($view, ['monthly', 'quarterly'], true)) {
+if (!in_array($view, ['monthly', 'quarterly', 'yearly'], true)) {
 	$view = 'monthly';
 }
 
@@ -91,9 +91,10 @@ if ($userBarangayId > 0) {
  |--------------------------------------------------------------------------
  | Anchor date: ages on every roster/list are evaluated at the END of the
  | reporting month (monthly view) or check-up round month (quarterly).
+ | Yearly view (v1) is a year-end snapshot anchored at Dec 31.
  |--------------------------------------------------------------------------
  */
-$anchorMonth = $view === 'monthly' ? $month : $checkupMonth;
+$anchorMonth = $view === 'monthly' ? $month : ($view === 'quarterly' ? $checkupMonth : 12);
 try {
 	$anchorDate = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $anchorMonth)))->modify('last day of this month');
 } catch (Exception) {
@@ -107,7 +108,9 @@ $roundsList = [4 => 'APRIL ROUND', 7 => 'JULY ROUND', 10 => 'OCTOBER ROUND'];
 
 $periodLabel = $view === 'monthly'
 	? strtoupper($monthsList[$month] . ' ' . $year . ' MONTHLY MONITORING')
-	: ($roundsList[$checkupMonth] . ' ' . $year . ' QUARTERLY CHECK-UP');
+	: ($view === 'quarterly'
+		? ($roundsList[$checkupMonth] . ' ' . $year . ' QUARTERLY CHECK-UP')
+		: ('YEAR ' . $year . ' ANNUAL MONITORING (JAN-DEC)'));
 
 /*
  |--------------------------------------------------------------------------
@@ -1132,11 +1135,15 @@ if ($isNutStatus) {
 } elseif ($isForm1C) {
 	$downloadName = 'eopt-form1c-' . strtolower($view) . '-' . $year . '-' . date('Y-m-d');
 } elseif ($isSingleList) {
-	$downloadName = sprintf('eopt-list-%s-%04d-%s', strtolower((string)$listParam), $year, date('Y-m-d'));
+	$downloadName = $view === 'yearly'
+		? sprintf('eopt-list-%s-yearly-%04d-%s', strtolower((string)$listParam), $year, date('Y-m-d'))
+		: sprintf('eopt-list-%s-%04d-%s', strtolower((string)$listParam), $year, date('Y-m-d'));
 } else {
 	$downloadSlug = $view === 'monthly'
 		? sprintf('monthly-%02d%04d', $month, $year)
-		: sprintf('quarterly-%02d%04d', $checkupMonth, $year);
+		: ($view === 'quarterly'
+			? sprintf('quarterly-%02d%04d', $checkupMonth, $year)
+			: sprintf('yearly-%04d', $year));
 	$downloadName = 'eopt-report-' . $downloadSlug . '-' . date('Y-m-d');
 }
 $csvDownloadName = $downloadName . '.csv';
