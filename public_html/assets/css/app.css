@@ -228,20 +228,23 @@ select {
   --sk-micro-dur: 150ms;
 }
 
-/* ---- Cross-document view transitions (progressive enhancement) ----
- * Chrome/Edge animate page-to-page navigations; all other browsers
- * silently ignore this block and navigate exactly as before. */
+/* ---- Cross-document view transitions: OFF ----
+ * `navigation: auto` made Chrome/Edge crossfade every page navigation, and
+ * combined with the content fade-in below it produced a white flicker on
+ * every page change. Instant swaps instead; other browsers unaffected. */
 @view-transition {
-  navigation: auto;
+  navigation: none;
 }
 
-/* ---- Global page-enter: every full load fades/rises once ---- */
+/* ---- One-time enter fade for login/kiosk shells only ----
+ * NOTE: .admin-content deliberately has NO enter animation — console pages
+ * navigate constantly and fading the whole content from opacity 0 each
+ * load reads as a white flash. */
 @keyframes sk-page-in {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 
-.admin-content,
 .auth-shell,
 .kiosk-shell {
   animation: sk-page-in var(--sk-enter-dur) var(--sk-ease);
@@ -269,16 +272,6 @@ body.sk-welcome .admin-pageheader {
 .sk-stagger > *:nth-child(4) { animation: sk-rise-in 260ms var(--sk-ease) 150ms backwards; }
 .sk-stagger > *:nth-child(5) { animation: sk-rise-in 260ms var(--sk-ease) 200ms backwards; }
 .sk-stagger > *:nth-child(n+6) { animation: sk-rise-in 260ms var(--sk-ease) 240ms backwards; }
-
-/* ---- Table first-paint fade (runs once per load) ---- */
-@keyframes sk-table-in {
-  from { opacity: 0; }
-  to   { opacity: 1; }
-}
-
-.admin-table tbody {
-  animation: sk-table-in 300ms ease;
-}
 
 /* ---- Skeleton shimmer for async zones ---- */
 @keyframes sk-shimmer-sweep {
