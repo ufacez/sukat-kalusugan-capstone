@@ -122,6 +122,25 @@ function admin_avatar_color(string $name): string
     return $colors[$hash];
 }
 
+/**
+ * Gender-coded child avatar color (green palette only):
+ * dark green for male, light green for female, gray when unknown.
+ */
+function child_avatar_color(?string $sex): string
+{
+    $normalized = strtolower(trim((string)$sex));
+
+    if ($normalized === 'male' || $normalized === 'm') {
+        return '#0B6E4F';
+    }
+
+    if ($normalized === 'female' || $normalized === 'f') {
+        return '#52B788';
+    }
+
+    return '#94a3b8';
+}
+
 function admin_grouped_nav_items(): array
 {
     return [

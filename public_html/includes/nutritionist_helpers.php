@@ -12,13 +12,12 @@ function nutritionist_nav_items(): array
     return [
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/nutritionist/dashboard.php')],
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php')],
-        ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php')],
-        ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
+        ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'monitoring', 'label' => 'Monitoring List', 'href' => app_url('/nutritionist/monitoring.php')],
         ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
-        ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
+        ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
         ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php')],
         ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php')],
     ];
@@ -37,8 +36,7 @@ function nutritionist_grouped_nav_items(): array
             'label' => 'Clinical',
             'items' => [
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php'), 'icon' => 'children'],
-                ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php'), 'icon' => 'clipboard'],
-                ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
+                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
                 ['key' => 'monitoring', 'label' => 'Monitoring List', 'href' => app_url('/nutritionist/monitoring.php'), 'icon' => 'audit_logs'],
             ],
         ],
@@ -46,7 +44,6 @@ function nutritionist_grouped_nav_items(): array
             'label' => 'Community',
             'items' => [
                 ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
-                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
             ],
         ],
         [
@@ -59,6 +56,7 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Tools',
             'items' => [
+                ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
                 ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
             ],

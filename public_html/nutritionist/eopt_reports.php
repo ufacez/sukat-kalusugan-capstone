@@ -348,6 +348,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-section-title{font-size:15px;font-weight:700;color:var(--admin-text);letter-spacing:-0.02em}
 .rp-section-sub{font-size:12px;color:var(--admin-muted);margin-top:2px}
 .rp-table-section{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:16px;box-shadow:var(--admin-shadow);margin-bottom:14px;overflow:hidden}
+.rp-table-section.allow-overflow{overflow:visible}
 .rp-table-title{font-size:13px;font-weight:700;color:var(--admin-text);margin-bottom:10px}
 .rp-breadcrumb{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--admin-muted);margin-bottom:14px}
 .rp-breadcrumb a{color:var(--admin-text);text-decoration:none;font-weight:600}
@@ -382,7 +383,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 	<span>/</span>
 	<span><?php echo nutritionist_e($spec['title']); ?></span>
 </div>
-<div class="rp-table-section">
+<div class="rp-table-section allow-overflow">
 	<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
 		<div>
 			<div class="rp-table-title"><?php echo nutritionist_e($spec['title']); ?></div>

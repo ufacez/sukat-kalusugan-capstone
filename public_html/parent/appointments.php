@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/parent_helpers.php';
 $user = parent_require_access();
 
 $children = admin_fetch_all(
-	'SELECT id, first_name, last_name, child_code
+	'SELECT id, first_name, last_name, child_code, sex
 	 FROM children
 	 WHERE parent_id = ?
 	 ORDER BY last_name ASC, first_name ASC',
@@ -128,7 +128,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 
 <section class="parent-appointments-intro">
 	<button type="button" class="parent-appointment-child-card" data-appointment-child-open aria-haspopup="dialog" aria-controls="appointment-child-picker">
-		<span class="parent-child-avatar" aria-hidden="true"><?php echo $selectedChild !== null ? parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))) : '?'; ?></span>
+		<span class="parent-child-avatar" style="background:<?php echo parent_e(child_avatar_color($selectedChild !== null ? (string)($selectedChild['sex'] ?? '') : '')); ?>;" aria-hidden="true"><?php echo $selectedChild !== null ? parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))) : '?'; ?></span>
 		<span class="parent-appointment-child-name"><?php echo $selectedChild !== null ? parent_e($selectedChild['first_name'] . ' ' . $selectedChild['last_name']) : 'All children'; ?></span>
 		<span class="parent-appointment-child-arrow" aria-hidden="true">&#9662;</span>
 	</button>
@@ -144,7 +144,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		<div class="parent-child-picker-header"><div><h2 id="appointment-child-picker-title">Choose a child</h2><p>Show appointments for this child.</p></div><button type="button" class="parent-child-picker-close" data-appointment-child-close aria-label="Close child picker">&times;</button></div>
 		<div class="parent-child-picker-list">
 			<?php foreach ($children as $child): ?>
-				<a class="parent-child-option <?php echo (int)$child['id'] === $selectedChildId ? 'is-selected' : ''; ?>" href="<?php echo parent_e(app_url('/parent/appointments.php?child_id=' . (int)$child['id'])); ?>"><span class="parent-child-option-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span><span class="parent-child-option-copy"><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($child['child_code']); ?></small></span></a>
+				<a class="parent-child-option <?php echo (int)$child['id'] === $selectedChildId ? 'is-selected' : ''; ?>" href="<?php echo parent_e(app_url('/parent/appointments.php?child_id=' . (int)$child['id'])); ?>"><span class="parent-child-option-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span><span class="parent-child-option-copy"><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($child['child_code']); ?></small></span></a>
 			<?php endforeach; ?>
 		</div>
 	</div>

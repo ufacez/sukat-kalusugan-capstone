@@ -2,6 +2,8 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/monitoring_periods.php';
+require_once __DIR__ . '/../includes/who_calculator.php';
+require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
 
@@ -58,12 +60,6 @@ $totalPages = max(1, (int)ceil($totalRows / $perPage));
 if ($page > $totalPages) $page = $totalPages;
 $offset = ($page - 1) * $perPage;
 $pageRows = array_slice($roster, $offset, $perPage);
-
-$countMeasured = 0;
-foreach ($roster as $row) {
-    if ($row['measured_in_period']) $countMeasured++;
-}
-$countPending = $totalRows - $countMeasured;
 
 // ── Link builders (preserve view state) ──
 $baseParams = ['view' => $view, 'year' => $year];
@@ -130,43 +126,10 @@ nutritionist_layout_start('Monitoring List', 'Period-based weighing rosters — 
 .mon-pagination{display:flex;justify-content:space-between;align-items:center;padding:12px 0;font-size:12px;color:var(--admin-muted)}
 </style>
 
-<!-- ============ STAT CARDS ============ -->
-<section style="margin-bottom:18px;">
-    <div class="admin-grid-cards">
-        <article class="admin-card">
-            <div class="admin-card-row">
-                <div class="admin-card-icon"><?php echo admin_action_icon('children'); ?></div>
-                <div class="admin-card-content">
-                    <div class="admin-card-label">In Roster</div>
-                    <div class="admin-card-value"><?php echo $totalRows; ?></div>
-                </div>
-            </div>
-        </article>
-        <article class="admin-card">
-            <div class="admin-card-row">
-                <div class="admin-card-icon is-success"><?php echo admin_action_icon('verify'); ?></div>
-                <div class="admin-card-content">
-                    <div class="admin-card-label">Measured (<?php echo nutritionist_e($period['label'] . ($view === 'quarterly' ? ' ' . $year : '')); ?>)</div>
-                    <div class="admin-card-value"><?php echo $countMeasured; ?></div>
-                </div>
-            </div>
-        </article>
-        <article class="admin-card">
-            <div class="admin-card-row">
-                <div class="admin-card-icon" style="background:rgba(217,119,6,.12);color:#d97706;"><?php echo admin_action_icon('bell'); ?></div>
-                <div class="admin-card-content">
-                    <div class="admin-card-label">Pending</div>
-                    <div class="admin-card-value" style="<?php echo $countPending > 0 ? 'color:#d97706;' : ''; ?>"><?php echo $countPending; ?></div>
-                </div>
-            </div>
-        </article>
-    </div>
-</section>
-
 <!-- ============ VIEW TABS ============ -->
 <div class="rp-tabs">
-    <a class="rp-tab <?php echo $view === 'monthly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('monthly')); ?>">Monthly <span>(0–23 + 24–59 abnormal)</span></a>
-    <a class="rp-tab <?php echo $view === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('quarterly')); ?>">Quarterly <span>(24–59 normal)</span></a>
+    <a class="rp-tab <?php echo $view === 'monthly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('monthly')); ?>">Monthly</a>
+    <a class="rp-tab <?php echo $view === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('quarterly')); ?>">Quarterly</a>
 </div>
 
 <!-- ============ SUB TABS ============ -->
@@ -219,6 +182,25 @@ nutritionist_layout_start('Monitoring List', 'Period-based weighing rosters — 
             <h3 class="mon-card-title"><?php echo nutritionist_e($rosterTitle); ?></h3>
             <p class="mon-card-sub"><?php echo nutritionist_e($rosterSub); ?></p>
         </div>
+        <div>
+            <?php
+            $expBase = ['view' => $view, 'year' => $year];
+            if ($view === 'monthly') {
+                $expBase['month'] = $month;
+            } else {
+                $expBase['quarter'] = $quarter;
+            }
+            if ($search !== '') {
+                $expBase['q'] = $search;
+            }
+            echo export_dropdown(
+                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'xlsx']))),
+                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'csv']))),
+                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'pdf']))),
+                'Export'
+            );
+            ?>
+        </div>
     </div>
 
     <?php if (empty($pageRows)): ?>
@@ -228,50 +210,75 @@ nutritionist_layout_start('Monitoring List', 'Period-based weighing rosters — 
         <table class="mon-table">
             <thead>
                 <tr>
-                    <th style="width:160px;">Child</th>
-                    <th style="width:50px;">Age</th>
-                    <th style="width:110px;">Barangay</th>
-                    <th style="width:120px;">Parent</th>
-                    <th style="width:100px;">Last Measured</th>
-                    <th style="width:110px;">Category</th>
-                    <th style="width:90px;">Period Status</th>
-                    <th style="width:90px;">Actions</th>
+                    <th>Full name of child</th>
+                    <th>Date</th>
+                    <th>Weight (kg)</th>
+                    <th>Height (cm)</th>
+                    <th>Nutritional status (WFA · HFA · WFH)</th>
+                    <th>Age (months)</th>
+                    <th>Age (days)</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody>
+                <?php
+                $monShort = static fn(string $code): string => match ($code) {
+                    'Normal' => 'N',
+                    'Tall' => 'T',
+                    default => $code,
+                };
+                ?>
                 <?php foreach ($pageRows as $entry):
                     $fullName = $entry['first_name'] . ' ' . $entry['last_name'];
-                    $lastMeasured = $entry['last_measurement_date'] ? date('M j, Y', strtotime($entry['last_measurement_date'])) : '<span style="color:var(--admin-muted);">Never</span>';
                     $measured = $entry['measured_in_period'];
-                    $periodDate = $entry['period_measurement_date'] ? date('M j', strtotime($entry['period_measurement_date'])) : '';
-                    $catLabel = monitoring_category_label($entry['category']);
+                    $wfaCode = (string)($entry['wfa_status'] ?? '—');
+                    $hfaCode = (string)($entry['hfa_status'] ?? '—');
+                    $wfhRaw = (string)($entry['wfh_status'] ?? '');
+                    $wfhCode = $wfhRaw !== '' ? wfh_display_short($wfhRaw) : '—';
+                    $ageDays = doh_age((string)$entry['birthdate']) ?? ['days' => 0, 'months' => 0];
+                    $hasMeasurement = $measured && $entry['period_measurement_date'];
                 ?>
-                <tr>
+                 <tr>
                     <td>
                         <strong><?php echo nutritionist_e($fullName); ?></strong>
-                        <div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($entry['child_code']); ?></div>
+                        <div style="font-size:10px;color:var(--admin-muted);margin-top:2px;"><?php echo nutritionist_e($entry['child_code']); ?> · <?php echo nutritionist_e($entry['sex']); ?></div>
                     </td>
-                    <td><?php echo $entry['age_months']; ?> mo</td>
-                    <td><?php echo nutritionist_e($entry['barangay_name']); ?></td>
-                    <td>
-                        <?php echo nutritionist_e($entry['parent_name'] !== '' ? $entry['parent_name'] : '—'); ?>
-                        <?php if ($entry['parent_phone'] !== ''): ?>
-                            <div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($entry['parent_phone']); ?></div>
-                        <?php endif; ?>
-                    </td>
-                    <td><?php echo $lastMeasured; ?></td>
-                    <td><span class="admin-pill <?php echo nutritionist_status_class($catLabel); ?>"><?php echo nutritionist_e($entry['category'] === 'Normal' ? 'Normal' : $entry['category']); ?></span></td>
-                    <td>
-                        <?php if ($measured): ?>
-                            <span class="mon-pill measured">Measured<?php echo $periodDate !== '' ? ' · ' . $periodDate : ''; ?></span>
+                    <td style="white-space:nowrap;">
+                        <?php if ($measured && $entry['period_measurement_date']): ?>
+                            <?php echo nutritionist_e(date('M j, Y', strtotime($entry['period_measurement_date']))); ?>
                         <?php else: ?>
-                            <span class="mon-pill pending">Pending</span>
+                            <span style="color:var(--admin-muted);font-style:italic;">Not yet</span>
                         <?php endif; ?>
+                    </td>
+                    <td style="white-space:nowrap;font-weight:600;">
+                        <?php if ($hasMeasurement): ?>
+                            <?php echo $entry['last_weight'] !== null ? number_format((float)$entry['last_weight'], 2) : ''; ?>
+                        <?php endif; ?>
+                    </td>
+                    <td style="white-space:nowrap;font-weight:600;">
+                        <?php if ($hasMeasurement): ?>
+                            <?php echo $entry['last_height'] !== null ? number_format((float)$entry['last_height'], 1) : ''; ?>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($hasMeasurement): ?>
+                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                            <span class="admin-pill <?php echo nutritionist_status_class($wfaCode); ?>" title="Weight-for-Age: <?php echo nutritionist_e($wfaCode); ?>"><?php echo nutritionist_e($monShort($wfaCode)); ?></span>
+                            <span class="admin-pill <?php echo nutritionist_status_class($hfaCode); ?>" title="Height-for-Age: <?php echo nutritionist_e($hfaCode); ?>"><?php echo nutritionist_e($monShort($hfaCode)); ?></span>
+                            <span class="admin-pill <?php echo nutritionist_status_class($wfhCode); ?>" title="Weight-for-Length/Height: <?php echo nutritionist_e($wfhCode); ?>"><?php echo nutritionist_e($monShort($wfhCode)); ?></span>
+                        </div>
+                        <?php endif; ?>
+                    </td>
+                    <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
+                        <?php echo (int)$ageDays['months']; ?> m
+                    </td>
+                    <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
+                        <?php echo (int)$ageDays['days']; ?> d
                     </td>
                     <td>
                         <div class="admin-actions" onclick="event.stopPropagation();">
                             <a class="admin-icon-btn admin-icon-btn-primary" title="Record measurement" href="<?php echo nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . $entry['id'])); ?>"><?php echo admin_action_icon('add'); ?></a>
-                            <a class="admin-icon-btn" title="View measurements" href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>"><?php echo admin_action_icon('view'); ?></a>
+                            <a class="admin-icon-btn" title="View child" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>"><?php echo admin_action_icon('view'); ?></a>
                         </div>
                     </td>
                 </tr>

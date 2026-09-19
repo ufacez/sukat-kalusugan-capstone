@@ -51,7 +51,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $children = admin_fetch_all(
-	'SELECT id, first_name, last_name, child_code
+	'SELECT id, first_name, last_name, child_code, sex
 	 FROM children
 	 WHERE parent_id = ?
 	 AND status = \'active\'
@@ -103,7 +103,7 @@ parent_layout_start('Request Appointment', 'Submit a follow-up request for any l
 			<div class="parent-appointment-child-picker" role="group" aria-label="Choose a child">
 				<?php foreach ($children as $child): ?>
 					<button type="button" class="parent-appointment-child-option" data-child-id="<?php echo (int)$child['id']; ?>">
-						<span class="parent-child-option-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span>
+						<span class="parent-child-option-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span>
 						<span><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($child['child_code']); ?></small></span>
 					</button>
 				<?php endforeach; ?>

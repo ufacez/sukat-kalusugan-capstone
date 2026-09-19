@@ -151,7 +151,7 @@ nutritionist_layout_start(
     const PAGE_URLS = {
         eoptExport: '<?php echo app_url('/nutritionist/eopt_reports_export.php'); ?>',
         eoptReports: '<?php echo app_url('/nutritionist/eopt_reports.php'); ?>',
-        measurements: '<?php echo app_url('/nutritionist/measurements.php'); ?>',
+        measurements: '<?php echo app_url('/nutritionist/children.php'); ?>',
         whoAnalysis: '<?php echo app_url('/nutritionist/who_analysis.php'); ?>',
         children: '<?php echo app_url('/nutritionist/children.php'); ?>'
     };
@@ -651,7 +651,7 @@ nutritionist_layout_start(
         } else if (value.includes('eopt') || value.includes('program report')) {
             action = { label: 'Open EOPT Reports', href: PAGE_URLS.eoptReports };
         } else if (value.includes('measurement') || value.includes('measurements')) {
-            action = { label: 'Open Measurements', href: PAGE_URLS.measurements };
+            action = { label: 'Open Children', href: PAGE_URLS.measurements };
         } else if (value.includes('who') || value.includes('z-score') || value.includes('zscore')) {
             action = { label: 'Open WHO Analysis', href: PAGE_URLS.whoAnalysis };
         } else if (value.includes('children') || value.includes('child list')) {
@@ -712,7 +712,7 @@ nutritionist_layout_start(
                     <button class="ai-suggestion" data-msg="Which children need follow-up based on their latest measurements?">Analyze children needing follow-up</button>
                 </div>
                 <div class="ai-page-links" aria-label="Nutritionist pages">
-                    <a href="<?php echo app_url('/nutritionist/measurements.php'); ?>">Measurements</a>
+                    <a href="<?php echo app_url('/nutritionist/measurement_record.php'); ?>">Record measurement</a>
                     <a href="<?php echo app_url('/nutritionist/who_analysis.php'); ?>">WHO Analysis</a>
                     <a href="<?php echo app_url('/nutritionist/eopt_reports.php'); ?>">EOPT Reports</a>
                     <a href="<?php echo app_url('/nutritionist/children.php'); ?>">Children</a>

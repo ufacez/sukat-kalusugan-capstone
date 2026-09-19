@@ -125,6 +125,7 @@ $measurements = admin_fetch_all(
 		c.last_name,
 		c.child_code,
 		c.birthdate,
+		c.sex,
 		bg.name AS barangay,
 		p.name AS parent_name
 	 FROM measurements m
@@ -647,7 +648,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($measurements); ?></div>
-				<div class="dashboard-stat-meta">This month <a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>">View all →</a></div>
+				<div class="dashboard-stat-meta">This month <a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>">View all →</a></div>
 			</div>
 		</div>
 	</article>
@@ -924,7 +925,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 		<div class="nutritionist-bottom-col">
 			<div class="nutritionist-toolbar" style="margin-bottom:10px;">
 				<h2 class="admin-section-title" style="margin:0;">Recent Measurements</h2>
-				<a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>" class="admin-mini" style="font-weight:600;">View all &rarr;</a>
+				<a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" class="admin-mini" style="font-weight:600;">View all &rarr;</a>
 			</div>
 
 			<div class="nutritionist-table-wrap">
@@ -955,7 +956,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($m['child_code'] ?? ''); ?></td>
 						<td>
 							<div class="child-name-cell">
-								<span class="avatar" style="background:<?php echo nutritionist_e(admin_avatar_color($fullName)); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+								<span class="avatar" style="background:<?php echo nutritionist_e(child_avatar_color((string)($m['sex'] ?? ''))); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
 								<div class="text">
 									<div class="name"><?php echo nutritionist_e($fullName); ?></div>
 								</div>

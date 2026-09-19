@@ -857,7 +857,7 @@ nutritionist_layout_start(
         var months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
         if (now.getDate() < b.getDate()) months--;
         if (months < 0) return '';
-        if (months < 24) return months + ' mo';
+        if (months < 24) return months + ' m';
         var y = Math.floor(months / 12), m = months % 12;
         return y + 'y' + (m > 0 ? ' ' + m + 'm' : '');
     }

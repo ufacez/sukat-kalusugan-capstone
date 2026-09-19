@@ -75,13 +75,13 @@ $childrenJson = json_encode(
 );
 
 $actions = '<a class="admin-btn-secondary" href="'
-    . nutritionist_e(app_url('/nutritionist/measurements.php'))
-    . '">' . admin_action_icon('back') . ' Measurements</a>';
+    . nutritionist_e(app_url('/nutritionist/children.php'))
+    . '">' . admin_action_icon('back') . ' Children</a>';
 
 nutritionist_layout_start(
     'New measurement',
     'Select a child, type weight and height, see the WHO assessment live, and save.',
-    'measurements',
+    'children',
     $actions,
     'New measurement'
 );
@@ -275,7 +275,7 @@ nutritionist_layout_start(
 
             <div id="recheck-panel" style="display:none;padding:12px 14px;border-radius:8px;background:rgba(11,110,79,.06);border:1px solid rgba(11,110,79,.30);margin-bottom:14px;">
                 <div style="font-weight:800;font-size:13px;color:#0b6e4f;margin-bottom:6px;">Double-check — save as recheck?</div>
-                <p style="margin:0 0 10px;font-size:12px;color:#14532d;">Rechecks are allowed anytime (even same day) and never move the due schedule. The previous reading stays in history; this one is marked as the verified value.</p>
+                <p style="margin:0 0 10px;font-size:12px;color:#14532d;">Rechecks must be within the same month as the measurement you are verifying (before moving to the next month). They never move the due schedule. The previous reading stays in history; this one is marked as the verified value.</p>
                 <label class="admin-field" style="margin-bottom:10px;">
                     <span>Reason for recheck *</span>
                     <textarea id="recheck-reason" maxlength="255" rows="2" placeholder="e.g. Child moved during scan, unstable reading — verifying"></textarea>
@@ -381,9 +381,11 @@ nutritionist_layout_start(
         }
         childResults.innerHTML = matches.map(function (c) {
             var initials = (c.first_name.charAt(0) + c.last_name.charAt(0)).toUpperCase();
+            var sexLetter = String(c.sex || '').toLowerCase().charAt(0);
+            var avatarBg = sexLetter === 'm' ? '#0B6E4F' : (sexLetter === 'f' ? '#52B788' : '#94a3b8');
             return ''
                 + '<div class="child-picker-item" data-id="' + c.id + '">'
-                + '<span class="avatar">' + escapeHtml(initials) + '</span>'
+                + '<span class="avatar" style="background:' + avatarBg + ';">' + escapeHtml(initials) + '</span>'
                 + '<div class="meta">'
                 + '<div class="name">' + escapeHtml(c.name) + '</div>'
                 + '<div class="sub">' + escapeHtml(c.code) + ' · ' + escapeHtml(c.barangay || '—') + '</div>'

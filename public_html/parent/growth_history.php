@@ -118,7 +118,7 @@ parent_layout_start('Growth Progress', 'Track your child\'s growth over time.', 
 <section class="parent-panel parent-profile-card">
 	<button type="button" class="parent-child-trigger" data-child-picker-open aria-haspopup="dialog" aria-controls="gh-child-picker">
 		<div class="parent-child-banner">
-			<div class="parent-child-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))); ?></div>
+			<div class="parent-child-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($selectedChild['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))); ?></div>
 			<div class="parent-child-info">
 				<div class="parent-child-name-row">
 					<div class="parent-child-name"><?php echo parent_e($selectedChild['first_name'] . ' ' . $selectedChild['last_name']); ?></div>
@@ -146,7 +146,7 @@ parent_layout_start('Growth Progress', 'Track your child\'s growth over time.', 
 				$pcAgeLabel = $pcAge !== null ? intdiv($pcMonths, 12) . ' years, ' . ($pcMonths % 12) . ' months' : 'Age unavailable';
 				?>
 				<a class="parent-child-option <?php echo (int)$pickerChild['id'] === $selectedChildId ? 'is-selected' : ''; ?>" href="<?php echo parent_e(app_url('/parent/growth_history.php?child_id=' . (int)$pickerChild['id'])); ?>">
-					<span class="parent-child-option-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$pickerChild['first_name'], 0, 1))); ?></span>
+					<span class="parent-child-option-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($pickerChild['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$pickerChild['first_name'], 0, 1))); ?></span>
 					<span class="parent-child-option-copy"><strong><?php echo parent_e($pickerChild['first_name'] . ' ' . $pickerChild['last_name']); ?></strong><small><?php echo parent_e($pcAgeLabel); ?> · <?php echo parent_e((string)$pickerChild['sex']); ?></small></span>
 				</a>
 			<?php endforeach; ?>

@@ -18,9 +18,14 @@
  *
  * There are no exact due dates, no grace windows, no overdue carry-over,
  * and no baseline category: a child counts as measured for a period when a
- * ROUTINE/OVERRIDE measurement falls inside that period. RECHECK rows are
- * verification-only and never count. Children over 59 months (age at the
- * END of the period) have graduated from eOPT coverage. Children with no
+ * weighing (ROUTINE, OVERRIDE, or RECHECK) falls inside that period.
+ * A recheck carries the newest verified values, so the roster's current
+ * status/values follow it — the same-month rule keeps the recheck inside
+ * the verified month, so it confirms rather than disrupts coverage.
+ * The 0-23 vs 24-59 split uses age at the END of the period, so a child
+ * who turns 24 mid-period automatically moves to quarterly.
+ * Children over 59 months (age at the END of the period) have graduated
+ * from eOPT coverage. Children with no
  * scheduled measurement on record yet are NOT listed at all — registered
  * but never-measured children only join their roster after their first
  * weighing.
@@ -191,7 +196,7 @@ function followup_category_label(string $category): string
  *
  * Membership is evaluated at the END of the period (age + latest scheduled
  * measurement on or before period end). Completion is period coverage: any
- * ROUTINE/OVERRIDE measurement dated inside [start, end] counts.
+ * weighing (ROUTINE, OVERRIDE, or RECHECK) dated inside [start, end] counts.
  *
  * @param array $user Current user (for barangay scope)
  * @param string $kind 'monthly' or 'quarterly'
@@ -218,6 +223,8 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
             p.name AS parent_name,
             p.phone AS parent_phone,
             lm.measurement_date AS last_measurement_date,
+            lm.weight_kg AS last_weight,
+            lm.height_cm AS last_height,
             lm.wfa_status,
             lm.hfa_status,
             lm.wfh_status,
@@ -225,13 +232,13 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
             EXISTS (
                 SELECT 1 FROM measurements m
                 WHERE m.child_id = c.id
-                  AND m.measurement_type IN ('ROUTINE','OVERRIDE')
+                  AND m.measurement_type IN ('ROUTINE','OVERRIDE','RECHECK')
                   AND m.measurement_date BETWEEN ? AND ?
             ) AS measured_in_period,
             (
                 SELECT m2.measurement_date FROM measurements m2
                 WHERE m2.child_id = c.id
-                  AND m2.measurement_type IN ('ROUTINE','OVERRIDE')
+                  AND m2.measurement_type IN ('ROUTINE','OVERRIDE','RECHECK')
                   AND m2.measurement_date BETWEEN ? AND ?
                 ORDER BY m2.measurement_date DESC, m2.id DESC
                 LIMIT 1
@@ -240,9 +247,9 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
          LEFT JOIN barangays bg ON bg.id = c.barangay_id
          LEFT JOIN parents p ON p.id = c.parent_id
          LEFT JOIN measurements lm ON lm.id = (
-            SELECT m3.id FROM measurements m3
+             SELECT m3.id FROM measurements m3
             WHERE m3.child_id = c.id
-              AND m3.measurement_type IN ('ROUTINE','OVERRIDE')
+              AND m3.measurement_type IN ('ROUTINE','OVERRIDE','RECHECK')
               AND m3.measurement_date <= ?
             ORDER BY m3.measurement_date DESC, m3.id DESC
             LIMIT 1
@@ -250,7 +257,7 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
          WHERE {$scope}
            AND c.status = 'active'
            AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59
-         ORDER BY c.last_name ASC, c.first_name ASC",
+         ORDER BY c.child_code DESC",
         'sssss' . $scopeTypes . 's',
         array_merge([$periodStart, $periodEnd, $periodStart, $periodEnd, $periodEnd], $params, [$periodEnd])
     );
@@ -279,11 +286,14 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
 
         if ($kind === 'monthly') {
             // 0-23 always monthly; 24-59 only when abnormal.
+            // Age is evaluated at the END of the period, so a child who
+            // turns 24 mid-period automatically moves to quarterly.
             if ($ageMonths >= 24 && $abnormal === []) {
                 continue;
             }
         } else {
-            // Quarterly is strictly 24-59 normal.
+            // Quarterly is strictly 24-59 normal, age at the END of the
+            // period — turning 24 mid-period moves the child here automatically.
             if ($ageMonths <= 23) {
                 continue;
             }
@@ -308,6 +318,8 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
             'parent_phone' => (string)($row['parent_phone'] ?? ''),
             'last_measurement_date' => $row['last_measurement_date'] ?? null,
             'has_measurement' => $hasMeasurement,
+            'last_weight' => $row['last_weight'] !== null ? (float)$row['last_weight'] : null,
+            'last_height' => $row['last_height'] !== null ? (float)$row['last_height'] : null,
             'wfa_status' => $row['wfa_status'] ?? null,
             'hfa_status' => $row['hfa_status'] ?? null,
             'wfh_status' => $row['wfh_status'] ?? null,
@@ -318,12 +330,9 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
         ];
     }
 
-    // Pending first so workers see who still needs measuring.
+    // Newest child code first (CHD-0017 before CHD-0001).
     usort($result, static function (array $a, array $b): int {
-        if ($a['measured_in_period'] !== $b['measured_in_period']) {
-            return $a['measured_in_period'] <=> $b['measured_in_period'];
-        }
-        return strcmp($a['last_name'] . $a['first_name'], $b['last_name'] . $b['first_name']);
+        return strnatcmp((string)$b['child_code'], (string)$a['child_code']);
     });
 
     return $result;
