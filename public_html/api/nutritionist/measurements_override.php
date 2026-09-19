@@ -16,7 +16,6 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -245,9 +244,6 @@ log_action(
     )
 );
 
-// Trigger follow-up sync to schedule next measurement
-$followupSync = followup_sync_for_child($childId);
-
 api_success(
     [
         'measurement_id' => $measurementId,
@@ -273,13 +269,6 @@ api_success(
         'override_reason' => $overrideReason,
         'override_authority' => $authorityName,
         'recorded_by' => $recordedBy,
-        'followup' => [
-            'generated' => (int)$followupSync['generated'],
-            'completed' => (int)$followupSync['completed'],
-            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
-            'track' => $followupSync['track'],
-            'category' => $followupSync['category'],
-        ],
     ],
     'Override measurement saved successfully.'
 );

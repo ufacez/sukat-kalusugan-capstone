@@ -21,14 +21,14 @@ if ($month < 4 || $month > 12) {
 }
 
 $defaultCheckupMonth = 7;
-foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
+foreach ([4, 7, 10] as $candidateRound) {
 	if ((int)date('n') <= $candidateRound) {
 		$defaultCheckupMonth = $candidateRound;
 		break;
 	}
 }
 $checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
-if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
+if (!in_array($checkupMonth, [4, 7, 10], true)) {
 	$checkupMonth = 7;
 }
 

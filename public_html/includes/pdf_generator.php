@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../../vendor/autoload.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/nutritionist_helpers.php';
-require_once __DIR__ . '/followup_scheduler.php';
+require_once __DIR__ . '/monitoring_periods.php';
 require_once __DIR__ . '/who_calculator.php';
 
 function pdf_base(string $title, string $orientation = 'Portrait'): TCPDF {
@@ -174,14 +174,14 @@ function pdf_scope_and_filter(): array {
 	}
 
 	$defaultCheckupMonth = 7;
-	foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
+	foreach (MONITORING_REPORT_ROUNDS as $candidateRound) {
 		if ((int)date('n') <= $candidateRound) {
 			$defaultCheckupMonth = $candidateRound;
 			break;
 		}
 	}
 	$checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
-	if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
+	if (!in_array($checkupMonth, MONITORING_REPORT_ROUNDS, true)) {
 		$checkupMonth = 7;
 	}
 
@@ -334,8 +334,8 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 		}
 
 		if ($showCategory) {
-			$catCodes = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
-			$values[] = followup_category_label(implode('+', $catCodes)) ?: '';
+			$catCodes = monitoring_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
+			$values[] = monitoring_category_label(implode('+', $catCodes)) ?: '';
 		}
 
 		if ($showFollowups) {
@@ -1639,8 +1639,8 @@ function pdf_generate_referral(int $childId): TCPDF {
 		$pdf->Ln(2);
 		$pdf->SetFont('helvetica', 'B', 8);
 		$pdf->Cell(35, 5, 'Classification:', 0, 0);
-		$codes = followup_abnormal_codes($wfa, $hfa, $wfh);
-		$pdf->Cell(120, 5, $codes ? followup_category_label(implode('+', $codes)) : 'Normal', 0, 1);
+		$codes = monitoring_abnormal_codes($wfa, $hfa, $wfh);
+		$pdf->Cell(120, 5, $codes ? monitoring_category_label(implode('+', $codes)) : 'Normal', 0, 1);
 	}
 
 	$pdf->Ln(6);

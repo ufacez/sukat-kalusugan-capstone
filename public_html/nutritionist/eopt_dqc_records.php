@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 $user = nutritionist_require_access();
 

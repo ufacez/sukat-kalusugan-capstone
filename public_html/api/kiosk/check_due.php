@@ -5,20 +5,25 @@ declare(strict_types=1);
 /**
  * check_due.php
  *
- * Kiosk API endpoint — checks whether a child is due for measurement today.
- * Called by the kiosk UI when an operator selects a child, before starting
- * a measurement session. Backend is the final authority.
+ * Kiosk API endpoint — checks whether a child may be measured.
+ *
+ * Period-based monitoring has no exact due dates: any active child aged
+ * 0-59 months may be measured at any time (the Monitoring List only
+ * tracks whether a measurement fell inside the month/quarter). This
+ * endpoint therefore answers "eligible", keeping the kiosk UI flow and
+ * the response shape unchanged.
  *
  * POST { child_id, device_id }
  * GET  ?child_id=ID&device_id=CODE
  *
  * Returns:
- *   { success, data: { is_due, next_due, reason, monitoring_status } }
+ *   { success, data: { is_due, next_due, reason, monitoring_status,
+ *     already_measured_today, can_recheck } }
  */
 
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -67,12 +72,46 @@ if ($deviceCode !== '') {
     }
 }
 
-// Check if child is due for measurement today.
-// already_measured_today lets the kiosk offer "Sukatin Ulit" (recheck)
-// instead of a dead-end NOT DUE screen: a recheck is allowed anytime
-// and never moves the due schedule.
-$dueCheck = followup_is_due_today($childId);
+// Eligibility: active child aged 0-59 months may always be measured.
+$childRow = admin_fetch_one(
+    "SELECT id, birthdate FROM children WHERE id = ? AND status = 'active' LIMIT 1",
+    'i',
+    [$childId]
+);
 
+if ($childRow === null) {
+    api_error('Child not found or inactive.', 404);
+}
+
+$ageMonths = 0;
+try {
+    $birth = new DateTimeImmutable((string)$childRow['birthdate']);
+    $diff = $birth->diff(new DateTimeImmutable('today'));
+    $ageMonths = $diff->y * 12 + $diff->m;
+} catch (Exception) {
+    $ageMonths = 0;
+}
+
+if ($ageMonths > 59) {
+    log_action(
+        null,
+        'MEASUREMENT_CHECK_NOT_DUE',
+        'info',
+        sprintf('Kiosk eligibility check for child #%d: NOT ELIGIBLE (aged out at %d months).', $childId, $ageMonths)
+    );
+
+    api_success([
+        'is_due' => false,
+        'next_due' => null,
+        'reason' => 'Child is ' . $ageMonths . ' months old — aged out of eOPT coverage (maximum 59 months).',
+        'monitoring_status' => 'routine',
+        'already_measured_today' => false,
+        'can_recheck' => true,
+    ]);
+}
+
+// already_measured_today lets the kiosk offer "Sukatin Ulit" (recheck)
+// instead of a dead-end screen: a recheck is allowed anytime.
 $alreadyMeasuredToday = false;
 try {
     $todayRow = admin_fetch_one(
@@ -85,25 +124,11 @@ try {
     $alreadyMeasuredToday = false;
 }
 
-// Audit log rejections (not due)
-if (!$dueCheck['is_due']) {
-    log_action(
-        null,
-        'MEASUREMENT_CHECK_NOT_DUE',
-        'info',
-        sprintf(
-            'Kiosk due-date check for child #%d: NOT DUE. %s',
-            $childId,
-            $dueCheck['reason']
-        )
-    );
-}
-
 api_success([
-    'is_due' => $dueCheck['is_due'],
-    'next_due' => $dueCheck['next_due'],
-    'reason' => $dueCheck['reason'],
-    'monitoring_status' => $dueCheck['monitoring_status'],
+    'is_due' => true,
+    'next_due' => null,
+    'reason' => 'Eligible — period-based monitoring allows measurement at any time.',
+    'monitoring_status' => 'routine',
     'already_measured_today' => $alreadyMeasuredToday,
     'can_recheck' => true,
 ]);

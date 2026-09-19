@@ -8,11 +8,9 @@ declare(strict_types=1);
  * Nutritionist API — records an anytime double-check (recheck) measurement.
  *
  * RECHECK is verification-only:
- *   - allowed anytime, including the same date as an existing measurement
- *     (bypasses the due-date gate AND the duplicate-date gate);
- *   - does NOT complete follow-up appointments and does NOT move next_due
- *     (followup_sync_for_child() is intentionally NOT called — the
- *     scheduler only looks at ROUTINE/OVERRIDE rows);
+ *   - allowed anytime, including the same date as an existing measurement;
+ *   - does NOT count toward monthly/quarterly period completion
+ *     (only ROUTINE/OVERRIDE rows count);
  *   - keeps history: the previous reading stays, this row links back via
  *     recheck_of_measurement_id and shows as the verified value.
  *
@@ -20,10 +18,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -282,10 +280,10 @@ log_action(
     )
 );
 
-// Intentionally NO followup_sync_for_child() call: rechecks are neutral.
-// Report the current scheduled next_due (from ROUTINE/OVERRIDE only) so the
-// UI can show "due unchanged".
-$dueCheck = followup_is_due_today($childId);
+// Intentionally no schedule sync: rechecks are verification-only and
+// period completion derives from ROUTINE/OVERRIDE rows inside the
+// month/quarter, so there is no next_due to report.
+$dueCheck = ['next_due' => null];
 
 api_success(
     [

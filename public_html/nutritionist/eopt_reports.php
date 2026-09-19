@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
+require_once __DIR__ . '/../includes/monitoring_periods.php';
 require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
@@ -24,14 +24,14 @@ if ($month < 4 || $month > 12) {
 }
 
 $defaultCheckupMonth = 7;
-foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
+foreach (MONITORING_REPORT_ROUNDS as $candidateRound) {
 	if ((int)date('n') <= $candidateRound) {
 		$defaultCheckupMonth = $candidateRound;
 		break;
 	}
 }
 $checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
-if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
+if (!in_array($checkupMonth, MONITORING_REPORT_ROUNDS, true)) {
 	$checkupMonth = 7;
 }
 
@@ -363,9 +363,6 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-dqc-card.is-danger{border-left:3px solid var(--admin-danger)}
 .rp-dqc-count{font-size:20px;font-weight:800;color:var(--admin-text)}
 .rp-dqc-label{font-size:11px;color:var(--admin-muted);font-weight:600;margin-top:4px}
-.rp-followup-row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap}
-.rp-followup-pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;background:var(--admin-surface-alt);border:1px solid var(--admin-border)}
-.rp-followup-pill .count{font-size:16px;font-weight:800}
 .rp-export-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rp-export-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px}
 @media(max-width:1200px){.rp-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}.rp-dqc-grid{grid-template-columns:repeat(2,1fr)}}
@@ -760,98 +757,6 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 	</div>
 </div>
 
-<?php elseif ($activeTab === 'followup'): ?>
-<div class="rp-panel is-active" data-panel="followup">
-	<?php
-	$followupRows = admin_fetch_all(
-		"SELECT c.id AS child_id, c.child_code, c.first_name, c.middle_name, c.last_name,
-			c.sex, c.birthdate, p.name AS parent_name, lm.measurement_date, lm.weight_kg, lm.height_cm,
-			lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.nutritional_status,
-			a.id AS appt_id, a.scheduled_at, a.status AS appt_status, a.followup_category,
-			TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months
-		 FROM appointments a
-		 INNER JOIN children c ON c.id = a.child_id
-		 INNER JOIN parents p ON p.id = c.parent_id
-		 LEFT JOIN measurements lm ON lm.id = (SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1)
-		 WHERE a.appointment_type = 'followup' AND a.status IN ('pending','scheduled') AND {$scope}
-		 ORDER BY a.scheduled_at ASC LIMIT 25",
-		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
-		array_merge($scopeParams, $barangayFilterParams)
-	);
-	$fcRows = admin_fetch_all(
-		"SELECT a.status, COUNT(*) AS cnt FROM appointments a INNER JOIN children c ON c.id = a.child_id
-		 WHERE a.appointment_type = 'followup' AND {$scope} GROUP BY a.status",
-		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
-		array_merge($scopeParams, $barangayFilterParams)
-	);
-	$fCounts = ['pending' => 0, 'scheduled' => 0, 'completed' => 0, 'referred' => 0];
-	foreach ($fcRows as $fr) { $st = (string)$fr['status']; if (isset($fCounts[$st])) $fCounts[$st] = (int)$fr['cnt']; }
-	?>
-	<div class="rp-followup-row">
-		<div class="rp-followup-pill"><span class="count" style="color:#d97706;"><?php echo $fCounts['pending']; ?></span> Pending</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $fCounts['scheduled']; ?></span> Scheduled</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $fCounts['completed']; ?></span> Completed</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-danger);"><?php echo $fCounts['referred']; ?></span> Referred</div>
-	</div>
-	<?php if (empty($followupRows)): ?>
-		<div class="rp-table-section"><div style="padding:20px;text-align:center;color:var(--admin-muted);font-size:13px;">No children currently require follow-up.</div></div>
-	<?php else: ?>
-		<div class="rp-table-section">
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" style="min-width:850px;">
-					<thead><tr><th>Child</th><th>Age</th><th>Status</th><th>Last Measured</th><th>Weight</th><th>Height</th><th>Appt</th><th>Scheduled</th><th>Action</th></tr></thead>
-					<tbody>
-						<?php foreach ($followupRows as $i => $row):
-							$ab = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
-							$catLabel = $ab ? followup_category_label(implode('+', $ab)) : 'Normal';
-						?>
-							<tr>
-								<td><div style="font-weight:600;"><?php echo nutritionist_e(trim(($row['last_name']??'').', '.($row['first_name']??'').' '.($row['middle_name']??''))); ?></div><div style="font-size:11px;color:var(--admin-muted);"><?php echo nutritionist_e((string)$row['child_code']); ?></div></td>
-								<td><?php echo (int)$row['age_months']; ?> mo</td>
-								<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e($catLabel); ?></span></td>
-								<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? '—')); ?></td>
-								<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) . ' kg' : '—'; ?></td>
-								<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) . ' cm' : '—'; ?></td>
-								<td><span class="admin-pill <?php echo (string)$row['appt_status'] === 'pending' ? 'is-warn' : 'is-info'; ?>"><?php echo nutritionist_e(ucfirst((string)$row['appt_status'])); ?></span></td>
-								<td><?php echo nutritionist_e((string)($row['scheduled_at'] ?? '—')); ?></td>
-								<td><a class="admin-icon-btn" title="Referral PDF" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=referral&child_id=' . (int)$row['child_id'])); ?>"><?php echo admin_action_icon('print'); ?></a></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			</div>
-		</div>
-	<?php endif; ?>
-</div>
-
-<?php elseif ($activeTab === 'export'): ?>
-<div class="rp-panel is-active" data-panel="export">
-	<div class="rp-export-grid">
-		<div class="rp-export-card">
-			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook</div>
-			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format. Pick a file type:</div>
-			<div style="display:flex;gap:8px;flex-wrap:wrap;">
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)), 'Workbook'); ?>
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams)), 'NutStatusTool'); ?>
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams)), 'NutStatusBrgy'); ?>
-			</div>
-		</div>
-		<div class="rp-export-card">
-			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">Formal PDF Reports</div>
-			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Printable official report forms with DOH headers and signatures.</div>
-			<div style="display:flex;gap:8px;flex-wrap:wrap;">
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">Form 1A PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">Form 1B PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">Form 1C PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams))); ?>">NutStatusTool PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams))); ?>">NutStatusBrgy PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Summary PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query($filterParams))); ?>">Prevalence PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query($filterParams))); ?>">DQC PDF</a>
-			</div>
-		</div>
-	</div>
-</div>
 <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

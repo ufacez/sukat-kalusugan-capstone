@@ -34,13 +34,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		$ok = admin_execute(
 			'UPDATE appointments
 			 SET status = ?
-			 WHERE id = ? AND parent_id = ? AND status NOT IN (?, ?)
-			   AND appointment_type <> ?',
-			'ssiiss',
-			['cancelled', $appointmentId, (int)$user['id'], 'completed', 'cancelled', 'followup']
+			 WHERE id = ? AND parent_id = ? AND status IN (?, ?)',
+			'ssiss',
+			['cancelled', $appointmentId, (int)$user['id'], 'pending', 'confirmed']
 		);
 
-		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Appointment could not be cancelled. Mandatory EOPT follow-ups cannot be cancelled.', 'type' => 'error']);
+		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Appointment could not be cancelled.', 'type' => 'error']);
+	}
+
+	if ($action === 'confirm' && $appointmentId > 0) {
+		$ok = admin_execute(
+			'UPDATE appointments
+			 SET status = ?
+			 WHERE id = ? AND parent_id = ? AND created_by = ? AND status = ?',
+			'ssiis',
+			['confirmed', $appointmentId, (int)$user['id'], 'nutritionist', 'pending']
+		);
+
+		admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment confirmed.'] : ['notice' => 'Appointment could not be confirmed.', 'type' => 'error']);
 	}
 }
 
@@ -51,7 +62,7 @@ $appointments = admin_fetch_all(
 		a.scheduled_at,
 		a.status,
 		a.notes,
-		a.appointment_type,
+		a.created_by,
 		a.location,
 		c.first_name,
 		c.last_name,
@@ -90,11 +101,12 @@ usort($past, static fn(array $a, array $b): int => strcmp((string)$b['scheduled_
 $allJson = [];
 foreach ($appointments as $appt) {
 	$dt = new DateTimeImmutable((string)$appt['scheduled_at']);
+	$fromNutritionist = ($appt['created_by'] ?? '') === 'nutritionist';
 	$allJson[(int)$appt['id']] = [
 		'id' => (int)$appt['id'],
 		'date' => $dt->format('F j, Y'),
 		'time' => $dt->format('g:i A'),
-		'type' => ucfirst((string)($appt['appointment_type'] ?? 'Regular')),
+		'requested_by' => $fromNutritionist ? ('Nutritionist (' . (string)($appt['nutritionist_name'] ?? '') . ')') : 'You',
 		'child' => parent_e($appt['first_name'] . ' ' . $appt['last_name']),
 		'child_avatar' => strtoupper(substr((string)$appt['first_name'], 0, 1)),
 		'sex' => (string)$appt['sex'],
@@ -104,9 +116,8 @@ foreach ($appointments as $appt) {
 		'status' => ucfirst((string)$appt['status']),
 		'status_class' => parent_status_class((string)$appt['status']),
 		'notes' => parent_e((string)($appt['notes'] ?? '')),
-		'is_followup' => ($appt['appointment_type'] ?? 'regular') === 'followup',
-		'can_cancel' => ($appt['appointment_type'] ?? 'regular') !== 'followup'
-			&& !in_array((string)$appt['status'], ['completed', 'cancelled'], true),
+		'can_confirm' => $fromNutritionist && (string)$appt['status'] === 'pending',
+		'can_cancel' => in_array((string)$appt['status'], ['pending', 'confirmed'], true),
 	];
 }
 
@@ -147,6 +158,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		$statusClass = parent_status_class((string)$appt['status']);
 		$statusLabel = ucfirst((string)$appt['status']);
 		$status = (string)$appt['status'];
+		$fromNutritionist = ($appt['created_by'] ?? '') === 'nutritionist';
 	?>
 	<div class="parent-appt-row" data-appointment-id="<?php echo (int)$appt['id']; ?>">
 		<div class="parent-appt-row-icon <?php echo $status === 'confirmed' ? 'is-done' : ''; ?>">
@@ -160,7 +172,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		</div>
 		<div class="parent-appt-row-info">
 			<div class="parent-appt-row-date"><?php echo parent_e($dt->format('F j, Y')); ?> · <?php echo parent_e($dt->format('g:i A')); ?></div>
-			<div class="parent-appt-row-type"><?php echo parent_e(ucfirst((string)($appt['appointment_type'] ?? 'Regular'))); ?></div>
+			<div class="parent-appt-row-type"><?php echo $fromNutritionist ? 'Requested by nutritionist' : 'Requested by you'; ?></div>
 			<div class="parent-appt-row-child"><?php echo parent_e($appt['first_name'] . ' ' . $appt['last_name']); ?></div>
 		</div>
 		<div class="parent-appt-row-status">
@@ -184,6 +196,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		$statusClass = parent_status_class((string)$appt['status']);
 		$statusLabel = ucfirst((string)$appt['status']);
 		$isCompleted = (string)$appt['status'] === 'completed';
+		$fromNutritionist = ($appt['created_by'] ?? '') === 'nutritionist';
 	?>
 	<div class="parent-appt-row" data-appointment-id="<?php echo (int)$appt['id']; ?>">
 		<div class="parent-appt-row-icon <?php echo $isCompleted ? 'is-done' : ''; ?>">
@@ -195,7 +208,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		</div>
 		<div class="parent-appt-row-info">
 			<div class="parent-appt-row-date"><?php echo parent_e($dt->format('F j, Y')); ?></div>
-			<div class="parent-appt-row-type"><?php echo parent_e(ucfirst((string)($appt['appointment_type'] ?? 'Regular'))); ?></div>
+			<div class="parent-appt-row-type"><?php echo $fromNutritionist ? 'Requested by nutritionist' : 'Requested by you'; ?></div>
 			<div class="parent-appt-row-child"><?php echo parent_e($appt['first_name'] . ' ' . $appt['last_name']); ?></div>
 		</div>
 		<div class="parent-appt-row-status">
@@ -247,6 +260,13 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 				<div class="appt-modal-notes-label">Appointment Notes</div>
 				<p class="appt-modal-notes-text" id="modalNotes"></p>
 			</div>
+			<div class="appt-modal-cancel" id="modalConfirmSection">
+				<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>">
+					<input type="hidden" name="action" value="confirm">
+					<input type="hidden" name="id" id="modalConfirmId">
+					<button class="admin-btn appt-modal-cancel-btn" type="submit" style="width:100%;">Confirm Appointment</button>
+				</form>
+			</div>
 			<div class="appt-modal-cancel" id="modalCancelSection">
 				<form method="post" action="<?php echo parent_e(app_url('/parent/appointments.php')); ?>" data-admin-confirm="Cancel this appointment?">
 					<input type="hidden" name="action" value="cancel">
@@ -288,7 +308,7 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		if (!a) return;
 		document.getElementById('modalDate').textContent = a.date;
 		document.getElementById('modalTime').textContent = a.time;
-		document.getElementById('modalType').textContent = a.type;
+		document.getElementById('modalType').textContent = a.requested_by;
 		document.getElementById('modalChild').textContent = a.child;
 		document.getElementById('modalLocation').textContent = a.location;
 		document.getElementById('modalNutritionist').textContent = a.nutritionist;
@@ -302,6 +322,13 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 		var notesEl = document.getElementById('modalNotes');
 		if (a.notes) { notesSection.style.display = ''; notesEl.textContent = a.notes; }
 		else { notesSection.style.display = 'none'; }
+		var confirmSection = document.getElementById('modalConfirmSection');
+		if (a.can_confirm) {
+			confirmSection.style.display = '';
+			document.getElementById('modalConfirmId').value = a.id;
+		} else {
+			confirmSection.style.display = 'none';
+		}
 		var cancelSection = document.getElementById('modalCancelSection');
 		if (a.can_cancel) {
 			cancelSection.style.display = '';
@@ -333,4 +360,3 @@ parent_layout_start('Appointments', 'Keep track of your child\'s scheduled visit
 
 <?php
 parent_layout_end();
-

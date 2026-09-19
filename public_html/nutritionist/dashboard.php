@@ -479,6 +479,7 @@ foreach ($appointments as $appointment) {
 		'id' => (int)$appointment['id'],
 		'location' => '',
 		'status' => $effectiveStatus,
+		'url' => app_url('/nutritionist/appointments.php'),
 	];
 }
 

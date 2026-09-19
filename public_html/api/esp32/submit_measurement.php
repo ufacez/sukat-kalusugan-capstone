@@ -3,11 +3,11 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/firebase_sync.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -1208,21 +1208,14 @@ push_latest_measurement(
 
 /*
 |--------------------------------------------------------------------------
-| EOPT FOLLOW-UP SYNCHRONIZATION
+| PERIOD MONITORING NOTE
 |--------------------------------------------------------------------------
 |
-| After a kiosk measurement is committed, immediately materialize the
-| child's next mandatory follow-up based on the new classification.
-| RECHECK sessions skip this: verification-only readings never complete
-| appointments and never move next_due.
+| Period-based monitoring derives roster completion from measurements that
+| fall inside the month/quarter — no follow-up rows are generated here.
+| RECHECK sessions stay verification-only by their measurement_type.
 |
 */
-
-if ($isRecheckSession) {
-    $followupSync = ['generated' => 0, 'completed' => 0, 'recategorized' => 0, 'track' => null, 'category' => ''];
-} else {
-    $followupSync = followup_sync_for_child($childId);
-}
 
 /*
 |--------------------------------------------------------------------------
@@ -1297,14 +1290,6 @@ api_success(
 
         'firebase_synced' =>
             firebase_database_url() !== '',
-
-        'followup' => [
-            'generated' => (int)$followupSync['generated'],
-            'completed' => (int)$followupSync['completed'],
-            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
-            'track' => $followupSync['track'],
-            'category' => $followupSync['category'],
-        ],
     ],
     $isRecheckSession ? 'Recheck saved. Due schedule unchanged.' : 'Measurement saved successfully.'
 );
