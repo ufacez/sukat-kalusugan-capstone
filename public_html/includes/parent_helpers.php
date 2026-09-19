@@ -42,6 +42,12 @@ function parent_grouped_nav_items(): array
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/parent/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
     ];
 }
 
@@ -271,7 +277,6 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . parent_e(app_url('/parent/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -302,6 +307,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
 function parent_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();

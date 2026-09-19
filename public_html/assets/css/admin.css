@@ -327,6 +327,84 @@
   opacity: 1;
 }
 
+/* Sidebar notification bell (e.g. pending parent appointment requests) */
+.admin-nav-bell {
+  margin-left: auto;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  color: var(--admin-muted);
+  flex-shrink: 0;
+}
+
+.admin-nav-bell svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.8;
+}
+
+.admin-nav-link.is-active .admin-nav-bell {
+  color: var(--admin-primary);
+}
+
+.admin-nav-count {
+  position: absolute;
+  top: -8px;
+  right: -9px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: #dc2626;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 0 2px var(--admin-surface, #fff);
+}
+
+/* Keep the bell visible when the sidebar is collapsed (labels hide) */
+.admin-shell.is-collapsed .admin-nav-bell {
+  display: inline-flex;
+  margin-left: 0;
+}
+
+.admin-shell.is-collapsed .admin-nav-count {
+  display: inline-flex;
+}
+
+/* Shared console footer (About · Privacy · Terms · Contact) */
+.admin-console-footer {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 14px 4px 4px;
+  font-size: 12px;
+  color: var(--admin-muted);
+}
+
+.admin-console-footer-links {
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.admin-console-footer-links a {
+  color: var(--admin-muted);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.admin-console-footer-links a:hover {
+  color: var(--admin-primary);
+  text-decoration: underline;
+}
+
 .admin-sidebar-footer {
   display: flex;
   flex-direction: column;

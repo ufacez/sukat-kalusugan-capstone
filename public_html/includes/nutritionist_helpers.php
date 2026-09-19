@@ -61,6 +61,12 @@ function nutritionist_grouped_nav_items(): array
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
     ];
 }
 
@@ -170,6 +176,16 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     $logoutUrl = app_url('/api/auth/logout.php');
     $breadcrumb = nutritionist_build_breadcrumb($activeSection, nutritionist_grouped_nav_items(), $breadcrumbExtra);
 
+    // Pending parent appointment requests for the sidebar bell badge.
+    // Same scope as the appointments page (assigned to this nutritionist).
+    // admin_scalar() falls back to 0 when the query fails, so a DB hiccup
+    // never breaks page rendering.
+    $apptPendingCount = admin_scalar(
+        "SELECT COUNT(*) FROM appointments WHERE nutritionist_id = ? AND created_by = 'parent' AND status = 'pending'",
+        'i',
+        [(int)$currentUser['id']]
+    );
+
     echo '<!doctype html>';
     echo '<html lang="en">';
     echo '<head>';
@@ -227,6 +243,12 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
                 echo $iconHtml;
             }
             echo '<span>' . nutritionist_e($item['label']) . '</span>';
+            if ($item['key'] === 'appointments' && $apptPendingCount > 0) {
+                $badgeLabel = $apptPendingCount > 9 ? '9+' : (string)$apptPendingCount;
+                echo '<span class="admin-nav-bell" title="' . $apptPendingCount . ' pending parent request' . ($apptPendingCount === 1 ? '' : 's') . '">'
+                    . admin_action_icon('bell')
+                    . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
+            }
             echo '</a>';
         }
         echo '</div>';
@@ -263,7 +285,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . nutritionist_e(app_url('/nutritionist/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -294,6 +315,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
 function nutritionist_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();

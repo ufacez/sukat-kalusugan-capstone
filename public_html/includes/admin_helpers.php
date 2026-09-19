@@ -174,6 +174,12 @@ function admin_grouped_nav_items(): array
                 ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php'), 'icon' => 'roles_permissions'],
             ],
         ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/admin/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
     ];
 }
 
@@ -820,7 +826,6 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . admin_e(app_url('/admin/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -848,9 +853,30 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
 }
 
+/**
+ * Shared console footer (About · Privacy · Terms · Contact) rendered at the
+ * bottom of every admin/nutritionist/parent page via *_layout_end().
+ */
+function admin_console_footer(): string
+{
+    $link = static function (string $path, string $label): string {
+        return '<a href="' . admin_e(app_url($path)) . '">' . admin_e($label) . '</a>';
+    };
+
+    return '<footer class="admin-console-footer">'
+        . '<nav class="admin-console-footer-links" aria-label="Legal">'
+        . $link('/about.php', 'About')
+        . $link('/privacy.php', 'Privacy')
+        . $link('/terms.php', 'Terms')
+        . $link('/contact.php', 'Contact')
+        . '</nav>'
+        . '</footer>';
+}
+
 function admin_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();
