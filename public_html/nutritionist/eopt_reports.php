@@ -403,7 +403,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 		<div style="padding:24px;text-align:center;color:var(--admin-muted);font-size:13px;">No children match this monitoring list for the selected filters.</div>
 	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
+			<table class="nutritionist-table" data-page-size="5" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
 				<?php if ($isInfantList): ?>
 				<thead><tr><th rowspan="2">No.</th><th rowspan="2">Address</th><th rowspan="2">Mother/Caregiver</th><th rowspan="2">Child Name</th><th rowspan="2">Sex</th><th rowspan="2">Birthdate</th><th rowspan="2">Height</th><th rowspan="2">Weight</th><th rowspan="2">WFA</th><th rowspan="2">HFA</th><th rowspan="2">WFH</th><th colspan="6" style="text-align:center;">Follow-up Visits</th></tr><tr><?php for ($mh = 1; $mh <= 6; $mh++): ?><th>Month#<?php echo $mh; ?></th><?php endfor; ?></tr></thead>
 				<?php else: ?>

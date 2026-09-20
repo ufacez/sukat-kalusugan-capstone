@@ -205,7 +205,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 	</div>
 
 	<div class="nutritionist-table-wrap">
-		<table class="nutritionist-table" id="parents-table">
+		<table class="nutritionist-table" id="parents-table" data-page-size="5">
 			<thead>
 				<tr>
 					<th>Name</th>

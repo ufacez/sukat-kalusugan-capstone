@@ -33,7 +33,7 @@ if ($quarter < 1 || $quarter > 4) {
 
 $search = trim((string)($_GET['q'] ?? ''));
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 10;
+$perPage = 5;
 
 // ── Active period ──
 if ($view === 'monthly') {

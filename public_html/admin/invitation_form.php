@@ -271,7 +271,7 @@ admin_layout_start('New Invitation', 'Generate an activation code for a new staf
             <div class="admin-field-row">
                 <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                     <span>Mobile number</span>
-                    <input name="phone" id="invite-phone" type="tel" maxlength="11" inputmode="numeric" placeholder="09XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                    <input name="phone" id="invite-phone" type="tel" maxlength="14" inputmode="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
                     <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
             </div>

@@ -141,7 +141,7 @@ $children = admin_fetch_all(
 
 /*
  * No server-side pagination here on purpose: the full filtered list is
- * rendered and assets/js/admin.js paginates client-side (10/page) so the
+ * rendered and assets/js/admin.js paginates client-side (5/page) so the
  * search box filters across ALL rows, not just the current page.
  * Newest child (highest id / latest child_code like CH0015) is first
  * via ORDER BY c.id DESC above, so a newly added child shows on page 1.
@@ -228,6 +228,9 @@ function nchild_short_address(?string $localArea, ?string $barangay): string
 $actions = '<div class="admin-actions">'
     . (nutritionist_can_write('children.create')
         ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>'
+        : '')
+    . (nutritionist_can_write()
+        ? '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurement_record.php')) . '">' . admin_action_icon('measure') . ' Add measurement</a>'
         : '')
     . '</div>';
 
@@ -366,7 +369,7 @@ nutritionist_layout_start(
     </div>
 
     <div class="nutritionist-table-wrap">
-        <table class="nutritionist-table children-table" id="children-table">
+        <table class="nutritionist-table children-table" id="children-table" data-page-size="5">
             <thead>
                 <tr>
                     <th>Full name of child</th>
@@ -526,7 +529,7 @@ nutritionist_layout_start(
         </table>
     </div>
 
-    <?php /* Pagination + global search handled client-side by assets/js/admin.js (10/page). */ ?>
+    <?php /* Pagination + global search handled client-side by assets/js/admin.js (5/page). */ ?>
 </section>
 
 <!--
@@ -575,7 +578,6 @@ nutritionist_layout_start(
                 <div class="cc-card">
                     <div class="cc-section">Address</div>
                     <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
-                    <div class="cc-row"><span class="label">Street address</span><span class="value" id="cc-address">—</span></div>
                     <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
                     <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
                     <div class="cc-row"><span class="label">Household address</span><span class="value" id="cc-household-address">—</span></div>
@@ -694,7 +696,6 @@ nutritionist_layout_start(
         var localArea = get('localarea');
         var areaType = get('areatype');
         text('cc-localarea', (areaType && localArea) ? (areaType.charAt(0).toUpperCase() + areaType.slice(1) + ': ' + localArea) : (localArea || '—'));
-        text('cc-address', get('address'));
         text('cc-barangay', get('barangay'));
 
         text('cc-parent-name', getP('name'));
@@ -704,7 +705,7 @@ nutritionist_layout_start(
 
         var hhCode = getH('code');
         var hhAddress = getH('address');
-        text('cc-household-code', hhCode ? ('HH-' + String(getH('id') || '0').padStart(4, '0') + ' · ' + hhCode) : '—');
+        text('cc-household-code', hhCode || '—');
         text('cc-household-address', hhAddress || '—');
 
         renderMeasureStrip(row);

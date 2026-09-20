@@ -184,6 +184,17 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     $userRole = $currentUser['role'] ?? 'parent';
     $breadcrumb = parent_build_breadcrumb($activeSection, parent_grouped_nav_items(), $breadcrumbExtra);
 
+    // Pending health-worker appointment requests for the sidebar bell badge.
+    // Mirrors the nutritionist layout (which counts pending parent requests):
+    // requests created by a nutritionist that this parent hasn't confirmed
+    // or cancelled yet. admin_scalar() falls back to 0 when the query
+    // fails, so a DB hiccup never breaks page rendering.
+    $apptPendingCount = admin_scalar(
+        "SELECT COUNT(*) FROM appointments WHERE parent_id = ? AND created_by = 'nutritionist' AND status = 'pending'",
+        'i',
+        [(int)$currentUser['id']]
+    );
+
     echo '<!doctype html>';
     echo '<html lang="en">';
     echo '<head>';
@@ -240,6 +251,12 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
                 echo $iconHtml;
             }
             echo '<span>' . parent_e($item['label']) . '</span>';
+            if ($item['key'] === 'appointments' && $apptPendingCount > 0) {
+                $badgeLabel = $apptPendingCount > 9 ? '9+' : (string)$apptPendingCount;
+                echo '<span class="admin-nav-bell" title="' . $apptPendingCount . ' pending health worker request' . ($apptPendingCount === 1 ? '' : 's') . '">'
+                    . admin_action_icon('bell')
+                    . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
+            }
             echo '</a>';
         }
         echo '</div>';

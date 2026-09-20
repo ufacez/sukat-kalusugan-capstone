@@ -97,18 +97,15 @@ parent_layout_start('Request Appointment', 'Submit a follow-up request for any l
 
 	<form method="post" class="parent-form-grid" action="<?php echo parent_e(app_url('/parent/appointment_form.php')); ?>">
 		<input type="hidden" name="action" value="create">
-		<label class="admin-field">
-			<span>Child<span class="admin-required">*</span></span>
-			<input type="hidden" name="child_id" id="appointment-child-id" required>
-			<div class="parent-appointment-child-picker" role="group" aria-label="Choose a child">
-				<?php foreach ($children as $child): ?>
-					<button type="button" class="parent-appointment-child-option" data-child-id="<?php echo (int)$child['id']; ?>">
-						<span class="parent-child-option-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span>
-						<span><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($child['child_code']); ?></small></span>
-					</button>
-				<?php endforeach; ?>
-			</div>
-		</label>
+	<label class="admin-field">
+		<span>Child<span class="admin-required">*</span></span>
+		<select name="child_id" id="appointment-child-id" required>
+			<option value="">-- Select child --</option>
+			<?php foreach ($children as $child): ?>
+				<option value="<?php echo (int)$child['id']; ?>"><?php echo parent_e($child['first_name'] . ' ' . $child['last_name'] . ' · ' . $child['child_code']); ?></option>
+			<?php endforeach; ?>
+		</select>
+	</label>
 		<label class="admin-field">
 			<span>Nutritionist<span class="admin-required">*</span></span>
 			<select name="nutritionist_id" required>
@@ -134,18 +131,5 @@ parent_layout_start('Request Appointment', 'Submit a follow-up request for any l
 		</div>
 	</form>
 </section>
-<script>
-(function () {
-	var input = document.getElementById('appointment-child-id');
-	var options = document.querySelectorAll('.parent-appointment-child-option');
-	options.forEach(function (option) {
-		option.addEventListener('click', function () {
-			options.forEach(function (item) { item.classList.remove('is-selected'); });
-			option.classList.add('is-selected');
-			input.value = option.getAttribute('data-child-id');
-		});
-	});
-})();
-</script>
 <?php
 parent_layout_end();

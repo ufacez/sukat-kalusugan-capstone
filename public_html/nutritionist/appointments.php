@@ -45,17 +45,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if ($action === 'complete_request' && $appointmentId > 0) {
 		nutritionist_require_write();
+		$recommendations = trim((string)($_POST['recommendations'] ?? ''));
 		$ok = admin_execute(
-			"UPDATE appointments SET status = 'completed' WHERE id = ? AND nutritionist_id = ? AND status = 'confirmed'",
-			'ii',
-			[$appointmentId, (int)$user['id']]
+			"UPDATE appointments SET status = 'completed', recommendations = ? WHERE id = ? AND nutritionist_id = ? AND status = 'confirmed'",
+			'sii',
+			[$recommendations, $appointmentId, (int)$user['id']]
 		);
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment marked as completed.'] : ['notice' => 'Could not complete appointment.', 'type' => 'error']);
 	}
 }
 
 // ── Consultation requests for this nutritionist ──
-$baseSelect = "SELECT a.id, a.child_id, a.parent_id, a.scheduled_at, a.notes, a.location, a.created_at, a.created_by,
+$baseSelect = "SELECT a.id, a.child_id, a.parent_id, a.scheduled_at, a.notes, a.recommendations, a.location, a.created_at, a.created_by,
 		a.status AS appt_status,
 		c.first_name, c.last_name, c.child_code, c.birthdate, c.sex,
 		bg.name AS barangay_name,
@@ -94,7 +95,7 @@ $now = new DateTimeImmutable('now');
 $validTabs = ['incoming', 'outgoing', 'history'];
 $activeTab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'incoming';
 $page = max(1, (int)($_GET['page'] ?? 1));
-$perPage = 10;
+$perPage = 5;
 
 // ── Calendar ──
 $monthParam = (string)($_GET['m'] ?? $now->format('Y-m'));
@@ -253,20 +254,18 @@ nutritionist_layout_start('Appointments', 'Consultation requests between parents
 								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
 								<button type="submit" class="admin-btn-danger" title="Withdraw">Withdraw</button>
 							</form>
-							<?php elseif ($reqStatus === 'confirmed' && $activeTab !== 'history'): ?>
-							<form method="post" style="display:inline;">
-								<input type="hidden" name="action" value="complete_request">
-								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
-								<button type="submit" class="admin-btn" title="Mark completed">&#10003; Done</button>
-							</form>
-							<form method="post" style="display:inline;">
-								<input type="hidden" name="action" value="cancel_request">
-								<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
-								<button type="submit" class="admin-btn-danger" title="Cancel">Cancel</button>
-							</form>
-							<?php else: ?>
-							<span style="color:var(--admin-muted);font-size:11px;">—</span>
-							<?php endif; ?>
+						<?php elseif ($reqStatus === 'confirmed' && $activeTab !== 'history'): ?>
+						<button type="button" class="admin-btn" title="Mark completed" data-complete-open="<?php echo (int)$req['id']; ?>" data-complete-child="<?php echo nutritionist_e($fullName); ?>" data-complete-when="<?php echo nutritionist_e($reqDate); ?>">Done</button>
+						<form method="post" style="display:inline;">
+							<input type="hidden" name="action" value="cancel_request">
+							<input type="hidden" name="id" value="<?php echo (int)$req['id']; ?>">
+							<button type="submit" class="admin-btn-danger" title="Cancel">Cancel</button>
+						</form>
+						<?php elseif ($activeTab === 'history'): ?>
+						<button type="button" class="admin-btn-secondary" data-appt-view="<?php echo (int)$req['id']; ?>">View</button>
+						<?php else: ?>
+						<span style="color:var(--admin-muted);font-size:11px;">—</span>
+						<?php endif; ?>
 						</div>
 					</td>
 				</tr>
@@ -309,5 +308,159 @@ nutritionist_layout_start('Appointments', 'Consultation requests between parents
 		<?php echo nutritionist_render_calendar_grid($monthAnchor, $calendarEntries, $today); ?>
 	</div>
 </div>
+
+<?php
+// Details data for the history View modal (all tabs, keyed by id).
+$apptDetailJson = [];
+foreach (['incoming' => $incoming, 'outgoing' => $outgoing, 'history' => $history] as $groupRows) {
+	foreach ($groupRows as $row) {
+		$st = $row['appt_status'] ?? 'pending';
+		$pill = match ($st) { 'confirmed' => 'upcoming', 'completed' => 'completed', 'cancelled' => 'overdue', default => 'due' };
+		$apptDetailJson[(int)$row['id']] = [
+			'id' => (int)$row['id'],
+			'child' => $row['first_name'] . ' ' . $row['last_name'],
+			'code' => (string)($row['child_code'] ?? ''),
+			'parent' => (string)($row['parent_name'] ?? '—'),
+			'phone' => (string)($row['parent_phone'] ?? ''),
+			'barangay' => (string)($row['barangay_name'] ?? ''),
+			'when' => date('M j, Y g:i A', strtotime((string)$row['scheduled_at'])),
+			'location' => (string)($row['location'] ?? 'Barangay Health Center'),
+			'status' => ucfirst((string)$st),
+			'pill' => $pill,
+			'notes' => (string)($row['notes'] ?? ''),
+			'recommendations' => (string)($row['recommendations'] ?? ''),
+		];
+	}
+}
+?>
+
+<style>
+#completeModal, #apptDetailModal { display: none; }
+#completeModal.is-open, #apptDetailModal.is-open { display: flex; }
+.appt-detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--admin-border); font-size: 13px; }
+.appt-detail-row:last-child { border-bottom: none; }
+.appt-detail-row .k { color: var(--admin-muted); font-weight: 600; flex-shrink: 0; }
+.appt-detail-row .v { color: var(--admin-text); text-align: right; min-width: 0; word-break: break-word; }
+.appt-detail-notes { margin-top: 12px; }
+.appt-detail-notes .k { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--admin-muted); margin-bottom: 4px; }
+.appt-detail-notes .v { font-size: 13px; color: var(--admin-text); background: var(--admin-surface-alt); border: 1px solid var(--admin-border); border-radius: 8px; padding: 10px 12px; white-space: pre-wrap; }
+</style>
+
+<!-- ============ COMPLETE MODAL (Done + optional recommendations) ============ -->
+<div class="admin-modal-overlay" id="completeModal">
+	<div class="admin-modal" style="max-width:480px;" role="dialog" aria-modal="true" aria-label="Complete appointment">
+		<div class="admin-modal-head">
+			<h3>Complete appointment</h3>
+			<button class="admin-modal-close" id="completeModalClose" type="button">&times;</button>
+		</div>
+		<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" style="padding:16px 20px;">
+			<input type="hidden" name="action" value="complete_request">
+			<input type="hidden" name="id" id="completeModalId" value="0">
+			<p style="font-size:13px;color:var(--admin-text);margin:0 0 4px;"><strong id="completeModalChild"></strong></p>
+			<p style="font-size:12px;color:var(--admin-muted);margin:0 0 12px;" id="completeModalWhen"></p>
+			<label class="admin-field" style="display:block;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Recommendations <span style="color:var(--admin-muted);font-weight:500;">(optional)</span></span>
+				<textarea name="recommendations" id="completeModalRecs" rows="4" placeholder="e.g. feeding advice, vitamins, next visit..." style="width:100%;margin-top:6px;"></textarea>
+			</label>
+			<div class="admin-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+				<button class="admin-btn-secondary" type="button" id="completeModalCancel">Cancel</button>
+				<button class="admin-btn" type="submit">Mark completed</button>
+			</div>
+		</form>
+	</div>
+</div>
+
+<!-- ============ DETAILS MODAL (history re-view) ============ -->
+<div class="admin-modal-overlay" id="apptDetailModal">
+	<div class="admin-modal" style="max-width:480px;" role="dialog" aria-modal="true" aria-label="Appointment details">
+		<div class="admin-modal-head">
+			<h3>Appointment details</h3>
+			<button class="admin-modal-close" id="apptDetailClose" type="button">&times;</button>
+		</div>
+		<div style="padding:16px 20px;">
+			<div class="appt-detail-row"><span class="k">Child</span><span class="v" id="detailChild"></span></div>
+			<div class="appt-detail-row"><span class="k">Parent</span><span class="v" id="detailParent"></span></div>
+			<div class="appt-detail-row"><span class="k">Barangay</span><span class="v" id="detailBarangay"></span></div>
+			<div class="appt-detail-row"><span class="k">Schedule</span><span class="v" id="detailWhen"></span></div>
+			<div class="appt-detail-row"><span class="k">Location</span><span class="v" id="detailLocation"></span></div>
+			<div class="appt-detail-row"><span class="k">Status</span><span class="v"><span class="appt-pill" id="detailStatus"></span></span></div>
+			<div class="appt-detail-notes" id="detailNotesWrap">
+				<div class="k">Notes</div>
+				<div class="v" id="detailNotes"></div>
+			</div>
+			<div class="appt-detail-notes" id="detailRecsWrap">
+				<div class="k">Recommendations</div>
+				<div class="v" id="detailRecs"></div>
+			</div>
+			<div class="admin-actions" style="display:flex;justify-content:flex-end;margin-top:12px;">
+				<button class="admin-btn-secondary" type="button" id="apptDetailOk">Close</button>
+			</div>
+		</div>
+	</div>
+</div>
+
+<script>
+(function () {
+	var detailData = <?php echo json_encode($apptDetailJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+
+	function showModal(id) {
+		var el = document.getElementById(id);
+		if (el) { el.classList.add('is-open'); document.body.style.overflow = 'hidden'; }
+	}
+	function hideModal(id) {
+		var el = document.getElementById(id);
+		if (el) { el.classList.remove('is-open'); document.body.style.overflow = ''; }
+	}
+
+	// Done -> complete modal with optional recommendations.
+	document.querySelectorAll('[data-complete-open]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			document.getElementById('completeModalId').value = btn.getAttribute('data-complete-open');
+			document.getElementById('completeModalChild').textContent = btn.getAttribute('data-complete-child') || '';
+			document.getElementById('completeModalWhen').textContent = btn.getAttribute('data-complete-when') || '';
+			document.getElementById('completeModalRecs').value = '';
+			showModal('completeModal');
+		});
+	});
+	document.getElementById('completeModalClose').addEventListener('click', function () { hideModal('completeModal'); });
+	document.getElementById('completeModalCancel').addEventListener('click', function () { hideModal('completeModal'); });
+
+	// History -> read-only details modal.
+	function setText(id, v) {
+		var el = document.getElementById(id);
+		if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v;
+	}
+	document.querySelectorAll('[data-appt-view]').forEach(function (btn) {
+		btn.addEventListener('click', function () {
+			var a = detailData[parseInt(btn.getAttribute('data-appt-view'), 10)];
+			if (!a) return;
+			setText('detailChild', a.child + (a.code ? ' (' + a.code + ')' : ''));
+			setText('detailParent', a.parent + (a.phone ? ' · ' + a.phone : ''));
+			setText('detailBarangay', a.barangay);
+			setText('detailWhen', a.when);
+			setText('detailLocation', a.location);
+			var st = document.getElementById('detailStatus');
+			if (st) { st.textContent = a.status; st.className = 'appt-pill ' + a.pill; }
+			var notesWrap = document.getElementById('detailNotesWrap');
+			if (notesWrap) notesWrap.style.display = a.notes ? '' : 'none';
+			setText('detailNotes', a.notes);
+			var recsWrap = document.getElementById('detailRecsWrap');
+			if (recsWrap) recsWrap.style.display = a.recommendations ? '' : 'none';
+			setText('detailRecs', a.recommendations);
+			showModal('apptDetailModal');
+		});
+	});
+	document.getElementById('apptDetailClose').addEventListener('click', function () { hideModal('apptDetailModal'); });
+	document.getElementById('apptDetailOk').addEventListener('click', function () { hideModal('apptDetailModal'); });
+
+	['completeModal', 'apptDetailModal'].forEach(function (id) {
+		var overlay = document.getElementById(id);
+		if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) hideModal(id); });
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape') { hideModal('completeModal'); hideModal('apptDetailModal'); }
+	});
+})();
+</script>
 
 <?php nutritionist_layout_end(); ?>

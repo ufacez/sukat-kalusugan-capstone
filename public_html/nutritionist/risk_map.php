@@ -39,6 +39,7 @@ $spotRows = admin_fetch_all(
     "SELECT
         h.id,
         h.household_code,
+        h.address,
         h.lat,
         h.lng,
         h.local_area_id,
@@ -52,7 +53,7 @@ $spotRows = admin_fetch_all(
      LEFT JOIN local_areas la ON la.id = h.local_area_id
      LEFT JOIN children c ON c.household_id = h.id AND c.status = 'active'
      WHERE h.status = 'active' AND {$scope}
-     GROUP BY h.id, h.household_code, h.lat, h.lng, h.local_area_id, h.status, b.name, la.area_name
+     GROUP BY h.id, h.household_code, h.address, h.lat, h.lng, h.local_area_id, h.status, b.name, la.area_name
      ORDER BY h.created_at ASC, h.id ASC",
     str_repeat('i', count($scopeParams)),
     $scopeParams
@@ -225,6 +226,8 @@ foreach ($spotRows as $sr) {
     $spots[] = [
         'id' => $spotId,
         'code' => 'HH-' . str_pad((string)$spotId, 4, '0', STR_PAD_LEFT),
+        'address' => (string)($sr['address'] ?? ''),
+        'local_area_id' => $sr['local_area_id'] !== null ? (int)$sr['local_area_id'] : null,
         'lat' => $sr['lat'] !== null ? (float)$sr['lat'] : null,
         'lng' => $sr['lng'] !== null ? (float)$sr['lng'] : null,
         'barangay' => $sr['barangay_name'],
@@ -433,7 +436,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     <th>Moderate Risk</th>
                     <th>Severe Risk</th>
                     <th>Risk Level</th>
-                    <th>View</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="spot-summary-body">
@@ -622,6 +625,42 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         return '#22c55e';
     }
 
+    // Same-spot tolerance: ~15 meters. Clicking an existing spot selects
+    // it instead of opening the Add modal, and saving the same coords
+    // is blocked both in JS and in the households API.
+    var SPOT_DUP_METERS = 15;
+
+    function spotDistanceMeters(lat1, lng1, lat2, lng2) {
+        if (typeof map !== 'undefined' && map && typeof map.distance === 'function') {
+            try {
+                return map.distance([lat1, lng1], [lat2, lng2]);
+            } catch (err) { /* fall through to haversine */ }
+        }
+        var R = 6371000;
+        var dLat = (lat2 - lat1) * Math.PI / 180;
+        var dLng = (lng2 - lng1) * Math.PI / 180;
+        var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+        return 2 * R * Math.asin(Math.sqrt(a));
+    }
+
+    function findNearSpot(lat, lng, excludeId) {
+        var best = null;
+        var bestDist = Infinity;
+        for (var i = 0; i < SPOTS.length; i++) {
+            var s = SPOTS[i];
+            if (s.lat === null || s.lng === null) continue;
+            if (excludeId && parseInt(s.id, 10) === parseInt(excludeId, 10)) continue;
+            var d = spotDistanceMeters(lat, lng, parseFloat(s.lat), parseFloat(s.lng));
+            if (d <= SPOT_DUP_METERS && d < bestDist) {
+                best = s;
+                bestDist = d;
+            }
+        }
+        return best;
+    }
+
     function escapeHtml(str) {
         var div = document.createElement('div');
         div.textContent = str || '';
@@ -661,7 +700,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         filteredSpots = SPOTS.filter(function (s) {
             if (riskVal && s.level !== riskVal) return false;
             if (searchVal) {
-                var haystack = ((s.code || '') + ' ' + (s.purok || '') + ' ' + (s.barangay || '')).toLowerCase();
+                var haystack = ((s.code || '') + ' ' + (s.purok || '') + ' ' + (s.barangay || '') + ' ' + (s.address || '')).toLowerCase();
                 if (haystack.indexOf(searchVal) === -1) return false;
             }
             return true;
@@ -701,20 +740,35 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     '<td>' + s.moderate + '</td>' +
                     '<td>' + s.severe + '</td>' +
                     '<td><span class="admin-pill ' + pillClass + '">' + escapeHtml(s.level_label) + '</span></td>' +
-                    '<td><button class="admin-spotmap-view-btn" data-spot-id="' + s.id + '" title="View"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:14px;height:14px;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg> View</button></td>';
+                    '<td style="white-space:nowrap;"><button class="admin-spotmap-view-btn" data-spot-id="' + s.id + '" title="View"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:14px;height:14px;vertical-align:-2px"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg> View</button> ' +
+                    '<button class="admin-spotmap-view-btn" data-spot-edit="' + s.id + '" title="Edit spot details">Edit</button></td>';
                 tbody.appendChild(tr);
             });
         }
 
-        tbody.querySelectorAll('.admin-spotmap-view-btn').forEach(function (btn) {
+        tbody.querySelectorAll('.admin-spotmap-view-btn[data-spot-id]').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 var spotId = parseInt(this.dataset.spotId, 10);
                 var spot = SPOTS.find(function (s) { return s.id === spotId; });
-                if (spot && spot.lat && spot.lng) {
+                if (!spot) return;
+                // View is read-only: open the details panel only, never the edit modal.
+                if (spot.lat && spot.lng && typeof map !== 'undefined' && map) {
                     map.setView([spot.lat, spot.lng], 16);
-                    openSpotPanel(spot);
-                    openEditModal(spot);
                 }
+                openSpotPanel(spot);
+            });
+        });
+
+        tbody.querySelectorAll('[data-spot-edit]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var spotId = parseInt(this.dataset.spotEdit, 10);
+                var spot = SPOTS.find(function (s) { return s.id === spotId; });
+                if (!spot) return;
+                if (spot.lat && spot.lng && typeof map !== 'undefined' && map) {
+                    map.setView([spot.lat, spot.lng], 16);
+                }
+                openSpotPanel(spot);
+                openEditModal(spot);
             });
         });
 
@@ -793,7 +847,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         html += '<div class="admin-spotmap-panel-meta-row"><span>Purok</span><strong>' + escapeHtml(spot.purok) + '</strong></div>';
         html += '<div class="admin-spotmap-panel-meta-row"><span>Household Code</span><strong>' + escapeHtml(spotCode) + '</strong></div>';
         html += '<div class="admin-spotmap-panel-meta-row"><span>Barangay</span><strong>' + escapeHtml(spot.barangay) + '</strong></div>';
+        html += '<div class="admin-spotmap-panel-meta-row"><span>Street / Landmark</span><strong>' + escapeHtml(spot.address || '—') + '</strong></div>';
         html += '</div>';
+        html += '<div style="margin:0 0 12px;"><button class="admin-btn admin-btn-sm" data-spot-panel-edit="' + spot.id + '" style="width:100%;background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">Edit spot details</button></div>';
 
         html += '<div id="spot-panel-loading" style="text-align:center;padding:16px;color:var(--admin-muted);font-size:11px;">';
         html += 'Loading household members…';
@@ -802,7 +858,39 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
 
         body.innerHTML = html;
 
+        var panelEditBtn = body.querySelector('[data-spot-panel-edit]');
+        if (panelEditBtn) {
+            panelEditBtn.addEventListener('click', function () {
+                var pid = parseInt(this.getAttribute('data-spot-panel-edit'), 10);
+                var target = SPOTS.find(function (s) { return s.id === pid; }) || spot;
+                openEditModal(target);
+            });
+        }
+
         loadSpotDetails(spot.id, spot);
+    }
+
+    // Keep the in-memory SPOTS + summary table + markers in sync whenever
+    // fresh household details arrive (assign/unassign), so the panel,
+    // counts, and map reflect the change without a manual reload.
+    function syncSpotFromDetails(res) {
+        if (!res || !res.success || !res.household) return;
+        var h = res.household;
+        var summary = res.summary || {};
+        var hid = parseInt(h.id, 10);
+        var target = SPOTS.find(function (s) { return s.id === hid; });
+        if (!target) return;
+        if (typeof h.address !== 'undefined') target.address = h.address || '';
+        if (typeof h.purok !== 'undefined') target.purok = h.purok || target.purok;
+        if (typeof summary.child_count !== 'undefined') target.child_count = parseInt(summary.child_count, 10) || 0;
+        if (typeof summary.normal !== 'undefined') target.normal = parseInt(summary.normal, 10) || 0;
+        if (typeof summary.moderate !== 'undefined') target.moderate = parseInt(summary.moderate, 10) || 0;
+        if (typeof summary.severe !== 'undefined') target.severe = parseInt(summary.severe, 10) || 0;
+        if (typeof summary.overweight !== 'undefined') target.overweight = parseInt(summary.overweight, 10) || 0;
+        if (typeof summary.risk_level !== 'undefined') target.level = summary.risk_level;
+        if (typeof summary.risk_label !== 'undefined') target.level_label = summary.risk_label;
+        renderSummaryTable();
+        renderMapMarkers();
     }
 
     function loadSpotDetails(householdId, fallbackSpot) {
@@ -821,6 +909,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 detailEl.style.display = 'block';
                 detailEl.innerHTML = renderSpotDetail(res);
                 wireSpotDetailEvents(householdId);
+                syncSpotFromDetails(res);
             })
             .catch(function () {
                 if (loadingEl) loadingEl.textContent = 'Network error loading household details.';
@@ -834,6 +923,10 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         var summary = res.summary || {};
 
         var html = '';
+
+        html += '<div class="admin-spotmap-panel-meta" style="margin-bottom:12px;">';
+        html += '<div class="admin-spotmap-panel-meta-row"><span>Street / Landmark</span><strong>' + escapeHtml((h.address && String(h.address).trim() !== '') ? h.address : '—') + '</strong></div>';
+        html += '</div>';
 
         html += '<h4 class="admin-spotmap-panel-section-title">';
         html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>';
@@ -876,6 +969,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 html += '<div class="admin-spotmap-person-meta">' + escapeHtml(meta) + ' · ' + escapeHtml(ch.status) + '</div>';
                 html += '</div>';
                 html += '<a href="' + BASE_URL + 'nutritionist/children.php?id=' + ch.id + '" class="admin-spotmap-person-remove" title="View child" style="text-decoration:none;color:inherit;">→</a>';
+                html += '<button class="admin-spotmap-person-remove" data-action="unassign-child" data-id="' + ch.id + '" title="Remove from household">&times;</button>';
                 html += '</div>';
             });
             html += '</div>';
@@ -905,6 +999,27 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 var fd = new FormData();
                 fd.append('parent_id', parentId);
                 fetch(BASE_URL + 'api/households/unassign_parent.php', { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (res.success) loadSpotDetails(householdId);
+                        else AdminToast.error(res.message || 'Failed to unassign.');
+                    })
+                    .catch(function () { AdminToast.error('Network error.'); });
+                });
+            });
+        });
+
+        document.querySelectorAll('[data-action="unassign-child"]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var childId = parseInt(this.dataset.id, 10);
+                var proceed = window.SKConfirm
+                    ? window.SKConfirm('Remove this child from the household?', { title: 'Remove child', confirmLabel: 'Remove', danger: true })
+                    : Promise.resolve(confirm('Remove this child from the household?'));
+                proceed.then(function (ok) {
+                if (!ok) return;
+                var fd = new FormData();
+                fd.append('child_id', childId);
+                fetch(BASE_URL + 'api/households/unassign_child.php', { method: 'POST', body: fd, credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
                     .then(function (res) {
                         if (res.success) loadSpotDetails(householdId);
@@ -945,10 +1060,16 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     return;
                 }
                 if (res.data.length === 0) {
-                    list.innerHTML = '<p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">No available ' + type + ' to assign.</p>';
+                    var emptyHint = (type === 'children' && res.filtered_by_parents)
+                        ? 'No more children of the assigned parent(s) left to add. Add another parent first if needed.'
+                        : 'No available ' + type + ' to assign.';
+                    list.innerHTML = '<p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">' + escapeHtml(emptyHint) + '</p>';
                     return;
                 }
                 var html = '';
+                if (type === 'children' && res.filtered_by_parents) {
+                    html += '<p class="admin-mini" style="color:var(--admin-muted);margin:0 0 8px;">Showing only children of the parent(s) assigned to this household.</p>';
+                }
                 res.data.forEach(function (p) {
                     var meta = '';
                     if (type === 'children') {
@@ -998,6 +1119,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     document.getElementById(modalId).style.display = 'none';
                     form.reset();
                     loadSpotDetails(parseInt(householdId, 10));
+                    if (res.skipped && res.skipped.length > 0) {
+                        AdminToast.error(res.skipped.length + ' skipped: already assigned elsewhere.');
+                    }
                 } else {
                     AdminToast.error(res.message || 'Failed to assign.');
                 }
@@ -1017,12 +1141,15 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         var codePreview = document.getElementById('spot-form-code-preview');
         if (codePreview) codePreview.value = spot.code || '';
 
-        form.querySelector('[name="address"]').value = '';
-        form.querySelector('[name="lat"]').value = spot.lat !== null ? spot.lat : '';
-        form.querySelector('[name="lng"]').value = spot.lng !== null ? spot.lng : '';
+        // Prefill saved values so street details are never wiped on edit.
+        form.querySelector('[name="address"]').value = spot.address || '';
+        form.querySelector('[name="lat"]').value = (spot.lat !== null && typeof spot.lat !== 'undefined') ? spot.lat : '';
+        form.querySelector('[name="lng"]').value = (spot.lng !== null && typeof spot.lng !== 'undefined') ? spot.lng : '';
 
         var localSelect = form.querySelector('[name="local_area_id"]');
-        if (localSelect) localSelect.value = '';
+        if (localSelect) {
+            localSelect.value = (spot.local_area_id !== null && typeof spot.local_area_id !== 'undefined') ? String(spot.local_area_id) : '';
+        }
 
         modal.style.display = 'flex';
     }
@@ -1062,9 +1189,18 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 fillOpacity: 0.9
             });
 
-            marker.on('click', function () {
+            marker.on('click', function (e) {
+                // View is read-only: only the details panel opens.
+                // Editing happens via the "Edit spot details" buttons.
+                // Stop the click from bubbling to map.on('click') so the
+                // Add Spot modal never pops when tapping an existing spot.
+                if (e && e.originalEvent && typeof e.originalEvent.stopPropagation === 'function') {
+                    e.originalEvent.stopPropagation();
+                }
+                if (typeof L !== 'undefined' && L.DomEvent && e) {
+                    try { L.DomEvent.stopPropagation(e); } catch (err) { /* noop */ }
+                }
                 openSpotPanel(spot);
-                openEditModal(spot);
                 if (activeMarker && activeMarker !== marker) {
                     activeMarker.setStyle({ radius: 7, weight: 2, color: '#fff' });
                 }
@@ -1309,6 +1445,22 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             var lat = e.latlng.lat.toFixed(7);
             var lng = e.latlng.lng.toFixed(7);
 
+            // Clicking an existing spot selects it in the panel instead of
+            // opening the Add modal (safety net in case the marker click
+            // bubbles, or the tap lands just beside the small marker).
+            var tapped = findNearSpot(parseFloat(lat), parseFloat(lng), 0);
+            if (tapped) {
+                if (tempPin) { map.removeLayer(tempPin); tempPin = null; }
+                map.setView([tapped.lat, tapped.lng], Math.max(map.getZoom(), 16));
+                openSpotPanel(tapped);
+                var coordTextTapped = document.getElementById('spot-coord-text');
+                if (coordTextTapped) {
+                    coordTextTapped.textContent = parseFloat(tapped.lat).toFixed(7) + ', ' + parseFloat(tapped.lng).toFixed(7) + ' — existing spot selected';
+                    coordTextTapped.style.color = '';
+                }
+                return;
+            }
+
             var coordText = document.getElementById('spot-coord-text');
             if (coordText) {
                 coordText.textContent = lat + ', ' + lng;
@@ -1380,8 +1532,25 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 }
             }
 
+            var dupLatRaw = this.querySelector('[name="lat"]').value;
+            var dupLngRaw = this.querySelector('[name="lng"]').value;
+            var dupEditId = document.getElementById('spot-form-id').value;
+            if (dupLatRaw !== '' && dupLngRaw !== '') {
+                var dupHit = findNearSpot(parseFloat(dupLatRaw), parseFloat(dupLngRaw), dupEditId ? parseInt(dupEditId, 10) : 0);
+                if (dupHit) {
+                    var dupCode = dupHit.code || ('HH-' + String(dupHit.id).padStart(4, '0'));
+                    AdminToast.error('May spot na sa coordinates na ito (' + dupCode + '). Pinili na lang ang existing spot.');
+                    document.getElementById('spot-add-modal').style.display = 'none';
+                    resetAddModal();
+                    if (tempPin) { map.removeLayer(tempPin); tempPin = null; }
+                    map.setView([dupHit.lat, dupHit.lng], Math.max(map.getZoom(), 16));
+                    openSpotPanel(dupHit);
+                    return;
+                }
+            }
+
             var formData = new FormData(this);
-            var editId = document.getElementById('spot-form-id').value;
+            var editId = dupEditId;
             formData.append('barangay_id', <?php echo json_encode($user['barangay_id'] ?? 0); ?>);
 
             var apiUrl = editId

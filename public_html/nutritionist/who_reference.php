@@ -102,7 +102,7 @@ $minX = $rowCount > 0 ? $rows[0]['x'] : null;
 $maxX = $rowCount > 0 ? $rows[$rowCount - 1]['x'] : null;
 
 // Pagination
-$perPage = 10;
+$perPage = 5;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $totalPages = max(1, (int)ceil($rowCount / $perPage));
 if ($page > $totalPages) $page = $totalPages;

@@ -776,7 +776,6 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<li class="nutritionist-ai-bullet"><?php echo $bullet; ?></li>
 						<?php endforeach; ?>
 					</ul>
-					<a class="dashboard-ai-link" href="#ai-insights">View AI insights →</a>
 				</div>
 			</div>
 		</div>

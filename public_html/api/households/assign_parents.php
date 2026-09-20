@@ -69,12 +69,13 @@ if (!$isBarangayAdmin && $userBarangayId !== null && (int)$hh['barangay_id'] !==
 
 $assignedCount = 0;
 $skipped = [];
+$autoAssignedChildren = 0;
 $hhBarangayId = (int)$hh['barangay_id'];
 $hhLocalAreaId = $hh['local_area_id'] !== null ? (int)$hh['local_area_id'] : null;
 
 foreach ($parentIds as $pid) {
     $check = admin_fetch_one(
-        'SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1',
+        'SELECT id, barangay_id, household_id FROM parents WHERE id = ? LIMIT 1',
         'i',
         [$pid]
     );
@@ -84,6 +85,11 @@ foreach ($parentIds as $pid) {
     }
     if (!$isBarangayAdmin && $userBarangayId !== null && (int)$check['barangay_id'] !== (int)$userBarangayId) {
         $skipped[] = ['id' => $pid, 'reason' => 'Out of barangay scope'];
+        continue;
+    }
+    $currentHh = isset($check['household_id']) ? (int)$check['household_id'] : 0;
+    if ($currentHh > 0 && $currentHh !== $householdId) {
+        $skipped[] = ['id' => $pid, 'reason' => 'Already assigned to another household'];
         continue;
     }
 
@@ -102,6 +108,40 @@ foreach ($parentIds as $pid) {
     mysqli_stmt_bind_param($stmt, 'iiii', $householdId, $hhBarangayId, $laVar, $pid);
     if (mysqli_stmt_execute($stmt)) {
         $assignedCount++;
+
+        // Auto-add: unassigned children of this parent follow the parent
+        // into the same household (same barangay/local-area sync as a
+        // manual assign). Children already in another household are left
+        // untouched so they never get silently moved.
+        $kids = admin_fetch_all(
+            'SELECT id, barangay_id FROM children WHERE parent_id = ? AND status = "active" AND (household_id IS NULL OR household_id = 0)',
+            'i',
+            [$pid]
+        );
+        foreach ($kids as $kid) {
+            $kidId = (int)($kid['id'] ?? 0);
+            if ($kidId <= 0) {
+                continue;
+            }
+            if (!$isBarangayAdmin && $userBarangayId !== null && (int)($kid['barangay_id'] ?? 0) !== (int)$userBarangayId) {
+                continue;
+            }
+            $kidStmt = mysqli_prepare(
+                $conn,
+                'UPDATE children
+                    SET household_id = ?, barangay_id = ?, local_area_id = COALESCE(?, local_area_id)
+                  WHERE id = ? AND (household_id IS NULL OR household_id = 0)'
+            );
+            if ($kidStmt === false) {
+                continue;
+            }
+            $kidLaVar = $hhLocalAreaId;
+            mysqli_stmt_bind_param($kidStmt, 'iiii', $householdId, $hhBarangayId, $kidLaVar, $kidId);
+            if (mysqli_stmt_execute($kidStmt) && mysqli_stmt_affected_rows($kidStmt) > 0) {
+                $autoAssignedChildren++;
+            }
+            mysqli_stmt_close($kidStmt);
+        }
     } else {
         $skipped[] = ['id' => $pid, 'reason' => 'Update failed'];
     }
@@ -112,7 +152,7 @@ log_action(
     $user['id'] ?? null,
     'ASSIGN_PARENTS_TO_HOUSEHOLD',
     'info',
-    "Assigned {$assignedCount} parent(s) to household #{$householdId} (" . count($skipped) . ' skipped)'
+    "Assigned {$assignedCount} parent(s) to household #{$householdId} (" . count($skipped) . ' skipped, ' . $autoAssignedChildren . ' children auto-assigned)'
 );
 
 echo json_encode([
@@ -120,4 +160,5 @@ echo json_encode([
     'message' => "{$assignedCount} parent(s) assigned to household.",
     'assigned' => $assignedCount,
     'skipped' => $skipped,
+    'auto_assigned_children' => $autoAssignedChildren,
 ]);

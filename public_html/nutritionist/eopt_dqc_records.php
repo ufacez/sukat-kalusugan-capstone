@@ -189,7 +189,7 @@ nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_report
 		<div class="admin-mini" style="padding:24px;text-align:center;color:var(--admin-muted);">No records match this data quality issue. Great!</div>
 	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:800px;">
+			<table class="nutritionist-table" data-page-size="5" style="min-width:800px;">
 				<thead>
 					<tr>
 						<th>No.</th>

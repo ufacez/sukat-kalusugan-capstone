@@ -79,6 +79,28 @@
     );
   }
 
+  // Mirrors admin_normalize_ph_mobile() in includes/admin_helpers.php:
+  // accepts 09XXXXXXXXX, +639XXXXXXXXX, and 639XXXXXXXXX (spaces and
+  // dashes are ignored). Returns the canonical 09XXXXXXXXX form, or
+  // null when the input is not a valid PH mobile number.
+  function normalizePhMobile(raw) {
+    const trimmed = String(raw || "").trim();
+    if (trimmed === "") return null;
+    const hasPlus = trimmed.charAt(0) === "+";
+    const digitsOnly = trimmed.replace(/[^0-9]/g, "");
+
+    if (hasPlus && digitsOnly.substring(0, 2) !== "63") {
+      return null;
+    }
+
+    let canonical = digitsOnly;
+    if (canonical.substring(0, 2) === "63") {
+      canonical = "0" + canonical.substring(2);
+    }
+
+    return PH_MOBILE_RE.test(canonical) ? canonical : null;
+  }
+
   function validatePhone(input) {
     const raw = input.value.trim();
 
@@ -86,17 +108,10 @@
       return setState(input, !input.required, "Mobile number is required.");
     }
 
-    const digitsOnly = raw.replace(/[^0-9]/g, "");
-
-    if (digitsOnly !== raw) {
-      // normalize as the user types so 0917-910-393 style input still works
-      input.value = digitsOnly;
-    }
-
     return setState(
       input,
-      PH_MOBILE_RE.test(digitsOnly),
-      "Enter a valid 11-digit PH mobile number starting with 09 (e.g. 09171234567)."
+      normalizePhMobile(raw) !== null,
+      "Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)."
     );
   }
 
@@ -221,8 +236,9 @@
     });
 
     scope.querySelectorAll('[data-validate="phone-ph"]').forEach((input) => {
-      input.setAttribute("maxlength", "11");
-      input.setAttribute("inputmode", "numeric");
+      // 14 fits "+639123456789" (13) plus room for a space/dash while typing.
+      input.setAttribute("maxlength", "14");
+      input.setAttribute("inputmode", "tel");
       input.addEventListener("input", () => validatePhone(input));
       input.addEventListener("blur", () => validatePhone(input));
     });
