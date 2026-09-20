@@ -3932,3 +3932,185 @@ body.admin-page .appointments-table {
     animation: none !important;
   }
 }
+
+/* ─── Admin dashboard rebuild: compact cards + above-the-fold ─────── */
+.admin-grid-cards--compact .admin-card--dashboard {
+  padding: 14px 16px;
+}
+.admin-card-value--warn {
+  color: #b6791f !important;
+}
+[data-theme="dark"] .admin-card-value--warn {
+  color: #f5b942 !important;
+}
+
+.admin-dashboard-insights-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.admin-dashboard-insights-actions .admin-icon-btn {
+  width: 30px;
+  height: 30px;
+}
+.admin-dashboard-insights-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.admin-dashboard-insights-item {
+  position: relative;
+  padding: 9px 10px 9px 28px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  font-size: 0.8rem;
+  line-height: 1.45;
+  color: var(--admin-text);
+}
+.admin-dashboard-insights-item::before {
+  content: "";
+  position: absolute;
+  left: 10px;
+  top: 13px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--admin-primary);
+}
+.admin-dashboard-insights-item.is-loading {
+  color: var(--admin-muted);
+}
+.admin-dashboard-insights-item.is-loading::before {
+  background: var(--admin-border);
+}
+#family-insights-meta {
+  margin-top: 8px;
+}
+.admin-dashboard-kiosk-more {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  padding: 2px 4px;
+}
+.admin-btn-secondary--sm {
+  min-height: 34px;
+  padding: 0 12px;
+  font-size: 0.76rem;
+}
+
+/* ─── Horizontal quick nav strip (dashboard) ───────────────────────── */
+.admin-quicknav {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+.admin-quicknav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  box-shadow: var(--admin-shadow);
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.admin-quicknav-item:hover {
+  border-color: var(--admin-primary);
+  box-shadow: 0 8px 24px rgba(11, 110, 79, 0.14);
+  transform: translateY(-1px);
+}
+.admin-quicknav-item:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
+}
+.admin-quicknav-icon {
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  border-radius: 10px;
+  background: var(--admin-primary-soft);
+  color: var(--admin-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.admin-quicknav-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.admin-quicknav-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  line-height: 1.25;
+}
+.admin-quicknav-text strong {
+  font-size: 0.84rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  letter-spacing: -0.01em;
+}
+.admin-quicknav-text small {
+  font-size: 0.7rem;
+  color: var(--admin-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.admin-quicknav-arrow {
+  color: var(--admin-muted);
+  font-size: 1rem;
+  line-height: 1;
+}
+@media (max-width: 720px) {
+  .admin-quicknav {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Above-the-fold on wide desktop: compact rows, no page scroll */
+@media (min-width: 1201px) {
+  .admin-dashboard-maprow--compact {
+    grid-template-columns: minmax(0, 1fr) 370px;
+    gap: 14px;
+    align-items: stretch;
+  }
+  .admin-dashboard-maprow--compact .admin-section {
+    padding: 16px;
+  }
+  .admin-dashboard-maprow--compact .admin-dashboard-mapsection {
+    display: flex;
+    flex-direction: column;
+  }
+  .admin-riskmap-layout--compact {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 220px;
+    gap: 12px;
+    flex: 1;
+    align-items: stretch;
+  }
+  .admin-riskmap-layout--compact .admin-riskmap-mapwrap {
+    display: flex;
+    min-height: 340px;
+  }
+  .admin-riskmap-canvas--compact {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    min-height: 340px;
+  }
+  .admin-dashboard-maprow--compact .admin-dashboard-toplist {
+    gap: 10px;
+  }
+  .admin-dashboard-kiosksection--compact .admin-dashboard-kiosk-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -323,7 +323,8 @@ function nutritionist_layout_end(): void
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
-    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+    $formValidateVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-form-validate.js');
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
 
     // Floating Kali AI widget (general-mode) on every nutritionist page
     // except the dedicated assistant page itself.

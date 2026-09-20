@@ -7,7 +7,7 @@ require_permission('parents.update');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    admin_redirect('/admin/parents.php', ['notice' => 'Method not allowed.', 'type' => 'error']);
+    admin_redirect('/admin/users.php', ['notice' => 'Method not allowed.', 'type' => 'error']);
 }
 
 $id = (int)($_POST['id'] ?? 0);
@@ -119,4 +119,4 @@ if ($ok) {
     log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent ' . $email . ' (' . $id . ')');
 }
 
-admin_redirect('/admin/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);
+admin_redirect('/admin/users.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);

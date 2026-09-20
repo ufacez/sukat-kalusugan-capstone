@@ -102,4 +102,4 @@ if ($ok) {
     log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $email);
 }
 
-admin_redirect('/admin/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
+admin_redirect('/admin/users.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);

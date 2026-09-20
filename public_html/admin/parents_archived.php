@@ -26,9 +26,9 @@ $parents = admin_fetch_all(
      ORDER BY p.id DESC"
 );
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parents.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
+$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
 
-admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'parents', $actions, 'Archived');
+admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'users', $actions, 'Archived');
 ?>
 
 <section class="admin-section">

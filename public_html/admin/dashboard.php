@@ -136,43 +136,58 @@ foreach ($barangayUserStats as $row) {
 
 /*
 |--------------------------------------------------------------------------
-| Staff Users (for User Management section)
+| Fleet + family rollups (for link cards)
 |--------------------------------------------------------------------------
 */
 
-$staffUsers = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.username, u.status, u.last_login, u.created_at,
-            r.name AS role_name, b.name AS barangay
-     FROM users u
-     INNER JOIN roles r ON r.id = u.role_id
-     LEFT JOIN barangays b ON b.id = u.barangay_id
-     ORDER BY u.created_at DESC, u.id DESC'
-);
+$familyTotal = (int)$totalParents + (int)$totalChildren;
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('view') . ' Manage users</a>';
+$fleetOfflineCount = (int)$devicesTotal - (int)$devicesOnlineCount;
+$fleetLabel = 'All Operational';
+$fleetLabelClass = 'admin-card-value--success';
+if ((int)$devicesTotal === 0) {
+    $fleetLabel = 'No Devices';
+    $fleetLabelClass = '';
+} elseif ($sensorNeedsRepair > 0 || $sensorOffline > 0) {
+    $fleetLabel = ((int)$devicesOnlineCount === 0) ? 'All Offline' : 'Degraded';
+    $fleetLabelClass = $sensorNeedsRepair > 0 ? 'admin-card-value--warn' : '';
+}
 
-admin_layout_start('Dashboard', 'System overview, user distribution, and device monitoring.', 'dashboard', $actions);
+$worstOfflineCode = '';
+$worstOfflineSecs = -1;
+foreach ($devices as $d) {
+    if (api_device_is_online($d)) {
+        continue;
+    }
+    $secs = isset($d['seconds_since_last_seen']) && $d['seconds_since_last_seen'] !== null
+        ? (int)$d['seconds_since_last_seen'] : -1;
+    if ($secs > $worstOfflineSecs) {
+        $worstOfflineSecs = $secs;
+        $worstOfflineCode = (string)($d['device_code'] ?? '');
+    }
+}
+
+$actions = '';
+
+admin_layout_start('Admin Dashboard', 'City families, kiosk fleet, and activity at a glance.', 'dashboard', $actions);
 ?>
 
 <?php
-/* ─── TOP SUMMARY CARDS ─────────────────────────────────────────────── */
+/* ─── TOP SUMMARY CARDS ───────────────────────────────────────────── */
 ?>
-<section class="admin-grid-cards sk-stagger">
+<section class="admin-grid-cards admin-grid-cards--compact sk-stagger">
     <article class="admin-card admin-card--dashboard">
         <div class="admin-card-row">
             <div class="admin-card-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
             </div>
             <div class="admin-card-content">
-                <div class="admin-card-label">Total Users</div>
-                <div class="admin-card-value" data-count-up><?php echo (int)$totalUsers; ?></div>
+                <div class="admin-card-label">Families &amp; Children</div>
+                <div class="admin-card-value" data-count-up><?php echo (int)$familyTotal; ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend is-up">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
-                        <?php echo (int)$adminCount; ?> admins
-                    </span>
+                    <span class="admin-card-trend is-up"><?php echo (int)$totalParents; ?> parents</span>
                     <span class="admin-card-sep">&middot;</span>
-                    <span class="admin-card-trend is-up"><?php echo (int)$nutritionistCount; ?> nutritionists</span>
+                    <span class="admin-card-trend is-up"><?php echo (int)$totalChildren; ?> children</span>
                 </div>
             </div>
         </div>
@@ -184,15 +199,22 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.429 9.75 2.25 12l4.179 2.25m0-4.5 5.571 3 5.571-3m-11.142 0L2.25 7.5 12 2.25l9.75 5.25-4.179 2.25m0 0L12 12.75 6.429 9.75m11.142 0 4.179 2.25-9.75 5.25-9.75-5.25 4.179-2.25"/></svg>
             </div>
             <div class="admin-card-content">
-                <div class="admin-card-label">Kiosk Devices</div>
-                <div class="admin-card-value" data-count-up><?php echo (int)$devicesTotal; ?></div>
+                <div class="admin-card-label">Kiosk Fleet &middot; <?php echo (int)$devicesOnlineCount; ?>/<?php echo (int)$devicesTotal; ?> online</div>
+                <div class="admin-card-value admin-card-value--text <?php echo $fleetLabelClass; ?>"><?php echo admin_e($fleetLabel); ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend is-up">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"/></svg>
-                        <?php echo (int)$devicesOnlineCount; ?> online
-                    </span>
-                    <span class="admin-card-sep">&middot;</span>
-                    <span class="admin-card-trend is-up"><?php echo (int)$devicesTotal - (int)$devicesOnlineCount; ?> offline</span>
+                    <?php if ((int)$devicesTotal === 0): ?>
+                        <span class="admin-card-trend">No devices registered</span>
+                    <?php else: ?>
+                        <span class="admin-card-trend is-up"><?php echo (int)$devicesOnlineCount; ?> online</span>
+                        <?php if ($sensorNeedsRepair > 0): ?>
+                            <span class="admin-card-sep">&middot;</span>
+                            <span class="admin-card-trend is-danger"><?php echo (int)$sensorNeedsRepair; ?> maintenance</span>
+                        <?php endif; ?>
+                        <?php if ($sensorOffline > 0): ?>
+                            <span class="admin-card-sep">&middot;</span>
+                            <span class="admin-card-trend is-danger"><?php echo (int)$sensorOffline; ?> offline<?php echo $worstOfflineCode !== '' ? ' (' . admin_e($worstOfflineCode) . ')' : ''; ?></span>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </div>
             </div>
         </div>
@@ -204,15 +226,10 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
             </div>
             <div class="admin-card-content">
-                <div class="admin-card-label">Security Events</div>
+                <div class="admin-card-label">Security &amp; Activity</div>
                 <div class="admin-card-value" data-count-up><?php echo (int)$securityEvents; ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend is-danger">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-                        <?php echo (int)$dangerEvents; ?> critical &middot; <?php echo (int)$warningEvents; ?> warnings
-                    </span>
-                    <span class="admin-card-sep">&middot;</span>
-                    <span class="admin-card-trend is-danger"><?php echo (int)$failedLogins; ?> failed logins</span>
+                    <span class="admin-card-trend is-danger"><?php echo (int)$dangerEvents; ?> critical &middot; <?php echo (int)$warningEvents; ?> warnings</span>
                 </div>
             </div>
         </div>
@@ -221,30 +238,15 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
     <article class="admin-card admin-card--dashboard">
         <div class="admin-card-row">
             <div class="admin-card-icon is-success">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M8.288 15.038a5.25 5.25 0 0 1 7.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 0 1 1.06 0Z"/></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
             </div>
             <div class="admin-card-content">
-                <div class="admin-card-label">Sensor Status</div>
-                <?php if ($sensorNeedsRepair > 0): ?>
-                    <div class="admin-card-value admin-card-value--text admin-card-value--warn">Needs Repair</div>
-                <?php elseif ($sensorOffline > 0): ?>
-                    <div class="admin-card-value admin-card-value--text">Partial Offline</div>
-                <?php else: ?>
-                    <div class="admin-card-value admin-card-value--text admin-card-value--success">All Healthy</div>
-                <?php endif; ?>
+                <div class="admin-card-label">Staff Users</div>
+                <div class="admin-card-value" data-count-up><?php echo (int)$totalUsers; ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend is-up">
-                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="12" height="12"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-                        <?php echo (int)$sensorHealthy; ?> healthy
-                    </span>
-                    <?php if ($sensorNeedsRepair > 0): ?>
-                        <span class="admin-card-sep">&middot;</span>
-                        <span class="admin-card-trend is-danger"><?php echo (int)$sensorNeedsRepair; ?> repair</span>
-                    <?php endif; ?>
-                    <?php if ($sensorOffline > 0): ?>
-                        <span class="admin-card-sep">&middot;</span>
-                        <span class="admin-card-trend is-danger"><?php echo (int)$sensorOffline; ?> offline</span>
-                    <?php endif; ?>
+                    <span class="admin-card-trend is-up"><?php echo (int)$adminCount; ?> admins</span>
+                    <span class="admin-card-sep">&middot;</span>
+                    <span class="admin-card-trend is-up"><?php echo (int)$nutritionistCount; ?> nutritionists</span>
                 </div>
             </div>
         </div>
@@ -252,20 +254,20 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
 </section>
 
 <?php
-/* ─── USERS ACROSS THE CITY + USER DISTRIBUTION ────────────────────── */
+/* ─── FAMILIES MAP + AI INSIGHTS + KIOSK ─────────────────────────── */
 ?>
-<section class="admin-dashboard-maprow">
+<section class="admin-dashboard-maprow admin-dashboard-maprow--compact">
     <article class="admin-section admin-dashboard-mapsection">
         <div class="admin-section-head">
             <div>
                 <h2 class="admin-section-title">Families Across the Entire City</h2>
-                <p class="admin-section-subtitle">Geographic distribution of registered families across all barangays in the City of San Fernando, Pampanga.</p>
+                <p class="admin-section-subtitle">Registered families per barangay — City of San Fernando, Pampanga.</p>
             </div>
         </div>
 
-        <div class="admin-riskmap-layout">
+        <div class="admin-riskmap-layout admin-riskmap-layout--compact">
             <div class="admin-riskmap-mapwrap">
-                <div id="user-map" class="admin-riskmap-canvas-v2"></div>
+                <div id="user-map" class="admin-riskmap-canvas-v2 admin-riskmap-canvas--compact"></div>
             </div>
 
             <aside class="admin-riskmap-sidebar">
@@ -306,125 +308,56 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
     </article>
 
     <div class="admin-dashboard-rightcol">
-        <article class="admin-section admin-dashboard-distsection">
+        <article class="admin-section admin-dashboard-insights">
             <div class="admin-section-head">
                 <div>
-                    <h2 class="admin-section-title">User Distribution</h2>
-                    <p class="admin-section-subtitle">System staff accounts — Admin and Nutritionist roles only.</p>
+                    <h2 class="admin-section-title">Quick AI Insights — City Families</h2>
+                    <p class="admin-section-subtitle">Coverage gaps and nutrition signals.</p>
+                </div>
+                <div class="admin-dashboard-insights-actions">
+                    <button id="family-insights-refresh" class="admin-icon-btn" type="button" title="Refresh insights"><?php echo admin_action_icon('sync'); ?></button>
                 </div>
             </div>
-
-            <div class="admin-dashboard-donut-wrap">
-                <?php
-                $totalStaff = max(1, (int)$adminCount + (int)$nutritionistCount);
-                $adminPct = round(((int)$adminCount / $totalStaff) * 360, 2);
-                $nutriPct = round(360 - $adminPct, 2);
-                ?>
-                <div class="admin-css-donut" style="background: conic-gradient(#f2a93b 0deg <?php echo $adminPct; ?>deg, #0b6e4f <?php echo $adminPct; ?>deg 360deg);">
-                    <div class="admin-css-donut-hole">
-                        <span class="admin-css-donut-total"><?php echo (int)($adminCount + $nutritionistCount); ?></span>
-                        <span class="admin-css-donut-label">Total Staff</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="admin-dashboard-dist-stats">
-                <div class="admin-dashboard-dist-stat">
-                    <div class="admin-dashboard-dist-dot" style="background:#f2a93b"></div>
-                    <div class="admin-dashboard-dist-info">
-                        <span class="admin-dashboard-dist-label">Admins</span>
-                        <span class="admin-dashboard-dist-value"><?php echo (int)$adminCount; ?></span>
-                    </div>
-                </div>
-                <div class="admin-dashboard-dist-stat">
-                    <div class="admin-dashboard-dist-dot" style="background:#0b6e4f"></div>
-                    <div class="admin-dashboard-dist-info">
-                        <span class="admin-dashboard-dist-label">Nutritionists</span>
-                        <span class="admin-dashboard-dist-value"><?php echo (int)$nutritionistCount; ?></span>
-                    </div>
-                </div>
-            </div>
+            <ul id="family-insights-list" class="admin-dashboard-insights-list">
+                <li class="admin-dashboard-insights-item is-loading">Loading city insights…</li>
+            </ul>
+            <div id="family-insights-meta" class="admin-mini"></div>
         </article>
 
-        <article class="admin-section admin-dashboard-kiosksection">
+        <article class="admin-section admin-dashboard-kiosksection admin-dashboard-kiosksection--compact">
             <div class="admin-section-head">
                 <div>
                     <h2 class="admin-section-title">Live Kiosk &amp; Sensor Status</h2>
-                    <p class="admin-section-subtitle">Quick overview of deployed devices.</p>
+                    <p class="admin-section-subtitle">Deployed devices at a glance.</p>
                 </div>
+                <a class="admin-btn-secondary admin-btn-secondary--sm" href="<?php echo admin_e(app_url('/admin/sensors.php')); ?>">Manage</a>
             </div>
             <div id="kiosk-tiles-wrap" class="admin-dashboard-kiosk-grid"></div>
-            <div id="kiosk-pagination" class="admin-pagination admin-pagination--mini"></div>
         </article>
     </div>
 </section>
 
 <?php
-/* ─── USER MANAGEMENT ───────────────────────────────────────────────── */
+/* ─── HORIZONTAL QUICK NAV ─────────────────────────────────────────── */
+$quickNavs = [
+    ['href' => app_url('/admin/children.php'), 'icon' => 'children', 'label' => 'Children', 'sub' => 'Records & growth'],
+    ['href' => app_url('/admin/sensors.php'), 'icon' => 'sensors', 'label' => 'Sensors', 'sub' => 'Kiosk fleet'],
+    ['href' => app_url('/admin/audit_logs.php'), 'icon' => 'audit_logs', 'label' => 'Audit Logs', 'sub' => 'Activity & security'],
+    ['href' => app_url('/admin/users.php'), 'icon' => 'users', 'label' => 'Users', 'sub' => 'Staff accounts'],
+];
 ?>
-<section class="admin-section">
-    <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title">User Management</h2>
-            <p class="admin-section-subtitle">Nutritionist and Administrator accounts with status and activity.</p>
-        </div>
-        <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-            <input class="admin-search" type="search" placeholder="Search users..." data-admin-filter="#staff-users-table" style="flex:1; min-width:180px;">
-            <?php if (has_permission('users.create')): ?>
-            <a class="admin-btn" href="<?php echo admin_e(app_url('/admin/invitation_form.php')); ?>"><?php echo admin_action_icon('add'); ?> Invite staff</a>
-            <?php endif; ?>
-        </div>
-    </div>
-
-    <div class="admin-table-wrap">
-        <table class="admin-table" id="staff-users-table">
-            <thead>
-                <tr>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Barangay</th>
-                    <th>Status</th>
-                    <th>Registered</th>
-                    <th>Last Login</th>
-                </tr>
-            </thead>
-            <tbody>
-                <?php foreach ($staffUsers as $su): ?>
-                    <?php
-                    $statusClass = $su['status'] === 'active' ? 'is-success' : 'is-muted';
-                    ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($su['name'] . ' ' . $su['role_name'] . ' ' . (string)($su['barangay'] ?? '') . ' ' . $su['status'])); ?>">
-                        <td>
-                            <div style="display:flex;align-items:center;gap:10px;">
-                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($su['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($su['name']); ?></span>
-                                <div>
-                                    <div style="font-weight:700;"><?php echo admin_e($su['name']); ?></div>
-                                    <div class="admin-mini"><?php echo admin_e($su['email']); ?></div>
-                                </div>
-                            </div>
-                        </td>
-                        <td><span class="admin-pill <?php echo $su['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($su['role_name'])); ?></span></td>
-                        <td><?php echo admin_e((string)($su['barangay'] ?? 'All barangays')); ?></td>
-                        <td><span class="admin-pill <?php echo $statusClass; ?>"><?php echo admin_e(ucfirst($su['status'])); ?></span></td>
-                        <td><?php
-                            $d = (string)($su['created_at'] ?? '');
-                            echo $d !== '' ? admin_e(date('M j Y', strtotime($d))) : 'n/a';
-                        ?></td>
-                        <td><?php
-                            $d = (string)($su['last_login'] ?? '');
-                            if ($d !== '' && $d !== 'never') {
-                                echo admin_e(date('M j Y', strtotime($d)));
-                                echo '<br><span class="admin-mini">' . admin_e(date('H:i', strtotime($d))) . '</span>';
-                            } else {
-                                echo 'never';
-                            }
-                        ?></td>
-                    </tr>
-                <?php endforeach; ?>
-            </tbody>
-        </table>
-    </div>
-</section>
+<nav class="admin-quicknav" aria-label="Quick navigation">
+    <?php foreach ($quickNavs as $qn): ?>
+        <a class="admin-quicknav-item" href="<?php echo admin_e($qn['href']); ?>">
+            <span class="admin-quicknav-icon"><?php echo admin_sidebar_icon($qn['icon']); ?></span>
+            <span class="admin-quicknav-text">
+                <strong><?php echo admin_e($qn['label']); ?></strong>
+                <small><?php echo admin_e($qn['sub']); ?></small>
+            </span>
+            <span class="admin-quicknav-arrow" aria-hidden="true">&#8250;</span>
+        </a>
+    <?php endforeach; ?>
+</nav>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -471,9 +404,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             .toLowerCase();
     }
 
-    /* ─── User Distribution Donut (pure CSS — no Chart.js needed) ─── */
-
-    /* ─── Top Barangays List ───────────────────────────────────────── */
+    /* ─── Top Barangays List (compact: top 3 for above-the-fold) ─────── */
     function renderTopBarangays() {
         var container = document.getElementById('top-barangays-list');
         if (!container) return;
@@ -481,7 +412,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         var sorted = Object.keys(STATS_BY_NAME).map(function (k) { return STATS_BY_NAME[k]; })
             .filter(function (s) { return s.total > 0; })
             .sort(function (a, b) { return b.total - a.total; })
-            .slice(0, 6);
+            .slice(0, 3);
 
         if (sorted.length === 0) {
             container.innerHTML = '<div class="admin-empty"><p>No families registered yet.</p></div>';
@@ -671,6 +602,9 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
                     }
                 }).addTo(map);
 
+                // Container stretches to the row height — re-check size now
+                // that CSS layout has settled, then fit the boundaries.
+                map.invalidateSize();
                 map.fitBounds(geoLayer.getBounds(), { padding: [16, 16] });
 
                 // Update legend counts
@@ -692,25 +626,19 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             });
     }
 
-    /* ─── Live Kiosk Tiles Pagination ──────────────────────────────── */
-    var KIOSK_PER_PAGE = 6;
-    var kioskPage = 1;
+    /* ─── Live Kiosk Tiles (compact: first 4, no pagination) ─────────── */
+    var KIOSK_MAX = 4;
 
     function renderKioskTiles() {
         var wrap = document.getElementById('kiosk-tiles-wrap');
-        var pag = document.getElementById('kiosk-pagination');
         if (!wrap) return;
 
         if (KIOSK_DEVICES.length === 0) {
-            wrap.innerHTML = '<div class="admin-empty" style="padding:16px;"><p>No devices registered yet.</p></div>';
-            if (pag) pag.innerHTML = '';
+            wrap.innerHTML = '<div class="admin-empty" style="padding:12px;"><p>No devices registered yet.</p></div>';
             return;
         }
 
-        var totalPages = Math.ceil(KIOSK_DEVICES.length / KIOSK_PER_PAGE);
-        if (kioskPage > totalPages) kioskPage = totalPages;
-        var start = (kioskPage - 1) * KIOSK_PER_PAGE;
-        var slice = KIOSK_DEVICES.slice(start, start + KIOSK_PER_PAGE);
+        var slice = KIOSK_DEVICES.slice(0, KIOSK_MAX);
 
         var html = '';
         slice.forEach(function (d) {
@@ -721,31 +649,66 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
             html += '<span class="admin-pill ' + d.pill + '" style="font-size:0.65rem;padding:2px 8px;">' + d.label + '</span>';
             html += '</div>';
         });
+        if (KIOSK_DEVICES.length > KIOSK_MAX) {
+            html += '<div class="admin-dashboard-kiosk-more">+' + (KIOSK_DEVICES.length - KIOSK_MAX) + ' more in Sensors</div>';
+        }
         wrap.innerHTML = html;
-
-        if (!pag || totalPages <= 1) { if (pag) pag.innerHTML = ''; return; }
-
-        var phtml = '<span class="admin-pagination-status">Page ' + kioskPage + ' of ' + totalPages + '</span>';
-        phtml += '<div class="admin-pagination-actions">';
-        phtml += '<button class="admin-icon-btn" data-kiosk-page="prev"' + (kioskPage <= 1 ? ' disabled' : '') + '>&#8249;</button>';
-        phtml += '<button class="admin-icon-btn" data-kiosk-page="next"' + (kioskPage >= totalPages ? ' disabled' : '') + '>&#8250;</button>';
-        phtml += '</div>';
-        pag.innerHTML = phtml;
     }
 
     function escHtml(s) {
         var d = document.createElement('div');
-        d.appendChild(document.createTextNode(s));
+        d.appendChild(document.createTextNode(String(s == null ? '' : s)));
         return d.innerHTML;
     }
 
+    /* ─── Family AI Insights ───────────────────────────────────────── */
+    var FAMILY_INSIGHTS_URL = <?php echo json_encode(app_url('/api/admin/family_insights.php')); ?>;
+
+    function renderFamilyInsights(insights, generatedAt) {
+        var list = document.getElementById('family-insights-list');
+        var meta = document.getElementById('family-insights-meta');
+        if (!list) return;
+        if (!insights || insights.length === 0) {
+            list.innerHTML = '<li class="admin-dashboard-insights-item">No city patterns yet — register families to unlock insights.</li>';
+        } else {
+            list.innerHTML = insights.map(function (t) {
+                return '<li class="admin-dashboard-insights-item">' + escHtml(t) + '</li>';
+            }).join('');
+        }
+        if (meta) {
+            meta.textContent = generatedAt ? ('Updated ' + generatedAt) : '';
+        }
+    }
+
+    function loadFamilyInsights(force) {
+        var list = document.getElementById('family-insights-list');
+        var btn = document.getElementById('family-insights-refresh');
+        if (list && !force) list.innerHTML = '<li class="admin-dashboard-insights-item is-loading">Loading city insights…</li>';
+        if (btn) btn.disabled = true;
+        var url = FAMILY_INSIGHTS_URL + (force ? '?force=1' : '');
+        fetch(url, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res && res.success) {
+                    renderFamilyInsights(res.insights, res.generated_at);
+                } else {
+                    renderFamilyInsights([], '');
+                    var m = document.getElementById('family-insights-meta');
+                    if (m) m.textContent = 'Could not load insights.';
+                }
+            })
+            .catch(function () {
+                renderFamilyInsights([], '');
+                var m2 = document.getElementById('family-insights-meta');
+                if (m2) m2.textContent = 'Could not load insights. Retrying…';
+            })
+            .finally(function () { if (btn) btn.disabled = false; });
+    }
+
     document.addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-kiosk-page]');
-        if (!btn) return;
-        var action = btn.getAttribute('data-kiosk-page');
-        var totalPages = Math.ceil(KIOSK_DEVICES.length / KIOSK_PER_PAGE);
-        if (action === 'prev' && kioskPage > 1) { kioskPage--; renderKioskTiles(); }
-        if (action === 'next' && kioskPage < totalPages) { kioskPage++; renderKioskTiles(); }
+        if (e.target.closest && e.target.closest('#family-insights-refresh')) {
+            loadFamilyInsights(true);
+        }
     });
 
     /* ─── Initialize ───────────────────────────────────────────────── */
@@ -753,6 +716,7 @@ admin_layout_start('Dashboard', 'System overview, user distribution, and device 
         renderTopBarangays();
         renderKioskTiles();
         initMap();
+        loadFamilyInsights(false);
     });
 })();
 </script>

@@ -15,11 +15,9 @@ function admin_nav_items(): array
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/admin/dashboard.php')],
         ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php')],
         ['key' => 'invitations', 'label' => 'Invitations', 'href' => app_url('/admin/invitations.php')],
-        ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php')],
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/admin/children.php')],
         ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php')],
         ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php')],
-        ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php')],
         ['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php')],
     ];
 }
@@ -155,7 +153,6 @@ function admin_grouped_nav_items(): array
             'items' => [
                 ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php'), 'icon' => 'users'],
                 ['key' => 'invitations', 'label' => 'Invitations', 'href' => app_url('/admin/invitations.php'), 'icon' => 'key'],
-                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php'), 'icon' => 'parents'],
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/admin/children.php'), 'icon' => 'children'],
                 ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php'), 'icon' => 'barangays'],
             ],
@@ -168,12 +165,6 @@ function admin_grouped_nav_items(): array
 				['key' => 'auto_archive', 'label' => 'Auto-Archive', 'href' => app_url('/admin/auto_archive.php'), 'icon' => 'calendar'],
 			],
 		],
-        [
-            'label' => 'Configuration',
-            'items' => [
-                ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php'), 'icon' => 'roles_permissions'],
-            ],
-        ],
         [
             'label' => 'Account',
             'items' => [
@@ -882,7 +873,8 @@ function admin_layout_end(): void
     echo confirm_modal_shell();
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
-    echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+    $formValidateVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-form-validate.js');
+    echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
     echo '</body>';
