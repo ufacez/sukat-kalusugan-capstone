@@ -14,9 +14,10 @@ $auth = current_user();
 
 if ($auth !== null) {
     $userId = (int)($auth['id'] ?? 0);
+    // Privacy: account type + id only — never the email.
     $description = ($auth['type'] ?? 'guest') === 'parent'
-        ? 'Parent logout for ' . ($auth['email'] ?? 'unknown')
-        : 'Staff logout for ' . ($auth['email'] ?? 'unknown');
+        ? 'Parent logout (#' . $userId . ')'
+        : 'Staff logout (#' . $userId . ')';
 
     log_action($userId, 'LOGOUT', 'info', $description);
 }

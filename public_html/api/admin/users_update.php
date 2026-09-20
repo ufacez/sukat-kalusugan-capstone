@@ -116,7 +116,7 @@ if (!mysqli_stmt_execute($stmt)) {
 mysqli_stmt_close($stmt);
 
 $actor = current_user();
-log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Updated user ' . $email . ' (' . $id . ')');
+log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Updated staff #' . $id);
 
 admin_clear_form_state();
 admin_redirect('/admin/users.php', ['notice' => 'User updated successfully.', 'type' => 'success']);

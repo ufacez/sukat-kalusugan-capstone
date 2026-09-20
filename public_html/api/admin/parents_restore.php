@@ -33,7 +33,7 @@ $restoredKids = $ok ? admin_cascade_parent_status($id, 'active') : 0;
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Restored parent ' . $target['email'] . ' (' . $id . ') with ' . $restoredKids . ' child(ren)');
+    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Restored parent #' . $id . ' with ' . $restoredKids . ' child(ren)');
 }
 
 admin_redirect('/admin/parents_archived.php', ['notice' => $ok ? 'Parent restored successfully' . ($restoredKids > 0 ? ' with ' . $restoredKids . ' child(ren).' : '.') : 'Parent could not be restored.', 'type' => $ok ? 'success' : 'error']);

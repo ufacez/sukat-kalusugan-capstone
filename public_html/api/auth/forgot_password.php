@@ -65,7 +65,9 @@ if ($account !== null) {
     password_reset_send_email($account['email'], $account['name'], $rawToken);
 
     $userIdForLog = $account['type'] === 'staff' ? $account['id'] : null;
-    log_action($userIdForLog, 'PASSWORD_RESET_REQUEST', 'info', 'Password reset requested for ' . $account['email']);
+    // Privacy: account type + id only — never the email (this endpoint must
+    // not confirm whether an address exists, either).
+    log_action($userIdForLog, 'PASSWORD_RESET_REQUEST', 'info', 'Password reset requested for ' . $account['type'] . ' account #' . $account['id']);
 }
 
 // Recorded as a "failure" purely so login_lockout_seconds_remaining() (which

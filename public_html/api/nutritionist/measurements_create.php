@@ -276,18 +276,10 @@ log_action(
     'measurement.create',
     'info',
     sprintf(
-        'Manual measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s%s',
+        // Privacy: general identifiers only — no measurement values.
+        'Manual measurement #%d for %s',
         $measurementId,
-        $childName,
-        (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
-        $isFlagged === 1 ? ' | Flagged: ' . (string)$flagReason : ''
+        (string)$child['child_code']
     )
 );
 

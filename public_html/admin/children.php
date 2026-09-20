@@ -6,6 +6,111 @@ require_once __DIR__ . '/../includes/who_calculator.php';
 start_secure_session();
 require_permission('children.view');
 
+$canAddChild = has_permission('children.create');
+
+// Handle create POST — the Add Child form is a modal on this page.
+// Validation errors reopen the modal with values preserved.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && ($_POST['action'] ?? '') === 'create') {
+    if (!$canAddChild) {
+        admin_redirect('/admin/children.php', ['notice' => 'You do not have permission to create children.', 'type' => 'error']);
+    }
+
+    $firstName = trim((string)($_POST['first_name'] ?? ''));
+    $middleName = trim((string)($_POST['middle_name'] ?? ''));
+    $lastName = trim((string)($_POST['last_name'] ?? ''));
+    $birthdate = trim((string)($_POST['birthdate'] ?? ''));
+    $sex = trim((string)($_POST['sex'] ?? 'Male'));
+    $isIp = isset($_POST['is_ip']) ? 1 : 0;
+    $hasDisability = isset($_POST['has_disability']) ? 1 : 0;
+    $parentId = (int)($_POST['parent_id'] ?? 0);
+    $localAreaId = (int)($_POST['local_area_id'] ?? 0);
+
+    $childBack = '/admin/children.php?modal=child';
+
+    if (
+        !admin_is_valid_name_part($firstName, true)
+        || !admin_is_valid_name_part($middleName, false)
+        || !admin_is_valid_name_part($lastName, true)
+        || $birthdate === ''
+        || $parentId <= 0
+    ) {
+        admin_flash_form_state($_POST, 'first_name');
+        admin_redirect($childBack, ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
+    }
+
+    $parent = admin_fetch_one('SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+
+    if (!$parent) {
+        admin_flash_form_state($_POST, 'parent_id');
+        admin_redirect($childBack, ['notice' => 'Selected parent/guardian could not be found.', 'type' => 'error']);
+    }
+
+    $barangayId = !empty($parent['barangay_id']) ? (int)$parent['barangay_id'] : null;
+
+    if ($barangayId === null) {
+        admin_flash_form_state($_POST, 'parent_id');
+        admin_redirect($childBack, ['notice' => 'The selected parent/guardian does not have a Barangay assigned.', 'type' => 'error']);
+    }
+
+    $validatedLocalAreaId = null;
+    if ($localAreaId > 0) {
+        $localArea = admin_fetch_one(
+            'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+            'ii',
+            [$localAreaId, $barangayId]
+        );
+
+        if ($localArea) {
+            $validatedLocalAreaId = (int)$localArea['id'];
+        } else {
+            admin_flash_form_state($_POST, 'local_area_id');
+            admin_redirect($childBack, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
+        }
+    }
+
+    // Form-level age validation: 0-5 years inclusive (the eOPT Plus
+    // scope). The day count is the canonical check now -- 60 months
+    // is roughly 1825 days, so we use that as the upper bound.
+    $registrationAgeDays = doh_age_in_days($birthdate);
+
+    if ($registrationAgeDays === null || $registrationAgeDays > 1825) {
+        admin_flash_form_state($_POST, 'birthdate');
+        admin_redirect($childBack, ['notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger.', 'type' => 'error']);
+    }
+
+    if (!in_array($sex, ['Male', 'Female'], true)) {
+        $sex = 'Male';
+    }
+
+    $childCode = admin_next_child_code();
+
+    $ok = admin_execute(
+        'INSERT INTO children (child_code, first_name, middle_name, last_name, birthdate, sex, barangay_id, local_area_id, is_ip, has_disability, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        'ssssssssiii',
+        [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId]
+    );
+
+    if ($ok) {
+        $actor = current_user();
+        log_action($actor['id'] ?? null, 'CREATE_CHILD', 'info', 'Created child ' . $childCode);
+    }
+
+    admin_clear_form_state();
+    admin_redirect('/admin/children.php', $ok ? ['notice' => 'Child added successfully.'] : ['notice' => 'Child could not be added.', 'type' => 'error']);
+}
+
+function admin_next_child_code(): string
+{
+    $row = admin_fetch_one('SELECT child_code FROM children ORDER BY id DESC LIMIT 1');
+    $lastCode = (string)($row['child_code'] ?? 'CHD-0000');
+
+    if (preg_match('/(\d+)$/', $lastCode, $matches) !== 1) {
+        return 'CHD-0001';
+    }
+
+    return 'CHD-' . str_pad((string)(((int)$matches[1]) + 1), 4, '0', STR_PAD_LEFT);
+}
+
 $editId = (int)($_GET['edit'] ?? 0);
 
 if ($editId > 0) {
@@ -60,9 +165,27 @@ $archivedCount = (int)($archivedCountRow['cnt'] ?? 0);
 
 $barangays = admin_fetch_all("SELECT id, name FROM barangays WHERE status = 'active' ORDER BY name ASC");
 
+$parentOptions = [];
+$cold = [];
+$cFormErrorField = null;
+$cFormErrorNotice = trim((string)($_GET['notice'] ?? ''));
+$childModalOpen = false;
+
+if ($canAddChild) {
+    $parentOptions = admin_fetch_all(
+        "SELECT p.id, p.name, p.parent_type, p.status, p.barangay_id, bg.name AS barangay
+         FROM parents p LEFT JOIN barangays bg ON bg.id = p.barangay_id
+         ORDER BY p.name ASC"
+    );
+    $cfState = admin_take_form_state();
+    $cold = $cfState['old'];
+    $cFormErrorField = $cfState['error_field'];
+    $childModalOpen = ($_GET['modal'] ?? '') === 'child';
+}
+
 $actions = '';
-if (has_permission('children.create')) {
-    $actions .= '<a class="admin-btn" href="' . admin_e(app_url('/admin/child_form.php')) . '">' . admin_action_icon('add') . ' Add child</a>';
+if ($canAddChild) {
+    $actions .= '<button class="admin-btn" type="button" data-child-open>' . admin_action_icon('add') . ' Add child</button>';
 }
 
 admin_layout_start('Children', 'Registered child profiles, growth status, and nutritional tracking.', 'children', $actions);
@@ -181,6 +304,170 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
         </table>
     </div>
 </section>
+
+<?php if ($canAddChild): ?>
+<div class="admin-modal-overlay" id="child-overlay"<?php echo $childModalOpen ? '' : ' hidden'; ?>>
+    <div class="admin-modal admin-modal--form" role="dialog" aria-modal="true" aria-labelledby="child-modal-title">
+        <div class="admin-modal-head">
+            <h3 id="child-modal-title">Add Child</h3>
+            <button class="admin-modal-close" data-child-close type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+            <p class="admin-section-subtitle" style="margin:0 0 14px;">Create a new child record. The barangay is inherited from the selected parent. <span class="admin-required">*</span> Required field.</p>
+            <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/admin/children.php')); ?>">
+                <input type="hidden" name="action" value="create">
+
+                <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
+
+                <div class="admin-field-wide">
+                    <div class="admin-field-row">
+                        <label class="admin-field<?php echo $cFormErrorField === 'first_name' ? ' is-invalid' : ''; ?>">
+                            <span>First name<span class="admin-required">*</span></span>
+                            <input name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo admin_e(admin_old_value($cold, 'first_name')); ?>" placeholder="Juan">
+                            <span class="admin-field-message"><?php echo $cFormErrorField === 'first_name' ? admin_e($cFormErrorNotice) : ''; ?></span>
+                        </label>
+                        <label class="admin-field">
+                            <span>Middle name</span>
+                            <input name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo admin_e(admin_old_value($cold, 'middle_name')); ?>" placeholder="Santos">
+                            <span class="admin-field-message"></span>
+                        </label>
+                        <label class="admin-field">
+                            <span>Surname<span class="admin-required">*</span></span>
+                            <input name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo admin_e(admin_old_value($cold, 'last_name')); ?>" placeholder="Dela Cruz">
+                            <span class="admin-field-message"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <label class="admin-field<?php echo $cFormErrorField === 'birthdate' ? ' is-invalid' : ''; ?>">
+                    <span>Birthdate<span class="admin-required">*</span></span>
+                    <input type="date" name="birthdate" required max="<?php echo admin_e(date('Y-m-d')); ?>" value="<?php echo admin_e(admin_old_value($cold, 'birthdate')); ?>">
+                    <span class="admin-field-message"><?php echo $cFormErrorField === 'birthdate' ? admin_e($cFormErrorNotice) : ''; ?></span>
+                </label>
+
+                <label class="admin-field">
+                    <span>Sex<span class="admin-required">*</span></span>
+                    <select name="sex" required>
+                        <option value="Male" <?php echo admin_old_value($cold, 'sex', 'Male') === 'Male' ? 'selected' : ''; ?>>Male</option>
+                        <option value="Female" <?php echo admin_old_value($cold, 'sex', '') === 'Female' ? 'selected' : ''; ?>>Female</option>
+                    </select>
+                </label>
+
+                <label class="admin-field<?php echo $cFormErrorField === 'parent_id' ? ' is-invalid' : ''; ?>">
+                    <span>Parent/Guardian<span class="admin-required">*</span></span>
+                    <select name="parent_id" id="cm-parent-select" required>
+                        <option value="">-- Select Parent --</option>
+                        <?php foreach ($parentOptions as $parent): ?>
+                            <option value="<?php echo (int)$parent['id']; ?>" data-barangay-id="<?php echo (int)($parent['barangay_id'] ?? 0); ?>" <?php echo admin_old_value($cold, 'parent_id', '') !== '' && (int)admin_old_value($cold, 'parent_id') === (int)$parent['id'] ? 'selected' : ''; ?>>
+                                <?php echo admin_e($parent['name'] . ' · Barangay: ' . ($parent['barangay'] ?? 'Not assigned')); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="admin-field-message"><?php echo $cFormErrorField === 'parent_id' ? admin_e($cFormErrorNotice) : ''; ?></span>
+                    <small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">The child's Barangay will match the selected parent.</small>
+                </label>
+
+                <label class="admin-field<?php echo $cFormErrorField === 'local_area_id' ? ' is-invalid' : ''; ?>">
+                    <span>Local Area / Purok</span>
+                    <select name="local_area_id" id="cm-local-area-select" data-current-area="<?php echo (int)admin_old_value($cold, 'local_area_id', '0'); ?>">
+                        <option value="">-- Select Local Area --</option>
+                    </select>
+                    <span class="admin-field-message"><?php echo $cFormErrorField === 'local_area_id' ? admin_e($cFormErrorNotice) : ''; ?></span>
+                </label>
+
+                <label class="admin-field admin-field-checkbox">
+                    <input type="checkbox" name="is_ip" value="1" <?php echo admin_old_value($cold, 'is_ip', '') !== '' ? 'checked' : ''; ?>>
+                    <span>Belongs to IP (Indigenous Peoples) group</span>
+                </label>
+
+                <label class="admin-field admin-field-checkbox">
+                    <input type="checkbox" name="has_disability" value="1" <?php echo admin_old_value($cold, 'has_disability', '') !== '' ? 'checked' : ''; ?>>
+                    <span>Has a disability</span>
+                </label>
+
+                <div class="admin-field admin-field-wide" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                    <button class="admin-btn-secondary" type="button" data-child-close>Cancel</button>
+                    <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Create child</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    var overlay = document.getElementById('child-overlay');
+    if (!overlay) return;
+    function openChild() {
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+    }
+    function closeChild() {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('[data-child-open]').forEach(function(b) {
+        b.addEventListener('click', openChild);
+    });
+    overlay.querySelectorAll('[data-child-close]').forEach(function(b) {
+        b.addEventListener('click', closeChild);
+    });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeChild();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !overlay.hidden) closeChild();
+    });
+})();
+(function() {
+    var parentSelect = document.getElementById('cm-parent-select');
+    var areaSelect = document.getElementById('cm-local-area-select');
+    if (!parentSelect || !areaSelect) return;
+    var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
+    var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+
+    function loadAreas(barangayId, selectedId) {
+        areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+        if (!barangayId || barangayId <= 0) return;
+        areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
+        fetch(apiBase + '?barangay_id=' + barangayId)
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+                if (!res.success || !res.data || res.data.length === 0) {
+                    areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
+                    return;
+                }
+                res.data.forEach(function(area) {
+                    if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) return;
+                    var opt = document.createElement('option');
+                    opt.value = area.id;
+                    opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+                    if (selectedId && parseInt(opt.value, 10) === selectedId) opt.selected = true;
+                    areaSelect.appendChild(opt);
+                });
+            })
+            .catch(function() {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+            });
+    }
+
+    function getParentBarangayId() {
+        var selected = parentSelect.options[parentSelect.selectedIndex];
+        if (!selected || !selected.value) return 0;
+        return parseInt(selected.getAttribute('data-barangay-id') || '0', 10);
+    }
+
+    parentSelect.addEventListener('change', function() {
+        currentAreaId = 0;
+        loadAreas(getParentBarangayId(), 0);
+    });
+
+    var initialBarangayId = getParentBarangayId();
+    if (initialBarangayId > 0) loadAreas(initialBarangayId, currentAreaId);
+})();
+</script>
+<?php endif; ?>
 
 <?php
 admin_layout_end();

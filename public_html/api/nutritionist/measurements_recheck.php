@@ -275,17 +275,10 @@ log_action(
     'MEASUREMENT_RECHECK',
     'info',
     sprintf(
-        'Recheck measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Verifies #%s | Reason: %s (due schedule untouched)',
+        // Privacy: general identifiers + staff reason only — no values.
+        'Recheck measurement #%d for %s | Verifies #%s | Reason: %s',
         $measurementId,
-        $childName,
         (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
         $recheckOfId !== null ? (string)$recheckOfId : 'none',
         $recheckReason
     )

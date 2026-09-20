@@ -229,17 +229,10 @@ log_action(
     'MEASUREMENT_OVERRIDE',
     'info',
     sprintf(
-        'Override measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Reason: %s',
+        // Privacy: general identifiers + staff reason only — no values.
+        'Override measurement #%d for %s | Reason: %s',
         $measurementId,
-        $childName,
         (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
         $overrideReason
     )
 );

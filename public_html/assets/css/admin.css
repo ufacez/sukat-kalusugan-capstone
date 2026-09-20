@@ -2447,6 +2447,18 @@
   color: var(--admin-text);
 }
 
+.admin-modal-overlay[hidden] {
+  display: none;
+}
+
+.admin-modal--form {
+  max-width: 680px;
+}
+
+.admin-modal-body {
+  padding: 16px 20px 20px;
+}
+
 #area-form {
   padding: 20px;
 }

@@ -122,7 +122,7 @@ if (is_array($staff) && password_verify($password, (string)($staff['password_has
         mysqli_stmt_close($lastLoginStmt);
     }
 
-    log_action((int)$staff['id'], 'LOGIN', 'info', 'Staff login for ' . (string)$staff['email']);
+    log_action((int)$staff['id'], 'LOGIN', 'info', 'Staff login (#' . (int)$staff['id'] . ')');
     \login_record_attempt($identifier, true);
     login_respond_success($_SESSION['auth']);
 }
@@ -165,7 +165,7 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
         'status' => (string)$parent['status'],
     ];
 
-    log_action((int)$parent['id'], 'LOGIN', 'info', 'Parent login for ' . (string)$parent['email']);
+    log_action((int)$parent['id'], 'LOGIN', 'info', 'Parent login (#' . (int)$parent['id'] . ')');
     \login_record_attempt($identifier, true);
     login_respond_success($_SESSION['auth']);
 }

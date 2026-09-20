@@ -31,7 +31,7 @@ $ok = admin_execute('DELETE FROM users WHERE id = ?', 'i', [$id]);
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'DELETE_USER', 'danger', 'Permanently deleted user ' . $target['email'] . ' (' . $id . ')');
+    log_action($actor['id'] ?? null, 'DELETE_USER', 'danger', 'Permanently deleted staff #' . $id);
 }
 
 admin_redirect('/admin/users_archived.php', ['notice' => $ok ? 'User permanently deleted.' : 'User could not be deleted.', 'type' => $ok ? 'success' : 'error']);

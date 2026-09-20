@@ -33,7 +33,7 @@ $archivedKids = $ok ? admin_cascade_parent_status($id, 'inactive') : 0;
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', 'Archived parent ' . $target['email'] . ' (' . $id . ') with ' . $archivedKids . ' child(ren)');
+    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', 'Archived parent #' . $id . ' with ' . $archivedKids . ' child(ren)');
 }
 
 admin_redirect('/admin/users.php', ['notice' => $ok ? 'Parent archived successfully' . ($archivedKids > 0 ? ' with ' . $archivedKids . ' child(ren).' : '.') : 'Parent could not be archived.', 'type' => $ok ? 'success' : 'error']);

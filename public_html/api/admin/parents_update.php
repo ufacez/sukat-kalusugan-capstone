@@ -116,7 +116,7 @@ if ($ok) {
         admin_cascade_parent_status($id, $status);
     }
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent ' . $email . ' (' . $id . ')');
+    log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $id);
 }
 
 admin_redirect('/admin/users.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);

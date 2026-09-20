@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($ok) {
             $actor = current_user();
             $actionLabel = $newStatus === 'inactive' ? 'Archived' : 'Restored';
-            log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', $actionLabel . ' parent ' . $target['email'] . ' (' . $parentId . ') with ' . $kids . ' child(ren)');
+            log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'warning', $actionLabel . ' parent #' . $parentId . ' with ' . $kids . ' child(ren)');
         }
 
         $backTab = $newStatus === 'inactive' ? '?tab=archived' : '';

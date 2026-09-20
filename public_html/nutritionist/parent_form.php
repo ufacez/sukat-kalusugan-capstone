@@ -196,7 +196,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 		if ($ok) {
 			$actor = current_user();
-			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $email);
+			$newParentId = (int)get_db_connection()->insert_id;
+			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account #' . $newParentId . ' via nutritionist form');
 		}
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
@@ -224,7 +225,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 				admin_cascade_parent_status($parentId, $status);
 			}
 			$actor = current_user();
-			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent ' . $email . ' (' . $parentId . ')');
+			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $parentId . ' via nutritionist form');
 		}
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);

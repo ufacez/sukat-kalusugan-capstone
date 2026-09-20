@@ -91,12 +91,34 @@ $accessLevels = [
     'readonly' => ['label' => 'Read Only',   'pill' => 'is-muted',   'dot' => '#64748b'],
 ];
 
+/*
+|--------------------------------------------------------------------------
+| Add Parent modal state (form posts to api/admin/parents_create.php)
+|--------------------------------------------------------------------------
+*/
+
+$parentTypes = [];
+$parentBarangays = [];
+$pold = [];
+$pFormErrorField = null;
+$pFormErrorNotice = trim((string)($_GET['notice'] ?? ''));
+$parentModalOpen = false;
+
+if ($canAddParent) {
+    $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
+    $parentBarangays = admin_barangay_options();
+    $pfState = admin_take_form_state();
+    $pold = $pfState['old'];
+    $pFormErrorField = $pfState['error_field'];
+    $parentModalOpen = ($_GET['modal'] ?? '') === 'parent';
+}
+
 $actions = '';
 if ($canAddParent) {
-    $actions .= '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parent_form.php')) . '">' . admin_action_icon('add') . ' Add parent</a>';
+    $actions .= '<button class="admin-btn-secondary" type="button" data-parent-open>' . admin_action_icon('add') . ' Add parent</button>';
 }
 if (has_permission('users.create')) {
-    $actions .= '<a class="admin-btn" href="' . admin_e(app_url('/admin/invitations.php')) . '">' . admin_action_icon('add') . ' Invite staff</a>';
+    $actions .= '<a class="admin-btn" href="' . admin_e(app_url('/admin/invitations.php?invite=open')) . '">' . admin_action_icon('add') . ' Invite staff</a>';
 }
 
 admin_layout_start('User Management', 'Staff and parent accounts in one directory.', 'users', $actions);
@@ -403,6 +425,189 @@ document.querySelectorAll('.rp-dropdown-item').forEach(function(item) {
     });
 });
 </script>
+
+<?php if ($canAddParent): ?>
+<div class="admin-modal-overlay" id="parent-overlay"<?php echo $parentModalOpen ? '' : ' hidden'; ?>>
+    <div class="admin-modal admin-modal--form" role="dialog" aria-modal="true" aria-labelledby="parent-modal-title">
+        <div class="admin-modal-head">
+            <h3 id="parent-modal-title">Add Parent</h3>
+            <button class="admin-modal-close" data-parent-close type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+            <p class="admin-section-subtitle" style="margin:0 0 14px;">Create a new guardian record. <span class="admin-required">*</span> Required field.</p>
+            <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/parents_create.php')); ?>">
+                <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
+
+                <div class="admin-field-wide">
+                    <div class="admin-field-row">
+                        <label class="admin-field<?php echo $pFormErrorField === 'first_name' ? ' is-invalid' : ''; ?>">
+                            <span>First name<span class="admin-required">*</span></span>
+                            <input id="pm_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Juan" value="<?php echo admin_e(admin_old_value($pold, 'first_name')); ?>">
+                            <span class="admin-field-message"><?php echo $pFormErrorField === 'first_name' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                        </label>
+                        <label class="admin-field">
+                            <span>Middle name</span>
+                            <input id="pm_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Reyes" value="<?php echo admin_e(admin_old_value($pold, 'middle_name')); ?>">
+                            <span class="admin-field-message"></span>
+                        </label>
+                        <label class="admin-field">
+                            <span>Surname<span class="admin-required">*</span></span>
+                            <input id="pm_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Dela Cruz" value="<?php echo admin_e(admin_old_value($pold, 'last_name')); ?>">
+                            <span class="admin-field-message"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <label class="admin-field<?php echo $pFormErrorField === 'email' ? ' is-invalid' : ''; ?>">
+                    <span>Email<span class="admin-required">*</span></span>
+                    <input id="pm_email" type="email" name="email" required data-validate="email" placeholder="juan@example.com" value="<?php echo admin_e(admin_old_value($pold, 'email')); ?>">
+                    <span class="admin-field-message"><?php echo $pFormErrorField === 'email' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                </label>
+
+                <div class="admin-field-wide">
+                    <div class="admin-field-row">
+                        <label class="admin-field<?php echo $pFormErrorField === 'phone' ? ' is-invalid' : ''; ?>">
+                            <span>Mobile number<span class="admin-required">*</span></span>
+                            <input id="pm_phone" name="phone" required data-validate="phone-ph" placeholder="09171234567" value="<?php echo admin_e(admin_old_value($pold, 'phone')); ?>">
+                            <span class="admin-field-message"><?php echo $pFormErrorField === 'phone' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                        </label>
+                        <label class="admin-field">
+                            <span>Parent Type<span class="admin-required">*</span></span>
+                            <select id="pm_parent_type" name="parent_type" required>
+                                <?php foreach ($parentTypes as $type): ?>
+                                    <option value="<?php echo admin_e($type); ?>" <?php echo admin_old_value($pold, 'parent_type', 'Guardian') === $type ? 'selected' : ''; ?>><?php echo admin_e($type); ?></option>
+                                <?php endforeach; ?>
+                            </select>
+                            <span class="admin-field-message"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <label class="admin-field<?php echo $pFormErrorField === 'barangay_id' ? ' is-invalid' : ''; ?>">
+                    <span>Assigned Barangay</span>
+                    <select name="barangay_id" id="pm-barangay-select">
+                        <option value="">-- Select Barangay --</option>
+                        <?php foreach ($parentBarangays as $barangay): ?>
+                            <option value="<?php echo (int)$barangay['id']; ?>" <?php echo admin_old_value($pold, 'barangay_id', '') !== '' && (int)admin_old_value($pold, 'barangay_id') === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                    <span class="admin-field-message"><?php echo $pFormErrorField === 'barangay_id' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                    <small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Children will inherit this barangay.</small>
+                </label>
+
+                <label class="admin-field<?php echo $pFormErrorField === 'local_area_id' ? ' is-invalid' : ''; ?>">
+                    <span>Local Area / Purok</span>
+                    <select name="local_area_id" id="pm-local-area-select">
+                        <option value="">-- Select Local Area --</option>
+                    </select>
+                    <span class="admin-field-message"><?php echo $pFormErrorField === 'local_area_id' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                </label>
+
+                <label class="admin-field admin-field-wide">
+                    <span>Home address</span>
+                    <textarea id="pm_address" name="address"><?php echo admin_e(admin_old_value($pold, 'address')); ?></textarea>
+                </label>
+
+                <label class="admin-field<?php echo $pFormErrorField === 'password' ? ' is-invalid' : ''; ?>">
+                    <span>Password<span class="admin-required">*</span></span>
+                    <input id="pm_password" type="password" name="password" required data-validate="password" autocomplete="new-password" placeholder="Create a strong password">
+                    <span class="admin-field-message"><?php echo $pFormErrorField === 'password' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                    <ul class="admin-pw-checklist" data-pw-checklist-for="pm_password">
+                        <li data-pw-rule="length">At least 8 characters</li>
+                        <li data-pw-rule="upper">One uppercase letter</li>
+                        <li data-pw-rule="lower">One lowercase letter</li>
+                        <li data-pw-rule="number">One number</li>
+                        <li data-pw-rule="special">One special character</li>
+                    </ul>
+                    <div class="admin-pw-strength" data-pw-strength-for="pm_password">
+                        <div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
+                        <div class="admin-pw-strength-label"></div>
+                    </div>
+                </label>
+                <label class="admin-field<?php echo $pFormErrorField === 'password_confirm' ? ' is-invalid' : ''; ?>">
+                    <span>Confirm password<span class="admin-required">*</span></span>
+                    <input id="pm_password_confirm" type="password" name="password_confirm" required data-validate="confirm-password" data-match="pm_password" autocomplete="new-password" placeholder="Re-type the password">
+                    <span class="admin-field-message"><?php echo $pFormErrorField === 'password_confirm' ? admin_e($pFormErrorNotice) : ''; ?></span>
+                </label>
+
+                <div class="admin-field admin-field-wide" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                    <button class="admin-btn-secondary" type="button" data-parent-close>Cancel</button>
+                    <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Create parent</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    var overlay = document.getElementById('parent-overlay');
+    if (!overlay) return;
+    function openParent() {
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+        var f = document.getElementById('pm_first_name');
+        if (f) f.focus();
+    }
+    function closeParent() {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('[data-parent-open]').forEach(function(b) {
+        b.addEventListener('click', openParent);
+    });
+    overlay.querySelectorAll('[data-parent-close]').forEach(function(b) {
+        b.addEventListener('click', closeParent);
+    });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeParent();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !overlay.hidden) closeParent();
+    });
+})();
+(function() {
+    var barangaySelect = document.getElementById('pm-barangay-select');
+    var areaSelect = document.getElementById('pm-local-area-select');
+    if (!barangaySelect || !areaSelect) return;
+    var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+
+    function loadAreas(barangayId) {
+        areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+        if (!barangayId || barangayId <= 0) return;
+        areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
+        fetch(apiBase + '?barangay_id=' + barangayId)
+            .then(function(r) { return r.json(); })
+            .then(function(res) {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+                if (!res.success || !res.data || res.data.length === 0) {
+                    areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
+                    return;
+                }
+                res.data.forEach(function(area) {
+                    if (parseInt(area.is_active, 10) !== 1) return;
+                    var opt = document.createElement('option');
+                    opt.value = area.id;
+                    opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+                    areaSelect.appendChild(opt);
+                });
+                var oldArea = '<?php echo admin_e(admin_old_value($pold, "local_area_id", "")); ?>';
+                if (oldArea !== '') areaSelect.value = oldArea;
+            })
+            .catch(function() {
+                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+            });
+    }
+
+    barangaySelect.addEventListener('change', function() {
+        loadAreas(parseInt(barangaySelect.value || '0', 10));
+    });
+
+    var initial = parseInt(barangaySelect.value || '0', 10);
+    if (initial > 0) loadAreas(initial);
+})();
+</script>
+<?php endif; ?>
 
 <?php
 admin_layout_end();

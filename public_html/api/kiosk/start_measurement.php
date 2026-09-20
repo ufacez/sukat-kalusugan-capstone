@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/audit_logger.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 
 api_require_method(['POST']);
@@ -277,10 +278,9 @@ try {
             'MEASUREMENT_RECHECK_START',
             'info',
             sprintf(
-                'Kiosk recheck started for child #%d (%s %s): verification-only, schedule untouched.',
-                $childId,
-                $child['first_name'] ?? '',
-                $child['last_name'] ?? ''
+                // Privacy: child id only — never the name.
+                'Kiosk recheck started for child #%d: verification-only, schedule untouched.',
+                $childId
             )
         );
     }
