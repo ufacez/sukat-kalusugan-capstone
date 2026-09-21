@@ -460,7 +460,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
 
     $map = ml_import_map_columns($sheet);
     if ($map === null) {
-        admin_redirect('/nutritionist/family_import.php', ['notice' => 'Hindi mahanap ang header (kailangan ang mother/caregiver at child name columns). Gamitin ang template.', 'type' => 'error']);
+        admin_redirect('/nutritionist/family_import.php', ['notice' => 'Hindi mahanap ang header (kailangan ang mother/caregiver at child name columns).', 'type' => 'error']);
     }
 
     $barangayNames = array_column(
@@ -787,6 +787,11 @@ nutritionist_layout_start(
 .ml-guide{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0 0}
 .ml-guide td{border:1px solid var(--admin-border);padding:6px 10px}
 .ml-guide td:first-child{font-weight:700;white-space:nowrap;background:var(--admin-surface-alt)}
+.mon-subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.mon-subtab{font-size:14px;font-weight:700;padding:9px 18px;border-radius:999px;border:2px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-text);text-decoration:none;transition:all .15s;cursor:pointer}
+.mon-subtab:hover{border-color:var(--admin-primary);color:var(--admin-primary)}
+.mon-subtab.is-active{background:var(--admin-primary);color:#fff;border-color:var(--admin-primary)}
+.mon-subtab.is-active span{opacity:.85;}
 </style>
 
 <section class="nutritionist-panel">
@@ -816,19 +821,15 @@ nutritionist_layout_start(
         </div>
 
         <p class="admin-section-subtitle">Skipped: <strong><?php echo (int)($batch['skipped_rows'] ?? 0); ?></strong></p>
-        <div class="admin-actions" style="margin-bottom:16px;">
-            <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>"><?php echo admin_action_icon('back'); ?> Children list</a>
-            <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('add'); ?> Mag-import ulit</a>
-        </div>
 
         <?php if ($result['staged'] !== []): ?>
             <h3 class="admin-section-title" style="font-size:14px;margin:16px 0 8px;">Kailangang kumpletuhin (<?php echo count($result['staged']); ?>)</h3>
-            <div class="ml-table-wrap">
-                <table class="ml-table">
+            <div class="nutritionist-table-wrap">
+                <table class="nutritionist-table" data-page-size="10">
                     <thead><tr><th>Row</th><th>Nanay</th><th>Bata</th><th>Sex</th><th>Birthdate</th><th>Bakit?</th></tr></thead>
                     <tbody>
-                        <?php foreach ($result['staged'] as $s): ?>
-                            <tr>
+                        <?php foreach ($result['staged'] as $stIndex => $s): ?>
+                            <tr<?php echo admin_paged_row_attr($stIndex, 10); ?>>
                                 <td><?php echo (int)$s['row_num']; ?></td>
                                 <td><?php echo nutritionist_e((string)($s['mother_raw'] ?? '')); ?></td>
                                 <td><?php echo nutritionist_e((string)($s['child_raw'] ?? '')); ?></td>
@@ -843,14 +844,15 @@ nutritionist_layout_start(
         <?php endif; ?>
 
         <?php $details = is_array($result['details']) ? $result['details'] : null; ?>
-        <?php if ($details !== null && (($details['skipped'] ?? []) !== [] || ($details['errors'] ?? []) !== [])): ?>
+        <?php $skipRows = $details !== null ? array_merge($details['skipped'] ?? [], $details['errors'] ?? []) : []; ?>
+        <?php if ($skipRows !== []): ?>
             <h3 class="admin-section-title" style="font-size:14px;margin:16px 0 8px;">Nilaktawan / errors</h3>
-            <div class="ml-table-wrap">
-                <table class="ml-table">
+            <div class="nutritionist-table-wrap">
+                <table class="nutritionist-table" data-page-size="10">
                     <thead><tr><th>Row</th><th>Nanay</th><th>Bata</th><th>Bakit?</th></tr></thead>
                     <tbody>
-                        <?php foreach (array_merge($details['skipped'] ?? [], $details['errors'] ?? []) as $s): ?>
-                            <tr>
+                        <?php foreach ($skipRows as $skIndex => $s): ?>
+                            <tr<?php echo admin_paged_row_attr($skIndex, 10); ?>>
                                 <td><?php echo (int)($s['row'] ?? 0); ?></td>
                                 <td><?php echo nutritionist_e((string)($s['mother_raw'] ?? '')); ?></td>
                                 <td><?php echo nutritionist_e((string)($s['child_raw'] ?? '')); ?></td>
@@ -862,6 +864,11 @@ nutritionist_layout_start(
             </div>
         <?php endif; ?>
 
+        <div class="admin-actions" style="margin-top:16px;">
+            <a class="admin-btn" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>"><?php echo admin_action_icon('back'); ?> Children list</a>
+            <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('add'); ?> Mag-import ulit</a>
+        </div>
+
     <?php elseif ($preview !== null): ?>
         <?php $prows = $preview['rows'] ?? []; ?>
         <div class="ml-cards">
@@ -871,14 +878,40 @@ nutritionist_layout_start(
             <div class="ml-card is-err"><div class="v"><?php echo (int)$counts['error']; ?></div><div class="k">Errors (skipped)</div></div>
         </div>
 
+        <div class="mon-subtabs" id="ml-verdict-pills">
+            <a class="mon-subtab is-active" data-ml-verdict="">All <span>(<?php echo count($prows); ?>)</span></a>
+            <a class="mon-subtab" data-ml-verdict="verdict:ok">Ready <span>(<?php echo (int)$counts['ok']; ?>)</span></a>
+            <a class="mon-subtab" data-ml-verdict="verdict:duplicate">Registered na <span>(<?php echo (int)$counts['duplicate']; ?>)</span></a>
+            <a class="mon-subtab" data-ml-verdict="verdict:staged">Kukumpletuhin <span>(<?php echo (int)$counts['staged']; ?>)</span></a>
+            <a class="mon-subtab" data-ml-verdict="verdict:error">Error <span>(<?php echo (int)$counts['error']; ?>)</span></a>
+        </div>
+
         <div class="children-toolbar" style="margin-bottom:18px;">
             <input
                 class="admin-search"
                 data-admin-filter="#ml-preview-table"
+                id="ml-preview-search"
                 type="search"
                 placeholder="Search preview rows..."
             >
         </div>
+
+        <script>
+        (function () {
+            var pills = document.querySelectorAll('#ml-verdict-pills [data-ml-verdict]');
+            var search = document.getElementById('ml-preview-search');
+            if (!pills.length || !search) return;
+            pills.forEach(function (pill) {
+                pill.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    pills.forEach(function (p) { p.classList.remove('is-active'); });
+                    pill.classList.add('is-active');
+                    search.value = pill.getAttribute('data-ml-verdict') || '';
+                    search.dispatchEvent(new Event('input', { bubbles: true }));
+                });
+            });
+        })();
+        </script>
 
         <div class="nutritionist-table-wrap" style="margin-bottom:14px;">
             <table class="nutritionist-table" id="ml-preview-table" data-page-size="10">
@@ -897,7 +930,7 @@ nutritionist_layout_start(
                         $kidParsed = isset($r['child']) ? nutritionist_e(trim($r['child']['first'] . ' ' . $r['child']['middle'] . ' ' . $r['child']['last'])) : nutritionist_e((string)($r['child_raw'] ?? '—'));
                         ?>
                         <tr<?php echo admin_paged_row_attr($pvIndex, 10); ?>
-                            data-filter-text="<?php echo nutritionist_e(strtolower(trim((string)($r['mother_raw'] ?? '') . ' ' . (string)($r['child_raw'] ?? '') . ' ' . (string)($r['verdict'] ?? '') . ' ' . (string)($r['note'] ?? '')))); ?>"
+                            data-filter-text="<?php echo nutritionist_e(strtolower(trim((string)($r['mother_raw'] ?? '') . ' ' . (string)($r['child_raw'] ?? '') . ' verdict:' . (string)($r['verdict'] ?? '') . ' ' . (string)($r['note'] ?? '')))); ?>"
                         >
                             <td><?php echo (int)($r['row'] ?? 0); ?></td>
                             <td><?php echo $momParsed; ?></td>
@@ -947,11 +980,10 @@ nutritionist_layout_start(
                         <span class="who-ref-file-size" id="mlFileSize"></span>
                         <button type="button" class="who-ref-file-clear" id="mlFileClear" aria-label="Remove selected file">&times;</button>
                     </span>
-                    <button class="admin-btn" type="submit" id="mlImportBtn" style="white-space:nowrap;" disabled>
+                    <button class="admin-btn" type="submit" id="mlImportBtn" style="white-space:nowrap;display:none;" disabled>
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                         Import
                     </button>
-                    <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php?action=template')); ?>" style="white-space:nowrap;"><?php echo admin_action_icon('document'); ?> Template</a>
                 </div>
                 <span class="admin-field-hint">First sheet only.</span>
             </div>
@@ -980,11 +1012,17 @@ nutritionist_layout_start(
                 return (bytes / 1048576).toFixed(2) + ' MB';
             }
 
+            function setImportVisible(visible) {
+                if (!importBtn) return;
+                importBtn.style.display = visible ? '' : 'none';
+                importBtn.disabled = !visible;
+            }
+
             input.addEventListener('change', function () {
                 var file = input.files && input.files[0];
                 if (!file) {
                     chip.hidden = true;
-                    if (importBtn) importBtn.disabled = true;
+                    setImportVisible(false);
                     return;
                 }
                 var valid = /\.xlsx$/i.test(file.name);
@@ -993,7 +1031,7 @@ nutritionist_layout_start(
                 sizeEl.textContent = valid ? fmtSize(file.size) : 'must be .xlsx';
                 chip.classList.toggle('is-invalid', !valid);
                 chip.hidden = false;
-                if (importBtn) importBtn.disabled = !valid;
+                setImportVisible(valid);
             });
 
             if (clearBtn) {
@@ -1001,7 +1039,7 @@ nutritionist_layout_start(
                     input.value = '';
                     chip.hidden = true;
                     chip.classList.remove('is-invalid');
-                    if (importBtn) importBtn.disabled = true;
+                    setImportVisible(false);
                 });
             }
         })();

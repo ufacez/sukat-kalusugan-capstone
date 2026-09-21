@@ -1285,7 +1285,7 @@ function pdf_generate_dqc(array $f): TCPDF {
 	$allTypes = str_repeat('i', count($allParams));
 
 	$totalChildren = admin_scalar(
-		"SELECT COUNT(*) FROM children c WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		"SELECT COUNT(*) FROM children c WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
 		'i' . $allTypes, array_merge([$anchorParam], $allParams)
 	);
 
@@ -1293,6 +1293,13 @@ function pdf_generate_dqc(array $f): TCPDF {
 		"SELECT COUNT(DISTINCT c.id) FROM children c
 		 INNER JOIN measurements m ON m.child_id = c.id AND m.measurement_date <= ?
 		 WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
+	);
+
+	$totalMeasured6to59 = admin_scalar(
+		"SELECT COUNT(DISTINCT c.id) FROM children c
+		 INNER JOIN measurements m ON m.child_id = c.id AND m.measurement_date <= ?
+		 WHERE {$scopeSql}{$brgySql} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
 		'ii' . $allTypes, array_merge([$anchorParam, $anchorParam], $allParams)
 	);
 
@@ -1344,7 +1351,7 @@ function pdf_generate_dqc(array $f): TCPDF {
 	};
 
 	$completenessRows = [
-		['A', '% Coverage (population of 0-59 months)', $pct($totalWithMeasurement, $totalChildren)],
+		['A', '% Coverage (population of 6-59 months)', $pct($totalMeasured6to59, $totalChildren)],
 		['B', '% Children measured with duplicate cases', $pct($dqDuplicateGroups, $totalWithMeasurement)],
 		['C', '% Children with length/height but no weight', $pct($dqHeightNoWeight, $totalWithMeasurement)],
 		['D', '% Children with weight but no length/height', $pct($dqWeightNoHeight, $totalWithMeasurement)],
@@ -1448,7 +1455,7 @@ function pdf_generate_dqc(array $f): TCPDF {
 	}
 
 	$accuracyRows = [
-		['A', '% Children with biologically implausible measurements (WHO flag cutoffs)', $dqFlaggedPct . '%'],
+		['A', '% Children with flagged measurement based on z-scores', $dqFlaggedPct . '%'],
 		['B', 'Digit preference score for anthropometric data', $dqDigitPref . '%'],
 		['C', 'Skewness of weight-for-height/length z-score', $dqSkewness],
 		['D', 'Kurtosis of weight-for-height/length z-score', $dqKurtosis],

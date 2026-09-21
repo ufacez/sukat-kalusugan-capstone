@@ -171,7 +171,7 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 						<span class="who-ref-file-size" id="whoFileSize"></span>
 						<button type="button" class="who-ref-file-clear" id="whoFileClear" aria-label="Remove selected file">&times;</button>
 					</span>
-					<button type="submit" class="admin-btn" style="white-space:nowrap;">
+					<button type="submit" class="admin-btn" id="whoImportBtn" style="white-space:nowrap;display:none;" disabled>
 						<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
 						Import
 					</button>
@@ -485,6 +485,7 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 	var nameEl = document.getElementById('whoFileName');
 	var sizeEl = document.getElementById('whoFileSize');
 	var clearBtn = document.getElementById('whoFileClear');
+	var importBtn = document.getElementById('whoImportBtn');
 	if (!input || !chip || !nameEl || !sizeEl) return;
 
 	function fmtSize(bytes) {
@@ -494,10 +495,17 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 		return (bytes / 1048576).toFixed(2) + ' MB';
 	}
 
+	function setImportVisible(visible) {
+		if (!importBtn) return;
+		importBtn.style.display = visible ? '' : 'none';
+		importBtn.disabled = !visible;
+	}
+
 	input.addEventListener('change', function () {
 		var file = input.files && input.files[0];
 		if (!file) {
 			chip.hidden = true;
+			setImportVisible(false);
 			return;
 		}
 		var valid = /\.xlsx$/i.test(file.name);
@@ -506,6 +514,7 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 		sizeEl.textContent = valid ? fmtSize(file.size) : 'must be .xlsx';
 		chip.classList.toggle('is-invalid', !valid);
 		chip.hidden = false;
+		setImportVisible(valid);
 	});
 
 	if (clearBtn) {
@@ -513,6 +522,7 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 			input.value = '';
 			chip.hidden = true;
 			chip.classList.remove('is-invalid');
+			setImportVisible(false);
 		});
 	}
 })();

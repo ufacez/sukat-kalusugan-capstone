@@ -179,10 +179,15 @@ $dqWeightNoHeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c IN
 $dqIssueCount = $dqDupCount + $dqMissingInformation + $dqNoParentAddress + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
 
 $dqTotalChildren = admin_scalar(
-	"SELECT COUNT(*) FROM children c WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+	"SELECT COUNT(*) FROM children c WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
 	$baseTypes, $baseParams
 );
 $dqTotalWithMeasurement = $totalAssessed;
+$dqMeasured6to59 = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id
+	 WHERE {$scope} AND m.measurement_date <= ? AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
+	$baseTypes . 's', array_merge($baseParams, [$anchorDate->format('Y-m-d')])
+);
 
 $dqMeasRows = admin_fetch_all(
 	"SELECT m.whz, m.is_flagged, m.weight_kg, m.height_cm
@@ -295,12 +300,7 @@ foreach ($listCountRows as $cr) {
 }
 $listCounts['0-23'] = (int)$infantCount;
 
-$actions = export_dropdown(
-	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)),
-	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))),
-	app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)),
-	'Save as'
-);
+$actions = '';
 
 nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
 ?>
@@ -635,9 +635,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 	$renderTable('HEIGHT-FOR-AGE (HFA)', $hfaS);
 	$renderTable('WEIGHT-FOR-LENGTH/HEIGHT (WFH)', $wfhS);
 	?>
-	<div style="margin-top:12px;">
-		<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Generate PDF</a>
-	</div>
 </div>
 
 <?php elseif ($activeTab === 'prevalence'): ?>
@@ -691,7 +688,7 @@ $dqPct = static function (int $num, int $den): string {
 	$d = $den > 0 ? $den : 1;
 	return number_format(($num / $d) * 100, 2) . '%';
 };
-$dqCoverage = $dqPct($dqTotalWithMeasurement, $dqTotalChildren);
+$dqCoverage = $dqPct($dqMeasured6to59, $dqTotalChildren);
 $dqDupPct = $dqPct($dqDupCount, $dqTotalWithMeasurement);
 $dqHnwPct = $dqPct($dqHeightNoWeight, $dqTotalWithMeasurement);
 $dqWnhPct = $dqPct($dqWeightNoHeight, $dqTotalWithMeasurement);
@@ -716,7 +713,7 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
 					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
 					<tbody>
-						<tr><td><strong>A</strong></td><td>% Coverage (population of 0-59 months)</td><td style="text-align:right;font-weight:600;"><?php echo $dqCoverage; ?></td></tr>
+						<tr><td><strong>A</strong></td><td>% Coverage (population of 6-59 months)</td><td style="text-align:right;font-weight:600;"><?php echo $dqCoverage; ?></td></tr>
 						<tr><td><strong>B</strong></td><td>% Children measured with duplicate cases</td><td style="text-align:right;font-weight:600;"><?php echo $dqDupPct; ?></td></tr>
 						<tr><td><strong>C</strong></td><td>% Children with length/height but no weight</td><td style="text-align:right;font-weight:600;"><?php echo $dqHnwPct; ?></td></tr>
 						<tr><td><strong>D</strong></td><td>% Children with weight but no length/height</td><td style="text-align:right;font-weight:600;"><?php echo $dqWnhPct; ?></td></tr>
@@ -734,7 +731,7 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
 					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
 					<tbody>
-						<tr><td><strong>A</strong></td><td>% Children with biologically implausible measurements (WHO flag cutoffs: WAZ outside −6…+5, HAZ outside −6…+6, WHZ outside −5…+5)</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
+						<tr><td><strong>A</strong></td><td>% Children with flagged measurement based on z-scores</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
 						<tr><td><strong>B</strong></td><td>Digit preference score for anthropometric data</td><td style="text-align:right;font-weight:600;"><?php echo $dqDigitPref . '%'; ?></td></tr>
 						<tr><td><strong>C</strong></td><td>Skewness of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqSkewStr; ?></td></tr>
 						<tr><td><strong>D</strong></td><td>Kurtosis of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqKurtStr; ?></td></tr>
