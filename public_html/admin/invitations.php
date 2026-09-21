@@ -312,8 +312,8 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($invitations as $inv): ?>
-                    <tr>
+                <?php foreach ($invitations as $invIndex => $inv): ?>
+                    <tr<?php echo admin_paged_row_attr($invIndex, 5); ?>>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:<?php echo admin_avatar_color($inv['invitee_name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($inv['invitee_name']); ?></span>

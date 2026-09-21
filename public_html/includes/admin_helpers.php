@@ -110,6 +110,43 @@ function admin_initials(string $name): string
     return mb_strtoupper(mb_substr($name, 0, 2));
 }
 
+/**
+ * First-paint guard for the shared client-side paginator
+ * (assets/js/admin.js): emits an inline hide for data rows past the
+ * first page so the browser never flashes the full list before the
+ * footer script runs and takes over paging.
+ *
+ * MUST stay in sync with the paginator: per-table data-page-size, or
+ * the global default of 10 when the table has no override. The
+ * paginator's render() sets row.style.display explicitly for every
+ * row on init, so this pre-hide is seamlessly replaced — and hidden
+ * rows remain searchable (filtering reads attributes/textContent).
+ *
+ * IMPORTANT: inline style only, never the `hidden` attribute — the
+ * paginator clears state via style.display, which cannot override
+ * a present `hidden` attribute.
+ */
+function admin_paged_row_attr(int $index, int $pageSize): string
+{
+    if ($pageSize <= 0) {
+        $pageSize = 10;
+    }
+
+    return $index >= $pageSize ? ' style="display:none;"' : '';
+}
+
+/**
+ * No-JS fallback for admin_paged_row_attr(): without JavaScript there is
+ * no paginator at all, so reveal every pre-hidden data row instead of
+ * stranding the user on page one.
+ */
+function admin_paged_noscript(): string
+{
+    return '<noscript><style>table.admin-table > tbody > tr[style],'
+        . 'table.nutritionist-table > tbody > tr[style],'
+        . 'table.parent-table > tbody > tr[style]{display:table-row !important;}</style></noscript>';
+}
+
 function admin_avatar_color(string $name): string
 {
     $colors = ['#0b6e4f','#1a6b5a','#2e8b6e','#3a7d5c','#4e9a6f','#2d8f6f','#347a5c','#408c6a'];
@@ -457,6 +494,104 @@ function admin_split_full_name(?string $fullName): array
     $middle = implode(' ', $parts);
 
     return ['first' => $first, 'middle' => $middle, 'last' => $last];
+}
+
+/**
+ * Split an OPT Plus style "Surname, First [Middle]" cell into first /
+ * middle / last parts for the master-list bulk importer.
+ *
+ *   "Arconado, Jonalky"       -> first=Jonalky  middle=''     last=Arconado
+ *   "Abana, Aaron Caleb"      -> first=Aaron    middle=Caleb  last=Abana
+ *   "Del Rosario, Ann Lyzalyn"-> first=Ann      middle=Lyzalyn last=Del Rosario
+ *   "Dela Cruz, Juan Jr"      -> first='Juan Jr' middle=''    last=Dela Cruz
+ *                               (suffix folds into first name — children and
+ *                               parents have no suffix column)
+ *
+ * Cells without a comma fall back to admin_split_full_name() so mixed
+ * lists never crash the import. Slashes (e.g. "Cj/ Maricar" from a shared
+ * caregiver cell) are turned into spaces and flagged for staff review.
+ *
+ * Returns ['first','middle','last','flag','note'] where flag is one of:
+ *   'ok'         clean comma split
+ *   'no_comma'   no comma found, space-split fallback used
+ *   'sanitized'  characters outside the name alphabet were repaired
+ *   'empty'      blank cell
+ *   'invalid'    parts failed admin_is_valid_name_part() — caller must
+ *                skip or stage the row, never silently import it.
+ */
+function admin_split_surname_first(?string $fullName): array
+{
+    $clean = trim((string)preg_replace('/\s+/', ' ', (string)$fullName));
+
+    if ($clean === '') {
+        return ['first' => '', 'middle' => '', 'last' => '', 'flag' => 'empty', 'note' => 'Blank name cell.'];
+    }
+
+    $flag = 'ok';
+    $note = '';
+
+    if (strpos($clean, ',') === false) {
+        $fallback = admin_split_full_name($clean);
+        $fallback['flag'] = 'no_comma';
+        $fallback['note'] = 'No comma found — read as "First Middle Last". Please check.';
+        return $fallback;
+    }
+
+    // Two people sharing one cell ("Dimatulac, John Paul/ Cruz,
+    // Kimberly"): import the FIRST person listed, flagged for review.
+    if (strpos($clean, '/') !== false && substr_count($clean, ',') >= 2) {
+        $clean = trim((string)preg_replace('/\s+/', ' ', (string)explode('/', $clean)[0]));
+        $flag = 'sanitized';
+        $note = 'Dalawang pangalan sa isang cell — unang pangalan ang ginamit. Please verify.';
+    }
+
+    // Split on the FIRST comma only: everything left is the surname
+    // (multi-word surnames like "Del Rosario" stay intact). A stray
+    // extra comma on the given side ("Lizardo, Princess, May") becomes
+    // a space so the row still imports, flagged.
+    [$surname, $given] = array_map('trim', explode(',', $clean, 2));
+    if (strpos($given, ',') !== false) {
+        $given = trim((string)preg_replace('/\s+/', ' ', str_replace(',', ' ', $given)));
+        $flag = 'sanitized';
+        $note = 'Sobrang comma sa pangalan — ginawang espasyo. Please verify.';
+    }
+
+    // Shared-cell markers ("\", "&", or a lone "/" inside one person's
+    // name) are not valid name characters. Turn them into spaces so
+    // "Cj/ Maricar" still imports, flagged.
+    if (preg_match('/[\\\\&]/', $given . $surname) || strpos($given . $surname, '/') !== false) {
+        $surname = trim((string)preg_replace('/[\/\\\\&]+/', ' ', $surname));
+        $given = trim((string)preg_replace('/[\/\\\\&]+/', ' ', $given));
+        $surname = trim((string)preg_replace('/\s+/', ' ', $surname));
+        $given = trim((string)preg_replace('/\s+/', ' ', $given));
+        $flag = 'sanitized';
+        $note = 'Cell contained "/, \ or &" — repaired with spaces. Please verify.';
+    }
+
+    if ($surname === '' || $given === '') {
+        return ['first' => '', 'middle' => '', 'last' => $surname, 'flag' => 'invalid', 'note' => 'Surname or given name is missing around the comma.'];
+    }
+
+    // Trailing generational suffix on the given side folds into the
+    // first name ("Juan Jr"), since no table has a suffix column.
+    $tokens = preg_split('/\s+/', $given);
+    $suffixes = ['JR', 'JR.', 'SR', 'SR.', 'II', 'III', 'IV', 'V'];
+    $suffix = '';
+    if (count($tokens) > 1 && in_array(strtoupper((string)end($tokens)), $suffixes, true)) {
+        $suffix = (string)array_pop($tokens);
+    }
+
+    $first = (string)array_shift($tokens);
+    if ($suffix !== '') {
+        $first = trim($first . ' ' . $suffix);
+    }
+    $middle = implode(' ', $tokens);
+
+    if (!admin_is_valid_name_part($first, true) || !admin_is_valid_name_part($surname, true) || !admin_is_valid_name_part($middle, false)) {
+        return ['first' => $first, 'middle' => $middle, 'last' => $surname, 'flag' => 'invalid', 'note' => 'Name parts contain characters outside letters, spaces, hyphens, apostrophes, and periods — or are too short.'];
+    }
+
+    return ['first' => $first, 'middle' => $middle, 'last' => $surname, 'flag' => $flag, 'note' => $note];
 }
 
 /**
@@ -877,6 +1012,7 @@ function admin_layout_end(): void
     echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
     echo '</body>';
     echo '</html>';
 }

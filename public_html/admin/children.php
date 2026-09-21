@@ -251,8 +251,8 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($children as $child): ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . $child['parent_name'] . ' ' . (string)($child['barangay'] ?? ''))); ?>">
+                <?php foreach ($children as $childIndex => $child): ?>
+                    <tr<?php echo admin_paged_row_attr($childIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . $child['parent_name'] . ' ' . (string)($child['barangay'] ?? ''))); ?>">
                         <td style="font-family:monospace;color:var(--admin-muted);"><?php echo admin_e($child['child_code']); ?></td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">

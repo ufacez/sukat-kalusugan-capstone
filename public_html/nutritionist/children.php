@@ -229,6 +229,9 @@ $actions = '<div class="admin-actions">'
     . (nutritionist_can_write('children.create')
         ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>'
         : '')
+    . ((nutritionist_can_write('parents.create') && nutritionist_can_write('children.create'))
+        ? '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/family_import.php')) . '">' . admin_action_icon('export') . ' Master-list import</a>'
+        : '')
     . (nutritionist_can_write()
         ? '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurement_record.php')) . '">' . admin_action_icon('measure') . ' Add measurement</a>'
         : '')
@@ -406,7 +409,7 @@ nutritionist_layout_start(
                         </div>
                     </td></tr>
                 <?php endif; ?>
-                <?php foreach ($pageChildren as $child): ?>
+                <?php foreach ($pageChildren as $childIndex => $child): ?>
                     <?php
                     $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
@@ -416,7 +419,7 @@ nutritionist_layout_start(
                     $parentAddress = (string)($child['parent_address'] ?? '');
                     $lastDate = $child['last_measurement_date'] ?? null;
                     ?>
-                    <tr
+                    <tr<?php echo admin_paged_row_attr($childIndex, 5); ?>
                         class="row-link"
                         data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $fullName . ' ' . ($child['parent_name'] ?? '') . ' ' . ($child['barangay'] ?? '') . ' ' . ($child['local_area'] ?? '') . ' ' . $parentAddress)); ?>"
                         data-child-id="<?php echo (int)$child['id']; ?>"

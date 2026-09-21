@@ -130,11 +130,23 @@ if (is_array($staff) && password_verify($password, (string)($staff['password_has
 // Fall back to parent authentication (email only).
 $parentStmt = mysqli_prepare(
     $conn,
-    'SELECT id, name, email, password_hash, parent_type, status, barangay_id
+    'SELECT id, name, email, password_hash, parent_type, status, barangay_id, must_change_password
      FROM parents
      WHERE LOWER(email) = LOWER(?)
      LIMIT 1'
 );
+
+if ($parentStmt === false) {
+    // Pre-migration database without the must_change_password column —
+    // log in without the flag rather than breaking every parent login.
+    $parentStmt = mysqli_prepare(
+        $conn,
+        'SELECT id, name, email, password_hash, parent_type, status, barangay_id
+         FROM parents
+         WHERE LOWER(email) = LOWER(?)
+         LIMIT 1'
+    );
+}
 
 if ($parentStmt === false) {
     login_respond_error('Unable to process sign in right now.', 500);
@@ -167,6 +179,28 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
 
     log_action((int)$parent['id'], 'LOGIN', 'info', 'Parent login (#' . (int)$parent['id'] . ')');
     \login_record_attempt($identifier, true);
+
+    // Import-minted accounts share one announced password — force a real
+    // password in Settings before any other parent page becomes usable
+    // (parent_require_access() enforces the same rule on every page).
+    if (!empty($parent['must_change_password'])) {
+        $_SESSION['auth']['must_change_password'] = 1;
+        $settingsUrl = app_url('/parent/settings.php?must_change=1');
+
+        if (wants_json_response()) {
+            header('Content-Type: application/json; charset=utf-8');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Please change your temporary password to continue.',
+                'redirect_url' => $settingsUrl,
+            ]);
+            exit;
+        }
+
+        header('Location: ' . $settingsUrl);
+        exit;
+    }
+
     login_respond_success($_SESSION['auth']);
 }
 

@@ -140,8 +140,8 @@ $flash = admin_flash_message();
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($areas as $area): ?>
-                        <tr data-filter-text="<?php echo admin_e(strtolower($area['area_name'] . ' ' . $area['area_type'] . ' ' . (string)($area['area_code'] ?? ''))); ?>">
+                    <?php foreach ($areas as $areaIndex => $area): ?>
+                        <tr<?php echo admin_paged_row_attr($areaIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($area['area_name'] . ' ' . $area['area_type'] . ' ' . (string)($area['area_code'] ?? ''))); ?>">
                             <td style="color:var(--admin-muted);font-family:monospace;font-size:12px;"><?php echo admin_e((string)($area['area_code'] ?? '—')); ?></td>
                             <td style="font-weight:700;color:var(--admin-text);"><?php echo admin_e($area['area_name']); ?></td>
                             <td>

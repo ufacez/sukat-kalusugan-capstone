@@ -56,6 +56,7 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Tools',
             'items' => [
+                ['key' => 'import', 'label' => 'Master-List Import', 'href' => app_url('/nutritionist/family_import.php'), 'icon' => 'clipboard'],
                 ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
                 ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
@@ -337,6 +338,7 @@ function nutritionist_layout_end(): void
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
 
     echo '</body>';
     echo '</html>';

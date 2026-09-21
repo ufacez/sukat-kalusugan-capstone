@@ -51,23 +51,51 @@ function parent_grouped_nav_items(): array
     ];
 }
 
+/**
+ * True when the parent must still replace the import-announced temporary
+ * password. Fail-open (false) on pre-migration databases so the check
+ * never locks anyone out when the column does not exist yet.
+ */
+function parent_must_change_password(int $parentId): bool
+{
+	if ($parentId <= 0) {
+		return false;
+	}
+
+	$row = admin_fetch_one('SELECT must_change_password FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+
+	if ($row === null) {
+		return false;
+	}
+
+	return !empty($row['must_change_password']);
+}
+
 function parent_require_access(): array
 {
-    $user = current_user();
+	$user = current_user();
 
-    if ($user === null) {
-        deny_access('Please sign in to continue.', 401);
-    }
+	if ($user === null) {
+		deny_access('Please sign in to continue.', 401);
+	}
 
-    if (($user['type'] ?? null) !== 'parent') {
-        deny_access('You do not have permission to access this page.', 403);
-    }
+	if (($user['type'] ?? null) !== 'parent') {
+		deny_access('You do not have permission to access this page.', 403);
+	}
 
-    if (($user['status'] ?? 'active') !== 'active') {
-        deny_access('This account is inactive.', 403);
-    }
+	if (($user['status'] ?? 'active') !== 'active') {
+		deny_access('This account is inactive.', 403);
+	}
 
-    return $user;
+	// Import-minted accounts share one announced password: hold them on
+	// the Settings page until they set a real one. Settings itself is
+	// exempt so the redirect can never loop.
+	$script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+	if ($script !== 'settings.php' && parent_must_change_password((int)($user['id'] ?? 0))) {
+		admin_redirect('/parent/settings.php', ['must_change' => 1, 'notice' => 'Palitan muna ang temporary password bago magpatuloy.', 'type' => 'error']);
+	}
+
+	return $user;
 }
 
 function parent_status_class(?string $status): string
@@ -343,6 +371,7 @@ function parent_layout_end(): void
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . parent_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
 
     echo '</body>';
     echo '</html>';

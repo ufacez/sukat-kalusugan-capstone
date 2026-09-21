@@ -75,8 +75,8 @@ $deleteTarget = admin_fetch_one('SELECT id, name, email FROM users WHERE id = ? 
                 <?php if ($users === []): ?>
                     <tr><td colspan="6" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived users.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($users as $user): ?>
-                        <tr data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $user['username'])); ?>">
+                    <?php foreach ($users as $userIndex => $user): ?>
+                        <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $user['username'])); ?>">
                             <td><span class="admin-pill <?php echo $user['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($user['role_name'])); ?></span></td>
                             <td><?php echo admin_e($user['name']); ?></td>
                             <td><?php echo admin_e($user['username'] ?? ''); ?></td>

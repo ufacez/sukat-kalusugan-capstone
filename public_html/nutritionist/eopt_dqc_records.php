@@ -203,7 +203,7 @@ nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_report
 				</thead>
 				<tbody>
 					<?php foreach ($records as $i => $row): ?>
-						<tr>
+						<tr<?php echo admin_paged_row_attr($i, 5); ?>>
 							<td><?php echo $i + 1; ?></td>
 							<td><?php echo nutritionist_e((string)$row['child_code']); ?></td>
 							<td>

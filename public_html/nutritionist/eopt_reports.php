@@ -411,7 +411,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 				<?php endif; ?>
 				<tbody>
 					<?php foreach ($listRows as $i => $row): ?>
-						<tr>
+						<tr<?php echo admin_paged_row_attr($i, 5); ?>>
 							<td><?php echo $i + 1; ?></td>
 							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
 							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>

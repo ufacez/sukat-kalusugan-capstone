@@ -121,6 +121,11 @@ $actions = nutritionist_can_write('children.create')
 		. nutritionist_e(app_url('/nutritionist/family_form.php'))
 		. '">' . admin_action_icon('add') . ' Add family</a>'
 	: '';
+$actions .= (nutritionist_can_write('parents.create') && nutritionist_can_write('children.create'))
+	? ' <a class="admin-btn-secondary" href="'
+		. nutritionist_e(app_url('/nutritionist/family_import.php'))
+		. '">' . admin_action_icon('export') . ' Master-list import</a>'
+	: '';
 
 nutritionist_layout_start('Parents', 'Linked guardians and household contact information.', 'parents', $actions);
 ?>
@@ -223,8 +228,8 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 				<?php if ($tabParents === []): ?>
 					<tr><td colspan="9" style="color:var(--admin-muted);text-align:center;padding:24px;"><?php echo $tab === 'archived' ? 'No archived parents in your scope.' : 'No active parents in your scope yet.'; ?></td></tr>
 				<?php endif; ?>
-				<?php foreach ($tabParents as $parent): ?>
-					<tr
+				<?php foreach ($tabParents as $parentIndex => $parent): ?>
+					<tr<?php echo admin_paged_row_attr($parentIndex, 5); ?>
 						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'])); ?>"
 						data-parent-id="<?php echo (int)$parent['id']; ?>"
 						data-parent-name="<?php echo nutritionist_e($parent['name']); ?>"

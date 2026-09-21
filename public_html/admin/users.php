@@ -203,13 +203,13 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($staff as $user): ?>
+                <?php foreach ($staff as $userIndex => $user): ?>
                     <?php
                     $al = $user['access_level'] ?? 'full';
                     $roleName = (string)($user['role_name'] ?? '');
                     $roleLabel = $roleName === 'admin' ? 'Admin' : 'Nutritionist';
                     ?>
-                    <tr data-role="<?php echo admin_e($roleName); ?>" data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $roleLabel . ' ' . $al . ' ' . (string)($user['barangay'] ?? ''))); ?>">
+                    <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-role="<?php echo admin_e($roleName); ?>" data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $roleLabel . ' ' . $al . ' ' . (string)($user['barangay'] ?? ''))); ?>">
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:<?php echo admin_avatar_color($user['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($user['name']); ?></span>
@@ -262,9 +262,9 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                         </td>
                     </tr>
                 <?php endforeach; ?>
-                <?php foreach ($parents as $parent): ?>
+                <?php foreach ($parents as $parentIndex => $parent): ?>
                     <?php $kidCount = (int)$parent['children_count']; ?>
-                    <tr data-role="parent" data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' parent ' . (string)($parent['barangay'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
+                    <tr<?php echo admin_paged_row_attr($parentIndex + count($staff), 10); ?> data-role="parent" data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' parent ' . (string)($parent['barangay'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:<?php echo admin_avatar_color($parent['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>

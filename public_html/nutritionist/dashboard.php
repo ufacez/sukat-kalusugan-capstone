@@ -942,7 +942,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 					</tr>
 				</thead>
 				<tbody>
-					<?php foreach ($recentMeasurements as $m):
+					<?php foreach ($recentMeasurements as $mIndex => $m):
 						$fullName = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
 						$wfaClass = $m['wfa_status'] !== null ? nutritionist_status_class($m['wfa_status']) : 'is-muted';
 						$hfaClass = $m['hfa_status'] !== null ? nutritionist_status_class($m['hfa_status']) : 'is-muted';
@@ -951,7 +951,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						$hfaDisplay = !empty($m['hfa_status']) ? $m['hfa_status'] : '—';
 						$wfhDisplay = !empty($m['wfh_status']) ? wfh_display_short($m['wfh_status']) : '—';
 					?>
-					<tr>
+					<tr<?php echo admin_paged_row_attr($mIndex, 10); ?>>
 						<td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($m['child_code'] ?? ''); ?></td>
 						<td>
 							<div class="child-name-cell">
