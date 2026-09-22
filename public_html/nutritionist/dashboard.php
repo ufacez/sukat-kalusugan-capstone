@@ -267,14 +267,14 @@ $axisCounts = [
 	'wflh' => buildAxisCounts($measurements, 'wfh_status'),
 ];
 
-// Per-pill counts (N / MUW / MSt / MW / OW / SUW / SSt / SW / Ob / REF) per axis.
+// Per-pill counts (N / MUW / MSt / MW/MAM / OW / SUW / SSt / SW/SAM / Ob / REF) per axis.
 // Used by the "Latest Status" sidebar so it can show every individual
 // classification bucket with its own count and percentage. WFA now
 // includes REF (Refer to WFL/H) for any child whose WAZ z-score lands
 // above +2 — per the DOH eOPT Plus rule, that reading is read off the
 // WFL/H axis instead.
 function buildAxisPillCounts(array $measurements, string $statusField, string $axis): array {
-	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW' => 0, 'Ob' => 0, 'REF' => 0, 'Tall' => 0];
+	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW/MAM' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW/SAM' => 0, 'Ob' => 0, 'REF' => 0, 'Tall' => 0];
 	foreach ($measurements as $m) {
 		$c = classifyAxisStatus($axis, (string)($m[$statusField] ?? ''));
 		$key = $c['label'];
@@ -522,11 +522,11 @@ $totalChildren = count($children);
 
 $suw = (int)($axisPillCounts['wfa']['SUW'] ?? 0);
 $sst = (int)($axisPillCounts['hfa']['SSt'] ?? 0);
-$sw  = (int)($axisPillCounts['wflh']['SW']  ?? 0);
+$sw  = (int)($axisPillCounts['wflh']['SW/SAM']  ?? 0);
 $ob  = (int)($axisPillCounts['wflh']['Ob']  ?? 0);
 $muw = (int)($axisPillCounts['wfa']['MUW'] ?? 0);
 $mst = (int)($axisPillCounts['hfa']['MSt'] ?? 0);
-$mw  = (int)($axisPillCounts['wflh']['MW']  ?? 0);
+$mw  = (int)($axisPillCounts['wflh']['MW/MAM']  ?? 0);
 $owWflh = (int)($axisPillCounts['wflh']['OW'] ?? 0);
 $refWfa = (int)($axisPillCounts['wfa']['REF'] ?? 0);
 $tallHfa = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
@@ -751,11 +751,11 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Moderately Wasted / MAM</strong> <span class="stat-code">MW/MAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW"><?php echo (int)$axisPillCounts['wflh']['MW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
+					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW/MAM"><?php echo (int)$axisPillCounts['wflh']['MW/MAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW/MAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Severely Wasted / SAM</strong> <span class="stat-code">SW/SAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW"><?php echo (int)$axisPillCounts['wflh']['SW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
+					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW/SAM"><?php echo (int)$axisPillCounts['wflh']['SW/SAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW/SAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Overweight</strong> <span class="stat-code">OW</span></span></div>
