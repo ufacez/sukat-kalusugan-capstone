@@ -102,7 +102,7 @@ $minX = $rowCount > 0 ? $rows[0]['x'] : null;
 $maxX = $rowCount > 0 ? $rows[$rowCount - 1]['x'] : null;
 
 // Pagination
-$perPage = 5;
+$perPage = 15;
 $page = max(1, (int)($_GET['page'] ?? 1));
 $totalPages = max(1, (int)ceil($rowCount / $perPage));
 if ($page > $totalPages) $page = $totalPages;
@@ -198,9 +198,9 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 		<?php endforeach; ?>
 	</div>
 
-	<!-- Unified info card: About + Classification -->
-	<div class="who-ref-unified-card">
-		<div class="who-ref-unified-left">
+	<!-- Top info row: About + Standard Details + How it is used — 3-col -->
+	<div class="who-ref-top-row">
+		<div class="who-ref-sidebar-card who-ref-sidebar-about">
 			<div class="who-ref-about-icon">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="22" height="22">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/>
@@ -208,61 +208,90 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 			</div>
 			<div class="who-ref-about-content">
 				<h3 class="who-ref-about-title"><?php echo nutritionist_e($config['aboutTitle']); ?></h3>
-				<p class="who-ref-about-desc"><?php echo nutritionist_e($config['aboutDesc']); ?></p>
-				<div class="who-ref-about-meta">
-					<div class="who-ref-about-meta-item">
-						<span class="who-ref-about-meta-label">Population</span>
-						<span class="who-ref-about-meta-value">0 – 60 months · Boys & Girls</span>
-					</div>
-					<div class="who-ref-about-meta-item">
-						<span class="who-ref-about-meta-label">Standard</span>
-						<span class="who-ref-about-meta-value">WHO Child Growth Standards, Methods and Development (2006)</span>
-					</div>
-				</div>
 			</div>
-		</div>
-		<div class="who-ref-unified-divider"></div>
-		<div class="who-ref-unified-right">
-			<h3 class="who-ref-class-title">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
-				Z-Score Classification
-			</h3>
-			<div class="who-ref-class-grid">
-				<div class="who-ref-class-col">
-					<div class="who-ref-class-col-header who-ref-class-wfa">WEIGHT-FOR-AGE (WFA)</div>
+			<!-- Consolidated Z-Score: only the active indicator -->
+			<div class="who-ref-class-inline">
+
+				<h4 class="who-ref-class-inline-title">
+					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z"/></svg>
+					Z-Score — <?php echo nutritionist_e($config['short']); ?>
+				</h4>
+				<?php if ($activeTab === 'wfa'): ?>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-red"></span><strong>SUW</strong> <span class="who-ref-class-range">Z ≤ −3</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-yellow"></span><strong>MUW</strong> <span class="who-ref-class-range">−3 ≤ Z &lt; −2</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-green"></span><strong>Normal</strong> <span class="who-ref-class-range">−2 &lt; Z &lt; +2</span></div>
-				</div>
-				<div class="who-ref-class-col">
-					<div class="who-ref-class-col-header who-ref-class-hfa">HEIGHT-FOR-AGE (HFA)</div>
+				<?php elseif ($activeTab === 'hfa'): ?>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-red"></span><strong>SSt</strong> <span class="who-ref-class-range">Z &lt; −3</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-yellow"></span><strong>MSt</strong> <span class="who-ref-class-range">−3 ≤ Z ≤ −2</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-green"></span><strong>Normal</strong> <span class="who-ref-class-range">−2 &lt; Z &lt; +2</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-green"></span><strong>Tall</strong> <span class="who-ref-class-range">Z &gt; +2</span></div>
-				</div>
-				<div class="who-ref-class-col">
-					<div class="who-ref-class-col-header who-ref-class-wflh">WEIGHT-FOR-LENGTH/HEIGHT (WFL/H)</div>
+				<?php else: /* wfl / wfh */ ?>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-red"></span><strong>SW/SAM</strong> <span class="who-ref-class-range">Z &lt; −3 · SAM</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-yellow"></span><strong>MW/MAM</strong> <span class="who-ref-class-range">−3 ≤ Z &lt; −2 · MAM</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-green"></span><strong>Normal</strong> <span class="who-ref-class-range">−2 &lt; Z &lt; +2</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-orange"></span><strong>OW</strong> <span class="who-ref-class-range">+2 ≤ Z &lt; +3</span></div>
 					<div class="who-ref-class-item"><span class="who-ref-dot who-ref-dot-orange"></span><strong>Ob</strong> <span class="who-ref-class-range">Z ≥ +3</span></div>
+				<?php endif; ?>
+			</div>
+		</div>
+
+		<div class="who-ref-sidebar-card who-ref-sidebar-details">
+			<h4 class="who-ref-sidebar-title">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
+				Standard Details
+			</h4>
+			<div class="who-ref-detail-rows">
+				<div class="who-ref-detail-row">
+					<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></span>
+					<span class="who-ref-detail-label">Indicator</span>
+					<span class="who-ref-detail-value"><?php echo nutritionist_e($config['label']); ?></span>
+				</div>
+				<div class="who-ref-detail-row">
+					<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg></span>
+					<span class="who-ref-detail-label"><?php echo $config['column'] === 'height_cm' ? 'Height Range' : 'Age Range'; ?></span>
+					<span class="who-ref-detail-value"><?php echo $config['column'] === 'height_cm' ? nutritionist_e(who_reference_height_range_label($indicator)) : nutritionist_e(who_reference_age_range_label($ageRange, $config['column'])); ?></span>
+				</div>
+				<div class="who-ref-detail-row">
+					<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg></span>
+					<span class="who-ref-detail-label">Sex</span>
+					<span class="who-ref-detail-value"><?php echo nutritionist_e($sex === 'Male' ? 'Boys' : 'Girls'); ?></span>
+				</div>
+				<?php if ($config['measureType'] !== ''): ?>
+				<div class="who-ref-detail-row">
+					<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg></span>
+					<span class="who-ref-detail-label">Type</span>
+					<span class="who-ref-detail-value"><?php echo nutritionist_e($config['measureType']); ?></span>
+				</div>
+				<?php endif; ?>
+				<div class="who-ref-detail-row">
+					<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg></span>
+					<span class="who-ref-detail-label">Standard</span>
+					<span class="who-ref-detail-value">WHO Child Growth Standards, Methods and Development (2006)</span>
 				</div>
 			</div>
-			<div class="who-ref-class-note">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="m11.25 11.25.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-				Note: Classification is based on WHO Child Growth Standards, Methods and Development (2006).
+		</div>
+
+		<div class="who-ref-sidebar-card who-ref-sidebar-formula">
+			<h4 class="who-ref-sidebar-title">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+				How it is used
+			</h4>
+			<p class="who-ref-how-text">The L, M, and S values are used in the LMS method to compute the Z-score:</p>
+			<div class="who-ref-formula-box">
+				<span class="who-ref-formula-eq">Z = ((X/M)<sup>L</sup> − 1) / (L × S)</span>
+			</div>
+			<div class="who-ref-formula-legend">
+				<span><strong>X</strong> = child's measurement</span>
+				<span><strong>L</strong> = Box-Cox Power</span>
+				<span><strong>M</strong> = Median</span>
+				<span><strong>S</strong> = Coefficient of Variation</span>
 			</div>
 		</div>
 	</div>
 
-	<!-- Main content: table + sidebar -->
-	<div class="who-ref-main-grid">
-		<div class="who-ref-table-section">
-			<div class="who-ref-table-card">
-				<div class="who-ref-table-header">
-					<h3 class="who-ref-table-title">WHO Standard Table (<?php echo nutritionist_e($config['label']); ?>)</h3>
+	<!-- Full-width WHO Standard Table -->
+	<div class="who-ref-table-section">
+		<div class="who-ref-table-card">
 					<div class="who-ref-filters who-ref-toolbar">
 						<form class="who-ref-filter-group who-ref-search" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>">
 							<label class="who-ref-filter-label" for="who-ref-q">Find <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?></label>
@@ -406,63 +435,6 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 						<?php endif; ?>
 					</div>
 				</div>
-			</div>
-		</div>
-
-		<!-- Sidebar -->
-		<div class="who-ref-sidebar">
-			<div class="who-ref-sidebar-card who-ref-sidebar-details">
-				<h4 class="who-ref-sidebar-title">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 0 1 1.063.852l-.708 2.836a.75.75 0 0 0 1.063.853l.041-.021M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9-3.75h.008v.008H12V8.25Z"/></svg>
-					Standard Details
-				</h4>
-				<div class="who-ref-detail-rows">
-					<div class="who-ref-detail-row">
-						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M7.5 3.75H6A2.25 2.25 0 0 0 3.75 6v1.5M16.5 3.75H18A2.25 2.25 0 0 1 20.25 6v1.5m0 9V18A2.25 2.25 0 0 1 18 20.25h-1.5m-9 0H6A2.25 2.25 0 0 1 3.75 18v-1.5M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg></span>
-						<span class="who-ref-detail-label">Indicator</span>
-						<span class="who-ref-detail-value"><?php echo nutritionist_e($config['label']); ?></span>
-					</div>
-					<div class="who-ref-detail-row">
-						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg></span>
-						<span class="who-ref-detail-label"><?php echo $config['column'] === 'height_cm' ? 'Height Range' : 'Age Range'; ?></span>
-						<span class="who-ref-detail-value"><?php echo $config['column'] === 'height_cm' ? nutritionist_e(who_reference_height_range_label($indicator)) : nutritionist_e(who_reference_age_range_label($ageRange, $config['column'])); ?></span>
-					</div>
-					<div class="who-ref-detail-row">
-						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg></span>
-						<span class="who-ref-detail-label">Sex</span>
-						<span class="who-ref-detail-value"><?php echo nutritionist_e($sex === 'Male' ? 'Boys' : 'Girls'); ?></span>
-					</div>
-					<?php if ($config['measureType'] !== ''): ?>
-					<div class="who-ref-detail-row">
-						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15"/></svg></span>
-						<span class="who-ref-detail-label">Type</span>
-						<span class="who-ref-detail-value"><?php echo nutritionist_e($config['measureType']); ?></span>
-					</div>
-					<?php endif; ?>
-					<div class="who-ref-detail-row">
-						<span class="who-ref-detail-icon"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="14" height="14"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25"/></svg></span>
-						<span class="who-ref-detail-label">Standard</span>
-						<span class="who-ref-detail-value">WHO Child Growth Standards, Methods and Development (2006)</span>
-					</div>
-				</div>
-			</div>
-
-			<div class="who-ref-sidebar-card who-ref-sidebar-formula">
-				<h4 class="who-ref-sidebar-title">
-					<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
-					How it is used
-				</h4>
-				<p class="who-ref-how-text">The L, M, and S values are used in the LMS method to compute the Z-score:</p>
-				<div class="who-ref-formula-box">
-					<span class="who-ref-formula-eq">Z = ((X/M)<sup>L</sup> − 1) / (L × S)</span>
-				</div>
-				<div class="who-ref-formula-legend">
-					<span><strong>X</strong> = child's measurement</span>
-					<span><strong>L</strong> = Box-Cox Power</span>
-					<span><strong>M</strong> = Median</span>
-					<span><strong>S</strong> = Coefficient of Variation</span>
-				</div>
-			</div>
 		</div>
 	</div>
 

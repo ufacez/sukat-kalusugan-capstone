@@ -324,7 +324,7 @@
 .who-ref-layout {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 14px;
   margin-top: -8px;
 }
 
@@ -542,11 +542,71 @@
   color: var(--admin-muted);
 }
 
-/* --- Main Grid (Table + Sidebar) --- */
+/* --- Top Info Row: About + Details + Formula — horizontal --- */
+.who-ref-top-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 14px;
+  align-items: stretch;
+}
+
+/* --- Inline Z-Score Classification (inside About card) --- */
+.who-ref-class-inline {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.who-ref-class-inline-title {
+  margin: 0 0 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.who-ref-class-inline-title svg {
+  color: var(--admin-valid, #16a34a);
+  flex-shrink: 0;
+}
+
+.who-ref-class-inline .who-ref-class-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-right: 10px;
+  font-size: 0.72rem;
+  line-height: 1.6;
+}
+
+/* --- Toolbar (filter bar inside table card) --- */
+.who-ref-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 18px 14px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--admin-border);
+  background: var(--admin-surface-alt);
+  border-radius: 18px 18px 0 0;
+}
+
+.who-ref-tb-sep {
+  display: block;
+  width: 1px;
+  height: 26px;
+  background: var(--admin-border);
+  flex-shrink: 0;
+}
+
+/* --- Main Grid (Table + Details + Formula — 3-col) --- */
 .who-ref-main-grid {
   display: grid;
-  grid-template-columns: 1fr 300px;
-  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) 260px 260px;
+  gap: 16px;
   align-items: start;
 }
 
@@ -558,10 +618,11 @@
 .who-ref-table-card {
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
-  border-radius: 14px;
+  border-radius: 18px;
   box-shadow: var(--admin-shadow);
-  overflow: visible;
+  overflow: hidden;
 }
+
 
 .who-ref-table-header {
   display: flex;
@@ -705,8 +766,8 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 0;
-  font-size: 0.82rem;
-  min-width: 880px;
+  font-size: 0.8rem;
+  min-width: 820px;
 }
 
 .who-ref-table thead th {
@@ -719,7 +780,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 10px 10px;
+  padding: 8px 7px;
   border-bottom: 1px solid var(--admin-border);
   text-align: center;
   white-space: nowrap;
@@ -766,7 +827,7 @@
 }
 
 .who-ref-table tbody td {
-  padding: 8px 10px;
+  padding: 6px 7px;
   border-bottom: 1px solid var(--admin-border);
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -930,7 +991,7 @@
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
   border-radius: 14px;
-  padding: 18px 20px;
+  padding: 16px 18px;
   box-shadow: var(--admin-shadow);
 }
 
@@ -1054,50 +1115,53 @@
   padding: 4px 0;
 }
 
-/* --- Import Section --- */
+/* --- Import Section (compact single-row) --- */
 .who-ref-import-section {
   background: var(--admin-surface);
   border: 1px solid var(--admin-border);
-  border-radius: 14px;
-  padding: 18px 20px;
+  border-radius: 10px;
+  padding: 10px 16px;
   box-shadow: var(--admin-shadow);
 }
 
 .who-ref-import-form {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .who-ref-import-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.88rem;
+  gap: 6px;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--admin-text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+  white-space: nowrap;
 }
 
 .who-ref-import-title svg {
+  width: 15px;
+  height: 15px;
   color: var(--admin-primary, currentColor);
 }
 
 .who-ref-import-body {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
 }
 
 .who-ref-import-meta {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
   flex-wrap: wrap;
-  font-size: 0.84rem;
+  font-size: 0.76rem;
   color: var(--admin-muted);
 }
 
@@ -1108,7 +1172,7 @@
 .who-ref-import-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -1175,14 +1239,20 @@
 
 /* --- Responsive --- */
 @media (max-width: 1100px) {
-  .who-ref-main-grid {
-    grid-template-columns: 1fr;
+  .who-ref-top-row {
+    grid-template-columns: 1fr 1fr;
   }
 
-  .who-ref-sidebar {
-    display: grid;
+  .who-ref-top-row .who-ref-sidebar-about {
+    grid-column: 1 / -1;
+  }
+
+  .who-ref-main-grid {
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+  }
+
+  .who-ref-main-grid .who-ref-table-section {
+    grid-column: 1 / -1;
   }
 
   .who-ref-unified-card {
@@ -1196,6 +1266,14 @@
 }
 
 @media (max-width: 760px) {
+  .who-ref-top-row {
+    grid-template-columns: 1fr;
+  }
+
+  .who-ref-top-row .who-ref-sidebar-about {
+    grid-column: auto;
+  }
+
   .who-ref-table {
     min-width: 480px;
   }
@@ -1219,8 +1297,12 @@
     grid-template-columns: 1fr;
   }
 
-  .who-ref-sidebar {
+  .who-ref-main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .who-ref-main-grid .who-ref-table-section {
+    grid-column: auto;
   }
 
   .who-ref-about-meta {
@@ -2107,7 +2189,7 @@
   border-radius: 12px;
   padding: 18px;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
 }
 .audit-chart-header {
   display: flex;
@@ -2229,7 +2311,6 @@
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transform: translate(-50%, 0);
   opacity: 0;
   transition: opacity 0.12s;
   z-index: 10;
@@ -2239,7 +2320,7 @@
 .audit-chart-tooltip::after {
   content: '';
   position: absolute;
-  left: 50%;
+  left: var(--arrow-left, 50%);
   top: 100%;
   transform: translateX(-50%);
   border: 3px solid transparent;

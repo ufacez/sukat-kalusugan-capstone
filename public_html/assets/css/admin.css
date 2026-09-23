@@ -3354,7 +3354,7 @@ body.admin-page .who-ref-class-grid {
 
 body.nutritionist-page .who-ref-main-grid,
 body.admin-page .who-ref-main-grid {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr) 260px 260px;
 }
 
 body.nutritionist-page .who-ref-table-header,
@@ -3378,7 +3378,7 @@ body.admin-page .who-ref-filter-group {
 
 body.nutritionist-page .who-ref-table,
 body.admin-page .who-ref-table {
-  min-width: 760px;
+  min-width: 580px;
 }
 
 body.nutritionist-page .who-ref-table th,
