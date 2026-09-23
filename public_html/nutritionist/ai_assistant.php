@@ -61,7 +61,7 @@ nutritionist_layout_start(
             </div>
             <div class="ai-session-pagination">
                 <button type="button" class="ai-session-page-btn" id="aiSessionPrev" disabled aria-label="Previous sessions">&lsaquo;</button>
-                <span id="aiSessionPage">Page 1</span>
+                <span id="aiSessionPage">Loading…</span>
                 <button type="button" class="ai-session-page-btn" id="aiSessionNext" disabled aria-label="Next sessions">&rsaquo;</button>
             </div>
         </div>
@@ -168,6 +168,7 @@ nutritionist_layout_start(
         sending: false,
         creatingConversation: false,
         conversationRequestToken: 0,
+        sessionRequestToken: 0,
         pendingMessage: null,
         childDetail: null,
         childModalPage: 1,
@@ -325,16 +326,37 @@ nutritionist_layout_start(
         createConversation(null);
     }
 
+    function renderSessionsLoading() {
+        // Instant skeleton so the pagination never looks "late" while
+        // GET conversations.php is in flight. Keeps cached rows visible
+        // on background refreshes (e.g. after sending a message).
+        if (!state.sessions.length) {
+            dom.sessionList.innerHTML = '<div class="ai-session-loading">Loading sessions…</div>';
+        }
+        dom.sessionPageEl.textContent = 'Loading…';
+        dom.sessionPrev.disabled = true;
+        dom.sessionNext.disabled = true;
+    }
+
     function loadSessions() {
+        const requestToken = ++state.sessionRequestToken;
+        renderSessionsLoading();
         fetch(API + 'conversations.php')
             .then(r => r.json())
             .then(res => {
-                if (!res.success) return;
+                if (requestToken !== state.sessionRequestToken) return;
+                if (!res.success) {
+                    renderSessions();
+                    return;
+                }
                 state.sessions = res.data.conversations || [];
                 state.sessionPage = 1;
                 renderSessions();
             })
-            .catch(() => {});
+            .catch(() => {
+                if (requestToken !== state.sessionRequestToken) return;
+                renderSessions();
+            });
     }
 
     function renderSessions() {
@@ -886,8 +908,12 @@ nutritionist_layout_start(
      * ================================================================ */
 
     loadChildren();
+    // Single GET only: the old init fired loadSessions() + createConversation()
+    // (POST) in parallel, and the POST's trailing loadSessions() overwrote the
+    // first render — that double-fetch is what made the pagination flicker in
+    // late. Conversations are now created lazily on first send/child-pick.
+    showGlobalEmpty();
     loadSessions();
-    createConversation(null);
 
 })();
 </script>

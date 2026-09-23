@@ -358,11 +358,11 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             <p class="admin-section-subtitle">View the distribution of children and nutritional risk status per household in your assigned barangay.</p>
         </div>
         <div class="admin-section-actions">
-            <button class="admin-btn admin-btn-sm" id="spotmap-add-btn" style="background:var(--admin-valid);color:#fff;border:none;">
+            <button class="admin-btn admin-btn-sm" id="spotmap-add-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
                 Add Spot
             </button>
-            <button class="admin-btn admin-btn-sm" id="spotmap-import-btn" style="background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">
+            <button class="admin-btn-secondary admin-btn-sm" id="spotmap-import-btn">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
                 Import Spot Map
             </button>

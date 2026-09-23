@@ -427,6 +427,8 @@
   overflow-y: auto;
   padding-right: 2px;
   scrollbar-width: thin;
+  align-content: start;
+  grid-auto-rows: min-content;
 }
 
 .ai-session-item {
@@ -440,6 +442,8 @@
   color: var(--ai-text);
   text-align: left;
   cursor: pointer;
+  align-self: start;
+  height: auto;
 }
 
 .ai-session-item:hover,
