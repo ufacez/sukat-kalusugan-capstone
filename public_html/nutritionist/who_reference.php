@@ -143,6 +143,51 @@ $actions = export_dropdown(
 
 nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
 ?>
+<style>
+/* Senior-friendly filter bar: roomy gaps + padding, bigger tap targets, readable text. */
+.nutritionist-page .who-ref-filters.who-ref-toolbar{
+width:100%;
+gap:12px 20px;
+padding:14px 18px;
+align-items:center;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-filter-group{
+gap:10px;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-filter-label{
+font-size:0.75rem;
+}
+.who-ref-tb-sep{
+min-height:34px;
+margin:2px 8px;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-search-input{
+width:200px;
+min-height:44px;
+padding:10px 12px;
+font-size:14px;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-search-btn{
+width:44px;
+height:44px;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-select{
+max-width:none;
+min-width:130px;
+min-height:44px;
+padding:10px 32px 10px 12px;
+font-size:14px;
+}
+.nutritionist-page .who-ref-toolbar .who-ref-toggle{
+padding:12px 22px;
+min-height:44px;
+font-size:14px;
+}
+@media (max-width:560px){
+.who-ref-search-row{width:100%}
+.who-ref-search-input{flex:1;width:auto}
+}
+</style>
 
 <div class="who-ref-layout">
 	<?php if (nutritionist_can_write()): ?>
@@ -341,7 +386,6 @@ nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 yea
 						</div>
 						<?php endif; ?>
 					</div>
-				</div>
 
 				<div class="who-ref-table-wrap">
 					<table class="who-ref-table" id="who-reference-table">

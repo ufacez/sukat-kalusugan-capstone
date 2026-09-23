@@ -639,7 +639,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($measurements); ?></div>
-				<div class="dashboard-stat-meta">This month <a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>">View all →</a></div>
+				<div class="dashboard-stat-meta">This month</div>
 			</div>
 		</div>
 	</article>
@@ -652,7 +652,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<div>
 				<div class="dashboard-stat-label">Appointments</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($upcomingAppointments); ?></div>
-				<div class="dashboard-stat-meta">Upcoming <a href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">View all →</a></div>
+				<div class="dashboard-stat-meta">Upcoming</div>
 			</div>
 		</div>
 	</article>

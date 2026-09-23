@@ -61,6 +61,65 @@ if ($page > $totalPages) $page = $totalPages;
 $offset = ($page - 1) * $perPage;
 $pageRows = array_slice($roster, $offset, $perPage);
 
+// ── Measurement history for the modal (last 5 readings per child on this page) ──
+$monHistoryJson = [];
+$pageChildIds = array_values(array_unique(array_map(static fn(array $r): int => (int)$r['id'], $pageRows)));
+if ($pageChildIds !== []) {
+    $inPlaceholders = implode(',', array_fill(0, count($pageChildIds), '?'));
+    $histRows = admin_fetch_all(
+        "SELECT child_id, measurement_date, weight_kg, height_cm,
+            waz, haz, whz, wfa_status, hfa_status, wfh_status,
+            nutritional_status, measurement_type
+         FROM measurements
+         WHERE child_id IN ({$inPlaceholders})
+           AND measurement_type IN ('ROUTINE','OVERRIDE','RECHECK')
+         ORDER BY measurement_date DESC, id DESC",
+        str_repeat('i', count($pageChildIds)),
+        $pageChildIds
+    );
+    $histByChild = [];
+    foreach ($histRows as $hr) {
+        $histByChild[(int)$hr['child_id']][] = $hr;
+    }
+    foreach ($pageRows as $entry) {
+        $cid = (int)$entry['id'];
+        $fullName = trim($entry['first_name'] . ' ' . $entry['last_name']);
+        $hist = array_slice($histByChild[$cid] ?? [], 0, 5);
+        $monHistoryJson[$cid] = [
+            'id' => $cid,
+            'name' => $fullName,
+            'code' => (string)($entry['child_code'] ?? ''),
+            'sex' => (string)($entry['sex'] ?? ''),
+            'barangay' => (string)($entry['barangay_name'] ?? ''),
+            'parent' => (string)($entry['parent_name'] ?? ''),
+            'avatar_bg' => child_avatar_color((string)($entry['sex'] ?? '')),
+            'initials' => admin_initials($fullName),
+            'record_url' => app_url('/nutritionist/measurement_record.php?child=' . $cid),
+            'history' => array_map(static function (array $m): array {
+                $wfa = (string)($m['wfa_status'] ?? '—');
+                $hfa = (string)($m['hfa_status'] ?? '—');
+                $wfhRaw = (string)($m['wfh_status'] ?? '');
+                $wfh = $wfhRaw !== '' ? wfh_display_short($wfhRaw) : '—';
+                $fmtZ = static fn($v): string => $v === null ? '—' : number_format((float)$v, 2);
+                return [
+                    'date' => date('M j, Y', strtotime((string)$m['measurement_date'])),
+                    'weight' => $m['weight_kg'] !== null ? number_format((float)$m['weight_kg'], 2) . ' kg' : '—',
+                    'height' => $m['height_cm'] !== null ? number_format((float)$m['height_cm'], 1) . ' cm' : '—',
+                    'waz' => $fmtZ($m['waz'] ?? null),
+                    'haz' => $fmtZ($m['haz'] ?? null),
+                    'whz' => $fmtZ($m['whz'] ?? null),
+                    'wfa' => $wfa,
+                    'hfa' => $hfa,
+                    'wfh' => $wfh,
+                    'wfa_class' => nutritionist_status_class($wfa),
+                    'hfa_class' => nutritionist_status_class($hfa),
+                    'wfh_class' => nutritionist_status_class($wfh),
+                ];
+            }, $hist),
+        ];
+    }
+}
+
 // ── Link builders (preserve view state) ──
 $baseParams = ['view' => $view, 'year' => $year];
 if ($view === 'monthly') {
@@ -131,34 +190,28 @@ $monChevronRight = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox=
 
 $monthNames = [1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'];
 
-$rosterTitle = $view === 'monthly'
-    ? 'Monthly Monitoring — ' . $period['label']
-    : 'Quarterly Monitoring — ' . $period['label'] . ' ' . $year;
+$actions = '';
 
-$actions = '<a class="admin-btn-secondary" href="'
-    . nutritionist_e(app_url('/nutritionist/appointments.php'))
-    . '">' . admin_action_icon('back') . ' Appointments</a>';
-
-nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
+nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monitoring of children.', 'monitoring', $actions);
 ?>
 
 <style>
 .rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 14px}
-.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:12px 20px;min-height:44px;font-size:14px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
 .rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
 .rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
 .mon-subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
-.mon-subtab{font-size:14px;font-weight:700;padding:9px 18px;border-radius:999px;border:2px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-text);text-decoration:none;transition:all .15s}
+.mon-subtab{font-size:14px;font-weight:700;padding:10px 18px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px;border:2px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-text);text-decoration:none;transition:all .15s}
 .mon-subtab:hover{border-color:var(--admin-primary);color:var(--admin-primary)}
 .mon-subtab.is-active{background:var(--admin-primary);color:#fff;border-color:var(--admin-primary)}
 .mon-subtab.is-active span{opacity:.85;}
 .mon-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px;margin-bottom:18px}
-.mon-card-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;flex-wrap:wrap;gap:8px}
-.mon-card-title{font-size:14px;font-weight:700;color:var(--admin-text);margin:0}
-.mon-card-sub{font-size:12px;color:var(--admin-muted);margin-top:2px}
 .children-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.children-toolbar .admin-search{flex:1;min-width:220px}
-.children-toolbar .admin-select{min-width:200px;max-width:260px}
+.children-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
+.children-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
+.children-toolbar .mon-year{min-width:110px;max-width:130px}
+.children-toolbar .admin-btn-secondary{min-height:44px;font-size:14px;display:inline-flex;align-items:center}
+.children-toolbar .mon-export{margin-left:auto;display:flex;align-items:center}
 .children-toolbar .admin-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--admin-muted);font-weight:600}
 .nutritionist-table-wrap{overflow-x:auto}
 .children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
@@ -171,8 +224,9 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
 .children-empty .empty-sub{color:var(--admin-muted);max-width:420px;line-height:1.45}
 @media (max-width: 560px) {
   .children-toolbar{flex-direction:column;align-items:stretch}
-  .children-toolbar .admin-search{min-width:0;flex:1}
+  .children-toolbar .admin-search{min-width:0;flex:1;max-width:100%}
   .children-toolbar .admin-select{min-width:0;max-width:100%;width:100%}
+  .children-toolbar .mon-export{margin-left:0}
 }
 </style>
 
@@ -193,13 +247,14 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
             <?php
             $qMonthNames = array_map(static fn(int $m): string => $monthNames[$m], $qr['months']);
             ?>
-            <a class="mon-subtab <?php echo $quarter === $qNo ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($subLink($qNo)); ?>">Q<?php echo $qNo; ?> <span style="font-weight:600;"><?php echo implode(' - ', $qMonthNames); ?></span></a>
+            <a class="mon-subtab <?php echo $quarter === $qNo ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($subLink($qNo)); ?>"><?php echo implode(' - ', $qMonthNames); ?></a>
         <?php endfor; ?>
     <?php endif; ?>
 </div>
 
-<!-- ============ FILTER BAR ============ -->
-<form method="get" class="children-toolbar">
+<!-- ============ ROSTER TABLE (filters + table in one card to save space) ============ -->
+<div class="mon-card">
+<form method="get" class="children-toolbar" id="mon-filter-form">
     <input type="hidden" name="view" value="<?php echo nutritionist_e($view); ?>">
     <?php if ($view === 'monthly'): ?>
         <input type="hidden" name="month" value="<?php echo $month; ?>">
@@ -207,55 +262,50 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
         <input type="hidden" name="quarter" value="<?php echo $quarter; ?>">
     <?php endif; ?>
     <input
+        id="mon-search"
         class="admin-search"
         type="search"
         name="q"
         placeholder="Search by name, code, guardian, or address..."
+        aria-label="Search monitoring roster"
         value="<?php echo nutritionist_e($search); ?>"
+        autocomplete="off"
     >
     <select
-        class="admin-select"
+        class="admin-select mon-year"
         name="year"
+        aria-label="Filter by year"
         onchange="this.form.submit()"
     >
         <?php for ($y = (int)date('Y'); $y >= (int)date('Y') - 4; $y--): ?>
             <option value="<?php echo $y; ?>" <?php echo $year === $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
         <?php endfor; ?>
     </select>
+    <?php if ($search !== ''): ?>
     <div style="display:flex;gap:6px;align-items:center;">
-        <button class="admin-btn-secondary" type="submit">Filter</button>
-        <?php if ($search !== ''): ?>
             <a class="admin-btn-secondary" href="<?php echo nutritionist_e($view === 'monthly' ? $subLink($month) : $subLink($quarter)); ?>">Clear</a>
-        <?php endif; ?>
+    </div>
+    <?php endif; ?>
+    <div class="mon-export">
+        <?php
+        $expBase = ['view' => $view, 'year' => $year];
+        if ($view === 'monthly') {
+            $expBase['month'] = $month;
+        } else {
+            $expBase['quarter'] = $quarter;
+        }
+        if ($search !== '') {
+            $expBase['q'] = $search;
+        }
+        echo export_dropdown(
+            app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'xlsx']))),
+            app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'csv']))),
+            app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'pdf']))),
+            'Export'
+        );
+        ?>
     </div>
 </form>
-
-<!-- ============ ROSTER TABLE ============ -->
-<div class="mon-card">
-    <div class="mon-card-head">
-        <div>
-            <h3 class="mon-card-title"><?php echo nutritionist_e($rosterTitle); ?></h3>
-        </div>
-        <div>
-            <?php
-            $expBase = ['view' => $view, 'year' => $year];
-            if ($view === 'monthly') {
-                $expBase['month'] = $month;
-            } else {
-                $expBase['quarter'] = $quarter;
-            }
-            if ($search !== '') {
-                $expBase['q'] = $search;
-            }
-            echo export_dropdown(
-                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'xlsx']))),
-                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'csv']))),
-                app_url('/nutritionist/monitoring_export.php?' . http_build_query(array_merge($expBase, ['format' => 'pdf']))),
-                'Export'
-            );
-            ?>
-        </div>
-    </div>
 
     <?php if (empty($pageRows)): ?>
         <div class="children-empty">
@@ -303,7 +353,6 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
                             <div class="text">
                                 <div class="name"><?php echo nutritionist_e($fullName); ?></div>
                                 <div class="sub"><?php echo nutritionist_e((string)$entry['child_code']); ?> · <?php echo nutritionist_e((string)$entry['sex']); ?></div>
-                                <div class="sub" style="margin-top:3px;"><span class="admin-pill <?php echo $measured ? 'is-success' : 'is-warn'; ?>"><?php echo $measured ? 'Measured' : 'Pending'; ?></span></div>
                             </div>
                         </div>
                     </td>
@@ -340,7 +389,7 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
                     <td>
                         <div class="admin-actions" onclick="event.stopPropagation();">
                             <a class="admin-icon-btn admin-icon-btn-primary" title="Record measurement" href="<?php echo $recordUrl; ?>"><?php echo admin_action_icon('measure'); ?></a>
-                            <a class="admin-icon-btn" title="View child" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>"><?php echo admin_action_icon('view'); ?></a>
+                            <button type="button" class="admin-icon-btn" title="View measurement history" data-view-history="<?php echo (int)$entry['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
                         </div>
                     </td>
                 </tr>
@@ -358,5 +407,173 @@ nutritionist_layout_start('Monitoring List', '', 'monitoring', $actions);
     </div>
     <?php endif; ?>
 </div>
+
+<style>
+#monHistoryModal{display:none;}
+#monHistoryModal.is-open{display:flex;}
+.mon-hist-sub{font-size:13px;color:var(--admin-muted);margin-top:2px}
+.mon-hist-latest{background:var(--admin-primary-soft);border:1px solid var(--admin-border);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+.mon-hist-latest .m-title{font-size:12px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.mon-hist-grid{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+.mon-hist-stat{display:flex;flex-direction:column;gap:2px;min-width:80px}
+.mon-hist-stat .k{font-size:12px;color:var(--admin-muted);font-weight:600}
+.mon-hist-stat .v{font-size:16px;font-weight:700;color:var(--admin-text)}
+.mon-hist-pills{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.mon-hist-table{width:100%;border-collapse:collapse;font-size:13px}
+.mon-hist-table th{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--admin-muted);text-align:left;padding:8px 6px;border-bottom:2px solid var(--admin-border);white-space:nowrap}
+.mon-hist-table td{padding:9px 6px;border-bottom:1px solid var(--admin-border);color:var(--admin-text);white-space:nowrap}
+.mon-hist-table tr:last-child td{border-bottom:none}
+.mon-hist-empty{padding:20px;text-align:center;color:var(--admin-muted);font-size:14px;font-style:italic}
+</style>
+
+<!-- ============ MEASUREMENT HISTORY MODAL (last 5 readings + z-scores) ============ -->
+<div class="admin-modal-overlay" id="monHistoryModal">
+    <div class="admin-modal" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="Measurement history">
+        <div class="admin-modal-head">
+            <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+                <span class="avatar" id="monHistAvatar" style="width:44px;height:44px;border-radius:50%;background:#94a3b8;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">--</span>
+                <div style="min-width:0;">
+                    <h3 id="monHistName" style="margin:0;font-size:16px;">Child name</h3>
+                    <div class="mon-hist-sub" id="monHistSub">—</div>
+                </div>
+            </div>
+            <button class="admin-modal-close" id="monHistClose" type="button" aria-label="Close" style="min-width:44px;min-height:44px;font-size:22px;">&times;</button>
+        </div>
+        <div style="padding:16px 20px;">
+            <div class="mon-hist-latest" id="monHistLatest"></div>
+            <div style="overflow-x:auto;">
+                <table class="mon-hist-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th>Weight</th>
+                            <th>Height</th>
+                            <th>WAZ</th>
+                            <th>HAZ</th>
+                            <th>WHZ</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monHistBody"></tbody>
+                </table>
+            </div>
+            <div class="admin-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap;">
+                <a class="admin-btn-secondary" id="monHistRecord" href="#" style="min-height:44px;display:inline-flex;align-items:center;font-size:14px;">Record measurement</a>
+                <button class="admin-btn" type="button" id="monHistClose2" style="min-height:44px;font-size:14px;">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+var monHistory = <?php echo json_encode($monHistoryJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
+(function () {
+    var overlay = document.getElementById('monHistoryModal');
+    if (!overlay) return;
+
+    function escapeHtml(s) {
+        return String(s === null || s === undefined ? '' : s)
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    // Same short codes as the roster table (Normal→N, Tall→T); full axis
+    // name stays in the title tooltip for clarity.
+    function monShort(code) {
+        if (code === 'Normal') return 'N';
+        if (code === 'Tall') return 'T';
+        return code;
+    }
+
+    function openHistory(childId) {
+        var c = monHistory[childId];
+        if (!c) return;
+        var avatar = document.getElementById('monHistAvatar');
+        avatar.textContent = c.initials || '--';
+        avatar.style.background = c.avatar_bg || '#94a3b8';
+        document.getElementById('monHistName').textContent = c.name || 'Child';
+        document.getElementById('monHistSub').textContent =
+            (c.code || '') + (c.sex ? ' · ' + c.sex : '') +
+            (c.barangay ? ' · ' + c.barangay : '') +
+            (c.parent ? ' · ' + c.parent : '');
+
+        var body = document.getElementById('monHistBody');
+        var latest = document.getElementById('monHistLatest');
+        var hist = c.history || [];
+        if (hist.length === 0) {
+            latest.innerHTML = '<div class="mon-hist-empty" style="padding:6px;">No measurements yet.</div>';
+            body.innerHTML = '<tr><td colspan="7"><div class="mon-hist-empty">No recent measurements yet.</div></td></tr>';
+        } else {
+            var first = hist[0];
+            latest.innerHTML =
+                '<div class="m-title">Latest reading · ' + escapeHtml(first.date) + '</div>' +
+                '<div class="mon-hist-grid">' +
+                '<div class="mon-hist-stat"><span class="k">Weight</span><span class="v">' + escapeHtml(first.weight) + '</span></div>' +
+                '<div class="mon-hist-stat"><span class="k">Height</span><span class="v">' + escapeHtml(first.height) + '</span></div>' +
+                '<div class="mon-hist-pills">' +
+                '<span class="admin-pill ' + escapeHtml(first.wfa_class) + '" title="Weight-for-Age: ' + escapeHtml(first.wfa) + '">' + escapeHtml(monShort(first.wfa)) + '</span>' +
+                '<span class="admin-pill ' + escapeHtml(first.hfa_class) + '" title="Height-for-Age: ' + escapeHtml(first.hfa) + '">' + escapeHtml(monShort(first.hfa)) + '</span>' +
+                '<span class="admin-pill ' + escapeHtml(first.wfh_class) + '" title="Weight-for-Length/Height: ' + escapeHtml(first.wfh) + '">' + escapeHtml(monShort(first.wfh)) + '</span>' +
+                '</div></div>';
+            body.innerHTML = hist.map(function (h) {
+                return '<tr><td>' + escapeHtml(h.date) + '</td>' +
+                    '<td>' + escapeHtml(h.weight) + '</td>' +
+                    '<td>' + escapeHtml(h.height) + '</td>' +
+                    '<td>' + escapeHtml(h.waz) + '</td>' +
+                    '<td>' + escapeHtml(h.haz) + '</td>' +
+                    '<td>' + escapeHtml(h.whz) + '</td>' +
+                    '<td><span class="admin-pill ' + escapeHtml(h.wfa_class) + '" title="Weight-for-Age: ' + escapeHtml(h.wfa) + '">' + escapeHtml(monShort(h.wfa)) + '</span> ' +
+                    '<span class="admin-pill ' + escapeHtml(h.hfa_class) + '" title="Height-for-Age: ' + escapeHtml(h.hfa) + '">' + escapeHtml(monShort(h.hfa)) + '</span> ' +
+                    '<span class="admin-pill ' + escapeHtml(h.wfh_class) + '" title="Weight-for-Length/Height: ' + escapeHtml(h.wfh) + '">' + escapeHtml(monShort(h.wfh)) + '</span></td></tr>';
+            }).join('');
+        }
+
+        var recLink = document.getElementById('monHistRecord');
+        if (recLink) recLink.setAttribute('href', c.record_url || '#');
+
+        overlay.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeHistory() {
+        overlay.classList.remove('is-open');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-view-history]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            openHistory(btn.getAttribute('data-view-history'));
+        });
+    });
+
+    ['monHistClose', 'monHistClose2'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener('click', closeHistory);
+    });
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeHistory();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeHistory();
+    });
+
+    // Auto-filter: submit ~500ms after typing stops; native search-clear submits at once.
+    var form = document.getElementById('mon-filter-form');
+    var search = document.getElementById('mon-search');
+    if (form && search) {
+        var t = null;
+        search.addEventListener('input', function () {
+            if (t) clearTimeout(t);
+            t = setTimeout(function () { form.submit(); }, 500);
+        });
+        search.addEventListener('search', function () {
+            if (t) clearTimeout(t);
+            if (search.value === '') form.submit();
+        });
+    }
+})();
+</script>
 
 <?php nutritionist_layout_end(); ?>

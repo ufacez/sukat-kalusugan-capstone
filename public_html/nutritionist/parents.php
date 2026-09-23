@@ -57,6 +57,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 $tab = (($_GET['tab'] ?? 'active') === 'archived') ? 'archived' : 'active';
+$localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
 
 $childScopeParams = [];
 $childScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childScopeParams);
@@ -72,6 +73,9 @@ $parents = admin_fetch_all(
 		p.address,
 		p.barangay_id,
 		bg.name AS barangay,
+		p.local_area_id,
+		la.area_name AS local_area,
+		la.area_type AS local_area_type,
 		p.status,
 		p.household_id,
 		h.household_code AS household_code,
@@ -83,6 +87,7 @@ $parents = admin_fetch_all(
 		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count
 	 FROM parents p
 	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
+	 LEFT JOIN local_areas la ON la.id = p.local_area_id
 	 LEFT JOIN households h ON h.id = p.household_id AND h.status = 'active'
      LEFT JOIN children c ON c.parent_id = p.id AND {$childScope}
      LEFT JOIN appointments a ON a.parent_id = p.id
@@ -93,11 +98,11 @@ $parents = admin_fetch_all(
 		ORDER BY m2.measurement_date DESC, m2.id DESC
 		LIMIT 1
 	 )
-	 WHERE {$parentScope}
-	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
+	 WHERE {$parentScope}" . ($localAreaFilter > 0 ? ' AND p.local_area_id = ?' : '') . "
+	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.local_area_id, la.area_name, la.area_type, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
 	 ORDER BY p.id DESC",
-	str_repeat('i', count($childScopeParams) + count($parentScopeParams)),
-	array_merge($childScopeParams, $parentScopeParams)
+	str_repeat('i', count($childScopeParams) + count($parentScopeParams) + ($localAreaFilter > 0 ? 1 : 0)),
+	array_merge($childScopeParams, $parentScopeParams, $localAreaFilter > 0 ? [$localAreaFilter] : [])
 );
 
 $activeCount = count(array_filter($parents, static fn(array $parent): bool => (string)$parent['status'] === 'active'));
@@ -110,10 +115,34 @@ $tabParents = array_values(array_filter($parents, static fn(array $parent): bool
 $countActive = $activeCount;
 $countArchived = count($parents) - $activeCount;
 
-function nutritionist_parents_url(string $tab): string
+// Local area list for the filter dropdown (same scope pattern as children.php).
+$localAreaParams = [];
+$localAreaScope = nutritionist_scope_fragment($user, 'la.barangay_id', $localAreaParams);
+$localAreaList = admin_fetch_all(
+	"SELECT la.id, la.area_name, la.area_type, la.barangay_id, bg.name AS barangay
+	 FROM local_areas la
+	 INNER JOIN barangays bg ON bg.id = la.barangay_id
+	 WHERE la.is_active = 1 AND {$localAreaScope}
+	 ORDER BY bg.name ASC, la.area_name ASC",
+	str_repeat('i', count($localAreaParams)),
+	$localAreaParams
+);
+
+function nutritionist_parents_url(string $tab, ?int $localAreaId = null): string
 {
+    global $localAreaFilter;
+    if ($localAreaId === null) {
+        $localAreaId = $localAreaFilter;
+    }
     $base = app_url('/nutritionist/parents.php');
-    return $tab === 'active' ? $base : $base . '?tab=archived';
+    $params = [];
+    if ($tab !== '' && $tab !== 'active') {
+        $params['tab'] = $tab;
+    }
+    if ($localAreaId > 0) {
+        $params['local_area_id'] = $localAreaId;
+    }
+    return $params === [] ? $base : $base . '?' . http_build_query($params);
 }
 
 $actions = nutritionist_can_write('children.create')
@@ -131,77 +160,33 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 ?>
 <style>
 .rp-tabs{display:flex;gap:0;border-bottom:2px solid var(--admin-border);margin:0 0 14px}
-.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;font-size:13px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
+.rp-tab{display:inline-flex;align-items:center;gap:6px;padding:12px 20px;min-height:44px;font-size:14px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
 .rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
 .rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
-.rp-tab span{font-size:11px;opacity:.6}
+.rp-tab span{font-size:12px;opacity:.7}
+.parents-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
+.parents-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
+.parents-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
+@media (max-width:560px){
+.parents-toolbar{flex-direction:column;align-items:stretch}
+.parents-toolbar .admin-search,.parents-toolbar .admin-select{max-width:100%;width:100%;flex:1}
+}
 </style>
-<section class="admin-grid-cards">
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Parents</div>
-				<div class="admin-card-value"><?php echo count($parents); ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend is-up"><?php echo $activeCount; ?> active accounts</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Children Linked</div>
-				<div class="admin-card-value"><?php echo $totalChildren; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Households in scope</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">Appointments</div>
-				<div class="admin-card-value"><?php echo $totalAppointments; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Parent-requested and nutritionist-created visits</span>
-				</div>
-			</div>
-		</div>
-	</article>
-	<article class="admin-card">
-		<div class="admin-card-row">
-			<div class="admin-card-icon is-danger">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-			</div>
-			<div class="admin-card-content">
-				<div class="admin-card-label">At-Risk Links</div>
-				<div class="admin-card-value"><?php echo $atRiskCount; ?></div>
-				<div class="admin-card-meta">
-					<span class="admin-card-trend">Parents with follow-up children</span>
-				</div>
-			</div>
-		</div>
-	</article>
-</section>
-
-<section class="nutritionist-panel">
-	<div class="nutritionist-table-head" style="margin-bottom:12px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;">Parent Directory</h2>
-			<p class="admin-section-subtitle">Search, update, and review household records.</p>
-		</div>
-		<input class="admin-search" data-admin-filter="#parents-table" type="search" placeholder="Search parents" style="min-width:240px;">
+<section class="nutritionist-panel" style="margin-top:0;">
+	<div class="parents-toolbar">
+		<input class="admin-search" data-admin-filter="#parents-table" type="search" placeholder="Search parents" aria-label="Search parents">
+		<select class="admin-select" id="parent-local-area-filter" aria-label="Filter by local area" onchange="window.location.href=this.value">
+			<option value="<?php echo nutritionist_e(nutritionist_parents_url($tab, 0)); ?>" <?php echo $localAreaFilter <= 0 ? 'selected' : ''; ?>>All local areas</option>
+			<?php foreach ($localAreaList as $la): ?>
+				<option value="<?php echo nutritionist_e(nutritionist_parents_url($tab, (int)$la['id'])); ?>" <?php echo $localAreaFilter === (int)$la['id'] ? 'selected' : ''; ?>><?php
+					$label = ucfirst((string)$la['area_type']) . ': ' . $la['area_name'];
+					if (($user['role'] ?? '') === 'admin' && !empty($la['barangay'])) {
+						$label .= ' · ' . $la['barangay'];
+					}
+					echo nutritionist_e($label);
+				?></option>
+			<?php endforeach; ?>
+		</select>
 	</div>
 
 	<div class="rp-tabs">
@@ -230,7 +215,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 				<?php endif; ?>
 				<?php foreach ($tabParents as $parentIndex => $parent): ?>
 					<tr<?php echo admin_paged_row_attr($parentIndex, 5); ?>
-						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'])); ?>"
+						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'] . ' ' . ($parent['barangay'] ?? '') . ' ' . ($parent['local_area'] ?? ''))); ?>"
 						data-parent-id="<?php echo (int)$parent['id']; ?>"
 						data-parent-name="<?php echo nutritionist_e($parent['name']); ?>"
 						data-parent-type="<?php echo nutritionist_e($parent['parent_type']); ?>"

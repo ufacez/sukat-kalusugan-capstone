@@ -251,8 +251,8 @@ nutritionist_layout_start(
 .rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
 .rp-tab span{font-size:11px;opacity:.6}
 .children-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.children-toolbar .admin-search{flex:1;min-width:220px}
-.children-toolbar .admin-select{min-width:200px;max-width:260px}
+.children-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
+.children-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
 
 .children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
 .children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:#94a3b8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -328,25 +328,18 @@ nutritionist_layout_start(
 </style>
 
 <section class="nutritionist-panel">
-    <div class="nutritionist-form-head" style="margin-bottom:14px;">
-        <div>
-            <h2 class="admin-section-title" style="margin-bottom:2px;">Children directory</h2>
-            <p class="admin-section-subtitle">
-                Registered children in your scope. Click a row to view the child information card, or use the action buttons.
-            </p>
-        </div>
-    </div>
-
     <div class="children-toolbar">
         <input
             class="admin-search"
             data-admin-filter="#children-table"
             type="search"
             placeholder="Search by name, code, guardian, or address..."
+            aria-label="Search children"
         >
         <select
             class="admin-select"
             id="local-area-filter"
+            aria-label="Filter by local area"
             onchange="window.location.href=this.value"
         >
             <option value="<?php echo nutritionist_e(nutritionist_children_url([])); ?>">All local areas</option>
