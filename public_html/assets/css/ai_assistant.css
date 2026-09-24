@@ -542,6 +542,9 @@
   color: var(--ai-muted);
 }
 
+.ai-chat-header.is-no-title {
+  justify-content: flex-end;
+}
 .ai-chat-actions {
   display: flex;
   gap: 8px;
@@ -598,7 +601,7 @@
   border-radius: 10px;
 }
 
-/* ---- Message bubbles ---- */
+/* ---- Message bubbles — ChatGPT style: user boxed, assistant plain ---- */
 .ai-msg {
   display: flex;
   max-width: 75%;
@@ -621,23 +624,12 @@
 
 .ai-msg.is-assistant {
   align-items: flex-start;
-  gap: 8px;
+  max-width: 100%;
+  width: 100%;
 }
 
 .ai-msg-avatar {
-  width: 28px;
-  height: 28px;
-  flex: 0 0 28px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: #063d2c;
-  color: #fff;
-  font-size: 0.58rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-  box-shadow: 0 3px 8px rgba(6, 61, 44, 0.25);
+  display: none !important;
 }
 
 .ai-msg-bubble {
@@ -649,8 +641,8 @@
 }
 
 .ai-msg-bubble strong {
-  color: var(--ai-text);
-  font-weight: 800;
+  color: inherit;
+  font-weight: 700;
 }
 
 .ai-msg.is-user .ai-msg-bubble {
@@ -659,14 +651,41 @@
   border-bottom-right-radius: 4px;
 }
 
-.ai-msg.is-assistant .ai-msg-bubble {
-  background: #1e3a2e;
-  border: 1px solid #2e5040;
-  color: #c8dace;
-  border-bottom-left-radius: 4px;
+.ai-msg.is-user .ai-msg-bubble strong {
+  color: #fff;
 }
 
-/* ---- Dark theme for chat bubbles ---- */
+.ai-msg.is-assistant .ai-msg-bubble {
+  background: transparent;
+  border: none;
+  color: var(--ai-text);
+  border-radius: 0;
+  padding: 4px 2px;
+  max-width: 100%;
+  line-height: 1.7;
+}
+
+.ai-msg.is-assistant .ai-msg-bubble p {
+  margin: 0 0 10px;
+}
+
+.ai-msg.is-assistant .ai-msg-bubble p:last-child {
+  margin-bottom: 0;
+}
+
+.ai-msg.is-assistant .ai-md-h {
+  font-weight: 700;
+  margin: 0 0 8px;
+}
+
+.ai-msg.is-assistant .ai-md-list {
+  margin: 0 0 10px 20px;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+
+/* ---- Dark theme for chat bubbles — ChatGPT plain assistant ---- */
 :root[data-theme="dark"] .ai-msg.is-user .ai-msg-bubble,
 [data-theme="dark"] .ai-msg.is-user .ai-msg-bubble {
   background: #2ec57a;
@@ -675,20 +694,19 @@
 
 :root[data-theme="dark"] .ai-msg.is-assistant .ai-msg-bubble,
 [data-theme="dark"] .ai-msg.is-assistant .ai-msg-bubble {
-  background: #1e3a2e;
-  border-color: #2e5040;
-  color: #c8dace;
+  background: transparent;
+  border: none;
+  color: #dce8e1;
 }
 
 :root[data-theme="dark"] .ai-msg-avatar,
 [data-theme="dark"] .ai-msg-avatar {
-  background: #2ec57a;
-  color: #0f1a14;
+  display: none !important;
 }
 
 :root[data-theme="dark"] .ai-typing,
 [data-theme="dark"] .ai-typing {
-  background: rgba(46, 197, 122, 0.15);
+  background: transparent;
 }
 
 .ai-msg.is-system .ai-msg-bubble {
@@ -731,15 +749,13 @@
   filter: brightness(1.08);
 }
 
-/* ---- Typing indicator ---- */
+/* ---- Typing indicator — plain dots, no box ---- */
 .ai-typing {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 12px 16px;
-  background: var(--ai-accent-soft);
-  border-radius: 14px;
-  border-bottom-left-radius: 4px;
+  padding: 6px 2px;
+  background: transparent;
   width: fit-content;
 }
 
@@ -759,40 +775,40 @@
   30%           { transform: translateY(-4px); opacity: 1; }
 }
 
-/* ---- Empty state ---- */
+/* ---- Empty state — bulb + gray starters ---- */
 .ai-empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 10px;
   color: var(--ai-muted);
   text-align: center;
   padding: 40px 20px;
 }
 
 .ai-empty-icon {
-  width: 56px;
-  height: 56px;
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  background: var(--ai-accent-soft);
+  background: #f1f2f3;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .ai-empty-icon svg {
-  width: 28px;
-  height: 28px;
-  color: var(--ai-accent);
+  width: 24px;
+  height: 24px;
+  color: #9aa0a6;
 }
 
 .ai-empty h3 {
   margin: 0;
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--ai-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ai-muted);
 }
 
 .ai-empty p {
@@ -810,6 +826,10 @@
   margin-top: 4px;
 }
 
+.ai-empty-suggestions.is-gray {
+  gap: 8px;
+}
+
 .ai-suggestion {
   padding: 6px 12px;
   border: 1px solid var(--ai-border);
@@ -824,6 +844,23 @@
 .ai-suggestion:hover {
   background: var(--ai-accent-soft);
   border-color: var(--ai-accent);
+}
+
+.ai-suggestion.is-subtle {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f1f2f3;
+  color: #6b7280;
+  font-size: 0.78rem;
+  padding: 9px 12px;
+}
+
+.ai-suggestion.is-subtle:hover {
+  background: #e5e7eb;
+  border-color: transparent;
+  color: #374151;
+  transform: none;
+  box-shadow: none;
 }
 
 .ai-page-links {
@@ -1278,6 +1315,10 @@
     max-width: 90%;
   }
 
+  .ai-msg.is-assistant {
+    max-width: 100%;
+  }
+
   .ai-input-row textarea {
     font-size: 16px; /* Prevent iOS zoom */
   }
@@ -1424,7 +1465,12 @@
 
 :root[data-theme="dark"] .ai-empty-icon,
 [data-theme="dark"] .ai-empty-icon {
-  background: rgba(46, 197, 122, 0.15);
+  background: #1c2b23;
+}
+
+:root[data-theme="dark"] .ai-empty-icon svg,
+[data-theme="dark"] .ai-empty-icon svg {
+  color: #8fa89a;
 }
 
 :root[data-theme="dark"] .ai-suggestion,
@@ -1438,6 +1484,20 @@
 [data-theme="dark"] .ai-suggestion:hover {
   background: rgba(46, 197, 122, 0.15);
   border-color: #2ec57a;
+}
+
+:root[data-theme="dark"] .ai-suggestion.is-subtle,
+[data-theme="dark"] .ai-suggestion.is-subtle {
+  background: #1c2b23;
+  border-color: transparent;
+  color: #8fa89a;
+}
+
+:root[data-theme="dark"] .ai-suggestion.is-subtle:hover,
+[data-theme="dark"] .ai-suggestion.is-subtle:hover {
+  background: #2a3d32;
+  border-color: transparent;
+  color: #dce8e1;
 }
 
 /* =========================================================================
@@ -1536,9 +1596,10 @@
     0 4px 12px rgba(11, 110, 79, 0.08);
 }
 
-/* Gentle float on the empty-state icon */
+/* Gentle float on the empty-state icon — disabled for the gray bulb
+   to keep the ChatGPT-like calm look. */
 .ai-empty-icon {
-  animation: ai-float 3.2s ease-in-out infinite;
+  animation: none;
 }
 @keyframes ai-float {
   0%, 100% { transform: translateY(0); }

@@ -727,7 +727,11 @@
 
     childrenLastRefresh: 0,
 
-    thankyouTimer: null
+    thankyouTimer: null,
+
+    thankyouShownAt: 0,
+
+    thankyouCooldownTimer: null
   };
 
   // ============================================================
@@ -5330,6 +5334,13 @@ function finishResults(
       state.thankyouTimer = null;
     }
 
+    if (state.thankyouCooldownTimer) {
+      clearTimeout(
+        state.thankyouCooldownTimer
+      );
+      state.thankyouCooldownTimer = null;
+    }
+
     state.statusTimer =
       null;
 
@@ -6395,16 +6406,34 @@ function finishResults(
           ) {
             event.preventDefault();
             setStep("thankyou");
+            state.thankyouShownAt = Date.now();
 
             if (state.thankyouTimer) {
               clearTimeout(state.thankyouTimer);
               state.thankyouTimer = null;
             }
 
+            if (state.thankyouCooldownTimer) {
+              clearTimeout(state.thankyouCooldownTimer);
+              state.thankyouCooldownTimer = null;
+            }
+
+            // Ghost-tap cool-down: the Done tap can bleed through to the
+            // thank-you buttons on touchscreens (double-tap). Block taps
+            // on them for a moment so the screen stays visible.
+            const thankyouScreen = document.querySelector('[data-kiosk-screen="thankyou"]');
+            if (thankyouScreen) {
+              thankyouScreen.classList.add("is-cooldown");
+              state.thankyouCooldownTimer = setTimeout(() => {
+                state.thankyouCooldownTimer = null;
+                thankyouScreen.classList.remove("is-cooldown");
+              }, 1200);
+            }
+
             state.thankyouTimer = setTimeout(() => {
               state.thankyouTimer = null;
               resetKioskToIdle();
-            }, 5000);
+            }, 8000);
 
             return;
           }
@@ -6539,6 +6568,14 @@ function finishResults(
             action === "reset"
           ) {
             event.preventDefault();
+
+            // Ignore ghost taps landing right after the thank-you screen appears.
+            if (
+              state.step === "thankyou" &&
+              Date.now() - (state.thankyouShownAt || 0) < 1200
+            ) {
+              return;
+            }
 
             resetKioskToIdle();
 

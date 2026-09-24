@@ -46,11 +46,10 @@ $kaliApiBase = app_url('/api/chatbot');
         </div>
         <div class="kali-messages" id="kaliMessages" role="log" aria-live="polite" aria-label="Chat messages">
             <div class="kali-empty" id="kaliEmpty">
-                <p>Ask about child nutrition, growth monitoring, or eOPT Plus.</p>
-                <div class="kali-chips">
-                    <button type="button" class="kali-chip" data-msg="What does WAZ mean?">What does WAZ mean?</button>
-                    <button type="button" class="kali-chip" data-msg="Explain stunting in children">Explain stunting</button>
-                    <button type="button" class="kali-chip" data-msg="What is the eOPT Plus program?">eOPT Plus</button>
+                <p>Try asking:</p>
+                <div class="kali-chips is-gray">
+                    <button type="button" class="kali-chip is-subtle" data-msg="What does WAZ mean?">What does WAZ mean?</button>
+                    <button type="button" class="kali-chip is-subtle" data-msg="Explain stunting in children">Explain stunting</button>
                 </div>
             </div>
         </div>

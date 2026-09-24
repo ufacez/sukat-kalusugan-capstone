@@ -24,6 +24,7 @@ nutritionist_layout_start(
 ?>
 
 <link rel="stylesheet" href="<?php echo app_url('/assets/css/ai_assistant.css'); ?>">
+<style>.admin-pageheader{display:none}.ai-layout{height:calc(100dvh - 70px)}</style>
 
 <div class="ai-layout">
 
@@ -69,11 +70,8 @@ nutritionist_layout_start(
 
     <!-- ===== RIGHT CHAT ===== -->
     <main class="ai-chat">
-        <div class="ai-chat-header">
-            <div>
-                <div class="ai-chat-title" id="aiChatTitle">Kali AI</div>
-                <div class="ai-chat-subtitle" id="aiChatSubtitle">Select a child or ask a general question</div>
-            </div>
+        <div class="ai-chat-header is-no-title">
+            <div hidden aria-hidden="true"><span id="aiChatTitle">Kali AI</span><span id="aiChatSubtitle">Select a child or ask a general question</span></div>
             <div class="ai-chat-actions">
                 <button type="button" class="ai-btn-context" id="aiContextOpen" title="Choose a child">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -92,15 +90,13 @@ nutritionist_layout_start(
         <div class="ai-messages" id="aiMessages" role="log" aria-live="polite" aria-label="Chat messages">
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Kali AI</h3>
-                <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain stunting in children">Explain stunting</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Complementary feeding</button>
-                    <button class="ai-suggestion" data-msg="What is the eOPT Plus program?">eOPT Plus program</button>
+                <h3>Try asking:</h3>
+                <p>Ask about child nutrition, growth monitoring, or select a child to analyze.</p>
+                <div class="ai-empty-suggestions is-gray">
+                    <button class="ai-suggestion is-subtle" data-msg="What does WAZ mean?">What does WAZ mean?</button>
+                    <button class="ai-suggestion is-subtle" data-msg="Explain stunting in children">Explain stunting</button>
                 </div>
             </div>
         </div>
@@ -552,19 +548,43 @@ nutritionist_layout_start(
         });
     }
 
+    // Rotating gray starters: 6-item pools, 2 shown per visit (ChatGPT-style).
+    const GENERAL_SUGGESTION_POOL = [
+        { msg: "What does WAZ mean?", label: "What does WAZ mean?" },
+        { msg: "Explain stunting in children", label: "Explain stunting" },
+        { msg: "Explain wasting in children", label: "Explain wasting" },
+        { msg: "What is the difference between underweight, stunting, and wasting?", label: "What's the difference?" },
+        { msg: "Explain z-scores simply", label: "Explain z-scores" },
+        { msg: "What is overweight in children?", label: "Overweight" }
+    ];
+    const CHILD_SUGGESTION_POOL = [
+        { msg: "What does this result mean?", label: "What does this mean?" },
+        { msg: "Is the child growing well?", label: "Growing well?" },
+        { msg: "Explain the z-scores", label: "Explain z-scores" },
+        { msg: "What should we do about this result?", label: "What to do next?" }
+    ];
+    function pickTwoSuggestions(pool) {
+        const items = pool.slice();
+        for (let i = items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = items[i]; items[i] = items[j]; items[j] = tmp;
+        }
+        return items.slice(0, 2);
+    }
+    function suggestionButtonsHtml(pool) {
+        return pickTwoSuggestions(pool).map(function (s) {
+            return '<button class="ai-suggestion is-subtle" data-msg="' + esc(s.msg) + '">' + esc(s.label) + '</button>';
+        }).join('');
+    }
     function showEmptySuggestions() {
         dom.messages.innerHTML = `
             <div class="ai-empty">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Ask about this child</h3>
-                <p>I can explain growth measurements, z-scores, and nutritional status.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain the z-scores">Explain z-scores</button>
-                    <button class="ai-suggestion" data-msg="Is the child growing well?">Is the child growing well?</button>
-                </div>
+                <h3>Try asking:</h3>
+                <p>About this child's growth result in simple words.</p>
+                <div class="ai-empty-suggestions is-gray">${suggestionButtonsHtml(CHILD_SUGGESTION_POOL)}</div>
             </div>`;
         bindSuggestions();
     }
@@ -648,20 +668,43 @@ nutritionist_layout_start(
     function appendBubble(role, text) {
         const el = document.createElement('div');
         el.className = 'ai-msg is-' + role;
-        const avatar = role === 'assistant'
-            ? '<div class="ai-msg-avatar" aria-hidden="true">Kali</div>'
-            : '';
         const content = role === 'assistant' ? formatAssistantText(text) : esc(text).replace(/\n/g, '<br>');
-        el.innerHTML = avatar + '<div class="ai-msg-bubble">' + content + '</div>';
+        el.innerHTML = '<div class="ai-msg-bubble">' + content + '</div>';
         dom.messages.appendChild(el);
         scrollToBottom();
     }
 
     function formatAssistantText(text) {
-        return esc(text)
-            .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
-            .replace(/^###\s+(.+)$/gm, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
+        const lines = esc(text).split('\n');
+        let html = '';
+        let inList = null;
+        const closeList = () => {
+            if (inList) { html += inList === 'ul' ? '</ul>' : '</ol>'; inList = null; }
+        };
+        lines.forEach((raw) => {
+            const line = raw.trim();
+            if (line === '') { closeList(); return; }
+            const heading = line.match(/^#{1,3}\s+(.+)$/);
+            if (heading) { closeList(); html += '<p class="ai-md-h">' + inlineMd(heading[1]) + '</p>'; return; }
+            const ul = line.match(/^[-*•]\s+(.+)$/);
+            if (ul) {
+                if (inList !== 'ul') { closeList(); html += '<ul class="ai-md-list">'; inList = 'ul'; }
+                html += '<li>' + inlineMd(ul[1]) + '</li>'; return;
+            }
+            const ol = line.match(/^(\d+)[.)]\s+(.+)$/);
+            if (ol) {
+                if (inList !== 'ol') { closeList(); html += '<ol class="ai-md-list">'; inList = 'ol'; }
+                html += '<li>' + inlineMd(ol[2]) + '</li>'; return;
+            }
+            closeList();
+            html += '<p>' + inlineMd(line) + '</p>';
+        });
+        closeList();
+        return html || '<p></p>';
+    }
+
+    function inlineMd(s) {
+        return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     }
 
     function appendNavigationAction(prompt) {
@@ -722,23 +765,11 @@ nutritionist_layout_start(
         dom.messages.innerHTML = `
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Kali AI</h3>
-                <p>Ask anything about child nutrition, growth monitoring, or select a child to analyze their measurements.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What does WAZ mean?</button>
-                    <button class="ai-suggestion" data-msg="Explain stunting in children">Explain stunting</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Complementary feeding</button>
-                    <button class="ai-suggestion" data-msg="What is the eOPT Plus program?">eOPT Plus program</button>
-                    <button class="ai-suggestion" data-msg="Which children need follow-up based on their latest measurements?">Analyze children needing follow-up</button>
-                </div>
-                <div class="ai-page-links" aria-label="Nutritionist pages">
-                    <a href="<?php echo app_url('/nutritionist/measurement_record.php'); ?>">Record measurement</a>
-                    <a href="<?php echo app_url('/nutritionist/who_analysis.php'); ?>">WHO Analysis</a>
-                    <a href="<?php echo app_url('/nutritionist/eopt_reports.php'); ?>">EOPT Reports</a>
-                    <a href="<?php echo app_url('/nutritionist/children.php'); ?>">Children</a>
-                </div>
+                <h3>Try asking:</h3>
+                <p>Ask about child nutrition, growth monitoring, or select a child to analyze.</p>
+                <div class="ai-empty-suggestions is-gray">${suggestionButtonsHtml(GENERAL_SUGGESTION_POOL)}</div>
             </div>`;
         bindSuggestions();
     }

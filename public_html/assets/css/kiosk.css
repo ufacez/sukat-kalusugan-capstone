@@ -1318,6 +1318,11 @@ body {
   font-weight: 500;
 }
 
+/* Ghost-tap cool-down: block taps on thank-you buttons right after the screen swap. */
+.kiosk-thankyou.is-cooldown .kiosk-btn {
+  pointer-events: none;
+}
+
 /* ================================================================
    ACTIVITY FEED (hidden)
    ================================================================ */

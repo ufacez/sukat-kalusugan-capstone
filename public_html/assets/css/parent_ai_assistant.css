@@ -22,19 +22,21 @@ body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble {
   border-bottom-right-radius: 6px;
 }
 body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble {
-  background: var(--admin-primary-soft, #dff1ea);
-  border: 1px solid var(--ai-border);
+  background: transparent;
+  border: none;
   color: var(--ai-text);
-  border-bottom-left-radius: 6px;
+  border-radius: 0;
+  padding: 4px 2px;
+  line-height: 1.7;
 }
 body.parent-ai_assistant .ai-msg-bubble strong {
-  color: var(--admin-primary, #0b6e4f);
+  color: inherit;
 }
 body.parent-ai_assistant .ai-msg.is-user .ai-msg-bubble strong {
   color: #fff;
 }
 body.parent-ai_assistant .ai-msg-avatar {
-  background: linear-gradient(135deg, var(--admin-primary, #0b6e4f), var(--admin-primary-strong, #07513a));
+  display: none !important;
 }
 
 /* ---- Header + empty state ---- */
@@ -42,17 +44,26 @@ body.parent-ai_assistant .ai-chat-header {
   background: linear-gradient(180deg, var(--admin-primary-soft, #dff1ea), var(--ai-surface));
 }
 body.parent-ai_assistant .ai-empty-icon {
-  animation: ai-float 3.2s ease-in-out infinite;
+  animation: none;
+  background: #f1f2f3;
 }
-body.parent-ai_assistant .ai-suggestion {
-  border-radius: 22px;
-  padding: 8px 15px;
+body.parent-ai_assistant .ai-empty-icon svg {
+  color: #9aa0a6;
+}
+body.parent-ai_assistant .ai-suggestion.is-subtle {
+  border-radius: 8px;
+  padding: 9px 12px;
   font-size: 0.78rem;
+  background: #f1f2f3;
+  border-color: transparent;
+  color: #6b7280;
 }
-body.parent-ai_assistant .ai-suggestion:hover {
-  background: var(--admin-primary-soft, #dff1ea);
-  border-color: var(--admin-primary, #0b6e4f);
-  color: var(--admin-primary, #0b6e4f);
+body.parent-ai_assistant .ai-suggestion.is-subtle:hover {
+  background: #e5e7eb;
+  border-color: transparent;
+  color: #374151;
+  transform: none;
+  box-shadow: none;
 }
 
 /* ---- Controls in system green ---- */
@@ -77,6 +88,14 @@ body.parent-ai_assistant .ai-session-item:hover,
 body.parent-ai_assistant .ai-session-item.is-active {
   border-color: var(--admin-primary, #0b6e4f);
   background: var(--admin-primary-soft, #dff1ea);
+}
+
+/* AI chat fills the page: outer "Kali AI" pageheader hidden on desktop too. */
+body.parent-ai_assistant .admin-pageheader {
+  display: none;
+}
+body.parent-ai_assistant .ai-layout {
+  height: calc(100dvh - 70px);
 }
 
 /* =========================================================================
@@ -119,9 +138,9 @@ body.parent-ai_assistant .ai-session-item.is-active {
 /* ---- Dark theme: same tokens as the rest of the portal ---- */
 :root[data-theme="dark"] body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble,
 [data-theme="dark"] body.parent-ai_assistant .ai-msg.is-assistant .ai-msg-bubble {
-  background: #1e3a2e;
-  border-color: #2e5040;
-  color: #c8dace;
+  background: transparent;
+  border: none;
+  color: #dce8e1;
 }
 :root[data-theme="dark"] body.parent-ai_assistant .ai-msg-bubble strong,
 [data-theme="dark"] body.parent-ai_assistant .ai-msg-bubble strong {
@@ -148,10 +167,10 @@ body.parent-ai_assistant .ai-session-item.is-active {
 [data-theme="dark"] body.parent-ai_assistant .ai-empty-icon svg {
   color: #2ec57a;
 }
-:root[data-theme="dark"] body.parent-ai_assistant .ai-suggestion:hover,
-[data-theme="dark"] body.parent-ai_assistant .ai-suggestion:hover {
-  background: rgba(46, 197, 122, 0.15);
-  border-color: #2ec57a;
+:root[data-theme="dark"] body.parent-ai_assistant .ai-suggestion.is-subtle:hover,
+[data-theme="dark"] body.parent-ai_assistant .ai-suggestion.is-subtle:hover {
+  background: #2a3d32;
+  border-color: transparent;
   color: #dce8e1;
 }
 

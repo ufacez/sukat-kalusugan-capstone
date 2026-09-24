@@ -186,8 +186,12 @@
 }
 .kali-msg.is-assistant {
   align-self: flex-start;
-  background: var(--kali-accent-soft);
-  border-bottom-left-radius: 4px;
+  background: transparent;
+  color: var(--kali-text);
+  padding: 4px 2px;
+  max-width: 100%;
+  width: 100%;
+  line-height: 1.7;
 }
 .kali-msg.is-system {
   align-self: center;
@@ -201,10 +205,8 @@
   align-self: flex-start;
   display: flex;
   gap: 4px;
-  padding: 11px 14px;
-  border-radius: 13px;
-  border-bottom-left-radius: 4px;
-  background: var(--kali-accent-soft);
+  padding: 6px 2px;
+  background: transparent;
 }
 .kali-typing span {
   width: 6px;
@@ -252,6 +254,19 @@
   background: var(--kali-accent-soft);
   border-color: var(--kali-accent);
   box-shadow: 0 4px 10px rgba(11, 110, 79, 0.14);
+}
+.kali-chip.is-subtle {
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: #f1f2f3;
+  color: #6b7280;
+}
+.kali-chip.is-subtle:hover {
+  transform: none;
+  background: #e5e7eb;
+  border-color: transparent;
+  box-shadow: none;
+  color: #374151;
 }
 
 /* ---- Composer ---- */
@@ -327,8 +342,8 @@
 [data-theme="dark"] .kali-msg.is-assistant,
 :root[data-theme="dark"] .kali-typing,
 [data-theme="dark"] .kali-typing {
-  background: #1e3a2e;
-  color: #c8dace;
+  background: transparent;
+  color: #dce8e1;
 }
 :root[data-theme="dark"] .kali-input-row,
 [data-theme="dark"] .kali-input-row {
@@ -347,10 +362,17 @@
   border-color: #2a3d32;
   color: #dce8e1;
 }
-:root[data-theme="dark"] .kali-chip:hover,
-[data-theme="dark"] .kali-chip:hover {
-  background: rgba(46, 197, 122, 0.15);
-  border-color: #2ec57a;
+:root[data-theme="dark"] .kali-chip.is-subtle,
+[data-theme="dark"] .kali-chip.is-subtle {
+  background: #1c2b23;
+  border-color: transparent;
+  color: #8fa89a;
+}
+:root[data-theme="dark"] .kali-chip.is-subtle:hover,
+[data-theme="dark"] .kali-chip.is-subtle:hover {
+  background: #2a3d32;
+  border-color: transparent;
+  color: #dce8e1;
 }
 
 /* ---- Mobile: bottom sheet ---- */

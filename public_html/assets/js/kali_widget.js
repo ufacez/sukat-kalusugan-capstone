@@ -46,10 +46,37 @@
         return d.innerHTML;
     }
 
+    function inlineMd(s) {
+        return String(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    }
+
     function formatAssistant(text) {
-        return esc(text)
-            .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
+        var lines = esc(text).split('\n');
+        var html = '';
+        var inList = null;
+        var closeList = function () {
+            if (inList) { html += inList === 'ul' ? '</ul>' : '</ol>'; inList = null; }
+        };
+        lines.forEach(function (raw) {
+            var line = raw.trim();
+            if (line === '') { closeList(); return; }
+            var heading = line.match(/^#{1,3}\s+(.+)$/);
+            if (heading) { closeList(); html += '<p><strong>' + inlineMd(heading[1]) + '</strong></p>'; return; }
+            var ul = line.match(/^[-*\u2022]\s+(.+)$/);
+            if (ul) {
+                if (inList !== 'ul') { closeList(); html += '<ul style="margin:0 0 8px 18px;padding:0;display:grid;gap:4px;">'; inList = 'ul'; }
+                html += '<li>' + inlineMd(ul[1]) + '</li>'; return;
+            }
+            var ol = line.match(/^(\d+)[.)]\s+(.+)$/);
+            if (ol) {
+                if (inList !== 'ol') { closeList(); html += '<ol style="margin:0 0 8px 18px;padding:0;display:grid;gap:4px;">'; inList = 'ol'; }
+                html += '<li>' + inlineMd(ol[2]) + '</li>'; return;
+            }
+            closeList();
+            html += '<p style="margin:0 0 8px;">' + inlineMd(line) + '</p>';
+        });
+        closeList();
+        return html || '<p></p>';
     }
 
     function scrollDown() {

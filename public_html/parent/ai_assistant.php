@@ -80,11 +80,8 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
 
     <!-- ===== CHAT ===== -->
     <main class="ai-chat">
-        <div class="ai-chat-header">
-            <div>
-                <div class="ai-chat-title" id="aiChatTitle">Kali AI</div>
-                <div class="ai-chat-subtitle" id="aiChatSubtitle">Pick your child above, or ask a general question</div>
-            </div>
+        <div class="ai-chat-header is-no-title">
+            <div hidden aria-hidden="true"><span id="aiChatTitle">Kali AI</span><span id="aiChatSubtitle">Pick your child above, or ask a general question</span></div>
             <div class="ai-chat-actions">
                 <button type="button" class="ai-btn-context" id="aiContextOpen" title="Choose a child">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
@@ -103,15 +100,13 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         <div class="ai-messages" id="aiMessages" role="log" aria-live="polite" aria-label="Chat messages">
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Hi, I&#8217;m Kali!</h3>
-                <p>I can explain your child&#8217;s growth results in simple words. Pick your child above to begin.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
-                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What is WAZ?</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Feeding tips</button>
+                <h3>Try asking:</h3>
+                <p>About your child's growth result in simple words.</p>
+                <div class="ai-empty-suggestions is-gray">
+                    <button class="ai-suggestion is-subtle" data-msg="What does this result mean?">What does this mean?</button>
+                    <button class="ai-suggestion is-subtle" data-msg="Is my child growing well?">Growing well?</button>
                 </div>
             </div>
         </div>
@@ -636,19 +631,37 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         });
     }
 
+    // Rotating gray starters: 6-item pool, 2 shown per visit (ChatGPT-style).
+    const SUGGESTION_POOL = [
+        { msg: "What does this result mean?", label: "What does this mean?" },
+        { msg: "Is my child growing well?", label: "Growing well?" },
+        { msg: "Explain the z-scores simply", label: "Explain z-scores" },
+        { msg: "What does underweight mean?", label: "Underweight?" },
+        { msg: "What does stunting mean?", label: "Stunting?" },
+        { msg: "When should I visit the nutritionist?", label: "Visit nutritionist?" }
+    ];
+    function pickTwoSuggestions(pool) {
+        const items = pool.slice();
+        for (let i = items.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            const tmp = items[i]; items[i] = items[j]; items[j] = tmp;
+        }
+        return items.slice(0, 2);
+    }
+    function suggestionButtonsHtml(pool) {
+        return pickTwoSuggestions(pool).map(function (s) {
+            return '<button class="ai-suggestion is-subtle" data-msg="' + esc(s.msg) + '">' + esc(s.label) + '</button>';
+        }).join('');
+    }
     function showEmptySuggestions() {
         dom.messages.innerHTML = `
             <div class="ai-empty">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Ask about your child</h3>
-                <p>I explain growth results in simple words — no confusing terms.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
-                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
-                    <button class="ai-suggestion" data-msg="Explain the z-scores simply">Explain simply</button>
-                </div>
+                <h3>Try asking:</h3>
+                <p>About your child's growth result in simple words.</p>
+                <div class="ai-empty-suggestions is-gray">${suggestionButtonsHtml(SUGGESTION_POOL)}</div>
             </div>`;
         bindSuggestions();
     }
@@ -730,20 +743,43 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
     function appendBubble(role, text) {
         const el = document.createElement('div');
         el.className = 'ai-msg is-' + role;
-        const avatar = role === 'assistant'
-            ? '<div class="ai-msg-avatar" aria-hidden="true">Kali</div>'
-            : '';
         const content = role === 'assistant' ? formatAssistantText(text) : esc(text).replace(/\n/g, '<br>');
-        el.innerHTML = avatar + '<div class="ai-msg-bubble">' + content + '</div>';
+        el.innerHTML = '<div class="ai-msg-bubble">' + content + '</div>';
         dom.messages.appendChild(el);
         scrollToBottom();
     }
 
     function formatAssistantText(text) {
-        return esc(text)
-            .replace(/\*\*(.+?)\*\*/gs, '<strong>$1</strong>')
-            .replace(/^###\s+(.+)$/gm, '<strong>$1</strong>')
-            .replace(/\n/g, '<br>');
+        const lines = esc(text).split('\n');
+        let html = '';
+        let inList = null;
+        const closeList = () => {
+            if (inList) { html += inList === 'ul' ? '</ul>' : '</ol>'; inList = null; }
+        };
+        lines.forEach((raw) => {
+            const line = raw.trim();
+            if (line === '') { closeList(); return; }
+            const heading = line.match(/^#{1,3}\s+(.+)$/);
+            if (heading) { closeList(); html += '<p class="ai-md-h">' + inlineMd(heading[1]) + '</p>'; return; }
+            const ul = line.match(/^[-*•]\s+(.+)$/);
+            if (ul) {
+                if (inList !== 'ul') { closeList(); html += '<ul class="ai-md-list">'; inList = 'ul'; }
+                html += '<li>' + inlineMd(ul[1]) + '</li>'; return;
+            }
+            const ol = line.match(/^(\d+)[.)]\s+(.+)$/);
+            if (ol) {
+                if (inList !== 'ol') { closeList(); html += '<ol class="ai-md-list">'; inList = 'ol'; }
+                html += '<li>' + inlineMd(ol[2]) + '</li>'; return;
+            }
+            closeList();
+            html += '<p>' + inlineMd(line) + '</p>';
+        });
+        closeList();
+        return html || '<p></p>';
+    }
+
+    function inlineMd(s) {
+        return s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     }
 
     function appendNavigationAction(prompt) {
@@ -802,21 +838,11 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         dom.messages.innerHTML = `
             <div class="ai-empty" id="aiEmptyState">
                 <div class="ai-empty-icon">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z"/></svg>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.4 1 2.3h6c0-.9.4-1.8 1-2.3A7 7 0 0 0 12 2Z"/></svg>
                 </div>
-                <h3>Hi, I&#8217;m Kali!</h3>
-                <p>I can explain your child&#8217;s growth results in simple words. Pick your child above to begin.</p>
-                <div class="ai-empty-suggestions">
-                    <button class="ai-suggestion" data-msg="What does this result mean?">What does this mean?</button>
-                    <button class="ai-suggestion" data-msg="Is my child growing well?">Growing well?</button>
-                    <button class="ai-suggestion" data-msg="What does WAZ mean?">What is WAZ?</button>
-                    <button class="ai-suggestion" data-msg="When should complementary feeding start?">Feeding tips</button>
-                </div>
-                <div class="ai-page-links" aria-label="Parent pages">
-                    <a href="<?php echo app_url('/parent/growth_history.php'); ?>">Growth History</a>
-                    <a href="<?php echo app_url('/parent/children.php'); ?>">My Children</a>
-                    <a href="<?php echo app_url('/parent/appointments.php'); ?>">Appointments</a>
-                </div>
+                <h3>Try asking:</h3>
+                <p>About your child's growth result in simple words.</p>
+                <div class="ai-empty-suggestions is-gray">${suggestionButtonsHtml(SUGGESTION_POOL)}</div>
             </div>`;
         bindSuggestions();
     }
