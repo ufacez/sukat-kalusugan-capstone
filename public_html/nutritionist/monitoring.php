@@ -47,6 +47,16 @@ if ($view === 'monthly') {
 // ── Roster ──
 $roster = monitoring_fetch_list($user, $view, $period['start'], $period['end']);
 
+// ── Period coverage (full roster, unaffected by search) ──
+$coverageTotal = count($roster);
+$coverageMeasured = 0;
+foreach ($roster as $covRow) {
+    if (!empty($covRow['measured_in_period'])) {
+        $coverageMeasured++;
+    }
+}
+$coveragePct = $coverageTotal > 0 ? (int)round(($coverageMeasured / $coverageTotal) * 100) : 0;
+
 if ($search !== '') {
     $needle = mb_strtolower($search);
     $roster = array_values(array_filter($roster, static function (array $row) use ($needle): bool {
@@ -222,11 +232,18 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 .children-empty{padding:32px 18px;color:var(--admin-muted);font-size:13px;background:var(--admin-surface-alt);border-radius:10px;border:1px dashed var(--admin-border);text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .children-empty .empty-title{font-weight:700;color:var(--admin-text);font-size:14px}
 .children-empty .empty-sub{color:var(--admin-muted);max-width:420px;line-height:1.45}
+.mon-coverage{flex:1 1 260px;max-width:340px;min-width:220px;margin:0;padding:10px 12px;background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:10px}
+.mon-coverage-head{display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.mon-coverage-label{font-size:12px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em}
+.mon-coverage-count{font-size:12px;color:var(--admin-muted);font-weight:600}
+.mon-coverage-track{height:10px;border-radius:999px;background:var(--admin-border);overflow:hidden}
+.mon-coverage-fill{display:block;height:100%;border-radius:999px;background:var(--admin-primary);transition:width .3s}
 @media (max-width: 560px) {
   .children-toolbar{flex-direction:column;align-items:stretch}
   .children-toolbar .admin-search{min-width:0;flex:1;max-width:100%}
   .children-toolbar .admin-select{min-width:0;max-width:100%;width:100%}
   .children-toolbar .mon-export{margin-left:0}
+  .children-toolbar .mon-coverage{max-width:100%;flex:1 1 auto;min-width:0}
 }
 </style>
 
@@ -281,6 +298,15 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
             <option value="<?php echo $y; ?>" <?php echo $year === $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
         <?php endfor; ?>
     </select>
+    <div class="mon-coverage">
+        <div class="mon-coverage-head">
+            <span class="mon-coverage-label">Children Measured</span>
+            <span class="mon-coverage-count"><?php echo (int)$coverageMeasured; ?> of <?php echo (int)$coverageTotal; ?> (<?php echo (int)$coveragePct; ?>%)</span>
+        </div>
+        <div class="mon-coverage-track" role="progressbar" aria-valuenow="<?php echo (int)$coveragePct; ?>" aria-valuemin="0" aria-valuemax="100" aria-label="Children measured this period">
+            <span class="mon-coverage-fill" style="width:<?php echo (int)$coveragePct; ?>%;"></span>
+        </div>
+    </div>
     <?php if ($search !== ''): ?>
     <div style="display:flex;gap:6px;align-items:center;">
             <a class="admin-btn-secondary" href="<?php echo nutritionist_e($view === 'monthly' ? $subLink($month) : $subLink($quarter)); ?>">Clear</a>

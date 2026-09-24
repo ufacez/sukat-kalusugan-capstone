@@ -904,8 +904,8 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             btn.addEventListener('click', function () {
                 var parentId = parseInt(this.dataset.id, 10);
                 var proceed = window.SKConfirm
-                    ? window.SKConfirm('Remove this parent from the household? Their children in this spot will be removed as well.', { title: 'Remove parent', confirmLabel: 'Remove', danger: true })
-                    : Promise.resolve(confirm('Remove this parent from the household? Their children in this spot will be removed as well.'));
+                    ? window.SKConfirm('Remove this parent from the household? Children left without a parent in this spot will be removed as well.', { title: 'Remove parent', confirmLabel: 'Remove', danger: true })
+                    : Promise.resolve(confirm('Remove this parent from the household? Children left without a parent in this spot will be removed as well.'));
                 proceed.then(function (ok) {
                 if (!ok) return;
                 var fd = new FormData();

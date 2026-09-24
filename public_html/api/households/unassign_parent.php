@@ -72,23 +72,30 @@ if (!$ok) {
     exit;
 }
 
-// Cascade: children of this parent that live in the same household follow
-// the parent out, so spots stay parent-driven (no orphaned children left
-// behind on the map). Children assigned to a different household are
-// never touched.
+// Orphan sweep: spots are parent-driven, so any active child left in this
+// household without a parent still assigned to it follows the parent out.
+// This covers the removed parent's own children AND cross-assigned children
+// (via child_form / import) or children of already-removed parents. Children
+// whose parents remain in the household are never touched — and when the
+// last parent leaves, the spot is naturally left with no children.
 $removedChildren = 0;
 $oldHouseholdId = isset($parent['household_id']) ? (int)$parent['household_id'] : 0;
 if ($oldHouseholdId > 0) {
-    $kidStmt = mysqli_prepare(
+    $sweepStmt = mysqli_prepare(
         $conn,
-        'UPDATE children SET household_id = NULL WHERE parent_id = ? AND household_id = ? AND status = "active"'
+        'UPDATE children c
+            LEFT JOIN parents p ON p.id = c.parent_id
+            SET c.household_id = NULL
+          WHERE c.household_id = ?
+            AND c.status = "active"
+            AND (p.id IS NULL OR p.household_id IS NULL OR p.household_id != ? OR p.status != "active")'
     );
-    if ($kidStmt !== false) {
-        mysqli_stmt_bind_param($kidStmt, 'ii', $parentId, $oldHouseholdId);
-        if (mysqli_stmt_execute($kidStmt)) {
-            $removedChildren = (int)mysqli_stmt_affected_rows($kidStmt);
+    if ($sweepStmt !== false) {
+        mysqli_stmt_bind_param($sweepStmt, 'ii', $oldHouseholdId, $oldHouseholdId);
+        if (mysqli_stmt_execute($sweepStmt)) {
+            $removedChildren = (int)mysqli_stmt_affected_rows($sweepStmt);
         }
-        mysqli_stmt_close($kidStmt);
+        mysqli_stmt_close($sweepStmt);
     }
 }
 
