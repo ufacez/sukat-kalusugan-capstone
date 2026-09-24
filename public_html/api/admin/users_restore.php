@@ -30,7 +30,7 @@ $ok = admin_execute('UPDATE users SET status = ? WHERE id = ?', 'si', ['active',
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Restored user ' . $target['email'] . ' (' . $id . ')');
+    log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Restored staff #' . $id);
 }
 
 admin_redirect('/admin/users_archived.php', ['notice' => $ok ? 'User restored successfully.' : 'User could not be restored.', 'type' => $ok ? 'success' : 'error']);

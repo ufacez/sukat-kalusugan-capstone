@@ -171,9 +171,8 @@ mysqli_stmt_close($inviteStmt);
 admin_execute("UPDATE invitations SET status = 'used', used_at = NOW() WHERE id = ?", 'i', [$invitation['id']]);
 
 log_action($newUserId, 'ACCOUNT_ACTIVATED', 'info', sprintf(
-    'Account activated via code for %s (%s) — role: %s',
-    $displayName,
-    $email,
+    // Privacy: role only — never the name/email.
+    'Staff account activated via invitation code — role: %s',
     $invitation['role']
 ));
 

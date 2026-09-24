@@ -118,8 +118,8 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($barangays as $barangay): ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($barangay['name'] . ' ' . (string)($barangay['city_municipality'] ?? ''))); ?>">
+                <?php foreach ($barangays as $barangayIndex => $barangay): ?>
+                    <tr<?php echo admin_paged_row_attr($barangayIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($barangay['name'] . ' ' . (string)($barangay['city_municipality'] ?? ''))); ?>">
                         <td style="font-weight:700;color:var(--admin-text);"><?php echo admin_e($barangay['name']); ?></td>
                         <td style="color:var(--admin-muted);"><?php echo admin_e((string)($barangay['city_municipality'] ?? '')); ?></td>
                         <td><?php echo (int)$barangay['children_count']; ?></td>

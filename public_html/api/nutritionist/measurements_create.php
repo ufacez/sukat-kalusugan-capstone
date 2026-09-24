@@ -6,7 +6,6 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -118,27 +117,15 @@ if (($user['role'] ?? '') !== 'admin') {
     }
 }
 
-// DUE-DATE CHECK: Routine manual measurements are only allowed if the child
-// is due. Override measurements bypass this check (use measurements_override.php).
+// FREE MEASUREMENT: period-based monitoring has no exact due dates, so
+// routine manual measurements are always allowed for eligible children.
+// Override measurements still require a reason (use
+// measurements_override.php or pass measurement_type=OVERRIDE).
 $isOverride = (($payload['measurement_type'] ?? '') === 'OVERRIDE');
 $overrideReason = trim((string)($payload['override_reason'] ?? ''));
 
-if (!$isOverride) {
-    $dueCheck = followup_is_due_today($childId, $parsedDate);
-    if (!$dueCheck['is_due']) {
-        api_error(
-            'This child is not scheduled for measurement today. '
-            . 'Next scheduled measurement: ' . ($dueCheck['next_due'] ?? 'Unknown') . '. '
-            . 'Use the Override Measurement form if this is an exceptional case.',
-            422,
-            ['not_due' => true, 'next_due' => ($dueCheck['next_due'] ?? null)]
-        );
-    }
-} else {
-    // Override requires a reason
-    if ($overrideReason === '') {
-        api_error('Override measurements require a reason. Please use the Override Measurement form.', 422);
-    }
+if ($isOverride && $overrideReason === '') {
+    api_error('Override measurements require a reason. Please use the Override Measurement form.', 422);
 }
 
 $childBirthdate = trim((string)$child['birthdate']);
@@ -289,22 +276,12 @@ log_action(
     'measurement.create',
     'info',
     sprintf(
-        'Manual measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s%s',
+        // Privacy: general identifiers only — no measurement values.
+        'Manual measurement #%d for %s',
         $measurementId,
-        $childName,
-        (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
-        $isFlagged === 1 ? ' | Flagged: ' . (string)$flagReason : ''
+        (string)$child['child_code']
     )
 );
-
-$followupSync = followup_sync_for_child($childId);
 
 api_success(
     [
@@ -328,13 +305,6 @@ api_success(
         'flag_reason' => $flagReason,
         'source_type' => 'manual',
         'recorded_by' => $recordedBy,
-        'followup' => [
-            'generated' => (int)$followupSync['generated'],
-            'completed' => (int)$followupSync['completed'],
-            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
-            'track' => $followupSync['track'],
-            'category' => $followupSync['category'],
-        ],
     ],
     'Measurement saved successfully.'
 );

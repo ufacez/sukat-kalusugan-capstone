@@ -16,7 +16,7 @@ if ($id <= 0) {
 }
 
 $invitation = admin_fetch_one(
-    "SELECT id, invitee_name, code, status FROM invitations WHERE id = ? LIMIT 1",
+    "SELECT id, invitee_name, code, role, status FROM invitations WHERE id = ? LIMIT 1",
     'i',
     [$id]
 );
@@ -34,9 +34,11 @@ $ok = admin_execute("UPDATE invitations SET status = 'cancelled' WHERE id = ? AN
 if ($ok) {
     $actor = current_user();
     log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'danger', sprintf(
-        'Cancelled invitation for %s (code: %s)',
-        $invitation['invitee_name'],
-        $invitation['code']
+        // Privacy: invitation id + role only — never the invitee name/email,
+        // and never the activation code.
+        'Cancelled invitation #%d (%s)',
+        (int)$invitation['id'],
+        (string)($invitation['role'] ?? 'staff')
     ));
 }
 

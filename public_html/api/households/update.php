@@ -62,6 +62,23 @@ if ($check) {
     exit;
 }
 
+// Same-spot guard (~15m): editing must not land on another spot's coordinates.
+if ($lat !== null && $lng !== null) {
+    $dup = mysqli_prepare($conn, 'SELECT id, household_code FROM households WHERE barangay_id = ? AND status = "active" AND id <> ? AND lat IS NOT NULL AND lng IS NOT NULL AND ABS(lat - ?) < 0.00015 AND ABS(lng - ?) < 0.00015 LIMIT 1');
+    if ($dup) {
+        $existingBarangay = (int)($existing['barangay_id'] ?? 0);
+        mysqli_stmt_bind_param($dup, 'iidd', $existingBarangay, $id, $lat, $lng);
+        mysqli_stmt_execute($dup);
+        $dupRes = mysqli_stmt_get_result($dup);
+        $dupRow = $dupRes ? mysqli_fetch_assoc($dupRes) : null;
+        mysqli_stmt_close($dup);
+        if ($dupRow) {
+            echo json_encode(['success' => false, 'message' => 'May spot na sa coordinates na ito (' . ($dupRow['household_code'] ?? ('HH-' . $dupRow['id'])) . ').']);
+            exit;
+        }
+    }
+}
+
 $stmt = mysqli_prepare($conn, 'UPDATE households SET address = ?, lat = ?, lng = ?, local_area_id = ? WHERE id = ?');
 if ($stmt === false) {
     echo json_encode(['success' => false, 'message' => 'Database error.']);

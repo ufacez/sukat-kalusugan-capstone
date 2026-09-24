@@ -1,7 +1,6 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
 
 $user = nutritionist_require_access();
 
@@ -190,7 +189,7 @@ nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_report
 		<div class="admin-mini" style="padding:24px;text-align:center;color:var(--admin-muted);">No records match this data quality issue. Great!</div>
 	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:800px;">
+			<table class="nutritionist-table" data-page-size="5" style="min-width:800px;">
 				<thead>
 					<tr>
 						<th>No.</th>
@@ -204,7 +203,7 @@ nutritionist_layout_start('DQC: ' . $issueTitle, $issueDescription, 'eopt_report
 				</thead>
 				<tbody>
 					<?php foreach ($records as $i => $row): ?>
-						<tr>
+						<tr<?php echo admin_paged_row_attr($i, 5); ?>>
 							<td><?php echo $i + 1; ?></td>
 							<td><?php echo nutritionist_e((string)$row['child_code']); ?></td>
 							<td>

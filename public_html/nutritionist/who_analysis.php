@@ -132,7 +132,7 @@ $prevUwStunted_MUWMSt = 0; $prevUwStunted_MUWSSt = 0; $prevUwStunted_SUWMSt = 0;
 $prevStuntedWasted_MStMW = 0; $prevStuntedWasted_MStSW = 0; $prevStuntedWasted_SstMW = 0; $prevStuntedWasted_SstSW = 0; $prevStuntedWasted_Total = 0;
 
 $ageGroups = ['0-5','6-11','12-23','24-35','36-47','48-59'];
-$ageGroupLabels = ['0-5 mo','6-11 mo','12-23 mo','24-35 mo','36-47 mo','48-59 mo'];
+ $ageGroupLabels = ['0-5 m','6-11 m','12-23 m','24-35 m','36-47 m','48-59 m'];
 if ($filterAgeGroup !== '' && $filterAgeGroup !== 'all' && in_array($filterAgeGroup, $ageGroups, true)) {
 	$idx = array_search($filterAgeGroup, $ageGroups, true);
 	$ageGroups = [$ageGroups[$idx]];
@@ -274,7 +274,7 @@ function who_prev(array $data, int $total): array {
 	return $r;
 }
 
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('open') . ' Measurements</a>';
+$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">' . admin_action_icon('open') . ' Children</a>';
 
 nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of assessed children based on WHO Child Growth Standards.', 'who_analysis', $actions);
 ?>
@@ -775,7 +775,7 @@ window.WHO_DATA = {
       ctx.font = '600 11px Inter, sans-serif';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      /* split "0-5 mo" into two lines: "0-5" / "mo" */
+      /* split "0-5 m" into two lines: "0-5" / "m" */
       var parts = label.split(' ');
       if (parts.length > 1) {
         ctx.fillText(parts[0], cx, h - 40);

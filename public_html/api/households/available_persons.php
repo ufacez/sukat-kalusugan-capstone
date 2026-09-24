@@ -55,19 +55,52 @@ if (!$isBarangayAdmin && $userBarangayId !== null && (int)$hh['barangay_id'] !==
 }
 
 if ($type === 'children') {
-    $rows = admin_fetch_all(
-        "SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name, c.sex, c.birthdate,
-                TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months,
-                p.name AS parent_name
-           FROM children c
-           LEFT JOIN parents p ON p.id = c.parent_id
-          WHERE c.barangay_id = ?
-            AND c.status = 'active'
-            AND (c.household_id IS NULL OR c.household_id = 0 OR c.household_id <> ?)
-          ORDER BY c.first_name, c.last_name",
-        'ii',
-        [(int)$hh['barangay_id'], $householdId]
+    // Scope the picker to children of parents already assigned to this
+    // household. When no parent is assigned yet, fall back to all
+    // unassigned children in the barangay (previous behavior).
+    $assignedParents = admin_fetch_all(
+        'SELECT id FROM parents WHERE household_id = ? AND status = "active"',
+        'i',
+        [$householdId]
     );
+    $assignedParentIds = [];
+    foreach ($assignedParents as $ap) {
+        $assignedParentIds[] = (int)($ap['id'] ?? 0);
+    }
+    $assignedParentIds = array_values(array_filter($assignedParentIds, static fn($v) => $v > 0));
+    $filteredByParents = $assignedParentIds !== [];
+
+    if ($filteredByParents) {
+        $inPlaceholders = implode(',', array_fill(0, count($assignedParentIds), '?'));
+        $rows = admin_fetch_all(
+            "SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name, c.sex, c.birthdate,
+                    TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months,
+                    p.name AS parent_name
+               FROM children c
+               LEFT JOIN parents p ON p.id = c.parent_id
+              WHERE c.barangay_id = ?
+                AND c.status = 'active'
+                AND (c.household_id IS NULL OR c.household_id = 0)
+                AND c.parent_id IN ({$inPlaceholders})
+              ORDER BY c.first_name, c.last_name",
+            'i' . str_repeat('i', count($assignedParentIds)),
+            array_merge([(int)$hh['barangay_id']], $assignedParentIds)
+        );
+    } else {
+        $rows = admin_fetch_all(
+            "SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name, c.sex, c.birthdate,
+                    TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months,
+                    p.name AS parent_name
+               FROM children c
+               LEFT JOIN parents p ON p.id = c.parent_id
+              WHERE c.barangay_id = ?
+                AND c.status = 'active'
+                AND (c.household_id IS NULL OR c.household_id = 0)
+              ORDER BY c.first_name, c.last_name",
+            'i',
+            [(int)$hh['barangay_id']]
+        );
+    }
 
     $list = array_map(static function ($r) {
         return [
@@ -80,7 +113,7 @@ if ($type === 'children') {
         ];
     }, $rows);
 
-    echo json_encode(['success' => true, 'data' => $list]);
+    echo json_encode(['success' => true, 'data' => $list, 'filtered_by_parents' => $filteredByParents]);
     exit;
 }
 
@@ -89,10 +122,10 @@ $rows = admin_fetch_all(
        FROM parents
       WHERE barangay_id = ?
         AND status = 'active'
-        AND (household_id IS NULL OR household_id = 0 OR household_id <> ?)
+        AND (household_id IS NULL OR household_id = 0)
       ORDER BY name",
-    'ii',
-    [(int)$hh['barangay_id'], $householdId]
+    'i',
+    [(int)$hh['barangay_id']]
 );
 
 $list = array_map(static function ($r) {

@@ -86,6 +86,11 @@ foreach ($childIds as $cid) {
         $skipped[] = ['id' => $cid, 'reason' => 'Out of barangay scope'];
         continue;
     }
+    $currentHh = isset($check['household_id']) ? (int)$check['household_id'] : 0;
+    if ($currentHh > 0 && $currentHh !== $householdId) {
+        $skipped[] = ['id' => $cid, 'reason' => 'Already assigned to another household'];
+        continue;
+    }
 
     $stmt = mysqli_prepare(
         $conn,

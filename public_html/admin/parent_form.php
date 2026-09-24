@@ -27,18 +27,18 @@ if ($editId > 0) {
     );
 
     if ($editingParent === null) {
-        admin_redirect('/admin/parents.php', ['notice' => 'Parent not found.', 'type' => 'error']);
+        admin_redirect('/admin/users.php', ['notice' => 'Parent not found.', 'type' => 'error']);
     }
 }
 
 $editingNameParts = admin_split_full_name($editingParent['name'] ?? '');
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parents.php')) . '">' . admin_action_icon('back') . ' Parents</a>';
+$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('back') . ' Users</a>';
 
 admin_layout_start(
     $editingParent ? 'Edit Parent' : 'Add Parent',
     $editingParent ? 'Update this parent account.' : 'Create a new guardian record.',
-    'parents',
+    'users',
     $actions,
     $editingParent ? 'Edit Parent' : 'Add Parent'
 );
@@ -158,7 +158,7 @@ admin_layout_start(
         <div class="admin-field admin-field-wide" style="align-content:end;">
             <button class="admin-btn" type="submit"><?php echo admin_action_icon('save') . ' ' . ($editingParent ? 'Save changes' : 'Create parent'); ?></button>
             <?php if ($editingParent): ?>
-                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/parents.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
+                <a class="admin-btn-secondary" href="<?php echo admin_e(app_url('/admin/users.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
             <?php endif; ?>
         </div>
     </form>

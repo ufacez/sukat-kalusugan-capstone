@@ -309,7 +309,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         // so 0 would fail with errno 1452 when no purok is chosen.
         $parentLocalAreaId = ($pLocalAreaId !== null && $pLocalAreaId > 0) ? (int)$pLocalAreaId : null;
         $parentHouseholdId = ($pHouseholdId !== null && $pHouseholdId > 0) ? (int)$pHouseholdId : null;
-        $parentLabel = $pEmail;
+        $parentLabel = '#' . $parentId;
         } else {
         // Existing parent: children inherit its barangay / purok / household.
         $existingParentId = (int)($_POST['existing_parent_id'] ?? 0);
@@ -334,7 +334,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         }
         $parentLocalAreaId = isset($prow['local_area_id']) && $prow['local_area_id'] !== null && (int)$prow['local_area_id'] > 0 ? (int)$prow['local_area_id'] : null;
         $parentHouseholdId = isset($prow['household_id']) && $prow['household_id'] !== null ? (int)$prow['household_id'] : null;
-        $parentLabel = (string)($prow['name'] ?? $prow['email'] ?? ('#' . $parentId));
+        $parentLabel = '#' . $parentId;
 
         // Inherited spots may have gone inactive — fall back to NULL, never error.
         if ($parentLocalAreaId !== null && $parentLocalAreaId > 0) {
@@ -857,7 +857,7 @@ nutritionist_layout_start(
         var months = (now.getFullYear() - b.getFullYear()) * 12 + (now.getMonth() - b.getMonth());
         if (now.getDate() < b.getDate()) months--;
         if (months < 0) return '';
-        if (months < 24) return months + ' mo';
+        if (months < 24) return months + ' m';
         var y = Math.floor(months / 12), m = months % 12;
         return y + 'y' + (m > 0 ? ' ' + m + 'm' : '');
     }

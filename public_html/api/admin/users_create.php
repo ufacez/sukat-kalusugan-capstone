@@ -88,7 +88,8 @@ if (!mysqli_stmt_execute($stmt)) {
 mysqli_stmt_close($stmt);
 
 $actor = current_user();
-log_action($actor['id'] ?? null, 'CREATE_USER', 'info', 'Created user ' . $email . ' as ' . $roleName);
+$newUserId = (int)$conn->insert_id;
+log_action($actor['id'] ?? null, 'CREATE_USER', 'info', 'Created staff #' . $newUserId . ' as ' . $roleName);
 
 admin_redirect('/admin/users.php', ['notice' => 'User created successfully.', 'type' => 'success']);
 

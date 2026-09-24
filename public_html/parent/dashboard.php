@@ -185,7 +185,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 	<article class="parent-panel parent-profile-card">
 		<button type="button" class="parent-child-trigger" data-child-picker-open aria-haspopup="dialog" aria-controls="parent-child-picker">
 		<div class="parent-child-banner">
-			<div class="parent-child-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))); ?></div>
+			<div class="parent-child-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($selectedChild['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$selectedChild['first_name'], 0, 1))); ?></div>
 			<div class="parent-child-info">
 				<div class="parent-child-name-row">
 					<div class="parent-child-name"><?php echo parent_e($selectedChild['first_name'] . ' ' . $selectedChild['last_name']); ?></div>
@@ -234,7 +234,7 @@ parent_layout_start('Dashboard', 'Track your child records, follow-up visits, an
 				$childPickerAgeLabel = $childPickerAge !== null ? intdiv($childPickerMonths, 12) . ' years, ' . ($childPickerMonths % 12) . ' months' : 'Age unavailable';
 				?>
 				<a class="parent-child-option <?php echo (int)$child['id'] === $selectedChildId ? 'is-selected' : ''; ?>" href="<?php echo parent_e(app_url('/parent/dashboard.php?child_id=' . (int)$child['id'])); ?>">
-					<span class="parent-child-option-avatar" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span>
+					<span class="parent-child-option-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr((string)$child['first_name'], 0, 1))); ?></span>
 					<span class="parent-child-option-copy"><strong><?php echo parent_e($child['first_name'] . ' ' . $child['last_name']); ?></strong><small><?php echo parent_e($childPickerAgeLabel); ?> · <?php echo parent_e((string)$child['sex']); ?></small></span>
 					<span class="admin-pill <?php echo parent_status_class($childPickerStatus); ?> parent-child-option-status"><?php echo parent_e($childPickerStatus); ?></span>
 				</a>
