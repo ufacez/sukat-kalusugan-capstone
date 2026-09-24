@@ -751,9 +751,7 @@ if (is_array($preview)) {
     }
 }
 
-$actions = '<a class="admin-btn-secondary" href="'
-    . nutritionist_e(app_url('/nutritionist/children.php'))
-    . '">' . admin_action_icon('back') . ' Children</a>';
+$actions = '';
 
 nutritionist_layout_start(
     'Master-list import',

@@ -274,7 +274,7 @@ function who_prev(array $data, int $total): array {
 	return $r;
 }
 
-$actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/children.php')) . '">' . admin_action_icon('open') . ' Children</a>';
+$actions = '';
 
 nutritionist_layout_start('WHO Analysis', 'Summary of nutritional status of assessed children based on WHO Child Growth Standards.', 'who_analysis', $actions);
 ?>

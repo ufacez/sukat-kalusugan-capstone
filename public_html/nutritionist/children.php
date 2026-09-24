@@ -11,6 +11,7 @@ $user = nutritionist_require_access();
 $localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
 $validTabs = ['active', 'graduated', 'archived'];
 $tab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'active';
+$measuredOnly = (($_GET['measured'] ?? '') === 'with');
 
 // Archive / restore a single child (same behavior as the admin endpoints,
 // but scoped to the nutritionist's barangay).
@@ -66,6 +67,9 @@ if ($localAreaFilter > 0) {
     $where[] = 'c.local_area_id = ?';
     $types .= 'i';
     $filterParams[] = $localAreaFilter;
+}
+if ($measuredOnly) {
+    $where[] = 'EXISTS (SELECT 1 FROM measurements m WHERE m.child_id = c.id)';
 }
 $where[] = 'c.status = ?';
 $types .= 's';
@@ -190,10 +194,16 @@ $localAreaList = admin_fetch_all(
 
 function nutritionist_children_url(array $params): string
 {
-    global $tab;
+    global $tab, $localAreaFilter, $measuredOnly;
     $base = app_url('/nutritionist/children.php');
-    $params['tab'] = $params['tab'] ?? $tab;
-    $merged = array_filter($params, static fn($v) => $v !== '' && $v !== null);
+    $defaults = ['tab' => $tab];
+    if ($localAreaFilter > 0) {
+        $defaults['local_area_id'] = $localAreaFilter;
+    }
+    if ($measuredOnly) {
+        $defaults['measured'] = 'with';
+    }
+    $merged = array_filter(array_merge($defaults, $params), static fn($v) => $v !== '' && $v !== null);
     return $merged === [] ? $base : $base . '?' . http_build_query($merged);
 }
 
@@ -275,7 +285,7 @@ nutritionist_layout_start(
 .children-pagination .status{font-size:11px;color:var(--admin-muted)}
 .children-pagination .pages{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
 .children-pagination .page-btn{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 8px;border:1px solid var(--admin-border);border-radius:7px;background:var(--admin-surface);color:var(--admin-text);font-size:11px;font-weight:600;text-decoration:none}
-.children-pagination .page-btn.is-active{background:var(--admin-primary);border-color:var(--admin-primary);color:#fff}
+.children-pagination .page-btn.is-active{background:var(--admin-primary);border-color:var(--admin-primary);color:var(--admin-text-on-primary,#fff)}
 .children-pagination .page-btn.is-disabled{opacity:.4;pointer-events:none}
 
 /* Child detail modal — landscape, senior-friendly (large text, grouped columns) */
@@ -342,7 +352,7 @@ nutritionist_layout_start(
             aria-label="Filter by local area"
             onchange="window.location.href=this.value"
         >
-            <option value="<?php echo nutritionist_e(nutritionist_children_url([])); ?>">All local areas</option>
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => null])); ?>">All local areas</option>
             <?php foreach ($localAreaList as $la): ?>
                 <option
                     value="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => (int)$la['id']])); ?>"
@@ -355,6 +365,15 @@ nutritionist_layout_start(
                     echo nutritionist_e($label);
                 ?></option>
             <?php endforeach; ?>
+        </select>
+        <select
+            class="admin-select"
+            id="measurement-filter"
+            aria-label="Filter by measurement"
+            onchange="window.location.href=this.value"
+        >
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['measured' => null])); ?>" <?php echo !$measuredOnly ? 'selected' : ''; ?>>All children</option>
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['measured' => 'with'])); ?>" <?php echo $measuredOnly ? 'selected' : ''; ?>>With Measurement</option>
         </select>
     </div>
 
@@ -396,8 +415,8 @@ nutritionist_layout_start(
                                 <div class="empty-sub">Manually archived records and 60+ month auto-archived children in your scope will appear here.</div>
                             <?php else: ?>
                                 <div class="empty-title">No children in this view</div>
-                                <div class="empty-sub">Your current local area filter doesn't include any of the <?php echo (int)$totalAll; ?> children in your scope. Clear the filter to see all of them.</div>
-                                <a class="admin-btn-secondary" href="<?php echo nutritionist_e(nutritionist_children_url([])); ?>">Clear filter</a>
+                                <div class="empty-sub">Your current filters don't match any children in your scope. Clear the filters to see all of them.</div>
+                                <a class="admin-btn-secondary" href="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => null, 'measured' => null])); ?>">Clear filters</a>
                             <?php endif; ?>
                         </div>
                     </td></tr>

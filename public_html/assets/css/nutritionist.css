@@ -581,25 +581,24 @@
   line-height: 1.6;
 }
 
-/* --- Toolbar (filter bar inside table card) --- */
+/* --- Toolbar (plain filter row, same pattern as Parents/Children toolbars) --- */
 .who-ref-toolbar {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   flex-wrap: wrap;
-  padding: 12px 18px 14px;
-  margin-bottom: 4px;
-  border-bottom: 1px solid var(--admin-border);
-  background: var(--admin-surface-alt);
-  border-radius: 18px 18px 0 0;
+  margin-bottom: 14px;
 }
 
-.who-ref-tb-sep {
-  display: block;
-  width: 1px;
-  height: 26px;
-  background: var(--admin-border);
-  flex-shrink: 0;
+.who-ref-toolbar .admin-search {
+  flex: 0 1 280px;
+  max-width: 280px;
+  min-width: 200px;
+}
+
+.who-ref-toolbar .admin-select {
+  min-width: 200px;
+  max-width: 260px;
 }
 
 /* --- Main Grid (Table + Details + Formula — 3-col) --- */
@@ -697,8 +696,13 @@
 }
 
 .who-ref-toggle.is-active {
-  background: var(--admin-valid, #16a34a);
-  color: #fff;
+  background: var(--admin-primary);
+  color: var(--admin-text-on-primary, #fff);
+}
+
+.who-ref-toggle:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
 }
 
 /* --- Compact filter row: search + fit-content controls --- */
@@ -735,11 +739,20 @@
   width: 32px;
   height: 32px;
   flex: none;
-  color: #fff;
+  color: var(--admin-text-on-primary, #fff);
   background: var(--admin-primary);
   border: 1px solid var(--admin-primary);
   border-radius: 8px;
   cursor: pointer;
+}
+
+.who-ref-search-btn:hover {
+  filter: brightness(1.08);
+}
+
+.who-ref-search-btn:focus-visible {
+  outline: 2px solid var(--admin-primary);
+  outline-offset: 2px;
 }
 
 .who-ref-clear {
@@ -887,6 +900,27 @@
   color: var(--admin-valid, #16a34a);
   font-weight: 700;
   background: rgba(22, 163, 74, 0.06);
+}
+
+/* WHO table carries both .nutritionist-table and .who-ref-table classes:
+   keep the compact numeric density (higher specificity beats the roomy base). */
+.nutritionist-page .nutritionist-table.who-ref-table {
+  font-size: 0.8rem;
+  min-width: 820px;
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+.nutritionist-page .who-ref-table thead th {
+  padding: 8px 7px;
+  font-size: 0.7rem;
+  vertical-align: middle;
+}
+
+.nutritionist-page .who-ref-table tbody td {
+  padding: 8px 7px;
+  font-size: 0.8rem;
+  vertical-align: middle;
 }
 
 /* --- Pagination --- */
@@ -4980,54 +5014,37 @@
   }
 }
 
-/* --- WHO joined filter toolbar: one connected bar sized to content --- */
-.nutritionist-page .who-ref-filters.who-ref-toolbar,
-.admin-page .who-ref-filters.who-ref-toolbar {
-  display: inline-flex;
+/* --- WHO toolbar: plain filter row (same pattern as Parents/Children toolbars) --- */
+.nutritionist-page .who-ref-toolbar,
+.admin-page .who-ref-toolbar {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 4px 6px;
-  width: max-content;
+  gap: 10px;
+  width: 100%;
   max-width: 100%;
-  background: var(--admin-surface);
-  border: 1px solid var(--admin-border);
-  border-radius: 12px;
-  padding: 6px 10px;
+  min-width: 0;
+  margin-bottom: 14px;
 }
 
-.nutritionist-page .who-ref-toolbar .who-ref-filter-group,
-.admin-page .who-ref-toolbar .who-ref-filter-group {
-  flex: 0 0 auto;
-  flex-direction: row;
-  align-items: center;
-  gap: 8px;
+.nutritionist-page .who-ref-toolbar .admin-search,
+.admin-page .who-ref-toolbar .admin-search {
+  flex: 0 1 280px;
+  max-width: 280px;
+  min-width: 200px;
 }
 
-.nutritionist-page .who-ref-toolbar .who-ref-filter-label,
-.admin-page .who-ref-toolbar .who-ref-filter-label {
-  margin: 0;
-  white-space: nowrap;
-}
-
-.nutritionist-page .who-ref-toolbar .who-ref-select,
-.admin-page .who-ref-toolbar .who-ref-select {
-  width: auto;
-  max-width: 104px;
-  padding: 6px 26px 6px 9px;
-  font-size: 0.78rem;
-}
-
-.nutritionist-page .who-ref-toolbar .who-ref-search-input,
-.admin-page .who-ref-toolbar .who-ref-search-input {
-  width: 88px;
-  padding: 6px 9px;
-  font-size: 0.78rem;
+.nutritionist-page .who-ref-toolbar .admin-select,
+.admin-page .who-ref-toolbar .admin-select {
+  min-width: 200px;
+  max-width: 260px;
 }
 
 .nutritionist-page .who-ref-toolbar .who-ref-search-btn,
 .admin-page .who-ref-toolbar .who-ref-search-btn {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
+  flex: none;
 }
 
 .nutritionist-page .who-ref-toolbar .who-ref-toggle-group,
@@ -5038,43 +5055,35 @@
 .nutritionist-page .who-ref-toolbar .who-ref-toggle,
 .admin-page .who-ref-toolbar .who-ref-toggle {
   flex: none;
-  padding: 6px 10px;
-  font-size: 0.76rem;
+  padding: 7px 16px;
+  font-size: 0.8rem;
 }
 
-.who-ref-tb-sep {
-  width: 1px;
-  align-self: stretch;
-  min-height: 24px;
-  background: var(--admin-border);
-  margin: 2px 4px;
-  flex: none;
-}
-
-@media (max-width: 720px) {
-  .nutritionist-page .who-ref-filters.who-ref-toolbar,
-  .admin-page .who-ref-filters.who-ref-toolbar {
-    display: flex;
+@media (max-width: 560px) {
+  .nutritionist-page .who-ref-toolbar,
+  .admin-page .who-ref-toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .nutritionist-page .who-ref-toolbar .admin-search,
+  .admin-page .who-ref-toolbar .admin-search {
+    flex: 1;
+    max-width: 100%;
+    min-width: 0;
+  }
+
+  .nutritionist-page .who-ref-toolbar .admin-select,
+  .admin-page .who-ref-toolbar .admin-select {
+    min-width: 0;
+    max-width: 100%;
     width: 100%;
   }
 
-  .nutritionist-page .who-ref-toolbar .who-ref-filter-group,
-  .admin-page .who-ref-toolbar .who-ref-filter-group {
-    flex: 1 1 auto;
-  }
-
-  .nutritionist-page .who-ref-toolbar .who-ref-select,
-  .admin-page .who-ref-toolbar .who-ref-select,
-  .nutritionist-page .who-ref-toolbar .who-ref-search-input,
-  .admin-page .who-ref-toolbar .who-ref-search-input {
-    width: 100%;
-    max-width: none;
-  }
-
-  .who-ref-tb-sep {
-    display: none;
+  .nutritionist-page .who-ref-toolbar .who-ref-toggle,
+  .admin-page .who-ref-toolbar .who-ref-toggle {
+    flex: 1 1 50%;
+    text-align: center;
   }
 }
 

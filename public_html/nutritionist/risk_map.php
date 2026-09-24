@@ -573,27 +573,6 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
     </div>
 </div>
 
-<div id="assign-children-modal" class="admin-spotmap-modal" style="display:none;">
-    <div class="admin-spotmap-modal-backdrop" data-close-modal="assign-children-modal"></div>
-    <div class="admin-spotmap-modal-content" style="max-width:480px;">
-        <div class="admin-spotmap-modal-header">
-            <h3>Add Children to Household</h3>
-            <button class="admin-spotmap-panel-close" data-close-modal="assign-children-modal">&times;</button>
-        </div>
-        <form id="assign-children-form" class="admin-spotmap-modal-body">
-            <input type="hidden" name="household_id" id="assign-children-hh" value="">
-            <p class="admin-mini" style="color:var(--admin-muted);margin:0 0 8px;">Select children in this barangay who are not yet assigned to a household. Their barangay and local area will be synced to the household's.</p>
-            <div id="assign-children-list" class="admin-spotmap-pick-list">
-                <p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">Loading…</p>
-            </div>
-            <div class="admin-spotmap-modal-footer">
-                <button type="button" class="admin-btn admin-btn-sm" data-close-modal="assign-children-modal" style="background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">Cancel</button>
-                <button type="submit" class="admin-btn admin-btn-sm" style="background:var(--admin-valid);color:#fff;border:none;">Assign Selected</button>
-            </div>
-        </form>
-    </div>
-</div>
-
 <div id="assign-parents-modal" class="admin-spotmap-modal" style="display:none;">
     <div class="admin-spotmap-modal-backdrop" data-close-modal="assign-parents-modal"></div>
     <div class="admin-spotmap-modal-content" style="max-width:480px;">
@@ -603,7 +582,8 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         </div>
         <form id="assign-parents-form" class="admin-spotmap-modal-body">
             <input type="hidden" name="household_id" id="assign-parents-hh" value="">
-            <p class="admin-mini" style="color:var(--admin-muted);margin:0 0 8px;">Select parents in this barangay who are not yet assigned to a household. Their barangay and local area will be synced to the household's.</p>
+            <p class="admin-mini" style="color:var(--admin-muted);margin:0 0 8px;">Select parents in this barangay who are not yet assigned to a household. Their children follow automatically into the same household.</p>
+            <input type="search" id="assign-parents-search" class="admin-search" placeholder="Search parents by name…" aria-label="Search parents" autocomplete="off" style="width:100%;margin-bottom:8px;">
             <div id="assign-parents-list" class="admin-spotmap-pick-list">
                 <p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">Loading…</p>
             </div>
@@ -903,14 +883,12 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 html += '<div class="admin-spotmap-person-meta">' + escapeHtml(meta) + ' · ' + escapeHtml(ch.status) + '</div>';
                 html += '</div>';
                 html += '<a href="' + BASE_URL + 'nutritionist/children.php?id=' + ch.id + '" class="admin-spotmap-person-remove" title="View child" style="text-decoration:none;color:inherit;">→</a>';
-                html += '<button class="admin-spotmap-person-remove" data-action="unassign-child" data-id="' + ch.id + '" title="Remove from household">&times;</button>';
                 html += '</div>';
             });
             html += '</div>';
         } else {
-            html += '<div class="admin-spotmap-empty">No children assigned yet.</div>';
+            html += '<div class="admin-spotmap-empty">No children yet — children follow their parent automatically when a parent is added.</div>';
         }
-        html += '<button class="admin-spotmap-add-person" data-action="open-assign-children" data-hh="' + h.id + '">+ Add Child</button>';
 
         if (children.length > 0 || parents.length > 0) {
             html += '<div class="admin-spotmap-panel-actions">';
@@ -926,8 +904,8 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             btn.addEventListener('click', function () {
                 var parentId = parseInt(this.dataset.id, 10);
                 var proceed = window.SKConfirm
-                    ? window.SKConfirm('Remove this parent from the household?', { title: 'Remove parent', confirmLabel: 'Remove', danger: true })
-                    : Promise.resolve(confirm('Remove this parent from the household?'));
+                    ? window.SKConfirm('Remove this parent from the household? Their children in this spot will be removed as well.', { title: 'Remove parent', confirmLabel: 'Remove', danger: true })
+                    : Promise.resolve(confirm('Remove this parent from the household? Their children in this spot will be removed as well.'));
                 proceed.then(function (ok) {
                 if (!ok) return;
                 var fd = new FormData();
@@ -942,51 +920,27 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 });
             });
         });
-
-        document.querySelectorAll('[data-action="unassign-child"]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                var childId = parseInt(this.dataset.id, 10);
-                var proceed = window.SKConfirm
-                    ? window.SKConfirm('Remove this child from the household?', { title: 'Remove child', confirmLabel: 'Remove', danger: true })
-                    : Promise.resolve(confirm('Remove this child from the household?'));
-                proceed.then(function (ok) {
-                if (!ok) return;
-                var fd = new FormData();
-                fd.append('child_id', childId);
-                fetch(BASE_URL + 'api/households/unassign_child.php', { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (res) {
-                        if (res.success) loadSpotDetails(householdId);
-                        else AdminToast.error(res.message || 'Failed to unassign.');
-                    })
-                    .catch(function () { AdminToast.error('Network error.'); });
-                });
-            });
-        });
-
-        document.querySelectorAll('[data-action="open-assign-children"]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                openAssignPersonsModal('children', this.dataset.hh);
-            });
-        });
         document.querySelectorAll('[data-action="open-assign-parents"]').forEach(function (btn) {
             btn.addEventListener('click', function () {
-                openAssignPersonsModal('parents', this.dataset.hh);
+                openAssignPersonsModal(this.dataset.hh);
             });
         });
     }
 
-    function openAssignPersonsModal(type, householdId) {
-        var modalId = type === 'children' ? 'assign-children-modal' : 'assign-parents-modal';
-        var modal = document.getElementById(modalId);
-        var list = document.getElementById(type === 'children' ? 'assign-children-list' : 'assign-parents-list');
-        var hhField = document.getElementById(type === 'children' ? 'assign-children-hh' : 'assign-parents-hh');
+    // Parents only: assigning a parent auto-assigns their children
+    // (backend), and unassigning a parent removes them as well.
+    function openAssignPersonsModal(householdId) {
+        var modal = document.getElementById('assign-parents-modal');
+        var list = document.getElementById('assign-parents-list');
+        var search = document.getElementById('assign-parents-search');
+        var hhField = document.getElementById('assign-parents-hh');
         if (!modal || !list) return;
         hhField.value = householdId;
+        if (search) search.value = '';
         list.innerHTML = '<p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">Loading…</p>';
         modal.style.display = 'flex';
 
-        fetch(BASE_URL + 'api/households/available_persons.php?type=' + type + '&household_id=' + householdId, { credentials: 'same-origin' })
+        fetch(BASE_URL + 'api/households/available_persons.php?type=parents&household_id=' + householdId, { credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (!res.success) {
@@ -994,27 +948,15 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     return;
                 }
                 if (res.data.length === 0) {
-                    var emptyHint = (type === 'children' && res.filtered_by_parents)
-                        ? 'No more children of the assigned parent(s) left to add. Add another parent first if needed.'
-                        : 'No available ' + type + ' to assign.';
-                    list.innerHTML = '<p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">' + escapeHtml(emptyHint) + '</p>';
+                    list.innerHTML = '<p class="admin-mini" style="color:var(--admin-muted);text-align:center;padding:20px;">No available parents to assign.</p>';
                     return;
                 }
                 var html = '';
-                if (type === 'children' && res.filtered_by_parents) {
-                    html += '<p class="admin-mini" style="color:var(--admin-muted);margin:0 0 8px;">Showing only children of the parent(s) assigned to this household.</p>';
-                }
                 res.data.forEach(function (p) {
-                    var meta = '';
-                    if (type === 'children') {
-                        meta = (p.sex || '') + (p.parent_name ? ' · Guardian: ' + p.parent_name : '');
-                    } else {
-                        meta = p.parent_type || 'Guardian';
-                        if (p.phone) meta += ' · ' + p.phone;
-                    }
-                    var fieldName = type === 'children' ? 'child_ids[]' : 'parent_ids[]';
-                    html += '<label class="admin-spotmap-pick-item">';
-                    html += '<input type="checkbox" name="' + fieldName + '" value="' + p.id + '">';
+                    var meta = p.parent_type || 'Guardian';
+                    if (p.phone) meta += ' · ' + p.phone;
+                    html += '<label class="admin-spotmap-pick-item" data-pick-text="' + escapeHtml(((p.name || '') + ' ' + meta).toLowerCase()) + '">';
+                    html += '<input type="checkbox" name="parent_ids[]" value="' + p.id + '">';
                     html += '<div class="admin-spotmap-pick-info">';
                     html += '<div class="admin-spotmap-pick-name">' + escapeHtml(p.name) + '</div>';
                     html += '<div class="admin-spotmap-pick-meta">' + escapeHtml(meta) + '</div>';
@@ -1028,31 +970,44 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             });
     }
 
-    function submitAssignForm(type) {
-        var form = document.getElementById(type === 'children' ? 'assign-children-form' : 'assign-parents-form');
-        var modalId = type === 'children' ? 'assign-children-modal' : 'assign-parents-modal';
+    (function wireAssignParentsSearch() {
+        var search = document.getElementById('assign-parents-search');
+        var list = document.getElementById('assign-parents-list');
+        if (!search || !list) return;
+        search.addEventListener('input', function () {
+            var term = (search.value || '').trim().toLowerCase();
+            list.querySelectorAll('[data-pick-text]').forEach(function (item) {
+                var text = item.getAttribute('data-pick-text') || '';
+                item.style.display = (term === '' || text.indexOf(term) !== -1) ? '' : 'none';
+            });
+        });
+    })();
+
+    function submitAssignForm() {
+        var form = document.getElementById('assign-parents-form');
         if (!form) return;
 
         var householdId = form.querySelector('[name="household_id"]').value;
-        var fieldName = type === 'children' ? 'child_ids[]' : 'parent_ids[]';
-        var checked = form.querySelectorAll('[name="' + fieldName + '"]:checked');
+        var checked = form.querySelectorAll('[name="parent_ids[]"]:checked');
         if (checked.length === 0) {
-            AdminToast.error('Please select at least one ' + (type === 'children' ? 'child' : 'parent') + '.');
+            AdminToast.error('Please select at least one parent.');
             return;
         }
 
         var fd = new FormData();
         fd.append('household_id', householdId);
-        checked.forEach(function (cb) { fd.append(fieldName, cb.value); });
+        checked.forEach(function (cb) { fd.append('parent_ids[]', cb.value); });
 
-        var apiUrl = BASE_URL + 'api/households/assign_' + type + '.php';
-        fetch(apiUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+        fetch(BASE_URL + 'api/households/assign_parents.php', { method: 'POST', body: fd, credentials: 'same-origin' })
             .then(function (r) { return r.json(); })
             .then(function (res) {
                 if (res.success) {
-                    document.getElementById(modalId).style.display = 'none';
+                    document.getElementById('assign-parents-modal').style.display = 'none';
                     form.reset();
                     loadSpotDetails(parseInt(householdId, 10));
+                    if (res.auto_assigned_children > 0) {
+                        AdminToast.success(res.assigned + ' parent(s) assigned with ' + res.auto_assigned_children + ' child(ren).');
+                    }
                     if (res.skipped && res.skipped.length > 0) {
                         AdminToast.error(res.skipped.length + ' skipped: already assigned elsewhere.');
                     }
@@ -1285,13 +1240,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             }
         });
 
-        document.getElementById('assign-children-form').addEventListener('submit', function (e) {
-            e.preventDefault();
-            submitAssignForm('children');
-        });
         document.getElementById('assign-parents-form').addEventListener('submit', function (e) {
             e.preventDefault();
-            submitAssignForm('parents');
+            submitAssignForm();
         });
 
         document.querySelectorAll('[data-close-modal]').forEach(function (el) {

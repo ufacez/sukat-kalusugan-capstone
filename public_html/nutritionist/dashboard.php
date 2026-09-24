@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
+require_once __DIR__ . '/../includes/monitoring_periods.php';
 
 $user = nutritionist_require_access();
 $today = new DateTimeImmutable('today');
@@ -214,24 +215,20 @@ $parents = admin_fetch_all(
 	$parentsParams
 );
 
-// At-risk / severe statistics from real child data
-$atRiskChildren = [];
-$severeCount = 0;
-$moderateCount = 0;
-$normalCount = 0;
+// Current monitoring quarter (DOH calendar quarters) + coverage within it.
+// A child counts as measured for the quarter when its latest measurement
+// date falls inside the quarter window.
+$currentQuarter = (int)ceil((int)$today->format('n') / 3);
+$quarterRange = monitoring_quarter_range((int)$today->format('Y'), $currentQuarter);
+$quarterEnd = new DateTimeImmutable($quarterRange['end']);
+$quarterDaysLeft = $today > $quarterEnd ? 0 : (int)$today->diff($quarterEnd)->days;
 
-foreach ($children as $child) {
-	$status = strtolower(trim((string)($child['nutritional_status'] ?? '')));
-	if ($status === 'normal' || $status === '') {
-		$normalCount++;
-	} else {
-		$atRiskChildren[] = $child;
-		$severeLabels = ['severely underweight', 'severely stunted', 'severely wasted', 'suw', 'sst', 'sw'];
-		if (in_array($status, $severeLabels, true)) {
-			$severeCount++;
-		} else {
-			$moderateCount++;
-		}
+// Scope barangay name for the scope card. Admins see every barangay.
+$scopeBarangayName = 'All Barangays';
+if (($user['role'] ?? '') !== 'admin' && !empty($user['barangay_id'])) {
+	$scopeRow = admin_fetch_one('SELECT name FROM barangays WHERE id = ? LIMIT 1', 'i', [(int)$user['barangay_id']]);
+	if ($scopeRow !== null && trim((string)($scopeRow['name'] ?? '')) !== '') {
+		$scopeBarangayName = (string)$scopeRow['name'];
 	}
 }
 
@@ -370,14 +367,6 @@ function combinedStatusPills(?string $wfa, ?string $hfa, ?string $wfh): array {
 	}
 	return $pills;
 }
-
-$upcomingAppointments = array_values(array_filter(
-	$appointments,
-	static function (array $appointment) use ($today): bool {
-		$scheduled = new DateTimeImmutable((string)$appointment['scheduled_at']);
-		return $scheduled >= $today;
-	}
-));
 
 // WHO chart data — real computed from measurements for three axes
 $chartMonths = [];
@@ -620,21 +609,8 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 	<article class="dashboard-stat-card">
 		<div class="dashboard-stat-row">
-			<div class="dashboard-stat-icon-wrap is-accent">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z"/></svg>
-			</div>
-			<div>
-				<div class="dashboard-stat-label">Children Needing Attention</div>
-				<div class="dashboard-stat-value" data-count-up><?php echo count($atRiskChildren); ?></div>
-				<div class="dashboard-stat-meta is-danger"><span class="highlight"><?php echo $severeCount; ?> severe cases</span></div>
-			</div>
-		</div>
-	</article>
-
-	<article class="dashboard-stat-card">
-		<div class="dashboard-stat-row">
 			<div class="dashboard-stat-icon-wrap is-valid">
-				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0 2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
@@ -646,13 +622,26 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 
 	<article class="dashboard-stat-card">
 		<div class="dashboard-stat-row">
-			<div class="dashboard-stat-icon-wrap is-primary">
+			<div class="dashboard-stat-icon-wrap is-accent">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5"/></svg>
 			</div>
 			<div>
-				<div class="dashboard-stat-label">Appointments</div>
-				<div class="dashboard-stat-value" data-count-up><?php echo count($upcomingAppointments); ?></div>
-				<div class="dashboard-stat-meta">Upcoming</div>
+				<div class="dashboard-stat-label">Monitoring Quarter</div>
+				<div class="dashboard-stat-value" style="font-size:1.25rem;line-height:1.3;"><?php echo nutritionist_e(implode(' - ', array_map(static fn(int $m): string => DateTimeImmutable::createFromFormat('!n', (string)$m)->format('M'), $quarterRange['months']))); ?></div>
+				<div class="dashboard-stat-meta"><?php echo (int)$quarterDaysLeft; ?> days left</div>
+			</div>
+		</div>
+	</article>
+
+	<article class="dashboard-stat-card">
+		<div class="dashboard-stat-row">
+			<div class="dashboard-stat-icon-wrap is-valid">
+				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z"/></svg>
+			</div>
+			<div>
+				<div class="dashboard-stat-label">Scope Barangay</div>
+				<div class="dashboard-stat-value" style="font-size:1.25rem;line-height:1.3;"><?php echo nutritionist_e($scopeBarangayName); ?></div>
+				<div class="dashboard-stat-meta">Your assigned scope</div>
 			</div>
 		</div>
 	</article>

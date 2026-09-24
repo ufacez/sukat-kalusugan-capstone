@@ -44,10 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
 $indicator = strtolower((string)($_GET['indicator'] ?? 'waz'));
 if (!isset($indicators[$indicator])) $indicator = 'waz';
 $sex = ($_GET['sex'] ?? 'Male') === 'Female' ? 'Female' : 'Male';
-$search = trim((string)($_GET['q'] ?? ''));
-if ($search !== '' && preg_match('/^\d+(\.\d+)?$/', $search) !== 1) {
-	$search = '';
-}
 
 $activeTab = 'wfa';
 foreach ($tabMap as $tabKey => $tabDef) {
@@ -77,20 +73,7 @@ if ($rangeBounds[$ageRange] !== null && in_array($config['column'], ['age_months
 	$params[] = $high;
 }
 
-// Exact-match jump: a numeric search goes straight to the month / day / cm row.
-if ($search !== '') {
-	$sql .= " AND {$config['column']} = ?";
-	if ($config['column'] === 'height_cm') {
-		$types .= 'd';
-		$params[] = (float)$search;
-	} else {
-		$types .= 'i';
-		$params[] = (int)$search;
-	}
-}
-
-/*
- * Sort by the row's id (import / create order) so the original seeded
+/* Sort by the row's id (import / create order) so the original seeded
  * reference rows come first and any newly-imported LMS values show up
  * at the end. The data is still grouped sensibly because the importer
  * writes rows in the natural order of the source spreadsheet.
@@ -101,13 +84,12 @@ $rowCount = count($rows);
 $minX = $rowCount > 0 ? $rows[0]['x'] : null;
 $maxX = $rowCount > 0 ? $rows[$rowCount - 1]['x'] : null;
 
-// Pagination
-$perPage = 15;
-$page = max(1, (int)($_GET['page'] ?? 1));
-$totalPages = max(1, (int)ceil($rowCount / $perPage));
-if ($page > $totalPages) $page = $totalPages;
-$offset = ($page - 1) * $perPage;
-$pageRows = array_slice($rows, $offset, $perPage);
+/*
+ * No server-side pagination here on purpose: the full filtered list is
+ * rendered and assets/js/admin.js paginates client-side (10/page, same
+ * as Parents/Children) so paging and search never trigger a page reload.
+ * First-paint hiding is handled per-row via admin_paged_row_attr().
+ */
 
 function who_reference_sd(float $L, float $M, float $S, int $z): float {
 	if (abs($L) < 0.000001) return $M * exp($S * $z);
@@ -117,9 +99,8 @@ function who_reference_sd(float $L, float $M, float $S, int $z): float {
 function who_reference_format_l(float $L): string { return number_format($L, 4, '.', ''); }
 function who_reference_format_ms(float $val, bool $isS): string { return number_format($val, $isS ? 5 : 4, '.', ''); }
 
-function who_reference_url(string $indicator, string $sex, string $range, string $search = '', int $page = 1): string {
-	$params = ['indicator' => $indicator, 'sex' => $sex, 'range' => $range, 'page' => $page];
-	if ($search !== '') $params['q'] = $search;
+function who_reference_url(string $indicator, string $sex, string $range): string {
+	$params = ['indicator' => $indicator, 'sex' => $sex, 'range' => $range];
 	return app_url('/nutritionist/who_reference.php') . '?' . http_build_query($params);
 }
 
@@ -133,7 +114,6 @@ function who_reference_height_range_label(string $indicator): string {
 }
 
 $exportBase = ['indicator' => $indicator, 'sex' => $sex, 'range' => $ageRange];
-if ($search !== '') $exportBase['q'] = $search;
 $actions = export_dropdown(
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query($exportBase),
 	app_url('/nutritionist/who_reference_export.php') . '?' . http_build_query(array_merge($exportBase, ['format' => 'csv'])),
@@ -143,51 +123,6 @@ $actions = export_dropdown(
 
 nutritionist_layout_start('WHO Standard', 'WHO Child Growth Standards (0–5 years) • Used for Z-score calculation and nutritional assessment', 'who_reference', $actions);
 ?>
-<style>
-/* Senior-friendly filter bar: roomy gaps + padding, bigger tap targets, readable text. */
-.nutritionist-page .who-ref-filters.who-ref-toolbar{
-width:100%;
-gap:12px 20px;
-padding:14px 18px;
-align-items:center;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-filter-group{
-gap:10px;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-filter-label{
-font-size:0.75rem;
-}
-.who-ref-tb-sep{
-min-height:34px;
-margin:2px 8px;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-search-input{
-width:200px;
-min-height:44px;
-padding:10px 12px;
-font-size:14px;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-search-btn{
-width:44px;
-height:44px;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-select{
-max-width:none;
-min-width:130px;
-min-height:44px;
-padding:10px 32px 10px 12px;
-font-size:14px;
-}
-.nutritionist-page .who-ref-toolbar .who-ref-toggle{
-padding:12px 22px;
-min-height:44px;
-font-size:14px;
-}
-@media (max-width:560px){
-.who-ref-search-row{width:100%}
-.who-ref-search-input{flex:1;width:auto}
-}
-</style>
 
 <div class="who-ref-layout">
 	<?php if (nutritionist_can_write()): ?>
@@ -236,7 +171,7 @@ font-size:14px;
 					$tabIndicator = $tabDef['keys'][1];
 				}
 			?>
-			<a href="<?php echo nutritionist_e(who_reference_url($tabIndicator, $sex, $ageRange, $search)); ?>"
+			<a href="<?php echo nutritionist_e(who_reference_url($tabIndicator, $sex, $ageRange)); ?>"
 			   class="who-ref-main-tab <?php echo $tabKey === $activeTab ? 'is-active' : ''; ?>">
 				<?php echo nutritionist_e($tabDef['label']); ?>
 			</a>
@@ -334,61 +269,37 @@ font-size:14px;
 		</div>
 	</div>
 
-	<!-- Full-width WHO Standard Table -->
-	<div class="who-ref-table-section">
-		<div class="who-ref-table-card">
-					<div class="who-ref-filters who-ref-toolbar">
-						<form class="who-ref-filter-group who-ref-search" method="get" action="<?php echo nutritionist_e(app_url('/nutritionist/who_reference.php')); ?>">
-							<label class="who-ref-filter-label" for="who-ref-q">Find <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?></label>
-							<span class="who-ref-search-row">
-								<input type="hidden" name="indicator" value="<?php echo nutritionist_e($indicator); ?>">
-								<input type="hidden" name="sex" value="<?php echo nutritionist_e($sex); ?>">
-								<input type="hidden" name="range" value="<?php echo nutritionist_e($ageRange); ?>">
-								<input
-									id="who-ref-q"
-									class="who-ref-search-input"
-									type="text"
-									name="q"
-									inputmode="decimal"
-									autocomplete="off"
-									placeholder="<?php echo $config['column'] === 'height_cm' ? 'e.g. 65' : ($isDayView ? 'e.g. 730' : 'e.g. 24'); ?>"
-									value="<?php echo nutritionist_e($search); ?>"
-								>
-								<button class="who-ref-search-btn" type="submit" title="Search" aria-label="Search">
-									<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="15" height="15"><path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
-								</button>
-								<?php if ($search !== ''): ?>
-									<a class="who-ref-clear" href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange)); ?>">Clear</a>
-								<?php endif; ?>
-							</span>
-						</form>
+	<!-- Full-width WHO Standard Table (same pattern as Parents/Children) -->
+	<section class="nutritionist-panel" style="margin-top:0;">
+				<div class="who-ref-toolbar">
+					<input
+						id="who-ref-q"
+						class="admin-search"
+						data-admin-filter="#who-reference-table"
+						type="search"
+						inputmode="decimal"
+						autocomplete="off"
+						aria-label="Search <?php echo $config['column'] === 'height_cm' ? 'cm' : ($isDayView ? 'day' : 'month'); ?>"
+						placeholder="<?php echo $config['column'] === 'height_cm' ? 'Search cm (e.g. 65)' : ($isDayView ? 'Search day (e.g. 730)' : 'Search month (e.g. 24)'); ?>"
+					>
 
-						<span class="who-ref-tb-sep" aria-hidden="true"></span>
+					<select class="admin-select" aria-label="Filter by sex" onchange="window.location.href=this.value">
+							<option value="<?php echo nutritionist_e(who_reference_url($indicator, 'Male', $ageRange)); ?>" <?php echo $sex === 'Male' ? 'selected' : ''; ?>>Boys</option>
+							<option value="<?php echo nutritionist_e(who_reference_url($indicator, 'Female', $ageRange)); ?>" <?php echo $sex === 'Female' ? 'selected' : ''; ?>>Girls</option>
+					</select>
 
-						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Sex</label>
-							<select class="who-ref-select" onchange="window.location.href=this.value">
-								<option value="<?php echo nutritionist_e(who_reference_url($indicator, 'Male', $ageRange, $search)); ?>" <?php echo $sex === 'Male' ? 'selected' : ''; ?>>Boys</option>
-								<option value="<?php echo nutritionist_e(who_reference_url($indicator, 'Female', $ageRange, $search)); ?>" <?php echo $sex === 'Female' ? 'selected' : ''; ?>>Girls</option>
-							</select>
-						</div>
-
-						<?php if (in_array($config['column'], ['age_months', 'age_days'], true)): ?>
-						<span class="who-ref-tb-sep" aria-hidden="true"></span>
-						<div class="who-ref-filter-group">
-							<label class="who-ref-filter-label">Age</label>
-							<div class="who-ref-toggle-group">
-								<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz-days' ? 'waz' : 'haz', $sex, $ageRange, $search)); ?>"
-								   class="who-ref-toggle <?php echo !$isDayView ? 'is-active' : ''; ?>">Months</a>
-								<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz' ? 'waz-days' : ($indicator === 'haz' ? 'haz-days' : $indicator), $sex, $ageRange, $search)); ?>"
-								   class="who-ref-toggle <?php echo $isDayView ? 'is-active' : ''; ?>">Days</a>
-							</div>
-						</div>
-						<?php endif; ?>
+					<?php if (in_array($config['column'], ['age_months', 'age_days'], true)): ?>
+					<div class="who-ref-toggle-group" role="group" aria-label="Age unit">
+							<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz-days' ? 'waz' : 'haz', $sex, $ageRange)); ?>"
+							   class="who-ref-toggle <?php echo !$isDayView ? 'is-active' : ''; ?>">Months</a>
+							<a href="<?php echo nutritionist_e(who_reference_url($indicator === 'waz' ? 'waz-days' : ($indicator === 'haz' ? 'haz-days' : $indicator), $sex, $ageRange)); ?>"
+							   class="who-ref-toggle <?php echo $isDayView ? 'is-active' : ''; ?>">Days</a>
 					</div>
+					<?php endif; ?>
+				</div>
 
-				<div class="who-ref-table-wrap">
-					<table class="who-ref-table" id="who-reference-table">
+			<div class="nutritionist-table-wrap">
+				<table class="nutritionist-table who-ref-table" id="who-reference-table" data-page-size="10">
 						<thead>
 							<tr>
 								<?php if ($isDayView): ?>
@@ -412,13 +323,14 @@ font-size:14px;
 							</tr>
 						</thead>
 						<tbody>
-							<?php foreach ($pageRows as $row):
+							<?php foreach ($rows as $rowIndex => $row):
 								$rL = (float)$row['L'];
 								$rM = (float)$row['M'];
 								$rS = (float)$row['S'];
 								$rx = (float)$row['x'];
 							?>
-								<tr data-filter-text="<?php echo nutritionist_e($config['column'] === 'height_cm' ? number_format($rx, 1, '.', '') : (string)(int)$rx); ?>">
+								<tr<?php echo admin_paged_row_attr($rowIndex, 10); ?>
+									data-filter-text="<?php echo nutritionist_e($config['column'] === 'height_cm' ? number_format($rx, 1, '.', '') : (string)(int)$rx); ?>">
 									<?php if ($isDayView): ?>
 									<td class="who-ref-td-age"><?php echo (int)$rx; ?></td>
 									<td class="who-ref-td-age-sub"><?php echo nutritionist_e((string)intdiv((int)$rx, 30) . 'm ' . ((int)$rx % 30) . 'd'); ?></td>
@@ -443,44 +355,8 @@ font-size:14px;
 					</table>
 				</div>
 
-				<!-- Pagination -->
-				<div class="who-ref-pagination">
-					<span class="who-ref-page-info">Showing <?php echo $offset + 1; ?>–<?php echo min($offset + $perPage, $rowCount); ?> of <?php echo $rowCount; ?> rows</span>
-					<div class="who-ref-page-btns">
-						<?php if ($page > 1): ?>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, 1)); ?>" class="who-ref-page-btn" title="First">&laquo;</a>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, $page - 1)); ?>" class="who-ref-page-btn" title="Previous">&lsaquo;</a>
-						<?php else: ?>
-							<span class="who-ref-page-btn is-disabled">&laquo;</span>
-							<span class="who-ref-page-btn is-disabled">&lsaquo;</span>
-						<?php endif; ?>
-
-						<?php
-						$startPage = max(1, $page - 2);
-						$endPage = min($totalPages, $page + 2);
-						if ($startPage > 1): ?>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, 1)); ?>" class="who-ref-page-btn">1</a>
-							<?php if ($startPage > 2): ?><span class="who-ref-page-ellipsis">...</span><?php endif; ?>
-						<?php endif; ?>
-						<?php for ($p = $startPage; $p <= $endPage; $p++): ?>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, $p)); ?>" class="who-ref-page-btn <?php echo $p === $page ? 'is-active' : ''; ?>"><?php echo $p; ?></a>
-						<?php endfor; ?>
-						<?php if ($endPage < $totalPages): ?>
-							<?php if ($endPage < $totalPages - 1): ?><span class="who-ref-page-ellipsis">...</span><?php endif; ?>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, $totalPages)); ?>" class="who-ref-page-btn"><?php echo $totalPages; ?></a>
-						<?php endif; ?>
-
-						<?php if ($page < $totalPages): ?>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, $page + 1)); ?>" class="who-ref-page-btn" title="Next">&rsaquo;</a>
-							<a href="<?php echo nutritionist_e(who_reference_url($indicator, $sex, $ageRange, $search, $totalPages)); ?>" class="who-ref-page-btn" title="Last">&raquo;</a>
-						<?php else: ?>
-							<span class="who-ref-page-btn is-disabled">&rsaquo;</span>
-							<span class="who-ref-page-btn is-disabled">&raquo;</span>
-						<?php endif; ?>
-					</div>
-				</div>
-		</div>
-	</div>
+				<?php /* Pagination + instant search handled client-side by assets/js/admin.js (10/page). */ ?>
+		</section>
 
 	<div class="who-ref-source">
 		Source: WHO Child Growth Standards, Methods and Development (2006)

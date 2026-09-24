@@ -53,6 +53,48 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		);
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment marked as completed.'] : ['notice' => 'Could not complete appointment.', 'type' => 'error']);
 	}
+
+	// ── New request from the modal (same validation as appointment_form.php) ──
+	if ($action === 'create_request') {
+		nutritionist_require_write();
+
+		$childId = (int)($_POST['child_id'] ?? 0);
+		$scheduledAt = trim((string)($_POST['scheduled_at'] ?? ''));
+		$notes = trim((string)($_POST['notes'] ?? ''));
+		$location = trim((string)($_POST['location'] ?? ''));
+
+		if ($childId <= 0 || $scheduledAt === '') {
+			admin_redirect('/nutritionist/appointments.php?tab=outgoing', ['notice' => 'Child and schedule are required.', 'type' => 'error']);
+		}
+
+		if ($location === '') {
+			$location = 'Barangay Health Center';
+		}
+
+		$childParams = [$childId];
+		$childScope = nutritionist_scope_fragment($user, 'c.barangay_id', $childParams);
+		$childRecord = admin_fetch_one(
+			"SELECT c.id, c.parent_id
+			 FROM children c
+			 WHERE c.id = ? AND c.status = 'active' AND {$childScope}
+			 LIMIT 1",
+			str_repeat('i', count($childParams)),
+			$childParams
+		);
+
+		if ($childRecord === null) {
+			admin_redirect('/nutritionist/appointments.php?tab=outgoing', ['notice' => 'Select a valid child from your list.', 'type' => 'error']);
+		}
+
+		$ok = admin_execute(
+			'INSERT INTO appointments (child_id, parent_id, nutritionist_id, scheduled_at, status, notes, location)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)',
+			'iiissss',
+			[$childId, (int)$childRecord['parent_id'], (int)$user['id'], $scheduledAt, 'pending', $notes, $location]
+		);
+
+		admin_redirect('/nutritionist/appointments.php?tab=outgoing', $ok ? ['notice' => 'Appointment scheduled.'] : ['notice' => 'Appointment could not be scheduled.', 'type' => 'error']);
+	}
 }
 
 // ── Consultation requests for this nutritionist ──
@@ -90,6 +132,20 @@ $history = admin_fetch_all(
 
 $today = new DateTimeImmutable('today');
 $now = new DateTimeImmutable('now');
+
+// ── Children dropdown for the New request modal (same scope as appointment_form.php) ──
+$nrChildrenParams = [];
+$nrChildrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $nrChildrenParams);
+$nrChildren = admin_fetch_all(
+	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
+	 FROM children c
+	 INNER JOIN parents p ON p.id = c.parent_id
+	 WHERE {$nrChildrenScope} AND c.status = 'active'
+	 ORDER BY c.last_name ASC, c.first_name ASC",
+	str_repeat('i', count($nrChildrenParams)),
+	$nrChildrenParams
+);
+$nrDefaultScheduledAt = (new DateTimeImmutable('+1 day'))->setTime(9, 0)->format('Y-m-d\TH:i');
 
 // ── Tab / pagination ──
 $validTabs = ['incoming', 'outgoing', 'history'];
@@ -138,9 +194,9 @@ foreach (array_merge($incoming, $outgoing) as $req) {
 }
 ksort($calendarEntries);
 
-$actions = '<a class="admin-btn" href="'
-	. nutritionist_e(app_url('/nutritionist/appointment_form.php'))
-	. '">' . admin_action_icon('add') . ' New request</a>';
+$actions = nutritionist_can_write()
+	? '<button type="button" class="admin-btn" data-new-request-open>' . admin_action_icon('add') . ' New request</button>'
+	: '';
 
 nutritionist_layout_start('Appointments', 'Consultation requests between parents and nutritionists.', 'appointments', $actions);
 ?>
@@ -335,8 +391,8 @@ foreach (['incoming' => $incoming, 'outgoing' => $outgoing, 'history' => $histor
 ?>
 
 <style>
-#completeModal, #apptDetailModal { display: none; }
-#completeModal.is-open, #apptDetailModal.is-open { display: flex; }
+#completeModal, #apptDetailModal, #newRequestModal { display: none; }
+#completeModal.is-open, #apptDetailModal.is-open, #newRequestModal.is-open { display: flex; }
 .appt-detail-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; border-bottom: 1px solid var(--admin-border); font-size: 13px; }
 .appt-detail-row:last-child { border-bottom: none; }
 .appt-detail-row .k { color: var(--admin-muted); font-weight: 600; flex-shrink: 0; }
@@ -399,6 +455,54 @@ foreach (['incoming' => $incoming, 'outgoing' => $outgoing, 'history' => $histor
 	</div>
 </div>
 
+<!-- ============ NEW REQUEST MODAL (create only; edit stays on appointment_form.php) ============ -->
+<div class="admin-modal-overlay" id="newRequestModal">
+	<div class="admin-modal" style="max-width:520px;" role="dialog" aria-modal="true" aria-label="New appointment request">
+		<div class="admin-modal-head">
+			<h3>New request</h3>
+			<button class="admin-modal-close" id="newRequestClose" type="button">&times;</button>
+		</div>
+		<form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>" style="padding:16px 20px;">
+			<input type="hidden" name="action" value="create_request">
+			<label class="admin-field" style="display:block;margin-bottom:10px;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Child <span style="color:var(--admin-danger);">*</span></span>
+				<select name="child_id" id="newRequestChild" required style="width:100%;margin-top:6px;">
+					<option value="">-- Select Child --</option>
+					<?php foreach ($nrChildren as $nrChild): ?>
+						<option
+							value="<?php echo (int)$nrChild['id']; ?>"
+							data-parent-name="<?php echo nutritionist_e((string)$nrChild['parent_name']); ?>"
+							data-parent-type="<?php echo nutritionist_e((string)$nrChild['parent_type']); ?>"
+							data-parent-phone="<?php echo nutritionist_e((string)($nrChild['parent_phone'] ?? '')); ?>"
+						><?php echo nutritionist_e($nrChild['first_name'] . ' ' . $nrChild['last_name']); ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<label class="admin-field" style="display:block;margin-bottom:10px;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Parent/Guardian</span>
+				<input type="text" id="newRequestGuardian" value="Select a child first" disabled style="width:100%;margin-top:6px;color:var(--admin-muted);">
+			</label>
+			<label class="admin-field" style="display:block;margin-bottom:10px;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Schedule <span style="color:var(--admin-danger);">*</span></span>
+				<input type="datetime-local" name="scheduled_at" required value="<?php echo nutritionist_e($nrDefaultScheduledAt); ?>" style="width:100%;margin-top:6px;">
+			</label>
+			<label class="admin-field" style="display:block;margin-bottom:10px;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Location</span>
+				<input name="location" placeholder="e.g. Barangay Health Center" value="Barangay Health Center" style="width:100%;margin-top:6px;">
+			</label>
+			<label class="admin-field" style="display:block;">
+				<span style="font-size:12px;font-weight:700;color:var(--admin-text);">Notes</span>
+				<textarea name="notes" rows="3" placeholder="Optional follow-up notes" style="width:100%;margin-top:6px;"></textarea>
+			</label>
+			<p class="admin-mini" style="margin:8px 0 0;">New requests always start as pending until confirmed.</p>
+			<div class="admin-actions" style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;">
+				<button class="admin-btn-secondary" type="button" id="newRequestCancel">Cancel</button>
+				<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save appointment</button>
+			</div>
+		</form>
+	</div>
+</div>
+
 <script>
 (function () {
 	var detailData = <?php echo json_encode($apptDetailJson, JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP); ?>;
@@ -453,12 +557,36 @@ foreach (['incoming' => $incoming, 'outgoing' => $outgoing, 'history' => $histor
 	document.getElementById('apptDetailClose').addEventListener('click', function () { hideModal('apptDetailModal'); });
 	document.getElementById('apptDetailOk').addEventListener('click', function () { hideModal('apptDetailModal'); });
 
-	['completeModal', 'apptDetailModal'].forEach(function (id) {
+	// New request modal: open/close + guardian auto-display (same as appointment_form.php).
+	document.querySelectorAll('[data-new-request-open]').forEach(function (btn) {
+		btn.addEventListener('click', function () { showModal('newRequestModal'); });
+	});
+	var nrClose = document.getElementById('newRequestClose');
+	if (nrClose) nrClose.addEventListener('click', function () { hideModal('newRequestModal'); });
+	var nrCancel = document.getElementById('newRequestCancel');
+	if (nrCancel) nrCancel.addEventListener('click', function () { hideModal('newRequestModal'); });
+
+	var nrChild = document.getElementById('newRequestChild');
+	var nrGuardian = document.getElementById('newRequestGuardian');
+	function nrUpdateGuardian() {
+		if (!nrChild || !nrGuardian) return;
+		var option = nrChild.options[nrChild.selectedIndex];
+		if (!option || !option.value) { nrGuardian.value = 'Select a child first'; return; }
+		var parts = [option.getAttribute('data-parent-name') || 'Unknown guardian'];
+		var ptype = option.getAttribute('data-parent-type') || '';
+		var pphone = option.getAttribute('data-parent-phone') || '';
+		if (ptype) parts.push(ptype);
+		if (pphone) parts.push(pphone);
+		nrGuardian.value = parts.join(' · ');
+	}
+	if (nrChild) { nrChild.addEventListener('change', nrUpdateGuardian); nrUpdateGuardian(); }
+
+	['completeModal', 'apptDetailModal', 'newRequestModal'].forEach(function (id) {
 		var overlay = document.getElementById(id);
 		if (overlay) overlay.addEventListener('click', function (e) { if (e.target === overlay) hideModal(id); });
 	});
 	document.addEventListener('keydown', function (e) {
-		if (e.key === 'Escape') { hideModal('completeModal'); hideModal('apptDetailModal'); }
+		if (e.key === 'Escape') { hideModal('completeModal'); hideModal('apptDetailModal'); hideModal('newRequestModal'); }
 	});
 })();
 </script>

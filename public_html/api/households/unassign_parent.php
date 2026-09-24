@@ -72,6 +72,26 @@ if (!$ok) {
     exit;
 }
 
-log_action($user['id'] ?? null, 'UNASSIGN_PARENT', 'info', "Unassigned parent #{$parentId} from household");
+// Cascade: children of this parent that live in the same household follow
+// the parent out, so spots stay parent-driven (no orphaned children left
+// behind on the map). Children assigned to a different household are
+// never touched.
+$removedChildren = 0;
+$oldHouseholdId = isset($parent['household_id']) ? (int)$parent['household_id'] : 0;
+if ($oldHouseholdId > 0) {
+    $kidStmt = mysqli_prepare(
+        $conn,
+        'UPDATE children SET household_id = NULL WHERE parent_id = ? AND household_id = ? AND status = "active"'
+    );
+    if ($kidStmt !== false) {
+        mysqli_stmt_bind_param($kidStmt, 'ii', $parentId, $oldHouseholdId);
+        if (mysqli_stmt_execute($kidStmt)) {
+            $removedChildren = (int)mysqli_stmt_affected_rows($kidStmt);
+        }
+        mysqli_stmt_close($kidStmt);
+    }
+}
 
-echo json_encode(['success' => true, 'message' => 'Parent unassigned from household.']);
+log_action($user['id'] ?? null, 'UNASSIGN_PARENT', 'info', "Unassigned parent #{$parentId} from household ({$removedChildren} child(ren) removed with parent)");
+
+echo json_encode(['success' => true, 'message' => 'Parent unassigned from household.', 'removed_children' => $removedChildren]);
