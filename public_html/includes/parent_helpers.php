@@ -42,26 +42,60 @@ function parent_grouped_nav_items(): array
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/parent/ai_assistant.php'), 'icon' => 'robot'],
             ],
         ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/parent/settings.php'), 'icon' => 'settings'],
+            ],
+        ],
     ];
+}
+
+/**
+ * True when the parent must still replace the import-announced temporary
+ * password. Fail-open (false) on pre-migration databases so the check
+ * never locks anyone out when the column does not exist yet.
+ */
+function parent_must_change_password(int $parentId): bool
+{
+	if ($parentId <= 0) {
+		return false;
+	}
+
+	$row = admin_fetch_one('SELECT must_change_password FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
+
+	if ($row === null) {
+		return false;
+	}
+
+	return !empty($row['must_change_password']);
 }
 
 function parent_require_access(): array
 {
-    $user = current_user();
+	$user = current_user();
 
-    if ($user === null) {
-        deny_access('Please sign in to continue.', 401);
-    }
+	if ($user === null) {
+		deny_access('Please sign in to continue.', 401);
+	}
 
-    if (($user['type'] ?? null) !== 'parent') {
-        deny_access('You do not have permission to access this page.', 403);
-    }
+	if (($user['type'] ?? null) !== 'parent') {
+		deny_access('You do not have permission to access this page.', 403);
+	}
 
-    if (($user['status'] ?? 'active') !== 'active') {
-        deny_access('This account is inactive.', 403);
-    }
+	if (($user['status'] ?? 'active') !== 'active') {
+		deny_access('This account is inactive.', 403);
+	}
 
-    return $user;
+	// Import-minted accounts share one announced password: hold them on
+	// the Settings page until they set a real one. Settings itself is
+	// exempt so the redirect can never loop.
+	$script = basename((string)($_SERVER['SCRIPT_NAME'] ?? ''));
+	if ($script !== 'settings.php' && parent_must_change_password((int)($user['id'] ?? 0))) {
+		admin_redirect('/parent/settings.php', ['must_change' => 1, 'notice' => 'Palitan muna ang temporary password bago magpatuloy.', 'type' => 'error']);
+	}
+
+	return $user;
 }
 
 function parent_status_class(?string $status): string
@@ -178,6 +212,17 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     $userRole = $currentUser['role'] ?? 'parent';
     $breadcrumb = parent_build_breadcrumb($activeSection, parent_grouped_nav_items(), $breadcrumbExtra);
 
+    // Pending health-worker appointment requests for the sidebar bell badge.
+    // Mirrors the nutritionist layout (which counts pending parent requests):
+    // requests created by a nutritionist that this parent hasn't confirmed
+    // or cancelled yet. admin_scalar() falls back to 0 when the query
+    // fails, so a DB hiccup never breaks page rendering.
+    $apptPendingCount = admin_scalar(
+        "SELECT COUNT(*) FROM appointments WHERE parent_id = ? AND created_by = 'nutritionist' AND status = 'pending'",
+        'i',
+        [(int)$currentUser['id']]
+    );
+
     echo '<!doctype html>';
     echo '<html lang="en">';
     echo '<head>';
@@ -234,6 +279,12 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
                 echo $iconHtml;
             }
             echo '<span>' . parent_e($item['label']) . '</span>';
+            if ($item['key'] === 'appointments' && $apptPendingCount > 0) {
+                $badgeLabel = $apptPendingCount > 9 ? '9+' : (string)$apptPendingCount;
+                echo '<span class="admin-nav-bell" title="' . $apptPendingCount . ' pending health worker request' . ($apptPendingCount === 1 ? '' : 's') . '">'
+                    . admin_action_icon('bell')
+                    . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
+            }
             echo '</a>';
         }
         echo '</div>';
@@ -271,7 +322,6 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . parent_e(app_url('/parent/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -302,6 +352,7 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
 function parent_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();
@@ -320,6 +371,7 @@ function parent_layout_end(): void
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . parent_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
 
     echo '</body>';
     echo '</html>';

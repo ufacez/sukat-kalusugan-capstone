@@ -45,6 +45,22 @@ if ($barangayId <= 0) {
 
 $conn = get_db_connection();
 
+// Same-spot guard (~15m): never save a new spot on top of an existing one.
+if ($lat !== null && $lng !== null) {
+    $dup = mysqli_prepare($conn, 'SELECT id, household_code FROM households WHERE barangay_id = ? AND status = "active" AND lat IS NOT NULL AND lng IS NOT NULL AND ABS(lat - ?) < 0.00015 AND ABS(lng - ?) < 0.00015 LIMIT 1');
+    if ($dup) {
+        mysqli_stmt_bind_param($dup, 'idd', $barangayId, $lat, $lng);
+        mysqli_stmt_execute($dup);
+        $dupRes = mysqli_stmt_get_result($dup);
+        $dupRow = $dupRes ? mysqli_fetch_assoc($dupRes) : null;
+        mysqli_stmt_close($dup);
+        if ($dupRow) {
+            echo json_encode(['success' => false, 'message' => 'May spot na sa coordinates na ito (' . ($dupRow['household_code'] ?? ('HH-' . $dupRow['id'])) . ').']);
+            exit;
+        }
+    }
+}
+
 $stmt = mysqli_prepare($conn, 'INSERT INTO households (barangay_id, local_area_id, household_code, address, lat, lng) VALUES (?, ?, ?, ?, ?, ?)');
 if ($stmt === false) {
     echo json_encode(['success' => false, 'message' => 'Database error.']);

@@ -72,7 +72,7 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
             </div>
             <div class="ai-session-pagination">
                 <button type="button" class="ai-session-page-btn" id="aiSessionPrev" disabled aria-label="Previous chats">&lsaquo;</button>
-                <span id="aiSessionPage">Page 1</span>
+                <span id="aiSessionPage">Loading…</span>
                 <button type="button" class="ai-session-page-btn" id="aiSessionNext" disabled aria-label="Next chats">&rsaquo;</button>
             </div>
         </div>
@@ -196,6 +196,7 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         sending: false,
         creatingConversation: false,
         conversationRequestToken: 0,
+        sessionRequestToken: 0,
         pendingMessage: null,
         autoExplainPending: false,
         childDetail: null,
@@ -378,19 +379,39 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
         createConversation(null);
     }
 
+    function renderSessionsLoading() {
+        // Instant skeleton so the pagination never looks "late" while
+        // GET conversations.php is in flight. Keeps cached rows visible
+        // on background refreshes (e.g. after sending a message).
+        if (!state.sessions.length) {
+            dom.sessionList.innerHTML = '<div class="ai-session-loading">Loading chats…</div>';
+        }
+        dom.sessionPageEl.textContent = 'Loading…';
+        dom.sessionPrev.disabled = true;
+        dom.sessionNext.disabled = true;
+    }
+
     function loadSessions() {
+        const requestToken = ++state.sessionRequestToken;
+        renderSessionsLoading();
         fetchWithTimeout(API + 'conversations.php', undefined, QUICK_TIMEOUT_MS)
             .then(r => r.json())
             .then(res => {
+                if (requestToken !== state.sessionRequestToken) return;
                 if (!res.success) {
                     console.error('Kali AI: sessions:', res.message || 'request failed');
+                    renderSessions();
                     return;
                 }
                 state.sessions = res.data.conversations || [];
                 state.sessionPage = 1;
                 renderSessions();
             })
-            .catch((error) => { console.error('Kali AI: sessions fetch failed:', error); });
+            .catch((error) => {
+                if (requestToken !== state.sessionRequestToken) return;
+                console.error('Kali AI: sessions fetch failed:', error);
+                renderSessions();
+            });
     }
 
     function renderSessions() {
@@ -965,8 +986,12 @@ $parentAiCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/parent_ai_assis
      * ================================================================ */
 
     loadChildren();
+    // Single GET only: the old init fired loadSessions() + createConversation()
+    // (POST) in parallel, and the POST's trailing loadSessions() overwrote the
+    // first render — that double-fetch is what made the pagination flicker in
+    // late. Conversations are now created lazily on first send/child-pick.
+    showGlobalEmpty();
     loadSessions();
-    createConversation(null);
 
 })();
 </script>

@@ -7,7 +7,7 @@ require_permission('parents.create');
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Method not allowed.', 'type' => 'error']);
+    admin_redirect('/admin/users.php', ['notice' => 'Method not allowed.', 'type' => 'error']);
 }
 
 $firstName = trim((string)($_POST['first_name'] ?? ''));
@@ -27,12 +27,17 @@ $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 
+// Validation errors reopen the Add Parent modal on the Users page with
+// values preserved (passwords are never flashed — they must be retyped).
+$parentBack = '/admin/users.php?modal=parent';
+
 if (
     !admin_is_valid_name_part($firstName, true)
     || !admin_is_valid_name_part($middleName, false)
     || !admin_is_valid_name_part($lastName, true)
 ) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'first_name');
+    admin_redirect($parentBack, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
 }
 
 $name = admin_combine_name($firstName, $middleName, $lastName);
@@ -46,16 +51,19 @@ if (!in_array($parentType, $parentTypes, true)) {
 }
 
 if ($name === '' || $email === '') {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Name and email are required.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'first_name');
+    admin_redirect($parentBack, ['notice' => 'Name and email are required.', 'type' => 'error']);
 }
 
 if (!admin_is_valid_ph_mobile($phone)) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'phone');
+    admin_redirect($parentBack, ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
 }
 
 if ($localAreaId !== null && $localAreaId > 0) {
     if ($barangayId === null) {
-        admin_redirect('/admin/parent_form.php', ['notice' => 'A Barangay is required before assigning a Local Area.', 'type' => 'error']);
+        admin_flash_form_state($_POST, 'barangay_id');
+        admin_redirect($parentBack, ['notice' => 'A Barangay is required before assigning a Local Area.', 'type' => 'error']);
     }
 
     $localArea = admin_fetch_one(
@@ -64,30 +72,36 @@ if ($localAreaId !== null && $localAreaId > 0) {
         [$localAreaId, $barangayId]
     );
     if (!$localArea) {
-        admin_redirect('/admin/parent_form.php', ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
+        admin_flash_form_state($_POST, 'local_area_id');
+        admin_redirect($parentBack, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
     }
 }
 
 $phone = (string)admin_normalize_ph_mobile($phone);
 
 if ($password === '') {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Password is required.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'password');
+    admin_redirect($parentBack, ['notice' => 'Password is required.', 'type' => 'error']);
 }
 
 if (!admin_is_strong_password($password)) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'password');
+    admin_redirect($parentBack, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
 }
 
 if ($password !== $passwordConfirm) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'password_confirm');
+    admin_redirect($parentBack, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
 }
 
 // Duplicate email check — globally unique across staff + parents.
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'email');
+    admin_redirect($parentBack, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
 }
 if (admin_email_in_use($email)) {
-    admin_redirect('/admin/parent_form.php', ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'email');
+    admin_redirect($parentBack, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
@@ -99,7 +113,8 @@ $ok = admin_execute(
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $email);
+    $newParentId = (int)get_db_connection()->insert_id;
+    log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account #' . $newParentId);
 }
 
-admin_redirect('/admin/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
+admin_redirect('/admin/users.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);

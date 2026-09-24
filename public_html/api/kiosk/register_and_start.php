@@ -54,6 +54,7 @@ try {
 
         // Find or create a generic kiosk walk-in parent
         $parentStmt = mysqli_prepare($conn, 'SELECT id FROM parents WHERE name = ? AND email = ? LIMIT 1');
+        if ($parentStmt === false) throw new RuntimeException('Unable to prepare walk-in parent lookup.');
         $kioskParentName = 'Kiosk Walk-In Parent';
         $kioskParentEmail = 'walkin@sukat-kiosk.local';
         mysqli_stmt_bind_param($parentStmt, 'ss', $kioskParentName, $kioskParentEmail);
@@ -83,6 +84,7 @@ try {
 
         // Generate child_code
         $codeStmt = mysqli_prepare($conn, 'SELECT MAX(id) AS max_id FROM children');
+        if ($codeStmt === false) throw new RuntimeException('Unable to prepare child code lookup.');
         mysqli_stmt_execute($codeStmt);
         $codeResult = mysqli_stmt_get_result($codeStmt);
         $codeRow = ($codeResult instanceof mysqli_result ? mysqli_fetch_assoc($codeResult) : null);

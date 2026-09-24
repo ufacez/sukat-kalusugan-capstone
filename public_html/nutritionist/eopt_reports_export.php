@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
+require_once __DIR__ . '/../includes/monitoring_periods.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 
 $statusToStyle = [
@@ -55,7 +55,7 @@ if ($month < 4 || $month > 12) {
 }
 
 $defaultCheckupMonth = 7;
-foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
+foreach (MONITORING_REPORT_ROUNDS as $candidateRound) {
 	if ((int)date('n') <= $candidateRound) {
 		$defaultCheckupMonth = $candidateRound;
 		break;
@@ -63,7 +63,7 @@ foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
 }
 
 $checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
-if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
+if (!in_array($checkupMonth, MONITORING_REPORT_ROUNDS, true)) {
 	$checkupMonth = 7;
 }
 

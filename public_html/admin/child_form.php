@@ -13,6 +13,16 @@ if ($editId > 0) {
     require_permission('children.create');
 }
 
+// Add mode lives in the modal on children.php — this page is edit-only.
+// Stale create POSTs bounce back to the list instead of forking a second
+// create path that could drift out of sync with the modal handler.
+if ($editId <= 0) {
+    if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Child form to create records.', 'type' => 'error']);
+    }
+    admin_redirect('/admin/children.php?modal=child');
+}
+
 function admin_next_child_code(): string
 {
     $row = admin_fetch_one('SELECT child_code FROM children ORDER BY id DESC LIMIT 1');
@@ -153,20 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'create') {
-        $childCode = admin_next_child_code();
-
-        $ok = admin_execute(
-            'INSERT INTO children (child_code, first_name, middle_name, last_name, birthdate, sex, barangay_id, local_area_id, is_ip, has_disability, parent_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            'ssssssssiii',
-            [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId]
-        );
-
-        if ($ok) {
-            $actor = current_user();
-            log_action($actor['id'] ?? null, 'CREATE_CHILD', 'info', 'Created child ' . $childCode);
-        }
-
-        admin_redirect('/admin/children.php', $ok ? ['notice' => 'Child added successfully.'] : ['notice' => 'Child could not be added.', 'type' => 'error']);
+        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Child form to create records.', 'type' => 'error']);
     }
 
     admin_redirect('/admin/children.php', ['notice' => 'No action was performed.', 'type' => 'error']);

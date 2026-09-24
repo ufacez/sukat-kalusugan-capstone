@@ -16,7 +16,6 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -230,23 +229,13 @@ log_action(
     'MEASUREMENT_OVERRIDE',
     'info',
     sprintf(
-        'Override measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Reason: %s',
+        // Privacy: general identifiers + staff reason only — no values.
+        'Override measurement #%d for %s | Reason: %s',
         $measurementId,
-        $childName,
         (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
         $overrideReason
     )
 );
-
-// Trigger follow-up sync to schedule next measurement
-$followupSync = followup_sync_for_child($childId);
 
 api_success(
     [
@@ -273,13 +262,6 @@ api_success(
         'override_reason' => $overrideReason,
         'override_authority' => $authorityName,
         'recorded_by' => $recordedBy,
-        'followup' => [
-            'generated' => (int)$followupSync['generated'],
-            'completed' => (int)$followupSync['completed'],
-            'recategorized' => (int)($followupSync['recategorized'] ?? 0),
-            'track' => $followupSync['track'],
-            'category' => $followupSync['category'],
-        ],
     ],
     'Override measurement saved successfully.'
 );

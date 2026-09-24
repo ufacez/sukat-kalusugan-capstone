@@ -7,12 +7,13 @@ declare(strict_types=1);
  *
  * Nutritionist API — records an anytime double-check (recheck) measurement.
  *
- * RECHECK is verification-only:
- *   - allowed anytime, including the same date as an existing measurement
- *     (bypasses the due-date gate AND the duplicate-date gate);
- *   - does NOT complete follow-up appointments and does NOT move next_due
- *     (followup_sync_for_child() is intentionally NOT called — the
- *     scheduler only looks at ROUTINE/OVERRIDE rows);
+ * RECHECK is a verified re-weighing:
+ *   - restricted to the same calendar month as the measurement being
+ *     verified (enforced below);
+ *   - carries the newest verified values, so the monitoring roster's
+ *     current status/values follow it and it counts toward that month's
+ *     (and quarter's) period coverage — confirming rather than
+ *     disrupting it;
  *   - keeps history: the previous reading stays, this row links back via
  *     recheck_of_measurement_id and shows as the verified value.
  *
@@ -20,10 +21,10 @@ declare(strict_types=1);
  */
 
 require_once __DIR__ . '/../../includes/db.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -166,14 +167,14 @@ if ($ageMonths >= 60) {
 // Link back to the reading being verified: prefer today's latest row
 // (any type), else the latest row overall. History keeps both.
 $recheckOf = admin_fetch_one(
-    "SELECT id FROM measurements WHERE child_id = ? AND measurement_date = ? ORDER BY id DESC LIMIT 1",
+    "SELECT id, measurement_date FROM measurements WHERE child_id = ? AND measurement_date = ? ORDER BY id DESC LIMIT 1",
     'is',
     [$childId, $measurementDate]
 );
 
 if ($recheckOf === null) {
     $recheckOf = admin_fetch_one(
-        "SELECT id FROM measurements WHERE child_id = ? ORDER BY measurement_date DESC, id DESC LIMIT 1",
+        "SELECT id, measurement_date FROM measurements WHERE child_id = ? ORDER BY measurement_date DESC, id DESC LIMIT 1",
         'i',
         [$childId]
     );
@@ -182,6 +183,14 @@ if ($recheckOf === null) {
 $recheckOfId = $recheckOf !== null ? (int)($recheckOf['id'] ?? 0) : null;
 if ($recheckOfId !== null && $recheckOfId <= 0) {
     $recheckOfId = null;
+}
+
+// Restrict recheck to the same calendar month as the measurement being verified
+if ($recheckOf !== null) {
+    $verifiedDate = DateTimeImmutable::createFromFormat('!Y-m-d', $recheckOf['measurement_date']);
+    if ($verifiedDate !== false && (int)$verifiedDate->format('Ym') !== (int)$parsedDate->format('Ym')) {
+        api_error('Recheck date must be within the same month as the measurement you are verifying (' . $verifiedDate->format('M Y') . ').', 422);
+    }
 }
 
 // WHO calculations (canonical)
@@ -223,7 +232,7 @@ if ($insertStmt === false) {
 
 mysqli_stmt_bind_param(
     $insertStmt,
-    'iddiissidddsssssisi',
+    'iddiissidddssssisi',
     $childId,
     $heightCm,
     $weightKg,
@@ -266,26 +275,18 @@ log_action(
     'MEASUREMENT_RECHECK',
     'info',
     sprintf(
-        'Recheck measurement #%d recorded for %s (%s): %.2f kg / %.2f cm @ %d months | WAZ %.2f, HAZ %.2f, WHZ %.2f | %s | Verifies #%s | Reason: %s (due schedule untouched)',
+        // Privacy: general identifiers + staff reason only — no values.
+        'Recheck measurement #%d for %s | Verifies #%s | Reason: %s',
         $measurementId,
-        $childName,
         (string)$child['child_code'],
-        $weightKg,
-        $heightCm,
-        $ageMonths,
-        $waz,
-        $haz,
-        $whz,
-        (string)$status,
         $recheckOfId !== null ? (string)$recheckOfId : 'none',
         $recheckReason
     )
 );
 
-// Intentionally NO followup_sync_for_child() call: rechecks are neutral.
-// Report the current scheduled next_due (from ROUTINE/OVERRIDE only) so the
-// UI can show "due unchanged".
-$dueCheck = followup_is_due_today($childId);
+// Intentionally no schedule sync: the same-month rule keeps the recheck
+// inside the verified month/quarter, so there is no next_due to report.
+$dueCheck = ['next_due' => null];
 
 api_success(
     [

@@ -14,8 +14,8 @@ grep -c "viewport-fit" public_html/includes/parent_helpers.php
 grep -c "AdminToast" public_html/nutritionist/measurement_record.php
 
 echo "== 2/5 schema markers (proves migrations applied) =="
-mysql -u "${DBU:?set DBU}" -p"${DBP:?set DBP}" -h "${DBH:?set DBH}" --ssl-mode=REQUIRED "${DBN:-sukat_kalusugan}" -e "SELECT TABLE_NAME, CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME IN ('audit_logs','chat_conversations') AND CONSTRAINT_TYPE='FOREIGN KEY'; SHOW COLUMNS FROM appointments LIKE 'intervention%';"
-echo "(expect: only fk_chat_conv_child remains; both intervention_* columns listed)"
+mysql -u "${DBU:?set DBU}" -p"${DBP:?set DBP}" -h "${DBH:?set DBH}" --ssl-mode=REQUIRED "${DBN:-sukat_kalusugan}" -e "SELECT TABLE_NAME, CONSTRAINT_NAME FROM INFORMATION_SCHEMA.TABLE_CONSTRAINTS WHERE TABLE_NAME IN ('audit_logs','chat_conversations') AND CONSTRAINT_TYPE='FOREIGN KEY'; SHOW COLUMNS FROM appointments LIKE 'created_by'; SHOW COLUMNS FROM appointments LIKE '%followup%'; SHOW TABLES LIKE 'child_monitoring_status';"
+echo "(expect: only fk_chat_conv_child remains; created_by listed; no followup columns; child_monitoring_status gone)"
 
 echo "== 3/5 lint sweep =="
 fail=0

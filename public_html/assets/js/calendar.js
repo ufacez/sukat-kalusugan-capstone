@@ -49,9 +49,8 @@
       : "";
 
     let actionHtml = "";
-    if (entry.id) {
-      const href = "followup_child.php?id=" + encodeURIComponent(entry.id);
-      actionHtml = '<a class="sk-cal-event-action" href="' + escapeHtml(href) + '">View \u2192</a>';
+    if (entry.url) {
+      actionHtml = '<a class="sk-cal-event-action" href="' + escapeHtml(entry.url) + '">View \u2192</a>';
     }
 
     return (

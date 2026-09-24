@@ -15,11 +15,9 @@ function admin_nav_items(): array
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/admin/dashboard.php')],
         ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php')],
         ['key' => 'invitations', 'label' => 'Invitations', 'href' => app_url('/admin/invitations.php')],
-        ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php')],
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/admin/children.php')],
         ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php')],
         ['key' => 'audit_logs', 'label' => 'Audit Logs', 'href' => app_url('/admin/audit_logs.php')],
-        ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php')],
         ['key' => 'sensors', 'label' => 'Sensors', 'href' => app_url('/admin/sensors.php')],
     ];
 }
@@ -112,6 +110,43 @@ function admin_initials(string $name): string
     return mb_strtoupper(mb_substr($name, 0, 2));
 }
 
+/**
+ * First-paint guard for the shared client-side paginator
+ * (assets/js/admin.js): emits an inline hide for data rows past the
+ * first page so the browser never flashes the full list before the
+ * footer script runs and takes over paging.
+ *
+ * MUST stay in sync with the paginator: per-table data-page-size, or
+ * the global default of 10 when the table has no override. The
+ * paginator's render() sets row.style.display explicitly for every
+ * row on init, so this pre-hide is seamlessly replaced — and hidden
+ * rows remain searchable (filtering reads attributes/textContent).
+ *
+ * IMPORTANT: inline style only, never the `hidden` attribute — the
+ * paginator clears state via style.display, which cannot override
+ * a present `hidden` attribute.
+ */
+function admin_paged_row_attr(int $index, int $pageSize): string
+{
+    if ($pageSize <= 0) {
+        $pageSize = 10;
+    }
+
+    return $index >= $pageSize ? ' style="display:none;"' : '';
+}
+
+/**
+ * No-JS fallback for admin_paged_row_attr(): without JavaScript there is
+ * no paginator at all, so reveal every pre-hidden data row instead of
+ * stranding the user on page one.
+ */
+function admin_paged_noscript(): string
+{
+    return '<noscript><style>table.admin-table > tbody > tr[style],'
+        . 'table.nutritionist-table > tbody > tr[style],'
+        . 'table.parent-table > tbody > tr[style]{display:table-row !important;}</style></noscript>';
+}
+
 function admin_avatar_color(string $name): string
 {
     $colors = ['#0b6e4f','#1a6b5a','#2e8b6e','#3a7d5c','#4e9a6f','#2d8f6f','#347a5c','#408c6a'];
@@ -120,6 +155,25 @@ function admin_avatar_color(string $name): string
         $hash = ($hash * 31 + mb_ord(mb_substr($name, $i, 1))) % count($colors);
     }
     return $colors[$hash];
+}
+
+/**
+ * Gender-coded child avatar color (green palette only):
+ * dark green for male, light green for female, gray when unknown.
+ */
+function child_avatar_color(?string $sex): string
+{
+    $normalized = strtolower(trim((string)$sex));
+
+    if ($normalized === 'male' || $normalized === 'm') {
+        return '#0B6E4F';
+    }
+
+    if ($normalized === 'female' || $normalized === 'f') {
+        return '#52B788';
+    }
+
+    return '#94a3b8';
 }
 
 function admin_grouped_nav_items(): array
@@ -136,7 +190,6 @@ function admin_grouped_nav_items(): array
             'items' => [
                 ['key' => 'users', 'label' => 'Users', 'href' => app_url('/admin/users.php'), 'icon' => 'users'],
                 ['key' => 'invitations', 'label' => 'Invitations', 'href' => app_url('/admin/invitations.php'), 'icon' => 'key'],
-                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/admin/parents.php'), 'icon' => 'parents'],
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/admin/children.php'), 'icon' => 'children'],
                 ['key' => 'barangays', 'label' => 'Barangays', 'href' => app_url('/admin/barangays.php'), 'icon' => 'barangays'],
             ],
@@ -150,9 +203,9 @@ function admin_grouped_nav_items(): array
 			],
 		],
         [
-            'label' => 'Configuration',
+            'label' => 'Account',
             'items' => [
-                ['key' => 'roles_permissions', 'label' => 'Roles & Permissions', 'href' => app_url('/admin/roles_permissions.php'), 'icon' => 'roles_permissions'],
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/admin/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -441,6 +494,104 @@ function admin_split_full_name(?string $fullName): array
     $middle = implode(' ', $parts);
 
     return ['first' => $first, 'middle' => $middle, 'last' => $last];
+}
+
+/**
+ * Split an OPT Plus style "Surname, First [Middle]" cell into first /
+ * middle / last parts for the master-list bulk importer.
+ *
+ *   "Arconado, Jonalky"       -> first=Jonalky  middle=''     last=Arconado
+ *   "Abana, Aaron Caleb"      -> first=Aaron    middle=Caleb  last=Abana
+ *   "Del Rosario, Ann Lyzalyn"-> first=Ann      middle=Lyzalyn last=Del Rosario
+ *   "Dela Cruz, Juan Jr"      -> first='Juan Jr' middle=''    last=Dela Cruz
+ *                               (suffix folds into first name — children and
+ *                               parents have no suffix column)
+ *
+ * Cells without a comma fall back to admin_split_full_name() so mixed
+ * lists never crash the import. Slashes (e.g. "Cj/ Maricar" from a shared
+ * caregiver cell) are turned into spaces and flagged for staff review.
+ *
+ * Returns ['first','middle','last','flag','note'] where flag is one of:
+ *   'ok'         clean comma split
+ *   'no_comma'   no comma found, space-split fallback used
+ *   'sanitized'  characters outside the name alphabet were repaired
+ *   'empty'      blank cell
+ *   'invalid'    parts failed admin_is_valid_name_part() — caller must
+ *                skip or stage the row, never silently import it.
+ */
+function admin_split_surname_first(?string $fullName): array
+{
+    $clean = trim((string)preg_replace('/\s+/', ' ', (string)$fullName));
+
+    if ($clean === '') {
+        return ['first' => '', 'middle' => '', 'last' => '', 'flag' => 'empty', 'note' => 'Blank name cell.'];
+    }
+
+    $flag = 'ok';
+    $note = '';
+
+    if (strpos($clean, ',') === false) {
+        $fallback = admin_split_full_name($clean);
+        $fallback['flag'] = 'no_comma';
+        $fallback['note'] = 'No comma found — read as "First Middle Last". Please check.';
+        return $fallback;
+    }
+
+    // Two people sharing one cell ("Dimatulac, John Paul/ Cruz,
+    // Kimberly"): import the FIRST person listed, flagged for review.
+    if (strpos($clean, '/') !== false && substr_count($clean, ',') >= 2) {
+        $clean = trim((string)preg_replace('/\s+/', ' ', (string)explode('/', $clean)[0]));
+        $flag = 'sanitized';
+        $note = 'Dalawang pangalan sa isang cell — unang pangalan ang ginamit. Please verify.';
+    }
+
+    // Split on the FIRST comma only: everything left is the surname
+    // (multi-word surnames like "Del Rosario" stay intact). A stray
+    // extra comma on the given side ("Lizardo, Princess, May") becomes
+    // a space so the row still imports, flagged.
+    [$surname, $given] = array_map('trim', explode(',', $clean, 2));
+    if (strpos($given, ',') !== false) {
+        $given = trim((string)preg_replace('/\s+/', ' ', str_replace(',', ' ', $given)));
+        $flag = 'sanitized';
+        $note = 'Sobrang comma sa pangalan — ginawang espasyo. Please verify.';
+    }
+
+    // Shared-cell markers ("\", "&", or a lone "/" inside one person's
+    // name) are not valid name characters. Turn them into spaces so
+    // "Cj/ Maricar" still imports, flagged.
+    if (preg_match('/[\\\\&]/', $given . $surname) || strpos($given . $surname, '/') !== false) {
+        $surname = trim((string)preg_replace('/[\/\\\\&]+/', ' ', $surname));
+        $given = trim((string)preg_replace('/[\/\\\\&]+/', ' ', $given));
+        $surname = trim((string)preg_replace('/\s+/', ' ', $surname));
+        $given = trim((string)preg_replace('/\s+/', ' ', $given));
+        $flag = 'sanitized';
+        $note = 'Cell contained "/, \ or &" — repaired with spaces. Please verify.';
+    }
+
+    if ($surname === '' || $given === '') {
+        return ['first' => '', 'middle' => '', 'last' => $surname, 'flag' => 'invalid', 'note' => 'Surname or given name is missing around the comma.'];
+    }
+
+    // Trailing generational suffix on the given side folds into the
+    // first name ("Juan Jr"), since no table has a suffix column.
+    $tokens = preg_split('/\s+/', $given);
+    $suffixes = ['JR', 'JR.', 'SR', 'SR.', 'II', 'III', 'IV', 'V'];
+    $suffix = '';
+    if (count($tokens) > 1 && in_array(strtoupper((string)end($tokens)), $suffixes, true)) {
+        $suffix = (string)array_pop($tokens);
+    }
+
+    $first = (string)array_shift($tokens);
+    if ($suffix !== '') {
+        $first = trim($first . ' ' . $suffix);
+    }
+    $middle = implode(' ', $tokens);
+
+    if (!admin_is_valid_name_part($first, true) || !admin_is_valid_name_part($surname, true) || !admin_is_valid_name_part($middle, false)) {
+        return ['first' => $first, 'middle' => $middle, 'last' => $surname, 'flag' => 'invalid', 'note' => 'Name parts contain characters outside letters, spaces, hyphens, apostrophes, and periods — or are too short.'];
+    }
+
+    return ['first' => $first, 'middle' => $middle, 'last' => $surname, 'flag' => $flag, 'note' => $note];
 }
 
 /**
@@ -801,7 +952,6 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . admin_e(app_url('/admin/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -829,17 +979,40 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
 }
 
+/**
+ * Shared console footer (About · Privacy · Terms · Contact) rendered at the
+ * bottom of every admin/nutritionist/parent page via *_layout_end().
+ */
+function admin_console_footer(): string
+{
+    $link = static function (string $path, string $label): string {
+        return '<a href="' . admin_e(app_url($path)) . '">' . admin_e($label) . '</a>';
+    };
+
+    return '<footer class="admin-console-footer">'
+        . '<nav class="admin-console-footer-links" aria-label="Legal">'
+        . $link('/about.php', 'About')
+        . $link('/privacy.php', 'Privacy')
+        . $link('/terms.php', 'Terms')
+        . $link('/contact.php', 'Contact')
+        . '</nav>'
+        . '</footer>';
+}
+
 function admin_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
-    echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+    $formValidateVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-form-validate.js');
+    echo '<script src="' . admin_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . admin_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
     echo '</body>';
     echo '</html>';
 }

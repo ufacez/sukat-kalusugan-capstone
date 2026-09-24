@@ -12,13 +12,13 @@ function nutritionist_nav_items(): array
     return [
         ['key' => 'dashboard', 'label' => 'Dashboard', 'href' => app_url('/nutritionist/dashboard.php')],
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php')],
-        ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php')],
-        ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
-        ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php')],
-        ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
+        ['key' => 'monitoring', 'label' => 'Monitoring List', 'href' => app_url('/nutritionist/monitoring.php')],
+        ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
+        ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
+        ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php')],
         ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php')],
     ];
 }
@@ -36,16 +36,14 @@ function nutritionist_grouped_nav_items(): array
             'label' => 'Clinical',
             'items' => [
                 ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php'), 'icon' => 'children'],
-                ['key' => 'measurements', 'label' => 'Measurements', 'href' => app_url('/nutritionist/measurements.php'), 'icon' => 'clipboard'],
-                ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
-                ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
+                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
+                ['key' => 'monitoring', 'label' => 'Monitoring List', 'href' => app_url('/nutritionist/monitoring.php'), 'icon' => 'audit_logs'],
             ],
         ],
         [
             'label' => 'Community',
             'items' => [
                 ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
-                ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php'), 'icon' => 'users'],
             ],
         ],
         [
@@ -58,7 +56,16 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Tools',
             'items' => [
+                ['key' => 'import', 'label' => 'Master-List Import', 'href' => app_url('/nutritionist/family_import.php'), 'icon' => 'clipboard'],
+                ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php'), 'icon' => 'chart'],
+                ['key' => 'who_reference', 'label' => 'WHO Standard', 'href' => app_url('/nutritionist/who_reference.php'), 'icon' => 'book'],
                 ['key' => 'ai_assistant', 'label' => 'Kali AI', 'href' => app_url('/nutritionist/ai_assistant.php'), 'icon' => 'robot'],
+            ],
+        ],
+        [
+            'label' => 'Account',
+            'items' => [
+                ['key' => 'settings', 'label' => 'Settings', 'href' => app_url('/nutritionist/settings.php'), 'icon' => 'settings'],
             ],
         ],
     ];
@@ -170,6 +177,16 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     $logoutUrl = app_url('/api/auth/logout.php');
     $breadcrumb = nutritionist_build_breadcrumb($activeSection, nutritionist_grouped_nav_items(), $breadcrumbExtra);
 
+    // Pending parent appointment requests for the sidebar bell badge.
+    // Same scope as the appointments page (assigned to this nutritionist).
+    // admin_scalar() falls back to 0 when the query fails, so a DB hiccup
+    // never breaks page rendering.
+    $apptPendingCount = admin_scalar(
+        "SELECT COUNT(*) FROM appointments WHERE nutritionist_id = ? AND created_by = 'parent' AND status = 'pending'",
+        'i',
+        [(int)$currentUser['id']]
+    );
+
     echo '<!doctype html>';
     echo '<html lang="en">';
     echo '<head>';
@@ -227,6 +244,12 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
                 echo $iconHtml;
             }
             echo '<span>' . nutritionist_e($item['label']) . '</span>';
+            if ($item['key'] === 'appointments' && $apptPendingCount > 0) {
+                $badgeLabel = $apptPendingCount > 9 ? '9+' : (string)$apptPendingCount;
+                echo '<span class="admin-nav-bell" title="' . $apptPendingCount . ' pending parent request' . ($apptPendingCount === 1 ? '' : 's') . '">'
+                    . admin_action_icon('bell')
+                    . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
+            }
             echo '</a>';
         }
         echo '</div>';
@@ -263,7 +286,6 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '</div>';
     echo '<div class="admin-topbar-right">';
     echo admin_topbar_theme_toggle();
-    echo '<a href="' . nutritionist_e(app_url('/nutritionist/settings.php')) . '" class="admin-topbar-settings" title="Settings">' . admin_action_icon('settings') . '</a>';
     echo '<div class="admin-topbar-profile">';
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
@@ -294,6 +316,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
 function nutritionist_layout_end(): void
 {
     echo '</main>';
+    echo admin_console_footer();
     echo '</div>';
     echo '</div>';
     echo confirm_modal_shell();
@@ -301,7 +324,8 @@ function nutritionist_layout_end(): void
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
     $calendarJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/calendar.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/calendar.js?v=' . $calendarJsVersion)) . '"></script>';
-    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js')) . '"></script>';
+    $formValidateVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-form-validate.js');
+    echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
 
     // Floating Kali AI widget (general-mode) on every nutritionist page
     // except the dedicated assistant page itself.
@@ -314,6 +338,7 @@ function nutritionist_layout_end(): void
 
     $toastJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-toast.js');
     echo '<script src="' . nutritionist_e(app_url('/assets/js/admin-toast.js?v=' . $toastJsVersion)) . '"></script>';
+    echo admin_paged_noscript();
 
     echo '</body>';
     echo '</html>';

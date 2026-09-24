@@ -114,12 +114,25 @@ $children = admin_fetch_all(
         h.household_code AS household_code,
         h.address AS household_address,
         h.lat AS household_lat,
-        h.lng AS household_lng
+        h.lng AS household_lng,
+        lm.measurement_date AS last_measurement_date,
+        lm.weight_kg AS last_weight,
+        lm.height_cm AS last_height,
+        lm.nutritional_status AS last_nutritional_status,
+        lm.wfa_status AS last_wfa,
+        lm.hfa_status AS last_hfa,
+        lm.wfh_status AS last_wfh
      FROM children c
      INNER JOIN parents p ON p.id = c.parent_id
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
      LEFT JOIN local_areas la ON la.id = c.local_area_id
      LEFT JOIN households h ON h.id = c.household_id AND h.status = 'active'
+     LEFT JOIN measurements lm ON lm.id = (
+        SELECT m2.id FROM measurements m2
+        WHERE m2.child_id = c.id
+        ORDER BY m2.measurement_date DESC, m2.id DESC
+        LIMIT 1
+     )
      WHERE {$whereSql}
      ORDER BY c.id DESC",
     $types,
@@ -128,7 +141,7 @@ $children = admin_fetch_all(
 
 /*
  * No server-side pagination here on purpose: the full filtered list is
- * rendered and assets/js/admin.js paginates client-side (10/page) so the
+ * rendered and assets/js/admin.js paginates client-side (5/page) so the
  * search box filters across ALL rows, not just the current page.
  * Newest child (highest id / latest child_code like CH0015) is first
  * via ORDER BY c.id DESC above, so a newly added child shows on page 1.
@@ -213,9 +226,14 @@ function nchild_short_address(?string $localArea, ?string $barangay): string
 }
 
 $actions = '<div class="admin-actions">'
-    . '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurements.php')) . '">' . admin_action_icon('clipboard') . ' Measurements</a>'
     . (nutritionist_can_write('children.create')
         ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>'
+        : '')
+    . ((nutritionist_can_write('parents.create') && nutritionist_can_write('children.create'))
+        ? '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/family_import.php')) . '">' . admin_action_icon('export') . ' Master-list import</a>'
+        : '')
+    . (nutritionist_can_write()
+        ? '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/measurement_record.php')) . '">' . admin_action_icon('measure') . ' Add measurement</a>'
         : '')
     . '</div>';
 
@@ -233,8 +251,8 @@ nutritionist_layout_start(
 .rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
 .rp-tab span{font-size:11px;opacity:.6}
 .children-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
-.children-toolbar .admin-search{flex:1;min-width:220px}
-.children-toolbar .admin-select{min-width:200px;max-width:260px}
+.children-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
+.children-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
 
 .children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
 .children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:#94a3b8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
@@ -260,34 +278,48 @@ nutritionist_layout_start(
 .children-pagination .page-btn.is-active{background:var(--admin-primary);border-color:var(--admin-primary);color:#fff}
 .children-pagination .page-btn.is-disabled{opacity:.4;pointer-events:none}
 
-/* Child detail modal (just child information, no measurements) */
+/* Child detail modal — landscape, senior-friendly (large text, grouped columns) */
 .cc-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
 .cc-overlay.is-open{display:flex}
-.cc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
-.cc-head{display:flex;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
-.cc-head .avatar{width:56px;height:56px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:1000px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.cc-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
+.cc-head .avatar{width:60px;height:60px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .cc-head .meta{min-width:0;flex:1}
-.cc-head .name{font-size:16px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.cc-head .sub{font-size:11px;color:var(--admin-muted);margin-top:2px}
-.cc-head .close{background:none;border:none;color:var(--admin-muted);font-size:20px;line-height:1;cursor:pointer;padding:6px 10px;border-radius:6px}
+.cc-head .name{font-size:19px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-head .sub{font-size:13px;color:var(--admin-muted);margin-top:2px}
+.cc-head .close{background:none;border:none;color:var(--admin-muted);font-size:28px;line-height:1;cursor:pointer;padding:8px 14px;border-radius:8px;min-width:48px;min-height:48px}
 .cc-head .close:hover{background:var(--admin-surface-alt);color:var(--admin-text)}
 
-.cc-body{padding:18px 20px}
-.cc-section{font-weight:700;font-size:11px;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px}
-.cc-section:first-child{margin-top:0}
-.cc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--admin-border);font-size:12px}
+.cc-body{padding:20px 22px}
+.cc-measure{background:var(--admin-primary-soft);border:1px solid var(--admin-border);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.cc-measure .m-title{font-size:13px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.cc-measure .m-grid{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.cc-measure .m-stat{display:flex;flex-direction:column;gap:2px;min-width:90px}
+.cc-measure .m-stat .k{font-size:12px;color:var(--admin-muted);font-weight:600}
+.cc-measure .m-stat .v{font-size:17px;font-weight:700;color:var(--admin-text)}
+.cc-measure .m-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.cc-measure .m-pills .admin-pill{font-size:13px;padding:5px 12px}
+.cc-measure .m-empty{font-size:14px;color:var(--admin-muted);font-style:italic}
+.cc-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.cc-card{background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:14px 16px;min-width:0}
+.cc-section{font-weight:700;font-size:13px;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px}
+.cc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--admin-border);font-size:14px}
 .cc-row:last-child{border-bottom:none}
-.cc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0;width:120px}
+.cc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0}
 .cc-row .value{font-weight:600;color:var(--admin-text);text-align:right;flex:1;min-width:0;word-break:break-word}
-.cc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.cc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.cc-foot .admin-btn,.cc-foot .admin-btn-secondary{min-height:44px;display:inline-flex;align-items:center;font-size:14px}
 
+@media (max-width: 860px) {
+  .cc-cols{grid-template-columns:1fr}
+  .cc-measure .m-pills{margin-left:0}
+}
 @media (max-width: 560px) {
   .children-toolbar{flex-direction:column;align-items:stretch}
   .children-toolbar .admin-search{min-width:0;flex:1}
   .children-toolbar .admin-select{min-width:0;max-width:100%;width:100%}
   .cc-modal{max-width:calc(100vw - 16px);max-height:85vh}
   .cc-row{flex-direction:column;gap:4px}
-  .cc-row .label{width:auto;flex-shrink:0}
   .cc-row .value{text-align:left}
   .cc-head{padding:14px 16px}
   .cc-body{padding:14px 16px}
@@ -296,25 +328,18 @@ nutritionist_layout_start(
 </style>
 
 <section class="nutritionist-panel">
-    <div class="nutritionist-form-head" style="margin-bottom:14px;">
-        <div>
-            <h2 class="admin-section-title" style="margin-bottom:2px;">Children directory</h2>
-            <p class="admin-section-subtitle">
-                Registered children in your scope. Click a row to view the child information card, or use the action buttons.
-            </p>
-        </div>
-    </div>
-
     <div class="children-toolbar">
         <input
             class="admin-search"
             data-admin-filter="#children-table"
             type="search"
             placeholder="Search by name, code, guardian, or address..."
+            aria-label="Search children"
         >
         <select
             class="admin-select"
             id="local-area-filter"
+            aria-label="Filter by local area"
             onchange="window.location.href=this.value"
         >
             <option value="<?php echo nutritionist_e(nutritionist_children_url([])); ?>">All local areas</option>
@@ -340,14 +365,14 @@ nutritionist_layout_start(
     </div>
 
     <div class="nutritionist-table-wrap">
-        <table class="nutritionist-table children-table" id="children-table">
+        <table class="nutritionist-table children-table" id="children-table" data-page-size="5">
             <thead>
                 <tr>
-                    <th>Code</th>
-                    <th>Address (Local area · Barangay)</th>
-                    <th>Name of Guardian</th>
                     <th>Full name of child</th>
-                    <th>Sex</th>
+                    <th>Date</th>
+                    <th>Weight (kg)</th>
+                    <th>Height (cm)</th>
+                    <th>Nutritional status (WFA · HFA · WFH)</th>
                     <th>Age (months)</th>
                     <th>Age (days)</th>
                     <th>Actions</th>
@@ -377,15 +402,17 @@ nutritionist_layout_start(
                         </div>
                     </td></tr>
                 <?php endif; ?>
-                <?php foreach ($pageChildren as $child): ?>
+                <?php foreach ($pageChildren as $childIndex => $child): ?>
                     <?php
                     $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
                     $profileUrl = nutritionist_e(app_url('/nutritionist/child_view.php?id=' . (int)$child['id']));
                     $editUrl = nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id']));
+                    $recordUrl = nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . (int)$child['id']));
                     $parentAddress = (string)($child['parent_address'] ?? '');
+                    $lastDate = $child['last_measurement_date'] ?? null;
                     ?>
-                    <tr
+                    <tr<?php echo admin_paged_row_attr($childIndex, 5); ?>
                         class="row-link"
                         data-filter-text="<?php echo nutritionist_e(strtolower($child['child_code'] . ' ' . $fullName . ' ' . ($child['parent_name'] ?? '') . ' ' . ($child['barangay'] ?? '') . ' ' . ($child['local_area'] ?? '') . ' ' . $parentAddress)); ?>"
                         data-child-id="<?php echo (int)$child['id']; ?>"
@@ -393,13 +420,19 @@ nutritionist_layout_start(
                         data-child-code="<?php echo nutritionist_e((string)$child['child_code']); ?>"
                         data-child-sex="<?php echo nutritionist_e((string)$child['sex']); ?>"
                         data-child-birthdate="<?php echo nutritionist_e((string)$child['birthdate']); ?>"
-                        data-child-age="<?php echo (int)$age['days']; ?>"
+                        data-child-age="<?php echo (int)$age['months']; ?>"
                         data-child-localarea="<?php echo nutritionist_e((string)($child['local_area'] ?? '')); ?>"
                         data-child-areatype="<?php echo nutritionist_e((string)($child['area_type'] ?? '')); ?>"
                         data-child-address="<?php echo nutritionist_e($parentAddress); ?>"
                         data-child-barangay="<?php echo nutritionist_e((string)($child['barangay'] ?? '')); ?>"
                         data-child-ip="<?php echo !empty($child['is_ip']) ? '1' : '0'; ?>"
                         data-child-disability="<?php echo !empty($child['has_disability']) ? '1' : '0'; ?>"
+                        data-meas-date="<?php echo ($lastDate !== null && $lastDate !== '') ? nutritionist_e((string)$lastDate) : ''; ?>"
+                        data-meas-weight="<?php echo $child['last_weight'] !== null ? nutritionist_e((string)(float)$child['last_weight']) : ''; ?>"
+                        data-meas-height="<?php echo $child['last_height'] !== null ? nutritionist_e((string)(float)$child['last_height']) : ''; ?>"
+                        data-meas-wfa="<?php echo nutritionist_e((string)($child['last_wfa'] ?? '')); ?>"
+                        data-meas-hfa="<?php echo nutritionist_e((string)($child['last_hfa'] ?? '')); ?>"
+                        data-meas-wfh="<?php echo nutritionist_e((string)($child['last_wfh'] ?? '')); ?>"
                         data-parent-name="<?php echo nutritionist_e((string)($child['parent_name'] ?? '')); ?>"
                         data-parent-kind="<?php echo nutritionist_e((string)($child['parent_kind'] ?? '')); ?>"
                         data-parent-phone="<?php echo nutritionist_e((string)($child['parent_phone'] ?? '')); ?>"
@@ -410,30 +443,52 @@ nutritionist_layout_start(
                         data-household-lat="<?php echo $child['household_lat'] !== null ? nutritionist_e((string)$child['household_lat']) : ''; ?>"
                         data-household-lng="<?php echo $child['household_lng'] !== null ? nutritionist_e((string)$child['household_lng']) : ''; ?>"
                     >
-                        <td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($child['child_code']); ?></td>
-                        <td class="address-cell">
-                            <div class="primary"><?php echo nutritionist_e(nchild_short_address($child['local_area'] ?? null, $child['barangay'] ?? null)); ?></div>
-                            <?php if ($parentAddress !== ''): ?>
-                                <div class="sub" title="<?php echo nutritionist_e($parentAddress); ?>"><?php echo nutritionist_e(mb_strimwidth($parentAddress, 0, 48, '…')); ?></div>
-                            <?php endif; ?>
-                        </td>
-                        <td style="min-width:0;">
-                            <div style="font-weight:600;color:var(--admin-text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:200px;"><?php echo nutritionist_e((string)($child['parent_name'] ?? '—')); ?></div>
-                            <?php if (!empty($child['parent_kind'])): ?>
-                                <div class="admin-mini"><?php echo nutritionist_e((string)$child['parent_kind']); ?></div>
-                            <?php endif; ?>
-                        </td>
                         <td>
                             <div class="child-name-cell">
-                                <span class="avatar" style="background:<?php echo nutritionist_e(admin_avatar_color($fullName)); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+                                <span class="avatar" style="background:<?php echo nutritionist_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
                                 <div class="text">
                                     <div class="name"><?php echo nutritionist_e($fullName); ?></div>
+                                    <div class="sub"><?php echo nutritionist_e((string)$child['child_code']); ?> · <?php echo nutritionist_e((string)$child['sex']); ?></div>
                                 </div>
                             </div>
                         </td>
-                        <td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)$child['sex']); ?></td>
+                        <td style="white-space:nowrap;">
+                            <?php if ($lastDate !== null && $lastDate !== ''): ?>
+                                <?php echo nutritionist_e(date('M j, Y', strtotime((string)$lastDate))); ?>
+                            <?php else: ?>
+                                <span style="color:var(--admin-muted);font-style:italic;">Not yet</span>
+                            <?php endif; ?>
+                        </td>
+                        <td style="white-space:nowrap;font-weight:600;">
+                            <?php echo $child['last_weight'] !== null ? number_format((float)$child['last_weight'], 2) : '<span style="color:var(--admin-muted);font-weight:400;">—</span>'; ?>
+                        </td>
+                        <td style="white-space:nowrap;font-weight:600;">
+                            <?php echo $child['last_height'] !== null ? number_format((float)$child['last_height'], 1) : '<span style="color:var(--admin-muted);font-weight:400;">—</span>'; ?>
+                        </td>
+                        <td>
+                            <?php if ($lastDate !== null && $lastDate !== ''): ?>
+                                <?php
+                                $wfaCode = (string)($child['last_wfa'] ?? '—');
+                                $hfaCode = (string)($child['last_hfa'] ?? '—');
+                                $wfhRaw = (string)($child['last_wfh'] ?? '');
+                                $wfhCode = $wfhRaw !== '' ? wfh_display_short($wfhRaw) : '—';
+                                $short = static fn(string $code): string => match ($code) {
+                                    'Normal' => 'N',
+                                    'Tall' => 'T',
+                                    default => $code,
+                                };
+                                ?>
+                                <div style="display:flex;gap:4px;flex-wrap:wrap;">
+                                    <span class="admin-pill <?php echo nutritionist_status_class($wfaCode); ?>" title="Weight-for-Age: <?php echo nutritionist_e($wfaCode); ?>"><?php echo nutritionist_e($short($wfaCode)); ?></span>
+                                    <span class="admin-pill <?php echo nutritionist_status_class($hfaCode); ?>" title="Height-for-Age: <?php echo nutritionist_e($hfaCode); ?>"><?php echo nutritionist_e($short($hfaCode)); ?></span>
+                                    <span class="admin-pill <?php echo nutritionist_status_class($wfhCode); ?>" title="Weight-for-Length/Height: <?php echo nutritionist_e($wfhCode); ?>"><?php echo nutritionist_e($short($wfhCode)); ?></span>
+                                </div>
+                            <?php else: ?>
+                                <span class="admin-pill is-muted">Not yet</span>
+                            <?php endif; ?>
+                        </td>
                         <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
-                            <?php echo (int)$age['months']; ?> mo
+                            <?php echo (int)$age['months']; ?> m
                         </td>
                         <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
                             <?php echo (int)$age['days']; ?> d
@@ -441,6 +496,9 @@ nutritionist_layout_start(
                         <td>
                             <div class="admin-actions" onclick="event.stopPropagation();">
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
+                                <?php if (nutritionist_can_write()): ?>
+                                <a class="admin-icon-btn" title="Record measurement" href="<?php echo $recordUrl; ?>"><?php echo admin_action_icon('measure'); ?></a>
+                                <?php endif; ?>
                                 <?php if (nutritionist_can_write('children.update')): ?>
                                 <a class="admin-icon-btn" title="Edit profile" href="<?php echo $editUrl; ?>"><?php echo admin_action_icon('edit'); ?></a>
                                 <?php endif; ?>
@@ -467,13 +525,13 @@ nutritionist_layout_start(
         </table>
     </div>
 
-    <?php /* Pagination + global search handled client-side by assets/js/admin.js (10/page). */ ?>
+    <?php /* Pagination + global search handled client-side by assets/js/admin.js (5/page). */ ?>
 </section>
 
 <!--
     Child information card modal. Opened from the row's "view" button or
-    clicking anywhere on the row. Shows ONLY child information (no
-    measurements, no growth history) per the spec.
+    clicking anywhere on the row. Latest measurement strip on top, then
+    grouped Child / Parent-guardian / Address columns (no growth history).
 -->
 <div class="cc-overlay" id="cc-overlay" aria-hidden="true" role="dialog" aria-modal="true">
     <div class="cc-modal">
@@ -486,29 +544,41 @@ nutritionist_layout_start(
             <button type="button" class="close" id="cc-close" aria-label="Close">×</button>
         </div>
         <div class="cc-body">
-            <div class="cc-section">Child information</div>
-            <div class="cc-row"><span class="label">Child code</span><span class="value" id="cc-code">—</span></div>
-            <div class="cc-row"><span class="label">Sex</span><span class="value" id="cc-sex">—</span></div>
-            <div class="cc-row"><span class="label">Birthdate</span><span class="value" id="cc-birthdate">—</span></div>
-            <div class="cc-row"><span class="label">Age</span><span class="value" id="cc-age">—</span></div>
-            <div class="cc-row"><span class="label">IP group</span><span class="value" id="cc-ip">—</span></div>
-            <div class="cc-row"><span class="label">With disability</span><span class="value" id="cc-disability">—</span></div>
-
-            <div class="cc-section">Address</div>
-            <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
-            <div class="cc-row"><span class="label">Street address</span><span class="value" id="cc-address">—</span></div>
-            <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
-
-            <div class="cc-section">Parent / guardian</div>
-            <div class="cc-row"><span class="label">Name</span><span class="value" id="cc-parent-name">—</span></div>
-            <div class="cc-row"><span class="label">Type</span><span class="value" id="cc-parent-kind">—</span></div>
-            <div class="cc-row"><span class="label">Phone</span><span class="value" id="cc-parent-phone">—</span></div>
-            <div class="cc-row"><span class="label">Email</span><span class="value" id="cc-parent-email">—</span></div>
-
-            <div class="cc-section">Household / Spot</div>
-            <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
-            <div class="cc-row"><span class="label">Address</span><span class="value" id="cc-household-address">—</span></div>
-            <div class="cc-row"><span class="label">Coordinates</span><span class="value" id="cc-household-coords" style="font-family:monospace;font-size:11px;">—</span></div>
+            <div class="cc-measure">
+                <div class="m-title">Current measurement (latest)</div>
+                <div class="m-grid" id="cc-measure-grid">
+                    <div class="m-stat"><span class="k">Weight</span><span class="v" id="cc-m-weight">—</span></div>
+                    <div class="m-stat"><span class="k">Height</span><span class="v" id="cc-m-height">—</span></div>
+                    <div class="m-stat"><span class="k">Date</span><span class="v" id="cc-m-date" style="font-size:15px;">—</span></div>
+                    <div class="m-pills" id="cc-m-pills"></div>
+                </div>
+                <div class="m-empty" id="cc-m-empty" style="display:none;">Not yet weighed — no measurement on record.</div>
+            </div>
+            <div class="cc-cols">
+                <div class="cc-card">
+                    <div class="cc-section">Child information</div>
+                    <div class="cc-row"><span class="label">Child code</span><span class="value" id="cc-code">—</span></div>
+                    <div class="cc-row"><span class="label">Sex</span><span class="value" id="cc-sex">—</span></div>
+                    <div class="cc-row"><span class="label">Birthdate</span><span class="value" id="cc-birthdate">—</span></div>
+                    <div class="cc-row"><span class="label">Age</span><span class="value" id="cc-age">—</span></div>
+                    <div class="cc-row"><span class="label">IP group</span><span class="value" id="cc-ip">—</span></div>
+                    <div class="cc-row"><span class="label">With disability</span><span class="value" id="cc-disability">—</span></div>
+                </div>
+                <div class="cc-card">
+                    <div class="cc-section">Parent / guardian</div>
+                    <div class="cc-row"><span class="label">Name</span><span class="value" id="cc-parent-name">—</span></div>
+                    <div class="cc-row"><span class="label">Relationship</span><span class="value" id="cc-parent-kind">—</span></div>
+                    <div class="cc-row"><span class="label">Phone</span><span class="value" id="cc-parent-phone">—</span></div>
+                    <div class="cc-row"><span class="label">Email</span><span class="value" id="cc-parent-email">—</span></div>
+                </div>
+                <div class="cc-card">
+                    <div class="cc-section">Address</div>
+                    <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
+                    <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
+                    <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
+                    <div class="cc-row"><span class="label">Household address</span><span class="value" id="cc-household-address">—</span></div>
+                </div>
+            </div>
         </div>
         <div class="cc-foot">
             <a class="admin-btn-secondary" id="cc-edit" href="#">Edit profile</a>
@@ -524,6 +594,73 @@ nutritionist_layout_start(
 
     function val(id) { return document.getElementById(id); }
     function text(id, v) { var el = val(id); if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v; }
+    function ccEsc(s) {
+        return String(s).replace(/[&<>"']/g, function (ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+    }
+
+    // Mirrors PHP nutritionist_status_class() for the short status codes.
+    function ccStatusClass(s) {
+        var x = String(s || '').toLowerCase().trim();
+        if (x === 'normal' || x === 'n' || x === 'tall' || x === 't') return 'is-success';
+        if (x === 'muw' || x === 'mst' || x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam' || x.indexOf('moderately') === 0) return 'is-warn';
+        if (x === 'ow' || x === 'ob' || x === 'overweight' || x === 'obese') return 'is-orange';
+        if (x === 'suw' || x === 'sst' || x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam' || x.indexOf('severely') === 0) return 'is-danger';
+        if (x.indexOf('refer') !== -1) return 'is-info';
+        return 'is-muted';
+    }
+
+    function ccWfhShort(code) {
+        var x = String(code || '').toLowerCase().trim();
+        if (x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam') return 'SW/SAM';
+        if (x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam') return 'MW/MAM';
+        return String(code || '');
+    }
+
+    function ccFormatDate(iso) {
+        var p = String(iso || '').split('-');
+        if (p.length < 3) return String(iso || '');
+        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var mi = parseInt(p[1], 10) - 1;
+        if (mi < 0 || mi > 11) return String(iso || '');
+        return months[mi] + ' ' + parseInt(p[2], 10) + ', ' + p[0];
+    }
+
+    function ccPill(axisLabel, fullCode, displayCode) {
+        return '<span class="admin-pill ' + ccStatusClass(fullCode) + '" title="' + ccEsc(axisLabel) + ': ' + ccEsc(fullCode) + '">'
+            + ccEsc(axisLabel) + ': ' + ccEsc(displayCode) + '</span>';
+    }
+
+    function renderMeasureStrip(row) {
+        var getM = function (k) { return row.getAttribute('data-meas-' + k) || ''; };
+        var mDate = getM('date');
+        var hasMeas = mDate !== '';
+        var grid = val('cc-measure-grid');
+        var empty = val('cc-m-empty');
+        if (grid) grid.style.display = hasMeas ? '' : 'none';
+        if (empty) empty.style.display = hasMeas ? 'none' : '';
+        if (!hasMeas) {
+            var pills = val('cc-m-pills');
+            if (pills) pills.innerHTML = '';
+            return;
+        }
+        var mW = getM('weight');
+        var mH = getM('height');
+        text('cc-m-weight', mW !== '' ? (parseFloat(mW).toFixed(2) + ' kg') : '—');
+        text('cc-m-height', mH !== '' ? (parseFloat(mH).toFixed(1) + ' cm') : '—');
+        text('cc-m-date', ccFormatDate(mDate));
+        var wfa = getM('wfa');
+        var hfa = getM('hfa');
+        var wfhRaw = getM('wfh');
+        var wfh = wfhRaw !== '' ? ccWfhShort(wfhRaw) : '';
+        var html = [];
+        if (wfa) html.push(ccPill('WFA', wfa, wfa));
+        if (hfa) html.push(ccPill('HFA', hfa, hfa));
+        if (wfh) html.push(ccPill('WFH', wfhRaw, wfh));
+        var pillsEl = val('cc-m-pills');
+        if (pillsEl) pillsEl.innerHTML = html.join('');
+    }
 
     function openCard(row) {
         if (!row) return;
@@ -548,14 +685,13 @@ nutritionist_layout_start(
         text('cc-code', code);
         text('cc-sex', get('sex'));
         text('cc-birthdate', get('birthdate'));
-        text('cc-age', get('age') + ' months');
+        text('cc-age', get('age') + ' m');
         text('cc-ip', get('ip') === '1' ? 'Yes' : 'No');
         text('cc-disability', get('disability') === '1' ? 'Yes' : 'No');
 
         var localArea = get('localarea');
         var areaType = get('areatype');
         text('cc-localarea', (areaType && localArea) ? (areaType.charAt(0).toUpperCase() + areaType.slice(1) + ': ' + localArea) : (localArea || '—'));
-        text('cc-address', get('address'));
         text('cc-barangay', get('barangay'));
 
         text('cc-parent-name', getP('name'));
@@ -565,15 +701,10 @@ nutritionist_layout_start(
 
         var hhCode = getH('code');
         var hhAddress = getH('address');
-        var hhLat = getH('lat');
-        var hhLng = getH('lng');
-        text('cc-household-code', hhCode ? ('HH-' + String(getH('id') || '0').padStart(4, '0') + ' · ' + hhCode) : '—');
+        text('cc-household-code', hhCode || '—');
         text('cc-household-address', hhAddress || '—');
-        if (hhLat && hhLng) {
-            text('cc-household-coords', parseFloat(hhLat).toFixed(7) + ', ' + parseFloat(hhLng).toFixed(7));
-        } else {
-            text('cc-household-coords', '—');
-        }
+
+        renderMeasureStrip(row);
 
         var editLink = val('cc-edit');
         if (editLink) {

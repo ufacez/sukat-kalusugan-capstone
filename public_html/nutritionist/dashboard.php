@@ -125,6 +125,7 @@ $measurements = admin_fetch_all(
 		c.last_name,
 		c.child_code,
 		c.birthdate,
+		c.sex,
 		bg.name AS barangay,
 		p.name AS parent_name
 	 FROM measurements m
@@ -266,14 +267,14 @@ $axisCounts = [
 	'wflh' => buildAxisCounts($measurements, 'wfh_status'),
 ];
 
-// Per-pill counts (N / MUW / MSt / MW / OW / SUW / SSt / SW / Ob / REF) per axis.
+// Per-pill counts (N / MUW / MSt / MW/MAM / OW / SUW / SSt / SW/SAM / Ob / REF) per axis.
 // Used by the "Latest Status" sidebar so it can show every individual
 // classification bucket with its own count and percentage. WFA now
 // includes REF (Refer to WFL/H) for any child whose WAZ z-score lands
 // above +2 — per the DOH eOPT Plus rule, that reading is read off the
 // WFL/H axis instead.
 function buildAxisPillCounts(array $measurements, string $statusField, string $axis): array {
-	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW' => 0, 'Ob' => 0, 'REF' => 0, 'Tall' => 0];
+	$counts = ['N' => 0, 'MUW' => 0, 'MSt' => 0, 'MW/MAM' => 0, 'OW' => 0, 'SUW' => 0, 'SSt' => 0, 'SW/SAM' => 0, 'Ob' => 0, 'REF' => 0, 'Tall' => 0];
 	foreach ($measurements as $m) {
 		$c = classifyAxisStatus($axis, (string)($m[$statusField] ?? ''));
 		$key = $c['label'];
@@ -479,6 +480,7 @@ foreach ($appointments as $appointment) {
 		'id' => (int)$appointment['id'],
 		'location' => '',
 		'status' => $effectiveStatus,
+		'url' => app_url('/nutritionist/appointments.php'),
 	];
 }
 
@@ -500,16 +502,7 @@ if ($todayInCurrentMonth && isset($calendarEntries[(int)$today->format('j')])) {
 		}
 	}
 }
-// Deduplicate to one row per child (latest measurement only)
-$recentSeen = [];
-$recentMeasurements = [];
-foreach ($measurements as $m) {
-	$cid = (int)$m['child_id'];
-	if (isset($recentSeen[$cid])) continue;
-	$recentSeen[$cid] = true;
-	$recentMeasurements[] = $m;
-	if (count($recentMeasurements) >= 3) break;
-}
+
 
 // AI Insights — driven by the latest WHO growth-indicator snapshot per child.
 // Speaks in the language of WFA / HFA / WFH z-score classifications and
@@ -520,11 +513,11 @@ $totalChildren = count($children);
 
 $suw = (int)($axisPillCounts['wfa']['SUW'] ?? 0);
 $sst = (int)($axisPillCounts['hfa']['SSt'] ?? 0);
-$sw  = (int)($axisPillCounts['wflh']['SW']  ?? 0);
+$sw  = (int)($axisPillCounts['wflh']['SW/SAM']  ?? 0);
 $ob  = (int)($axisPillCounts['wflh']['Ob']  ?? 0);
 $muw = (int)($axisPillCounts['wfa']['MUW'] ?? 0);
 $mst = (int)($axisPillCounts['hfa']['MSt'] ?? 0);
-$mw  = (int)($axisPillCounts['wflh']['MW']  ?? 0);
+$mw  = (int)($axisPillCounts['wflh']['MW/MAM']  ?? 0);
 $owWflh = (int)($axisPillCounts['wflh']['OW'] ?? 0);
 $refWfa = (int)($axisPillCounts['wfa']['REF'] ?? 0);
 $tallHfa = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
@@ -646,7 +639,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($measurements); ?></div>
-				<div class="dashboard-stat-meta">This month <a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>">View all →</a></div>
+				<div class="dashboard-stat-meta">This month</div>
 			</div>
 		</div>
 	</article>
@@ -659,7 +652,7 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			<div>
 				<div class="dashboard-stat-label">Appointments</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($upcomingAppointments); ?></div>
-				<div class="dashboard-stat-meta">Upcoming <a href="<?php echo nutritionist_e(app_url('/nutritionist/appointments.php')); ?>">View all →</a></div>
+				<div class="dashboard-stat-meta">Upcoming</div>
 			</div>
 		</div>
 	</article>
@@ -749,11 +742,11 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Moderately Wasted / MAM</strong> <span class="stat-code">MW/MAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW"><?php echo (int)$axisPillCounts['wflh']['MW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
+					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW/MAM"><?php echo (int)$axisPillCounts['wflh']['MW/MAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW/MAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Severely Wasted / SAM</strong> <span class="stat-code">SW/SAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW"><?php echo (int)$axisPillCounts['wflh']['SW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
+					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW/SAM"><?php echo (int)$axisPillCounts['wflh']['SW/SAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW/SAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
 				</div>
 				<div class="stat-row" data-axis-row="wflh" hidden>
 					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Overweight</strong> <span class="stat-code">OW</span></span></div>
@@ -774,7 +767,6 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 						<li class="nutritionist-ai-bullet"><?php echo $bullet; ?></li>
 						<?php endforeach; ?>
 					</ul>
-					<a class="dashboard-ai-link" href="#ai-insights">View AI insights →</a>
 				</div>
 			</div>
 		</div>
@@ -812,168 +804,25 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 	</article>
 </section>
 
-<section class="nutritionist-dashboard-bottom" style="margin-top:18px;">
-	<article class="nutritionist-panel">
-		<div class="nutritionist-bottom-grid">
-			<!-- Children Requiring Attention -->
-			<div class="nutritionist-bottom-col">
-				<div class="nutritionist-toolbar" style="margin-bottom:10px;">
-					<h2 class="admin-section-title" style="margin:0;">Children Requiring Attention</h2>
-					<a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" class="admin-mini" style="font-weight:600;">View all →</a>
-				</div>
-
-				<?php if (empty($atRiskChildren)): ?>
-					<div class="nutritionist-empty" style="padding:14px;text-align:center;color:var(--admin-muted);font-size:0.8rem;border:1px dashed var(--admin-border);border-radius:12px;background:var(--admin-surface-alt);">No flagged cases at this time.</div>
-				<?php else: ?>
-					<div class="nutritionist-attention-list">
-						<?php
-						$sortedAtRisk = $atRiskChildren;
-						// Sort by the largest absolute z-score across WAZ / HAZ / WHZ
-						// (most extreme children surface first), then by the most
-						// recent measurement date.
-						usort($sortedAtRisk, static function ($a, $b) {
-							$score = static function (array $row): float {
-								$vals = [];
-								foreach (['waz', 'haz', 'whz'] as $field) {
-									$v = $row[$field] ?? null;
-									if ($v !== null && $v !== '' && is_numeric($v)) {
-										$vals[] = abs((float)$v);
-									}
-								}
-								return empty($vals) ? 0.0 : max($vals);
-							};
-							$scoreDiff = $score($b) <=> $score($a);
-							if ($scoreDiff !== 0) return $scoreDiff;
-							$aDate = (string)($a['measurement_date'] ?? '');
-							$bDate = (string)($b['measurement_date'] ?? '');
-							return strcmp($bDate, $aDate);
-						});
-						// Keep the dashboard compact; the Children page contains the full list.
-						$displayAtRisk = array_slice($sortedAtRisk, 0, 3);
-						?>
-						<?php foreach ($displayAtRisk as $child): ?>
-						<div class="nutritionist-attention-row">
-							<div class="nutritionist-attention-avatar" style="background:var(--admin-primary);color:#fff;">
-								<?php echo nutritionist_e(strtoupper(mb_substr($child['first_name'] ?? 'C', 0, 1) . mb_substr($child['last_name'] ?? 'N', 0, 1))); ?>
-							</div>
-							<?php
-								// Follow-up due indicator: derive from latest measurement
-								// date. DOH eOPT Plus follow-up cadence = 14 days for
-								// severe, 30 days for moderate. Shows Overdue / Due
-								// today / Due in N days.
-								$latestDate = !empty($child['measurement_date']) ? new DateTimeImmutable((string)$child['measurement_date']) : null;
-								$hasSevere = false;
-								$hasModerate = false;
-								foreach (['wfa_status', 'hfa_status', 'wfh_status'] as $axisField) {
-									$val = strtolower(trim((string)($child[$axisField] ?? '')));
-									if (str_contains($val, 'severe') || $val === 'suw' || $val === 'sst' || $val === 'sw' || $val === 'ob') $hasSevere = true;
-									elseif (str_contains($val, 'moderate') || $val === 'muw' || $val === 'mst' || $val === 'mw' || $val === 'ow') $hasModerate = true;
-								}
-								$cadenceDays = $hasSevere ? 14 : ($hasModerate ? 30 : null);
-								$dueLabel = '';
-								$dueClass = '';
-								if ($latestDate !== null && $cadenceDays !== null) {
-									$nextDue = $latestDate->modify('+' . $cadenceDays . ' days');
-									$diffDays = (int)$today->diff($nextDue)->format('%r%a');
-									if ($diffDays < 0) {
-										$overdue = abs($diffDays);
-										$dueLabel = 'Overdue ' . $overdue . ' day' . ($overdue === 1 ? '' : 's');
-										$dueClass = 'is-overdue';
-									} elseif ($diffDays === 0) {
-										$dueLabel = 'Due today';
-										$dueClass = 'is-due-today';
-									} else {
-										$dueLabel = 'Due in ' . $diffDays . ' day' . ($diffDays === 1 ? '' : 's');
-										$dueClass = 'is-upcoming';
-									}
-								}
-							?>
-							<div class="nutritionist-attention-meta">
-								<a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php') . '?id=' . $child['id']); ?>" class="nutritionist-attention-name" style="color:var(--admin-text);"><?php echo nutritionist_e($child['first_name'] . ' ' . $child['last_name']); ?></a>
-								<div class="nutritionist-attention-sub"><?php echo nutritionist_e((string)($child['child_code'] ?? $child['id'])); ?> · <?php echo nutritionist_e($child['barangay'] ?? ''); ?></div>
-							</div>
-							<div class="nutritionist-attention-status">
-								<div class="nutritionist-attention-status-label">Status</div>
-								<div class="nutritionist-attention-pills">
-									<?php
-									$pills = combinedStatusPills($child['wfa_status'] ?? null, $child['hfa_status'] ?? null, $child['wfh_status'] ?? null);
-									if (empty($pills)) {
-										echo '<span class="admin-pill is-success" style="font-size:0.65rem;padding:2px 6px;">N</span>';
-									} else {
-										foreach ($pills as $pill) {
-											$lvl = match($pill['level']) { 'severe' => 'is-danger', 'refer' => 'is-info', default => 'is-warn' };
-											echo '<span class="admin-pill ' . $lvl . '" style="font-size:0.65rem;padding:2px 6px;">' . nutritionist_e($pill['label']) . '</span>';
-										}
-									}
-									?>
-								</div>
-							</div>
-							<div class="nutritionist-attention-due">
-								<div class="nutritionist-attention-due-label">Follow-up</div>
-								<div class="nutritionist-attention-due-value <?php echo $dueClass; ?>"><?php echo nutritionist_e($dueLabel !== '' ? $dueLabel : '—'); ?></div>
-							</div>
-							<a href="<?php echo nutritionist_e(app_url('/nutritionist/children.php') . '?id=' . $child['id']); ?>" class="nutritionist-attention-link">Open →</a>
-						</div>
-						<?php endforeach; ?>
-					</div>
-				<?php endif; ?>
-			</div>
-
-		<!-- Recent Measurements -->
-		<div class="nutritionist-bottom-col">
-			<div class="nutritionist-toolbar" style="margin-bottom:10px;">
-				<h2 class="admin-section-title" style="margin:0;">Recent Measurements</h2>
-				<a href="<?php echo nutritionist_e(app_url('/nutritionist/measurements.php')); ?>" class="admin-mini" style="font-weight:600;">View all &rarr;</a>
-			</div>
-
-			<div class="nutritionist-table-wrap">
-			<table class="nutritionist-table measurements-table">
-				<thead>
-					<tr>
-						<th>Code</th>
-						<th>Full name of child</th>
-						<th>Date</th>
-						<th>Weight</th>
-						<th>Height</th>
-						<th style="text-align:center;">WFA</th>
-						<th style="text-align:center;">HFA</th>
-						<th style="text-align:center;">WFH</th>
-					</tr>
-				</thead>
-				<tbody>
-					<?php foreach ($recentMeasurements as $m):
-						$fullName = trim(($m['first_name'] ?? '') . ' ' . ($m['last_name'] ?? ''));
-						$wfaClass = $m['wfa_status'] !== null ? nutritionist_status_class($m['wfa_status']) : 'is-muted';
-						$hfaClass = $m['hfa_status'] !== null ? nutritionist_status_class($m['hfa_status']) : 'is-muted';
-						$wfhClass = $m['wfh_status'] !== null ? nutritionist_status_class(wfh_display_short($m['wfh_status'])) : 'is-muted';
-						$wfaDisplay = !empty($m['wfa_status']) ? $m['wfa_status'] : '—';
-						$hfaDisplay = !empty($m['hfa_status']) ? $m['hfa_status'] : '—';
-						$wfhDisplay = !empty($m['wfh_status']) ? wfh_display_short($m['wfh_status']) : '—';
-					?>
-					<tr>
-						<td style="font-family:monospace;color:var(--admin-muted);white-space:nowrap;"><?php echo nutritionist_e($m['child_code'] ?? ''); ?></td>
-						<td>
-							<div class="child-name-cell">
-								<span class="avatar" style="background:<?php echo nutritionist_e(admin_avatar_color($fullName)); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
-								<div class="text">
-									<div class="name"><?php echo nutritionist_e($fullName); ?></div>
-								</div>
-							</div>
-						</td>
-						<td><?php echo nutritionist_e(date('M d', strtotime($m['measurement_date']))); ?></td>
-						<td><?php echo nutritionist_e(number_format((float)($m['weight_kg'] ?? 0), 1) . ' kg'); ?></td>
-						<td><?php echo nutritionist_e(number_format((float)($m['height_cm'] ?? 0), 1) . ' cm'); ?></td>
-						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $wfaClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($wfaDisplay); ?></span></td>
-						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $hfaClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($hfaDisplay); ?></span></td>
-						<td style="text-align:center;white-space:nowrap;"><span class="admin-pill <?php echo $wfhClass; ?>" style="font-size:10px;padding:2px 7px;"><?php echo nutritionist_e($wfhDisplay); ?></span></td>
-					</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</div>
-		</div>
-	</article>
-</section>
+<nav class="admin-quicknav nutritionist-quicknav" aria-label="Quick actions" style="margin-top:18px;">
+	<?php
+	$quickActions = [
+		['href' => app_url('/nutritionist/children.php'), 'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 0 0 2.625.372 9.337 9.337 0 0 0 4.121-.952 4.125 4.125 0 0 0-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 0 1 8.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0 1 11.964-3.07M12 6.375a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0Zm8.25 2.25a2.625 2.625 0 1 1-5.25 0 2.625 2.625 0 0 1 5.25 0Z"/></svg>', 'label' => 'Children Records', 'sub' => 'View & manage children'],
+		['href' => app_url('/nutritionist/monitoring.php'), 'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z"/></svg>', 'label' => 'Monitoring List', 'sub' => 'Follow-up tracking'],
+		['href' => app_url('/nutritionist/family_import.php'), 'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5"/></svg>', 'label' => 'Import Families', 'sub' => 'Bulk upload'],
+		['href' => app_url('/nutritionist/measurement_record.php'), 'icon' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>', 'label' => 'Record Measurement', 'sub' => 'Add new reading'],
+	];
+	foreach ($quickActions as $qa): ?>
+		<a class="admin-quicknav-item" href="<?php echo nutritionist_e($qa['href']); ?>">
+			<span class="admin-quicknav-icon"><?php echo $qa['icon']; ?></span>
+			<span class="admin-quicknav-text">
+				<strong><?php echo nutritionist_e($qa['label']); ?></strong>
+				<small><?php echo nutritionist_e($qa['sub']); ?></small>
+			</span>
+			<span class="admin-quicknav-arrow" aria-hidden="true">&#8250;</span>
+		</a>
+	<?php endforeach; ?>
+</nav>
 
 </div><!-- /.nutritionist-dashboard -->
 
@@ -1096,6 +945,7 @@ var chartDataEmbedded = {
 
 	var padL = 36, padR = 14, padT = 16, padB = 26;
 	var W = 0, H = 320, cW = 0, cH = 0, dpr = 1, maxVal = 1;
+	var yInterval = 1, yTickCount = 4; // nice-axis state
 	var currentKey = 'wfa';
 	var currentSeries = []; // [{key,color,fill,label,values:[n]}]
 	var catData = []; // [{Normal:n,Moderate:n,Severe:n,Refer:n,Tall:n,label:'Jan'}]
@@ -1123,11 +973,33 @@ var chartDataEmbedded = {
 		currentSeries = cats.map(function (c) {
 			return { key: c.key, color: c.color, fill: c.fill, label: c.label, values: catData.map(function (d) { return d[c.key]; }) };
 		});
-		maxVal = 1;
+		// Compute a "nice" Y-axis maximum so tick labels are always clean
+		// round numbers (1, 2, 5, 10, 15, 20, 25, …) instead of awkward
+		// fractional artifacts like 3, 5, 8.
+		var rawMax = 1;
 		currentSeries.forEach(function (s) {
-			s.values.forEach(function (v) { if (v > maxVal) maxVal = v; });
+			s.values.forEach(function (v) { if (v > rawMax) rawMax = v; });
 		});
-		maxVal = Math.max(Math.ceil(maxVal * 1.25), 4);
+		rawMax = rawMax * 1.15; // 15 % headroom
+
+		// Pick a nice tick interval: 1, 2, 5, 10, 20, 25, 50, 100, …
+		function niceInterval(range, targetTicks) {
+			var roughStep = range / targetTicks;
+			var mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
+			var frac = roughStep / mag;
+			var nice;
+			if (frac <= 1)       nice = 1;
+			else if (frac <= 2)  nice = 2;
+			else if (frac <= 5)  nice = 5;
+			else                 nice = 10;
+			return Math.max(nice * mag, 1);
+		}
+
+		var DESIRED_TICKS = 5; // aim for ~5 horizontal grid lines
+		yInterval = niceInterval(rawMax, DESIRED_TICKS);
+		yTickCount = Math.ceil(rawMax / yInterval);
+		if (yTickCount < 2) yTickCount = 2;
+		maxVal = yTickCount * yInterval;
 	}
 
 	function sizeCanvas() {
@@ -1199,33 +1071,45 @@ var chartDataEmbedded = {
 		var borderRgb = parseRgb(resolveColor('var(--admin-border)'));
 		ctx.strokeStyle = 'rgba(' + borderRgb.r + ',' + borderRgb.g + ',' + borderRgb.b + ',0.55)';
 		ctx.lineWidth = 0.5;
-		for (var g = 0; g <= 4; g++) {
-			var gy = padT + cH * (g / 4);
+		for (var g = 0; g <= yTickCount; g++) {
+			var gy = padT + cH * (g / yTickCount);
 			ctx.beginPath();
 			ctx.moveTo(padL, gy);
 			ctx.lineTo(W - padR, gy);
 			ctx.stroke();
 		}
 
-		// Y-axis labels (DOM)
+		// Y-axis labels (DOM) — uses nice tick intervals
 		if (yAxisEl) {
 			yAxisEl.innerHTML = '';
-			for (var i = 4; i >= 0; i--) {
+			for (var i = yTickCount; i >= 0; i--) {
 				var lbl = document.createElement('div');
 				lbl.className = 'audit-chart-y-label';
-				lbl.textContent = Math.round(maxVal * i / 4);
+				lbl.textContent = i * yInterval;
 				yAxisEl.appendChild(lbl);
 			}
 		}
 
-		// X-axis labels (DOM)
+		// X-axis labels (DOM) — show all months, highlight current
 		if (xAxisEl) {
 			xAxisEl.innerHTML = '';
+			var currentMonthIndex = months.length - 1;
+			// Determine label skip: show all months when there's enough room,
+			// otherwise show every-other to avoid overlap.
+			var perLabel = cW / Math.max(months.length, 1);
+			var skipStep = perLabel < 32 ? 2 : 1; // 32px min per label
 			months.forEach(function (m, i) {
 				var lbl = document.createElement('div');
 				lbl.className = 'audit-chart-x-label';
-				var currentMonthIndex = months.length - 1;
-				lbl.textContent = (i % 2 === 0 || i === currentMonthIndex || i === months.length - 1) ? m : '';
+				// Always show the current month and the first month;
+				// skip others only when the chart is narrow.
+				var showLabel = (skipStep <= 1) || (i % skipStep === 0) || (i === currentMonthIndex) || (i === 0);
+				lbl.textContent = showLabel ? m : '';
+				// Highlight the current (most recent) month
+				if (i === currentMonthIndex) {
+					lbl.style.color = resolveColor('var(--admin-primary)');
+					lbl.style.fontWeight = '700';
+				}
 				xAxisEl.appendChild(lbl);
 			});
 		}
@@ -1286,19 +1170,44 @@ var chartDataEmbedded = {
 		}
 		var d = catData[idx];
 		var textOnDark = resolveColor('var(--admin-surface)');
+		// Axis-specific abbreviations matching the DOH eOPT Plus codes
+		var ABBR = {
+			wfa:  { Normal: 'N', Moderate: 'MUW', Severe: 'SUW', Refer: 'REF', Tall: 'T' },
+			hfa:  { Normal: 'N', Moderate: 'MSt', Severe: 'SSt', Refer: 'REF', Tall: 'T' },
+			wflh: { Normal: 'N', Moderate: 'MW',  Severe: 'SW',  Refer: 'REF', Tall: 'T' }
+		};
+		var abbr = ABBR[currentKey] || ABBR.wfa;
 		var parts = ['<strong style="color:' + textOnDark + ';">' + d.label + '</strong>'];
 		currentSeries.forEach(function (s) {
 			if (d[s.key] > 0) {
-				parts.push('<span style="color:' + s.color + '">●</span> ' + s.label + ' ' + d[s.key]);
+				var shortLabel = abbr[s.key] || s.key;
+				parts.push('<span style="color:' + s.color + '">●</span> ' + shortLabel + ' ' + d[s.key]);
 			}
 		});
 		if (parts.length === 1) parts.push('No data');
 		tooltip.innerHTML = parts.join(' &nbsp; ');
 		var pts0 = buildPoints(currentSeries[0].values);
 		var xPos = pts0[idx].x;
-		tooltip.style.left = xPos + 'px';
+
+		// Position the tooltip centered on xPos, then clamp so it
+		// stays fully visible within the chart body (no overflow clipping).
+		tooltip.style.transform = 'none';       // remove centering so we can measure
+		tooltip.style.left = '0px';
 		tooltip.style.top = (padT + 4) + 'px';
 		tooltip.style.opacity = '1';
+
+		var tw = tooltip.offsetWidth;
+		var idealLeft = xPos - tw / 2;           // centered position
+		var minLeft = 4;                          // small gap from left edge
+		var maxLeft = W - tw - 4;                 // small gap from right edge
+		var clampedLeft = Math.max(minLeft, Math.min(idealLeft, maxLeft));
+
+		tooltip.style.left = clampedLeft + 'px';
+
+		// Move the arrow so it still points at the data point
+		var arrowPct = ((xPos - clampedLeft) / tw) * 100;
+		arrowPct = Math.max(10, Math.min(90, arrowPct)); // keep arrow within tooltip
+		tooltip.style.setProperty('--arrow-left', arrowPct + '%');
 	}
 
 	function onMove(e) {

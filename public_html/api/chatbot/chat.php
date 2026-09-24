@@ -190,10 +190,9 @@ if ($childId !== null && $childId > 0) {
         }
         mysqli_stmt_close($stmt);
         
-        // Load appointment history (last 5 appointments)
-        // Only use columns guaranteed to exist in schema.sql:
-        // scheduled_at, status, notes (appointment_type, intervention_type
-        // and other extended columns are NOT in the baseline appointments table)
+        // Load appointment history (last 5 consultations).
+        // appointments holds consultation requests only: scheduled_at,
+        // status, notes, created_by (parent/nutritionist).
         $sql = 'SELECT scheduled_at, status, notes
                 FROM appointments
                 WHERE child_id = ?
@@ -212,18 +211,10 @@ if ($childId !== null && $childId > 0) {
             mysqli_stmt_close($stmt);
         }
         
-        // Load follow-up status if followup_scheduler is available
-        // Use @ to suppress any include errors, and wrap in try-catch-like logic
+        // No follow-up engine: period-based monitoring derives completion
+        // from measurements inside the month/quarter, so there is no
+        // per-child next-due to report here.
         $followup = null;
-        if (file_exists(__DIR__ . '/../../includes/followup_scheduler.php')) {
-            @include_once __DIR__ . '/../../includes/followup_scheduler.php';
-            if (function_exists('followup_fetch_visits')) {
-                $followupResult = @followup_fetch_visits($childId, date('Y-m-d'), date('Y-m-d', strtotime('+30 days')), 1);
-                if (!empty($followupResult) && is_array($followupResult)) {
-                    $followup = $followupResult[0];
-                }
-            }
-        }
     }
 }
 

@@ -169,8 +169,8 @@ admin_layout_start('Auto-Archive', 'Automatically archive children who have reac
 			</tr>
 		</thead>
 		<tbody>
-			<?php foreach ($eligible as $ch): ?>
-			<tr>
+			<?php foreach ($eligible as $eligibleIndex => $ch): ?>
+			<tr<?php echo admin_paged_row_attr($eligibleIndex, 10); ?>>
 				<td><strong><?php echo admin_e($ch['first_name'] . ' ' . $ch['last_name']); ?></strong></td>
 				<td><?php echo admin_e($ch['child_code']); ?></td>
 				<td><?php echo admin_e($ch['barangay_name'] ?? ''); ?></td>
@@ -203,8 +203,8 @@ admin_layout_start('Auto-Archive', 'Automatically archive children who have reac
 				</tr>
 			</thead>
 			<tbody>
-				<?php foreach ($recentlyArchived as $ch): ?>
-				<tr>
+				<?php foreach ($recentlyArchived as $archivedIndex => $ch): ?>
+				<tr<?php echo admin_paged_row_attr($archivedIndex, 10); ?>>
 					<td><?php echo admin_e($ch['first_name'] . ' ' . $ch['last_name']); ?></td>
 					<td><?php echo admin_e($ch['child_code']); ?></td>
 					<td><?php echo admin_e($ch['barangay_name'] ?? ''); ?></td>

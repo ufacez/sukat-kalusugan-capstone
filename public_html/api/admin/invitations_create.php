@@ -39,10 +39,10 @@ if (!in_array($method, ['email', 'manual'], true)) {
 if ($method === 'email') {
     $email = $emailRaw !== '' ? $emailRaw : null;
     if ($email === null || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        admin_redirect('/admin/invitation_form.php', ['notice' => 'A valid email address is required for email invitations.', 'type' => 'error']);
+        admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'A valid email address is required for email invitations.', 'type' => 'error']);
     }
     if (admin_email_in_use($email)) {
-        admin_redirect('/admin/invitation_form.php', ['notice' => 'This email is already registered. Use a different email address.', 'type' => 'error']);
+        admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'This email is already registered. Use a different email address.', 'type' => 'error']);
     }
 } else {
     $email = $emailRaw !== '' ? $emailRaw . '@sukat.kalusugan' : null;
@@ -93,12 +93,12 @@ if (!$ok) {
 }
 
 log_action($actor['id'] ?? null, 'CREATE_INVITATION', 'info', sprintf(
-    'Generated %s invitation for %s (%s) — role: %s, code: %s',
+    // Privacy: invitation id + role only — never the invitee
+    // name/email, and never the activation code.
+    'Generated %s invitation #%d — role: %s',
     $method,
-    $name,
-    $email ?? 'no email',
-    $role,
-    $code
+    (int)$conn->insert_id,
+    $role
 ));
 
 $noticeParam = 'Invitation created. ' . ($method === 'manual'

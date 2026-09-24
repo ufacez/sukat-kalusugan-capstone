@@ -26,9 +26,9 @@ $parents = admin_fetch_all(
      ORDER BY p.id DESC"
 );
 
-$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/parents.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
+$actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/users.php')) . '">' . admin_action_icon('back') . ' Active parents</a>';
 
-admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'parents', $actions, 'Archived');
+admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'users', $actions, 'Archived');
 ?>
 
 <section class="admin-section">
@@ -59,8 +59,8 @@ admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'par
                 <?php if ($parents === []): ?>
                     <tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived parents.</td></tr>
                 <?php else: ?>
-                    <?php foreach ($parents as $parent): ?>
-                        <tr data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'])); ?>">
+                    <?php foreach ($parents as $parentIndex => $parent): ?>
+                        <tr<?php echo admin_paged_row_attr($parentIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'])); ?>">
                             <td>
                                 <div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e($parent['name']); ?></div>
                             </td>

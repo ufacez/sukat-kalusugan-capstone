@@ -13,9 +13,12 @@ if ($editId <= 0 && !nutritionist_can_write('parents.create')) {
 
 /*
  * Create mode lives in the unified family form now — this page is
- * edit-only. POST update handling below is untouched.
+ * edit-only. POST update handling below is untouched. The bounce only
+ * applies to GET: the edit form POSTs back here and carries the parent
+ * id as a hidden field (plus ?id= in the action URL), so POST must
+ * always reach the handler below.
  */
-if ($editId <= 0) {
+if ($editId <= 0 && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
 	admin_redirect('/nutritionist/family_form.php');
 }
 
@@ -50,6 +53,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	 */
 	$isAdmin = ($user['role'] ?? '') === 'admin';
 	$userBarangayId = $user['barangay_id'] ?? null;
+	$redirectBack = '/nutritionist/parent_form.php' . ($action === 'update' && $parentId > 0 ? '?id=' . $parentId : '');
 
 	if (!$isAdmin) {
 		if ($userBarangayId === null || $userBarangayId === '') {
@@ -72,7 +76,6 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	$passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 	$householdIdRaw = trim((string)($_POST['household_id'] ?? ''));
 	$householdId = $householdIdRaw !== '' ? (int)$householdIdRaw : null;
-	$redirectBack = '/nutritionist/parent_form.php' . ($action === 'update' && $parentId > 0 ? '?id=' . $parentId : '');
 
 	if (
 		!admin_is_valid_name_part($firstName, true)
@@ -193,7 +196,8 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 		if ($ok) {
 			$actor = current_user();
-			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $email);
+			$newParentId = (int)get_db_connection()->insert_id;
+			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account #' . $newParentId . ' via nutritionist form');
 		}
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
@@ -221,7 +225,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 				admin_cascade_parent_status($parentId, $status);
 			}
 			$actor = current_user();
-			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent ' . $email . ' (' . $parentId . ')');
+			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $parentId . ' via nutritionist form');
 		}
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);
@@ -326,7 +330,7 @@ nutritionist_layout_start(
 		</div>
 	</div>
 
-	<form class="nutritionist-form-grid" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php')); ?>">
+	<form class="nutritionist-form-grid" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php' . ($editingParent ? '?id=' . (int)$editingParent['id'] : ''))); ?>">
 		<input type="hidden" name="action" value="<?php echo $editingParent ? 'update' : 'create'; ?>">
 		<?php if ($editingParent): ?>
 			<input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">

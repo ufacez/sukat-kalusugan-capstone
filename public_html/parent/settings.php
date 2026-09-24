@@ -69,6 +69,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 		$sql .= ', password_hash = ?';
 		$params[] = password_hash($password, PASSWORD_DEFAULT);
 		$types .= 's';
+
+		// A fresh password clears the import-minted temporary-password
+		// hold — but only when the column exists (pre-migration safety).
+		$flagProbe = admin_fetch_one(
+			"SELECT COUNT(*) AS c FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'parents' AND COLUMN_NAME = 'must_change_password'"
+		);
+		if ((int)($flagProbe['c'] ?? 0) > 0) {
+			$sql .= ', must_change_password = 0';
+		}
 	}
 
 	$sql .= ' WHERE id = ?';
@@ -83,6 +92,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 		$_SESSION['auth']['phone'] = $phone;
 		$_SESSION['auth']['address'] = $address;
 		$_SESSION['auth']['parent_type'] = $parentType;
+		if ($wantsNewPassword && isset($_SESSION['auth']['must_change_password'])) {
+			unset($_SESSION['auth']['must_change_password']);
+		}
 	}
 
 	admin_redirect('/parent/settings.php', $ok ? ['notice' => 'Account updated successfully.', 'type' => 'success'] : ['notice' => 'Account could not be updated. This email may already be in use.', 'type' => 'error']);
@@ -118,7 +130,16 @@ $storedAddress  = (string)($profile['address'] ?? '');
 $actions = '<a class="admin-btn-secondary" href="' . parent_e(app_url('/parent/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
 
 parent_layout_start('Settings', 'Manage your account details.', 'settings', $actions);
+
+$mustChangeBanner = (($_GET['must_change'] ?? '') !== '' && ($_GET['must_change'] ?? '') !== '0')
+    || parent_must_change_password((int)($user['id'] ?? 0));
 ?>
+<?php if ($mustChangeBanner): ?>
+	<div class="admin-flash is-error" role="alert" style="display:block;margin-bottom:14px;">
+		<strong>Palitan ang temporary password.</strong>
+		Ito ay password na inanunsyo sa lahat — maglagay ng sarili mong password sa kanan para ma-secure ang account mo.
+	</div>
+<?php endif; ?>
 <form method="post" data-validate-form class="admin-settings-form">
 	<input type="hidden" name="update_account" value="1">
 	<div class="admin-flash is-error" data-validate-banner style="display:none;"></div>

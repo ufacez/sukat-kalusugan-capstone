@@ -16,7 +16,7 @@ if ($editId > 0) {
 	$editParams = [$editId];
 	$editScope = nutritionist_scope_fragment($user, 'c.barangay_id', $editParams);
 	$editAppointment = admin_fetch_one(
-		"SELECT a.id, a.child_id, a.scheduled_at, a.status, a.notes, a.location, a.appointment_type, a.followup_track
+		"SELECT a.id, a.child_id, a.scheduled_at, a.status, a.notes, a.location, a.created_by
 		 FROM appointments a
 		 INNER JOIN children c ON c.id = a.child_id
 		 WHERE a.id = ? AND {$editScope}
@@ -27,10 +27,6 @@ if ($editId > 0) {
 
 	if ($editAppointment === null) {
 		admin_redirect('/nutritionist/appointments.php', ['notice' => 'Appointment not found in your area.', 'type' => 'error']);
-	}
-
-	if (($editAppointment['appointment_type'] ?? 'regular') === 'followup') {
-		admin_redirect('/nutritionist/appointments.php', ['notice' => 'Automatic follow-ups cannot be edited manually. Verify the mandatory re-measurement instead.', 'type' => 'error']);
 	}
 
 	$preselectedChildId = (int)$editAppointment['child_id'];
@@ -79,7 +75,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 	if ($action === 'update' && $editId > 0) {
 		$ok = admin_execute(
-			'UPDATE appointments SET child_id = ?, parent_id = ?, scheduled_at = ?, status = ?, notes = ?, location = ? WHERE id = ? AND appointment_type = \'regular\'',
+			'UPDATE appointments SET child_id = ?, parent_id = ?, scheduled_at = ?, status = ?, notes = ?, location = ? WHERE id = ?',
 			'iissssi',
 			[$childId, $parentId, $scheduledAt, $status, $notes, $location, $editId]
 		);
@@ -129,7 +125,7 @@ $actions = '<a class="admin-btn-secondary" href="'
 
 nutritionist_layout_start(
 	$isEdit ? 'Edit Appointment' : 'Schedule Appointment',
-	$isEdit ? 'Update the date, location, status, or notes for this visit.' : 'Create a new follow-up visit for a child in your scope.',
+	$isEdit ? 'Update the date, location, status, or notes for this visit.' : 'Send a consultation request to a parent in your scope.',
 	'appointments',
 	$actions,
 	$isEdit ? 'Edit Appointment' : 'New Appointment'

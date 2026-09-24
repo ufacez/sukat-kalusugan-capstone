@@ -128,13 +128,13 @@ admin_layout_start('Sensors', 'Manage kiosk devices and calibration offsets.', '
                 </tr>
             </thead>
             <tbody>
-                <?php foreach ($devices as $device): ?>
+                <?php foreach ($devices as $deviceIndex => $device): ?>
                     <?php
                         $connectionText = !empty($device['connection_online']) ? 'online' : 'offline';
                         $connectionClass = !empty($device['connection_online']) ? 'is-success' : 'is-danger';
                         $deviceStatus = (string)($device['status'] ?? 'offline');
                     ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower((string)$device['device_code'] . ' ' . (string)($device['location'] ?? '') . ' ' . (string)($device['barangay'] ?? '') . ' ' . $deviceStatus)); ?>">
+                    <tr<?php echo admin_paged_row_attr($deviceIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower((string)$device['device_code'] . ' ' . (string)($device['location'] ?? '') . ' ' . (string)($device['barangay'] ?? '') . ' ' . $deviceStatus)); ?>">
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:#64748b;width:32px;height:32px;font-size:0.65rem;font-family:monospace;"><?php echo admin_e(substr((string)($device['device_code'] ?? '??'), 0, 2)); ?></span>

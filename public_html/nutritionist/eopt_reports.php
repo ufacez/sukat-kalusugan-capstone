@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
-require_once __DIR__ . '/../includes/followup_scheduler.php';
+require_once __DIR__ . '/../includes/monitoring_periods.php';
 require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
@@ -24,14 +24,14 @@ if ($month < 4 || $month > 12) {
 }
 
 $defaultCheckupMonth = 7;
-foreach (FOLLOWUP_QUARTER_MONTHS as $candidateRound) {
+foreach (MONITORING_REPORT_ROUNDS as $candidateRound) {
 	if ((int)date('n') <= $candidateRound) {
 		$defaultCheckupMonth = $candidateRound;
 		break;
 	}
 }
 $checkupMonth = (int)($_GET['checkup_month'] ?? $defaultCheckupMonth);
-if (!in_array($checkupMonth, FOLLOWUP_QUARTER_MONTHS, true)) {
+if (!in_array($checkupMonth, MONITORING_REPORT_ROUNDS, true)) {
 	$checkupMonth = 7;
 }
 
@@ -179,10 +179,15 @@ $dqWeightNoHeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c IN
 $dqIssueCount = $dqDupCount + $dqMissingInformation + $dqNoParentAddress + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
 
 $dqTotalChildren = admin_scalar(
-	"SELECT COUNT(*) FROM children c WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
+	"SELECT COUNT(*) FROM children c WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
 	$baseTypes, $baseParams
 );
 $dqTotalWithMeasurement = $totalAssessed;
+$dqMeasured6to59 = admin_scalar(
+	"SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id
+	 WHERE {$scope} AND m.measurement_date <= ? AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
+	$baseTypes . 's', array_merge($baseParams, [$anchorDate->format('Y-m-d')])
+);
 
 $dqMeasRows = admin_fetch_all(
 	"SELECT m.whz, m.is_flagged, m.weight_kg, m.height_cm
@@ -295,12 +300,7 @@ foreach ($listCountRows as $cr) {
 }
 $listCounts['0-23'] = (int)$infantCount;
 
-$actions = export_dropdown(
-	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)),
-	app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))),
-	app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)),
-	'Save as'
-);
+$actions = '';
 
 nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
 ?>
@@ -348,6 +348,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-section-title{font-size:15px;font-weight:700;color:var(--admin-text);letter-spacing:-0.02em}
 .rp-section-sub{font-size:12px;color:var(--admin-muted);margin-top:2px}
 .rp-table-section{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:16px;box-shadow:var(--admin-shadow);margin-bottom:14px;overflow:hidden}
+.rp-table-section.allow-overflow{overflow:visible}
 .rp-table-title{font-size:13px;font-weight:700;color:var(--admin-text);margin-bottom:10px}
 .rp-breadcrumb{display:flex;gap:8px;align-items:center;font-size:13px;color:var(--admin-muted);margin-bottom:14px}
 .rp-breadcrumb a{color:var(--admin-text);text-decoration:none;font-weight:600}
@@ -363,9 +364,6 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-dqc-card.is-danger{border-left:3px solid var(--admin-danger)}
 .rp-dqc-count{font-size:20px;font-weight:800;color:var(--admin-text)}
 .rp-dqc-label{font-size:11px;color:var(--admin-muted);font-weight:600;margin-top:4px}
-.rp-followup-row{display:flex;gap:14px;margin-bottom:14px;flex-wrap:wrap}
-.rp-followup-pill{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;padding:6px 12px;border-radius:8px;background:var(--admin-surface-alt);border:1px solid var(--admin-border)}
-.rp-followup-pill .count{font-size:16px;font-weight:800}
 .rp-export-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rp-export-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px}
 @media(max-width:1200px){.rp-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}.rp-dqc-grid{grid-template-columns:repeat(2,1fr)}}
@@ -385,7 +383,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 	<span>/</span>
 	<span><?php echo nutritionist_e($spec['title']); ?></span>
 </div>
-<div class="rp-table-section">
+<div class="rp-table-section allow-overflow">
 	<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
 		<div>
 			<div class="rp-table-title"><?php echo nutritionist_e($spec['title']); ?></div>
@@ -405,7 +403,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 		<div style="padding:24px;text-align:center;color:var(--admin-muted);font-size:13px;">No children match this monitoring list for the selected filters.</div>
 	<?php else: ?>
 		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
+			<table class="nutritionist-table" data-page-size="5" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
 				<?php if ($isInfantList): ?>
 				<thead><tr><th rowspan="2">No.</th><th rowspan="2">Address</th><th rowspan="2">Mother/Caregiver</th><th rowspan="2">Child Name</th><th rowspan="2">Sex</th><th rowspan="2">Birthdate</th><th rowspan="2">Height</th><th rowspan="2">Weight</th><th rowspan="2">WFA</th><th rowspan="2">HFA</th><th rowspan="2">WFH</th><th colspan="6" style="text-align:center;">Follow-up Visits</th></tr><tr><?php for ($mh = 1; $mh <= 6; $mh++): ?><th>Month#<?php echo $mh; ?></th><?php endfor; ?></tr></thead>
 				<?php else: ?>
@@ -413,7 +411,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 				<?php endif; ?>
 				<tbody>
 					<?php foreach ($listRows as $i => $row): ?>
-						<tr>
+						<tr<?php echo admin_paged_row_attr($i, 5); ?>>
 							<td><?php echo $i + 1; ?></td>
 							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
 							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
@@ -637,9 +635,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 	$renderTable('HEIGHT-FOR-AGE (HFA)', $hfaS);
 	$renderTable('WEIGHT-FOR-LENGTH/HEIGHT (WFH)', $wfhS);
 	?>
-	<div style="margin-top:12px;">
-		<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Generate PDF</a>
-	</div>
 </div>
 
 <?php elseif ($activeTab === 'prevalence'): ?>
@@ -693,7 +688,7 @@ $dqPct = static function (int $num, int $den): string {
 	$d = $den > 0 ? $den : 1;
 	return number_format(($num / $d) * 100, 2) . '%';
 };
-$dqCoverage = $dqPct($dqTotalWithMeasurement, $dqTotalChildren);
+$dqCoverage = $dqPct($dqMeasured6to59, $dqTotalChildren);
 $dqDupPct = $dqPct($dqDupCount, $dqTotalWithMeasurement);
 $dqHnwPct = $dqPct($dqHeightNoWeight, $dqTotalWithMeasurement);
 $dqWnhPct = $dqPct($dqWeightNoHeight, $dqTotalWithMeasurement);
@@ -718,7 +713,7 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
 					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
 					<tbody>
-						<tr><td><strong>A</strong></td><td>% Coverage (population of 0-59 months)</td><td style="text-align:right;font-weight:600;"><?php echo $dqCoverage; ?></td></tr>
+						<tr><td><strong>A</strong></td><td>% Coverage (population of 6-59 months)</td><td style="text-align:right;font-weight:600;"><?php echo $dqCoverage; ?></td></tr>
 						<tr><td><strong>B</strong></td><td>% Children measured with duplicate cases</td><td style="text-align:right;font-weight:600;"><?php echo $dqDupPct; ?></td></tr>
 						<tr><td><strong>C</strong></td><td>% Children with length/height but no weight</td><td style="text-align:right;font-weight:600;"><?php echo $dqHnwPct; ?></td></tr>
 						<tr><td><strong>D</strong></td><td>% Children with weight but no length/height</td><td style="text-align:right;font-weight:600;"><?php echo $dqWnhPct; ?></td></tr>
@@ -736,7 +731,7 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
 					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
 					<tbody>
-						<tr><td><strong>A</strong></td><td>% Children with biologically implausible measurements (WHO flag cutoffs: WAZ outside −6…+5, HAZ outside −6…+6, WHZ outside −5…+5)</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
+						<tr><td><strong>A</strong></td><td>% Children with flagged measurement based on z-scores</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
 						<tr><td><strong>B</strong></td><td>Digit preference score for anthropometric data</td><td style="text-align:right;font-weight:600;"><?php echo $dqDigitPref . '%'; ?></td></tr>
 						<tr><td><strong>C</strong></td><td>Skewness of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqSkewStr; ?></td></tr>
 						<tr><td><strong>D</strong></td><td>Kurtosis of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqKurtStr; ?></td></tr>
@@ -760,98 +755,6 @@ $dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
 	</div>
 </div>
 
-<?php elseif ($activeTab === 'followup'): ?>
-<div class="rp-panel is-active" data-panel="followup">
-	<?php
-	$followupRows = admin_fetch_all(
-		"SELECT c.id AS child_id, c.child_code, c.first_name, c.middle_name, c.last_name,
-			c.sex, c.birthdate, p.name AS parent_name, lm.measurement_date, lm.weight_kg, lm.height_cm,
-			lm.wfa_status, lm.hfa_status, lm.wfh_status, lm.nutritional_status,
-			a.id AS appt_id, a.scheduled_at, a.status AS appt_status, a.followup_category,
-			TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) AS age_months
-		 FROM appointments a
-		 INNER JOIN children c ON c.id = a.child_id
-		 INNER JOIN parents p ON p.id = c.parent_id
-		 LEFT JOIN measurements lm ON lm.id = (SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1)
-		 WHERE a.appointment_type = 'followup' AND a.status IN ('pending','scheduled') AND {$scope}
-		 ORDER BY a.scheduled_at ASC LIMIT 25",
-		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
-		array_merge($scopeParams, $barangayFilterParams)
-	);
-	$fcRows = admin_fetch_all(
-		"SELECT a.status, COUNT(*) AS cnt FROM appointments a INNER JOIN children c ON c.id = a.child_id
-		 WHERE a.appointment_type = 'followup' AND {$scope} GROUP BY a.status",
-		str_repeat('i', count($scopeParams) + count($barangayFilterParams)),
-		array_merge($scopeParams, $barangayFilterParams)
-	);
-	$fCounts = ['pending' => 0, 'scheduled' => 0, 'completed' => 0, 'referred' => 0];
-	foreach ($fcRows as $fr) { $st = (string)$fr['status']; if (isset($fCounts[$st])) $fCounts[$st] = (int)$fr['cnt']; }
-	?>
-	<div class="rp-followup-row">
-		<div class="rp-followup-pill"><span class="count" style="color:#d97706;"><?php echo $fCounts['pending']; ?></span> Pending</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $fCounts['scheduled']; ?></span> Scheduled</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-primary);"><?php echo $fCounts['completed']; ?></span> Completed</div>
-		<div class="rp-followup-pill"><span class="count" style="color:var(--admin-danger);"><?php echo $fCounts['referred']; ?></span> Referred</div>
-	</div>
-	<?php if (empty($followupRows)): ?>
-		<div class="rp-table-section"><div style="padding:20px;text-align:center;color:var(--admin-muted);font-size:13px;">No children currently require follow-up.</div></div>
-	<?php else: ?>
-		<div class="rp-table-section">
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" style="min-width:850px;">
-					<thead><tr><th>Child</th><th>Age</th><th>Status</th><th>Last Measured</th><th>Weight</th><th>Height</th><th>Appt</th><th>Scheduled</th><th>Action</th></tr></thead>
-					<tbody>
-						<?php foreach ($followupRows as $i => $row):
-							$ab = followup_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
-							$catLabel = $ab ? followup_category_label(implode('+', $ab)) : 'Normal';
-						?>
-							<tr>
-								<td><div style="font-weight:600;"><?php echo nutritionist_e(trim(($row['last_name']??'').', '.($row['first_name']??'').' '.($row['middle_name']??''))); ?></div><div style="font-size:11px;color:var(--admin-muted);"><?php echo nutritionist_e((string)$row['child_code']); ?></div></td>
-								<td><?php echo (int)$row['age_months']; ?> mo</td>
-								<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e($catLabel); ?></span></td>
-								<td><?php echo nutritionist_e((string)($row['measurement_date'] ?? '—')); ?></td>
-								<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) . ' kg' : '—'; ?></td>
-								<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) . ' cm' : '—'; ?></td>
-								<td><span class="admin-pill <?php echo (string)$row['appt_status'] === 'pending' ? 'is-warn' : 'is-info'; ?>"><?php echo nutritionist_e(ucfirst((string)$row['appt_status'])); ?></span></td>
-								<td><?php echo nutritionist_e((string)($row['scheduled_at'] ?? '—')); ?></td>
-								<td><a class="admin-icon-btn" title="Referral PDF" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=referral&child_id=' . (int)$row['child_id'])); ?>"><?php echo admin_action_icon('print'); ?></a></td>
-							</tr>
-						<?php endforeach; ?>
-					</tbody>
-				</table>
-			</div>
-		</div>
-	<?php endif; ?>
-</div>
-
-<?php elseif ($activeTab === 'export'): ?>
-<div class="rp-panel is-active" data-panel="export">
-	<div class="rp-export-grid">
-		<div class="rp-export-card">
-			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">EOPT Workbook</div>
-			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Full workbook with summary sheet and all monitoring lists in DOH format. Pick a file type:</div>
-			<div style="display:flex;gap:8px;flex-wrap:wrap;">
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query($filterParams)), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams)), 'Workbook'); ?>
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams)), 'NutStatusTool'); ?>
-				<?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams)), 'NutStatusBrgy'); ?>
-			</div>
-		</div>
-		<div class="rp-export-card">
-			<div style="font-weight:700;font-size:14px;margin-bottom:6px;">Formal PDF Reports</div>
-			<div style="font-size:12px;color:var(--admin-muted);margin-bottom:14px;">Printable official report forms with DOH headers and signatures.</div>
-			<div style="display:flex;gap:8px;flex-wrap:wrap;">
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1a&' . http_build_query($filterParams))); ?>">Form 1A PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1b&' . http_build_query($filterParams))); ?>">Form 1B PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=form1c&' . http_build_query($filterParams))); ?>">Form 1C PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatus&' . http_build_query($filterParams))); ?>">NutStatusTool PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=nutstatusbrgy&' . http_build_query($filterParams))); ?>">NutStatusBrgy PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=summary&' . http_build_query($filterParams))); ?>">Summary PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query($filterParams))); ?>">Prevalence PDF</a>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query($filterParams))); ?>">DQC PDF</a>
-			</div>
-		</div>
-	</div>
-</div>
 <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

@@ -79,24 +79,79 @@
     );
   }
 
-  function validatePhone(input) {
+  // Mirrors admin_normalize_ph_mobile() in includes/admin_helpers.php:
+  // accepts 09XXXXXXXXX, +639XXXXXXXXX, and 639XXXXXXXXX (spaces and
+  // dashes are ignored). Returns the canonical 09XXXXXXXXX form, or
+  // null when the input is not a valid PH mobile number.
+  function normalizePhMobile(raw) {
+    const trimmed = String(raw || "").trim();
+    if (trimmed === "") return null;
+    const hasPlus = trimmed.charAt(0) === "+";
+    const digitsOnly = trimmed.replace(/[^0-9]/g, "");
+
+    if (hasPlus && digitsOnly.substring(0, 2) !== "63") {
+      return null;
+    }
+
+    let canonical = digitsOnly;
+    if (canonical.substring(0, 2) === "63") {
+      canonical = "0" + canonical.substring(2);
+    }
+
+    return PH_MOBILE_RE.test(canonical) ? canonical : null;
+  }
+
+  // While typing, a partial number that could still grow into a valid
+  // one ("+", "+63", "09…", with spaces/dashes) must stay neutral instead
+  // of flashing red on every keystroke. Strict validity is enforced on
+  // blur and on submit; this only decides whether the current keystrokes
+  // are still a plausible prefix.
+  function isPotentialPhMobile(raw) {
+    const trimmed = String(raw || "").trim();
+    if (trimmed === "" || trimmed === "+") return true;
+    // Only digits, one leading "+", and spaces/dashes while typing.
+    if (/[^0-9+\s-]/.test(trimmed)) return false;
+    if (trimmed.slice(1).indexOf("+") !== -1) return false;
+
+    const digitsOnly = trimmed.replace(/[^0-9]/g, "");
+    if (digitsOnly === "") return true;
+
+    if (trimmed.charAt(0) === "+") {
+      // Must stay a prefix of "+63" + 10 more digits (12 digits total).
+      if ("63".indexOf(digitsOnly) === 0) return true;
+      if (digitsOnly.indexOf("63") !== 0) return false;
+      return digitsOnly.length <= 12;
+    }
+
+    // Local form: a prefix of "09" + 9 digits (11 total)…
+    if ("09".indexOf(digitsOnly) === 0 && digitsOnly.length <= 2) return true;
+    if (digitsOnly.indexOf("09") === 0) return digitsOnly.length <= 11;
+    // …or a prefix of "63" + 10 digits (12 total, no plus typed yet).
+    if ("63".indexOf(digitsOnly) === 0 && digitsOnly.length <= 2) return true;
+    if (digitsOnly.indexOf("63") === 0) return digitsOnly.length <= 12;
+    return false;
+  }
+
+  function validatePhone(input, strict) {
     const raw = input.value.trim();
 
     if (raw === "") {
       return setState(input, !input.required, "Mobile number is required.");
     }
 
-    const digitsOnly = raw.replace(/[^0-9]/g, "");
-
-    if (digitsOnly !== raw) {
-      // normalize as the user types so 0917-910-393 style input still works
-      input.value = digitsOnly;
+    if (!strict && normalizePhMobile(raw) === null && isPotentialPhMobile(raw)) {
+      // Still typing a plausible number — clear any state, no error.
+      const wrap = fieldWrapper(input);
+      const msg = messageEl(input);
+      if (wrap) wrap.classList.remove("is-valid", "is-invalid");
+      if (msg) msg.textContent = "";
+      return true;
     }
 
     return setState(
       input,
-      PH_MOBILE_RE.test(digitsOnly),
-      "Enter a valid 11-digit PH mobile number starting with 09 (e.g. 09171234567)."
+      normalizePhMobile(raw) !== null,
+      "Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)."
     );
   }
 
@@ -221,10 +276,12 @@
     });
 
     scope.querySelectorAll('[data-validate="phone-ph"]').forEach((input) => {
-      input.setAttribute("maxlength", "11");
-      input.setAttribute("inputmode", "numeric");
-      input.addEventListener("input", () => validatePhone(input));
-      input.addEventListener("blur", () => validatePhone(input));
+      // 14 fits "+639123456789" (13) plus room for a space/dash while typing.
+      input.setAttribute("maxlength", "14");
+      input.setAttribute("inputmode", "tel");
+      // Lenient while typing (partial "+63…" stays neutral), strict on blur.
+      input.addEventListener("input", () => validatePhone(input, false));
+      input.addEventListener("blur", () => validatePhone(input, true));
     });
 
     scope.querySelectorAll('[data-validate="password"]').forEach((input) => {

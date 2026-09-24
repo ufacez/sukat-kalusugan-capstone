@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/audit_logger.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
-require_once __DIR__ . '/../../includes/followup_scheduler.php';
 
 api_require_method(['POST']);
 
@@ -262,50 +262,27 @@ try {
 
     /*
     |--------------------------------------------------------------------------
-    | DUE-DATE CHECK
+    | ELIGIBILITY NOTE
     |--------------------------------------------------------------------------
     |
-    | The kiosk MUST verify the child is scheduled for measurement today.
-    | This is the backend authority — the kiosk cannot start a measurement
-    | unless the child is due (or within the grace window).
+    | Period-based monitoring has no exact due dates: any active child may
+    | be measured at any time. The recheck flag only decides whether the
+    | session saves as verification-only (RECHECK) or scheduled
+    | (ROUTINE) — it no longer bypasses any gate.
     |
     */
 
-    // Recheck bypasses the due gate (anytime verification). Everything
-    // else — device/child validation, active-session guard — still applies.
     if ($isRecheck) {
         log_action(
             null,
             'MEASUREMENT_RECHECK_START',
             'info',
             sprintf(
-                'Kiosk recheck started for child #%d (%s %s): due gate bypassed (verification-only, schedule untouched).',
-                $childId,
-                $child['first_name'] ?? '',
-                $child['last_name'] ?? ''
+                // Privacy: child id only — never the name.
+                'Kiosk recheck started for child #%d: verification-only, schedule untouched.',
+                $childId
             )
         );
-    } else {
-        $dueCheck = followup_is_due_today($childId);
-
-        if (!$dueCheck['is_due']) {
-            log_action(
-                null,
-                'MEASUREMENT_REJECTED_NOT_DUE',
-                'warning',
-                sprintf(
-                    'Kiosk measurement rejected for child #%d (%s %s): %s',
-                    $childId,
-                    $child['first_name'] ?? '',
-                    $child['last_name'] ?? '',
-                    $dueCheck['reason']
-                )
-            );
-
-            throw new RuntimeException(
-                $dueCheck['reason']
-            );
-        }
     }
 
     /*

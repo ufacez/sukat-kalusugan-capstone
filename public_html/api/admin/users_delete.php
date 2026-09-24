@@ -34,7 +34,7 @@ $ok = admin_execute('UPDATE users SET status = ? WHERE id = ?', 'si', ['inactive
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_USER', 'warning', 'Archived user ' . $target['email'] . ' (' . $id . ')');
+    log_action($actor['id'] ?? null, 'UPDATE_USER', 'warning', 'Archived staff #' . $id);
 }
 
 admin_redirect('/admin/users.php', ['notice' => $ok ? 'User archived successfully.' : 'User could not be archived.', 'type' => $ok ? 'success' : 'error']);
