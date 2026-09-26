@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('settings.view');
+admin_require_access('settings.view');
 
 $actor = current_user();
 

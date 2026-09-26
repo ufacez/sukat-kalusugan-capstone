@@ -7,9 +7,9 @@ start_secure_session();
 $editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
 
 if ($editId > 0) {
-    require_permission('barangays.manage');
+    admin_require_access('barangays.manage');
 } else {
-    require_permission('barangays.manage');
+    admin_require_access('barangays.manage');
 }
 
 $editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));

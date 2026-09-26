@@ -7,9 +7,9 @@ start_secure_session();
 $editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
 
 if ($editId > 0) {
-    require_permission('parents.update');
+    admin_require_access('parents.update');
 } else {
-    require_permission('parents.create');
+    admin_require_access('parents.create');
 }
 
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];

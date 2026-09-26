@@ -6,14 +6,14 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/audit_logger.php';
 
 start_secure_session();
-require_permission('children.view');
+admin_require_access('children.view');
 
 $conn = get_db_connection();
 
 // ── POST: Run auto-archive ──
 $archiveResult = null;
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') === 'run_archive') {
-	require_permission('children.edit');
+	admin_require_access('children.edit');
 
 	$ageMonthsThreshold = 60;
 

@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('barangays.view');
+admin_require_access('barangays.view');
 
 $editId = (int)($_GET['edit'] ?? 0);
 

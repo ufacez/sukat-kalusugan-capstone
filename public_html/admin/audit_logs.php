@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/export_dropdown.php';
 
 start_secure_session();
-require_permission('audit_logs.view');
+admin_require_access('audit_logs.view');
 
 // Online window (minutes): an actor counts as "currently using the app"
 // when they have any audit row newer than this. Passive page views write

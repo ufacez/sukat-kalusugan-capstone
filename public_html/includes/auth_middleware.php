@@ -248,6 +248,41 @@ function require_permission(string $code): void
     }
 }
 
+/**
+ * Page gate for /admin/*.php browser pages (NOT for api/admin/*).
+ *
+ * require_permission() above is access-level based only, so any staff
+ * member (admin or nutritionist) passes it. This gate additionally
+ * requires role === 'admin', giving strict page-level isolation:
+ * nutritionists (and parents) cannot open admin pages.
+ */
+function admin_require_access(string $code): void
+{
+    $user = current_user();
+
+    if ($user === null) {
+        deny_access('Please sign in to continue.', 401);
+    }
+
+    if (($user['type'] ?? null) !== 'staff') {
+        deny_access('You do not have permission to access this page.', 403);
+    }
+
+    if ((string)($user['role'] ?? '') !== 'admin') {
+        deny_access('You do not have permission to access this page.', 403);
+    }
+
+    if (($user['status'] ?? 'active') !== 'active') {
+        deny_access('This account is inactive.', 403);
+    }
+
+    $accessLevel = $user['access_level'] ?? 'full';
+
+    if (!user_has_access_for_code($accessLevel, $code)) {
+        deny_access('You do not have permission to access this page.', 403);
+    }
+}
+
 function user_has_access_for_code(string $accessLevel, string $code): bool
 {
     switch ($accessLevel) {

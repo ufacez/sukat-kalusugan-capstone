@@ -10,7 +10,7 @@ if ($editId <= 0) {
     admin_redirect('/admin/users.php', ['notice' => 'Select a user to edit.', 'type' => 'error']);
 }
 
-require_permission('users.update');
+admin_require_access('users.update');
 
 $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
 $barangays = admin_barangay_options();

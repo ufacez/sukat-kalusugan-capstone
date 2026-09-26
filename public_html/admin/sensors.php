@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/api_helpers.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 
 start_secure_session();
-require_permission('sensors.view');
+admin_require_access('sensors.view');
 
 $devices = admin_fetch_all(
     'SELECT d.id, d.device_code, d.location, d.barangay_id, bg.name AS barangay, d.status, d.last_seen_at, d.last_calibration_at,

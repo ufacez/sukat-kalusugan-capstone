@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('users.create');
+admin_require_access('users.create');
 
 $conn = get_db_connection();
 

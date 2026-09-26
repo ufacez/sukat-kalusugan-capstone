@@ -83,9 +83,13 @@ function nutritionist_require_access(): array
         deny_access('You do not have permission to access this page.', 403);
     }
 
+    // Page-only strict isolation: only the nutritionist role may open
+    // /nutritionist/*.php pages. Admins use /admin/*.php instead.
+    // (Shared JSON APIs under api/ still allow both roles via
+    // api_require_staff_session(), so clinical workflows keep working.)
     $role = (string)($user['role'] ?? '');
 
-    if (!in_array($role, ['admin', 'nutritionist'], true)) {
+    if ($role !== 'nutritionist') {
         deny_access('You do not have permission to access this page.', 403);
     }
 

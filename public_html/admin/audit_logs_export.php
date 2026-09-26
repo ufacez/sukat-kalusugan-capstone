@@ -14,7 +14,7 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 
 start_secure_session();
-require_permission('audit_logs.view');
+admin_require_access('audit_logs.view');
 
 $format = strtolower(trim((string)($_GET['format'] ?? 'xlsx')));
 if ($format !== 'csv' && $format !== 'xlsx' && $format !== 'pdf') {

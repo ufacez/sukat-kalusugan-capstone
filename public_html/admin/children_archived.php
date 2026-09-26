@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 
 start_secure_session();
-require_permission('children.delete');
+admin_require_access('children.delete');
 
 $deleteId = (int)($_GET['delete'] ?? 0);
 

@@ -4,7 +4,7 @@ require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 
 start_secure_session();
-require_permission('children.view');
+admin_require_access('children.view');
 
 $canAddChild = has_permission('children.create');
 

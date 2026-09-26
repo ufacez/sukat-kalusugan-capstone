@@ -5,7 +5,7 @@ require_once __DIR__ . '/../includes/api_helpers.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 
 start_secure_session();
-require_permission('dashboard.view');
+admin_require_access('dashboard.view');
 
 /*
 |--------------------------------------------------------------------------

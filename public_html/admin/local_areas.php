@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('barangays.manage');
+admin_require_access('barangays.manage');
 
 $barangayId = (int)($_GET['barangay_id'] ?? 0);
 

@@ -8,9 +8,9 @@ start_secure_session();
 $editId = (int)($_GET['id'] ?? ($_GET['edit'] ?? 0));
 
 if ($editId > 0) {
-    require_permission('children.update');
+    admin_require_access('children.update');
 } else {
-    require_permission('children.create');
+    admin_require_access('children.create');
 }
 
 // Add mode lives in the modal on children.php — this page is edit-only.

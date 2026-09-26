@@ -5,10 +5,10 @@ require_once __DIR__ . '/../includes/api_helpers.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 
 start_secure_session();
-require_permission('sensors.update');
+admin_require_access('sensors.update');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_device'])) {
-    require_permission('sensors.update');
+    admin_require_access('sensors.update');
 
     $deviceId = (int)($_POST['device_id'] ?? 0);
     $location = trim((string)($_POST['location'] ?? ''));

@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('users.view');
+admin_require_access('users.view');
 
 $canViewParents = has_permission('parents.view');
 $canAddParent = has_permission('parents.create');

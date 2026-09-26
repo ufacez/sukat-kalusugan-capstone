@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('users.delete');
+admin_require_access('users.delete');
 
 $deleteId = (int)($_GET['delete'] ?? 0);
 
