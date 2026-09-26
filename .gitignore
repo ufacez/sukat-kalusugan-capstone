@@ -33,3 +33,6 @@ public_html/test/*
 
 # Private Excel/reference files
 public_html/data/*
+
+# --- Local-only docs (never deployed to Azure) ---
+docs/
