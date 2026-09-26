@@ -1,0 +1,603 @@
+/* ==========================================================================
+ * showcase.css — public "Learn more" page (showcase.php)
+ * Mobile-first. Reuses app.css tokens + auth.css public-page shell
+ * (.auth-page.info-page). Everything here is namespaced `.sk-`.
+ * Illustrations are hand-drawn inline SVG (no raster/AI images).
+ * ========================================================================== */
+
+.sk-panel h3 {
+  margin: 1.4rem 0 0.5rem;
+  font-family: "Nunito", var(--font-display);
+  font-weight: 800;
+  font-size: 1.05rem;
+  line-height: 1.3;
+}
+
+.sk-panel h3:first-child {
+  margin-top: 0;
+}
+
+.sk-panel p {
+  font-size: 0.92rem;
+  line-height: 1.65;
+  margin: 0.4rem 0;
+}
+
+.sk-list {
+  margin: 0.4rem 0 0.4rem 1.1rem;
+  padding: 0;
+  font-size: 0.9rem;
+  line-height: 1.65;
+}
+
+.sk-list li {
+  margin-bottom: 0.25rem;
+}
+
+/* ---- Hero extras (logo/tagline/badges come from auth.css) ---- */
+.sk-hero-badges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.45rem;
+  margin-top: 1rem;
+}
+
+.sk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid var(--flash-notice-border);
+  background: var(--surface-alt);
+  font-size: 0.74rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--text);
+  max-width: 100%;
+}
+
+.sk-badge .sk-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  min-width: 0.5rem;
+  border-radius: 50%;
+  background: var(--primary);
+}
+
+.sk-cta-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin: 1rem 0 0.4rem;
+}
+
+.sk-cta-row .auth-submit {
+  text-decoration: none;
+  width: 100%;
+}
+
+.sk-cta-ghost {
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  padding: 0.95rem 1.3rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--primary);
+  font-weight: 700;
+  text-decoration: none;
+  width: 100%;
+}
+
+/* ---- Stat strip ---- */
+.sk-stats {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.6rem;
+  margin: 1rem 0 0.2rem;
+}
+
+.sk-stat {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  padding: 0.8rem 0.7rem;
+  text-align: center;
+}
+
+.sk-stat strong {
+  display: block;
+  font-family: "Nunito", var(--font-display);
+  font-weight: 900;
+  font-size: 1.35rem;
+  line-height: 1.1;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-stat strong {
+  color: var(--primary);
+}
+
+.sk-stat span {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+
+/* ---- SVG illustration frames ---- */
+.sk-figure {
+  margin: 0.9rem 0 0.4rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 1rem 0.8rem 0.6rem;
+  text-align: center;
+}
+
+.sk-figure svg {
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-figure svg {
+  color: var(--primary);
+}
+
+.sk-figure figcaption {
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+/* ---- Photo placeholder slots (swap with real <img> later) ---- */
+.sk-photo-slot {
+  margin: 0.9rem 0 0.4rem;
+  border: 1.5px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  padding: 1rem 0.9rem;
+  text-align: center;
+}
+
+.sk-photo-slot.is-wide {
+  aspect-ratio: 16 / 9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+}
+
+.sk-photo-slot.is-square {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  max-width: 320px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.sk-photo-slot svg {
+  width: 40px;
+  height: 40px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.sk-photo-slot strong {
+  display: block;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sk-photo-slot span {
+  display: block;
+  font-size: 0.74rem;
+  line-height: 1.5;
+  color: var(--muted);
+  max-width: 30ch;
+}
+
+/* When a real photo is dropped in, it fills the slot cleanly. */
+.sk-photo-slot img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: calc(var(--radius-md) - 4px);
+}
+
+/* ---- Device frames (CSS only, hold SVG screen mocks) ---- */
+.sk-devices {
+  display: grid;
+  gap: 1rem;
+  margin-top: 0.9rem;
+}
+
+.sk-device-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 1rem 0.9rem;
+}
+
+.sk-device-card h4 {
+  margin: 0.7rem 0 0.15rem;
+  font-family: "Nunito", var(--font-display);
+  font-size: 0.98rem;
+  font-weight: 800;
+}
+
+.sk-role-tag {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--primary);
+}
+
+.sk-device-card p,
+.sk-device-card ul {
+  font-size: 0.86rem;
+  line-height: 1.6;
+}
+
+.sk-device-card ul {
+  margin: 0.4rem 0 0 1.1rem;
+  padding: 0;
+}
+
+/* Laptop */
+.sk-laptop-screen {
+  border: 3px solid var(--text);
+  border-radius: 10px 10px 0 0;
+  background: var(--surface-alt);
+  padding: 0.4rem;
+  opacity: 0.92;
+}
+
+.sk-laptop-screen svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-laptop-screen svg {
+  color: var(--primary);
+}
+
+.sk-laptop-base {
+  height: 10px;
+  margin: 0 -6px;
+  border-radius: 0 0 10px 10px;
+  background: var(--text);
+  opacity: 0.85;
+}
+
+/* Phone */
+.sk-phone {
+  width: min(200px, 64%);
+  margin: 0 auto;
+  border: 3px solid var(--text);
+  border-radius: 26px;
+  background: var(--surface-alt);
+  padding: 0.5rem 0.4rem 0.8rem;
+  opacity: 0.92;
+}
+
+.sk-phone::before {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 6px;
+  margin: 0 auto 0.45rem;
+  border-radius: 999px;
+  background: var(--text);
+  opacity: 0.6;
+}
+
+.sk-phone svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-phone svg {
+  color: var(--primary);
+}
+
+/* Monitor */
+.sk-monitor-screen {
+  border: 3px solid var(--text);
+  border-radius: 10px;
+  background: var(--surface-alt);
+  padding: 0.4rem;
+  opacity: 0.92;
+}
+
+.sk-monitor-screen svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-monitor-screen svg {
+  color: var(--primary);
+}
+
+.sk-monitor-stand {
+  width: 14px;
+  height: 16px;
+  margin: 0 auto;
+  background: var(--text);
+  opacity: 0.85;
+}
+
+.sk-monitor-foot {
+  width: 90px;
+  height: 8px;
+  margin: 0 auto;
+  border-radius: 999px;
+  background: var(--text);
+  opacity: 0.85;
+}
+
+/* ---- Sensor cards ---- */
+.sk-sensors {
+  display: grid;
+  gap: 0.8rem;
+  margin-top: 0.9rem;
+}
+
+.sk-sensor {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 1rem 0.9rem;
+  text-align: center;
+}
+
+.sk-sensor svg {
+  width: 100%;
+  max-width: 220px;
+  height: auto;
+  color: var(--primary-strong);
+}
+
+[data-theme="dark"] .sk-sensor svg {
+  color: var(--primary);
+}
+
+.sk-sensor h4 {
+  margin: 0.6rem 0 0.15rem;
+  font-family: "Nunito", var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.sk-sensor .sk-spec {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.sk-sensor p {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--muted);
+  margin: 0.35rem 0 0;
+}
+
+/* ---- Steps ---- */
+.sk-steps {
+  list-style: none;
+  margin: 0.9rem 0 0.2rem;
+  padding: 0;
+  display: grid;
+  gap: 0.7rem;
+}
+
+.sk-step {
+  display: flex;
+  gap: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  padding: 0.85rem 0.9rem;
+  align-items: flex-start;
+}
+
+.sk-step-num {
+  flex: 0 0 auto;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--primary);
+  color: #fff;
+  font-family: "Nunito", var(--font-display);
+  font-weight: 900;
+  font-size: 0.95rem;
+}
+
+.sk-step strong {
+  display: block;
+  font-size: 0.9rem;
+}
+
+.sk-step span {
+  display: block;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+  margin-top: 0.15rem;
+}
+
+/* ---- WHO badges ---- */
+.sk-who {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin: 0.8rem 0 0.2rem;
+}
+
+.sk-who-badge {
+  padding: 0.42rem 0.8rem;
+  border-radius: 999px;
+  font-size: 0.76rem;
+  font-weight: 800;
+  border: 1px solid transparent;
+}
+
+.sk-who-normal { background: #e6f4ec; color: #0b6e4f; border-color: #bfe3cf; }
+.sk-who-uw { background: #fef3e2; color: #9a6700; border-color: #f3d9a8; }
+.sk-who-st { background: #eef2ff; color: #3730a3; border-color: #c9d2f5; }
+.sk-who-ws { background: #fdecec; color: #b42323; border-color: #f3c1c1; }
+.sk-who-ow { background: #f3e8ff; color: #6d28d9; border-color: #d9c6f7; }
+
+[data-theme="dark"] .sk-who-badge {
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+/* ---- Section dividers inside long cards ---- */
+.sk-divider {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 1.2rem 0;
+}
+
+/* ---- Screen placeholder inside device frames (swap with a screenshot) ---- */
+.sk-screen-slot {
+  border: 1.5px dashed var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  aspect-ratio: 16 / 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 0.8rem;
+  text-align: center;
+}
+
+.sk-phone .sk-screen-slot {
+  aspect-ratio: 9 / 14;
+}
+
+.sk-screen-slot svg {
+  width: 28px;
+  height: 28px;
+  color: var(--muted);
+  opacity: 0.7;
+}
+
+.sk-screen-slot strong {
+  font-size: 0.72rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.sk-screen-slot span {
+  font-size: 0.7rem;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* ---- iPad frame (kiosk touch process) ---- */
+.sk-ipad {
+  width: min(560px, 100%);
+  margin: 0.9rem auto 0.4rem;
+  border: 4px solid var(--text);
+  border-radius: 24px;
+  background: var(--surface-alt);
+  padding: 0.7rem 0.9rem;
+  opacity: 0.95;
+}
+
+.sk-ipad-cam {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+  opacity: 0.6;
+  margin: 0 auto 0.55rem;
+}
+
+.sk-ipad .sk-screen-slot {
+  aspect-ratio: 4 / 3;
+  border-radius: 8px;
+}
+
+.sk-ipad-home {
+  width: 64px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--text);
+  opacity: 0.6;
+  margin: 0.6rem auto 0;
+}
+
+/* ---- Larger screens: keep the same look, just more columns ---- */
+@media (min-width: 640px) {
+  .sk-cta-row {
+    flex-direction: row;
+    justify-content: center;
+  }
+
+  .sk-cta-row .auth-submit,
+  .sk-cta-ghost {
+    width: auto;
+    min-width: 200px;
+  }
+
+  .sk-stats {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  .sk-sensors {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .sk-steps {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 900px) {
+  .sk-devices {
+    grid-template-columns: repeat(3, 1fr);
+    align-items: stretch;
+  }
+}
+
+/* ---- Reduced motion ---- */
+@media (prefers-reduced-motion: reduce) {
+  .sk-panel,
+  .sk-figure,
+  .sk-photo-slot,
+  .sk-device-card,
+  .sk-sensor,
+  .sk-step {
+    animation: none !important;
+    transition: none !important;
+  }
+}

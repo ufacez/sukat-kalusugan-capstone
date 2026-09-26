@@ -77,10 +77,10 @@ if ($user !== null) {
             </ul>
             <p style="display:flex;gap:.6rem;flex-wrap:wrap;margin:12px 0;justify-content:center;">
                 <a class="auth-submit" style="text-decoration:none;" href="auth/login.php"><span class="button-label">Sign in</span></a>
-                <a class="link" style="align-self:center;" href="about.php">Learn more</a>
+                <a class="link" style="align-self:center;" href="showcase.php">Learn more</a>
             </p>
             <p class="muted" style="font-size:.85rem;">Questions about an account? <a class="link" href="contact.php">Contact Group A4Tech</a> — espirituean@gmail.com / 09614730364, Philippines.</p>
-            <p class="auth-card-footer">Group A4Tech &middot; <a class="link" href="about.php">About</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="terms.php">Terms</a> &middot; <a class="link" href="contact.php">Contact</a><br><span class="muted" style="font-size:.78rem;">Capstone project — not an official OLFU system.</span></p>
+            <p class="auth-card-footer">Group A4Tech &middot; <a class="link" href="about.php">About</a> &middot; <a class="link" href="showcase.php">Project</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="terms.php">Terms</a> &middot; <a class="link" href="contact.php">Contact</a><br><span class="muted" style="font-size:.78rem;">Capstone project — not an official OLFU system.</span></p>
         </section>
     </main>
     <script>
