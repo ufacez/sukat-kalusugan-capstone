@@ -115,6 +115,12 @@ if ($ok) {
     if ($status !== (string)($existingParent['status'] ?? 'active')) {
         admin_cascade_parent_status($id, $status);
     }
+    // Barangay move cascades too — otherwise children keep the old (or
+    // NULL) barangay_id and vanish from dashboard counts until each child
+    // edit form is re-saved.
+    if ($barangayId !== null && (int)$barangayId !== (int)($existingParent['barangay_id'] ?? 0)) {
+        admin_cascade_parent_barangay($id, $barangayId);
+    }
     $actor = current_user();
     log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $id);
 }

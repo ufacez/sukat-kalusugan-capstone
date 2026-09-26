@@ -244,28 +244,21 @@ if ($method === 'DELETE') {
     );
     $referenceCount = $childCount + $parentCount + $householdCount;
 
-    if ($referenceCount > 0) {
-        admin_execute(
-            "UPDATE local_areas SET is_active = 0 WHERE id = ?",
-            'i',
-            [$id]
-        );
-
-        $actor = current_user();
-        log_action($actor['id'] ?? null, 'DEACTIVATE_LOCAL_AREA', 'info',
-            "Deactivated local area \"{$existing['area_name']}\" (#{$id}) — {$referenceCount} records linked");
-
-        api_success([], 'Local area deactivated (linked records preserved).');
-        exit;
-    }
-
-    admin_execute("DELETE FROM local_areas WHERE id = ?", 'i', [$id]);
+    // Hard delete retired: local areas are Active/Inactive only, so linked
+    // children/parents/households never lose their area assignment and the
+    // UI never has to re-resolve orphaned rows. A legacy DELETE request
+    // (stale tab, bookmarked form) degrades to a deactivate.
+    admin_execute(
+        "UPDATE local_areas SET is_active = 0 WHERE id = ?",
+        'i',
+        [$id]
+    );
 
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'DELETE_LOCAL_AREA', 'danger',
-        "Deleted local area \"{$existing['area_name']}\" (#{$id})");
+    log_action($actor['id'] ?? null, 'DEACTIVATE_LOCAL_AREA', 'info',
+        "Deactivated local area \"{$existing['area_name']}\" (#{$id}) — {$referenceCount} records linked");
 
-    api_success([], 'Local area deleted.');
+    api_success([], 'Local area deactivated (linked records preserved).');
     exit;
 }
 

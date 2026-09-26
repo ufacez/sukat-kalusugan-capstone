@@ -471,6 +471,67 @@ function admin_cascade_parent_status(int $parentId, string $newStatus): int
 }
 
 /**
+ * Cascade a parent barangay move to every linked child.
+ *
+ * Children carry their own barangay_id (used by the dashboard, reports,
+ * and the nutritionist scope filter), so moving a parent without moving
+ * the children orphans them from barangay counts until someone re-saves
+ * each child edit form. This keeps them in sync in one step.
+ *
+ * A stale local_area_id that belongs to the OLD barangay is cleared
+ * (areas are per-barangay), so the child never points at another
+ * barangay's purok. A null/empty move (unassigned parent) is a no-op —
+ * children keep their current barangay rather than being wiped.
+ *
+ * Single source of truth — every parent-barangay update path (admin API,
+ * nutritionist form) must go through this.
+ *
+ * @return int Number of children re-linked (0 when none or on failure).
+ */
+function admin_cascade_parent_barangay(int $parentId, $newBarangayId): int
+{
+    if ($parentId <= 0 || $newBarangayId === null || (int)$newBarangayId <= 0) {
+        return 0;
+    }
+
+    $newBarangayId = (int)$newBarangayId;
+
+    $count = admin_scalar(
+        'SELECT COUNT(*) FROM children WHERE parent_id = ? AND (barangay_id IS NULL OR barangay_id != ?)',
+        'ii',
+        [$parentId, $newBarangayId]
+    );
+
+    if ($count <= 0) {
+        return 0;
+    }
+
+    $ok = admin_execute(
+        'UPDATE children SET barangay_id = ? WHERE parent_id = ? AND (barangay_id IS NULL OR barangay_id != ?)',
+        'iii',
+        [$newBarangayId, $parentId, $newBarangayId]
+    );
+
+    if (!$ok) {
+        error_log('[SukatKalusugan] admin_cascade_parent_barangay failed for parent ' . $parentId . ' -> barangay ' . $newBarangayId);
+        return 0;
+    }
+
+    // Clear local areas that belong to a different barangay — they would
+    // otherwise fail the per-barangay validation on the next child save.
+    admin_execute(
+        'UPDATE children SET local_area_id = NULL
+          WHERE parent_id = ?
+            AND local_area_id IS NOT NULL
+            AND local_area_id NOT IN (SELECT id FROM local_areas WHERE barangay_id = ?)',
+        'ii',
+        [$parentId, $newBarangayId]
+    );
+
+    return $count;
+}
+
+/**
  * Best-effort split of a single "name" column into first / middle / last
  * name parts, used to pre-fill the Add/Edit forms when editing a record
  * that only ever stored one combined name string.

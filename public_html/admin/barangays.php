@@ -135,10 +135,23 @@ admin_layout_start('Barangays', 'The master list every child, parent, nutritioni
                                 </a>
                                 <?php if (has_permission('barangays.manage')): ?>
                                 <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/barangay_form.php?id=' . (int)$barangay['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
-                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_delete.php')); ?>" data-admin-confirm="Delete <?php echo admin_e($barangay['name']); ?>? Records linked to it will keep their history but lose the barangay assignment." data-admin-confirm-danger style="display:inline;">
+                                <?php if ((string)$barangay['status'] === 'active'): ?>
+                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_update.php')); ?>" data-admin-confirm="Deactivate <?php echo admin_e($barangay['name']); ?>? Linked children, parents, and kiosks keep their history but the barangay hides from new registrations." style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$barangay['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
+                                    <input type="hidden" name="name" value="<?php echo admin_e($barangay['name']); ?>">
+                                    <input type="hidden" name="city_municipality" value="<?php echo admin_e((string)($barangay['city_municipality'] ?? '')); ?>">
+                                    <input type="hidden" name="status" value="inactive">
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Deactivate" type="submit"><?php echo admin_action_icon('archive'); ?></button>
                                 </form>
+                                <?php else: ?>
+                                <form method="post" action="<?php echo admin_e(app_url('/api/admin/barangays_update.php')); ?>" data-admin-confirm="Reactivate <?php echo admin_e($barangay['name']); ?>? It will appear for new registrations again with its history intact." style="display:inline;">
+                                    <input type="hidden" name="id" value="<?php echo (int)$barangay['id']; ?>">
+                                    <input type="hidden" name="name" value="<?php echo admin_e($barangay['name']); ?>">
+                                    <input type="hidden" name="city_municipality" value="<?php echo admin_e((string)($barangay['city_municipality'] ?? '')); ?>">
+                                    <input type="hidden" name="status" value="active">
+                                    <button class="admin-icon-btn admin-icon-btn-primary" title="Reactivate" type="submit"><?php echo admin_action_icon('add'); ?></button>
+                                </form>
+                                <?php endif; ?>
                                 <?php endif; ?>
                             </div>
                             <?php endif; ?>

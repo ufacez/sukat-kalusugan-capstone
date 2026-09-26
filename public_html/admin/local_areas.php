@@ -168,27 +168,17 @@ $flash = admin_flash_message();
                                         data-active="<?php echo (int)$area['is_active']; ?>"
                                     ><?php echo admin_action_icon('edit'); ?></button>
                                     <?php if ((int)$area['is_active'] === 0): ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Reactivate <?php echo admin_e($area['area_name']); ?>? It will appear for new registrations again." style="display:inline;">
-                                            <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
-                                            <input type="hidden" name="is_active" value="1">
-                                            <input type="hidden" name="_method" value="PATCH">
-                                            <button class="admin-icon-btn admin-icon-btn-primary" title="Activate" type="submit"><?php echo admin_action_icon('add'); ?></button>
-                                        </form>
-                                    <?php elseif ((int)$area['linked_count'] === 0): ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Delete <?php echo admin_e($area['area_name']); ?>? This cannot be undone." data-admin-confirm-danger style="display:inline;">
-                                            <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
-                                            <input type="hidden" name="_method" value="DELETE">
-                                            <button class="admin-icon-btn admin-icon-btn-danger" title="Delete" type="submit"><?php echo admin_action_icon('delete'); ?></button>
-                                        </form>
+                                        <button class="admin-icon-btn admin-icon-btn-primary" title="Reactivate" type="button"
+                                            data-area-action="reactivate"
+                                            data-id="<?php echo (int)$area['id']; ?>"
+                                            data-name="<?php echo admin_e($area['area_name']); ?>"><?php echo admin_action_icon('add'); ?></button>
                                     <?php else: ?>
-                                        <form method="post" action="<?php echo admin_e(app_url('/api/admin/local_areas.php')); ?>" data-admin-confirm="Deactivate <?php echo admin_e($area['area_name']); ?>? It will no longer appear for new registrations." style="display:inline;">
-                                            <input type="hidden" name="id" value="<?php echo (int)$area['id']; ?>">
-                                            <input type="hidden" name="is_active" value="0">
-                                            <input type="hidden" name="_method" value="PATCH">
-                                            <button class="admin-icon-btn admin-icon-btn-danger" title="Deactivate" type="submit">
-                                                <?php echo admin_action_icon('archive'); ?>
-                                            </button>
-                                        </form>
+                                        <button class="admin-icon-btn admin-icon-btn-danger" title="Deactivate" type="button"
+                                            data-area-action="deactivate"
+                                            data-id="<?php echo (int)$area['id']; ?>"
+                                            data-name="<?php echo admin_e($area['area_name']); ?>">
+                                            <?php echo admin_action_icon('archive'); ?>
+                                        </button>
                                     <?php endif; ?>
                                 </div>
                             </td>
@@ -314,6 +304,42 @@ $flash = admin_flash_message();
         })
         .catch(function() {
             AdminToast.error('Network error. Please try again.');
+        });
+    });
+
+    // Activate / Deactivate row buttons use the same JSON API via fetch
+    // (plain form POSTs would navigate the browser to a raw JSON page).
+    document.querySelectorAll('[data-area-action]').forEach(function(btn) {
+        btn.addEventListener('click', function() {
+            const action = btn.getAttribute('data-area-action');
+            const areaName = btn.getAttribute('data-name') || 'this area';
+            const makeActive = action === 'reactivate';
+            const message = makeActive
+                ? 'Reactivate ' + areaName + '? It will appear for new registrations again.'
+                : 'Deactivate ' + areaName + '? It will no longer appear for new registrations. Linked records are preserved.';
+            const run = function() {
+                const body = new FormData();
+                body.set('id', btn.getAttribute('data-id') || '');
+                body.set('is_active', makeActive ? '1' : '0');
+                body.set('_method', 'PATCH');
+                fetch(apiUrl, { method: 'POST', body: body })
+                .then(function(r) { return r.json(); })
+                .then(function(res) {
+                    if (res.success) {
+                        location.reload();
+                    } else {
+                        AdminToast.error(res.message || 'Something went wrong.');
+                    }
+                })
+                .catch(function() {
+                    AdminToast.error('Network error. Please try again.');
+                });
+            };
+            if (window.SKConfirm && typeof window.SKConfirm === 'function') {
+                window.SKConfirm(message, {}).then(function(ok) { if (ok) run(); });
+            } else if (window.confirm(message)) {
+                run();
+            }
         });
     });
 })();
