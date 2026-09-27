@@ -61,11 +61,6 @@ switch ($reportType) {
 		$filename = 'eopt-prevalence-' . date('Y-m-d') . '.pdf';
 		break;
 
-	case 'dqc':
-		$pdf = pdf_generate_dqc($f);
-		$filename = 'eopt-dqc-' . date('Y-m-d') . '.pdf';
-		break;
-
 	case 'summary':
 		$pdf = pdf_generate_nutrition_summary($f);
 		$filename = 'eopt-nutrition-summary-' . date('Y-m-d') . '.pdf';

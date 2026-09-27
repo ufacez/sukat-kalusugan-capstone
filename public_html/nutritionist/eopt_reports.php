@@ -70,7 +70,7 @@ $periodLabel = $view === 'monthly'
 		: 'Year ' . $year . ' · Annual');
 
 $activeTab = (string)($_GET['tab'] ?? 'overview');
-$validTabs = ['overview', 'eopt_forms', 'nutrition', 'monitoring', 'dqc'];
+$validTabs = ['overview', 'eopt_forms', 'nutrition', 'monitoring'];
 if (!in_array($activeTab, $validTabs, true)) {
 	$activeTab = 'overview';
 }
@@ -162,125 +162,6 @@ $affectedCount = admin_scalar(
 	   AND (lm.wfa_status IN ('SUW','MUW') OR lm.hfa_status IN ('SSt','MSt') OR lm.wfh_status IN ('SW','MW') OR lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))",
 	$baseTypes, $baseParams
 );
-
-$dqDupCount = count(admin_fetch_all(
-	"SELECT 1 FROM children c1 WHERE c1.first_name != '' AND c1.last_name != '' AND c1.birthdate IS NOT NULL
-	 GROUP BY c1.first_name, c1.last_name, c1.birthdate HAVING COUNT(*) > 1", '', []
-));
-$baseIntParams = array_merge($scopeParams, $barangayFilterParams);
-$baseIntTypes = str_repeat('i', count($baseIntParams));
-$dqMissingSex = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.sex IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqMissingDob = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqMissingInformation = admin_scalar("SELECT COUNT(*) FROM children c WHERE (COALESCE(c.first_name, '') = '' OR COALESCE(c.last_name, '') = '' OR c.birthdate IS NULL) AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqNoParentAddress = admin_scalar("SELECT COUNT(*) FROM children c LEFT JOIN parents p ON p.id = c.parent_id WHERE (p.id IS NULL OR COALESCE(p.name, '') = '' OR (c.local_area_id IS NULL AND COALESCE(p.address, '') = '')) AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqOverAge = admin_scalar("SELECT COUNT(*) FROM children c WHERE c.birthdate IS NOT NULL AND TIMESTAMPDIFF(YEAR, c.birthdate, CURDATE()) > 4 AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqHeightNoWeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.height_cm IS NOT NULL AND m.weight_kg IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqWeightNoHeight = admin_scalar("SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id WHERE m.weight_kg IS NOT NULL AND m.height_cm IS NULL AND {$scope}", $baseIntTypes, $baseIntParams);
-$dqIssueCount = $dqDupCount + $dqMissingInformation + $dqNoParentAddress + $dqMissingSex + $dqMissingDob + $dqOverAge + $dqHeightNoWeight + $dqWeightNoHeight;
-
-$dqTotalChildren = admin_scalar(
-	"SELECT COUNT(*) FROM children c WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
-	$baseTypes, $baseParams
-);
-$dqTotalWithMeasurement = $totalAssessed;
-$dqMeasured6to59 = admin_scalar(
-	"SELECT COUNT(DISTINCT c.id) FROM children c INNER JOIN measurements m ON m.child_id = c.id
-	 WHERE {$scope} AND m.measurement_date <= ? AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 6 AND 59",
-	$baseTypes . 's', array_merge($baseParams, [$anchorDate->format('Y-m-d')])
-);
-
-$dqMeasRows = admin_fetch_all(
-	"SELECT m.whz, m.is_flagged, m.weight_kg, m.height_cm
-	 FROM children c
-	 INNER JOIN measurements m ON m.id = (
-		SELECT m2.id FROM measurements m2
-		WHERE m2.child_id = c.id AND m2.measurement_date <= ?
-		ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
-	 )
-	 WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
-	'ii' . str_repeat('i', count($scopeParams)), array_merge([$anchorDate->format('Y-m-d'), $anchorDate->format('Y-m-d')], $scopeParams)
-);
-
-$dqFlaggedCount = 0;
-$dqDigitNum = 0;
-$dqDigitDen = 0;
-$dqWhzVals = [];
-$dqWhzBelowNeg2 = 0;
-
-foreach ($dqMeasRows as $dm) {
-	if (!empty($dm['is_flagged'])) {
-		$dqFlaggedCount++;
-	}
-	if ($dm['weight_kg'] !== null) {
-		$dqDigitDen++;
-		$ld = (int)round((float)$dm['weight_kg'] * 10) % 10;
-		if ($ld === 0 || $ld === 5) {
-			$dqDigitNum++;
-		}
-	}
-	if ($dm['height_cm'] !== null) {
-		$dqDigitDen++;
-		$ld = (int)round((float)$dm['height_cm'] * 10) % 10;
-		if ($ld === 0 || $ld === 5) {
-			$dqDigitNum++;
-		}
-	}
-	if ($dm['whz'] !== null) {
-		$whzVal = (float)$dm['whz'];
-		$dqWhzVals[] = $whzVal;
-		if ($whzVal < -2) {
-			$dqWhzBelowNeg2++;
-		}
-	}
-}
-
-$dqValidWhzCount = count($dqWhzVals);
-$dqFlaggedPct = count($dqMeasRows) > 0 ? number_format(($dqFlaggedCount / count($dqMeasRows)) * 100, 2) : '0.00';
-$dqDigitPref = $dqDigitDen > 0 ? number_format(($dqDigitNum / $dqDigitDen) * 100, 2) : '0.00';
-
-$dqSkewnessVal = null;
-$dqKurtosisVal = null;
-$dqWhzStdDevVal = null;
-$dqPoissonPVal = null;
-
-if ($dqValidWhzCount >= 10) {
-	$whzMean = array_sum($dqWhzVals) / $dqValidWhzCount;
-	$whzVar = 0.0;
-	foreach ($dqWhzVals as $wv) {
-		$whzVar += ($wv - $whzMean) * ($wv - $whzMean);
-	}
-	$whzVar /= ($dqValidWhzCount - 1);
-	$whzSd = sqrt($whzVar);
-	$dqWhzStdDevVal = $whzSd;
-
-	if ($whzSd > 0) {
-		$skewSum = 0.0;
-		$kurtSum = 0.0;
-		foreach ($dqWhzVals as $wv) {
-			$z = ($wv - $whzMean) / $whzSd;
-			$skewSum += $z * $z * $z;
-			$kurtSum += $z * $z * $z * $z;
-		}
-		$n = $dqValidWhzCount;
-		$dqSkewnessVal = ($n / (($n - 1) * ($n - 2))) * $skewSum;
-		$dqKurtosisVal = (($n * ($n + 1)) / (($n - 1) * ($n - 2) * ($n - 3))) * $kurtSum
-			- (3 * ($n - 1) * ($n - 1)) / (($n - 2) * ($n - 3));
-	}
-
-	$lambda = $dqValidWhzCount * 0.0228;
-	if ($lambda > 0) {
-		$pSum = 0.0;
-		for ($pi = 0; $pi <= max(0, $dqWhzBelowNeg2 - 1); $pi++) {
-			$factN = 0.0;
-			for ($fi = 2; $fi <= $pi; $fi++) {
-				$factN += log($fi);
-			}
-			$pSum += exp(-$lambda + $pi * log($lambda) - $factN);
-		}
-		$dqPoissonPVal = max(0, 1.0 - $pSum);
-	}
-}
-
 $listCountRows = admin_fetch_all(
 	"SELECT lm.wfa_status, lm.hfa_status, lm.wfh_status FROM children c {$latestJoin}
 	 WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 59",
@@ -302,7 +183,7 @@ $listCounts['0-23'] = (int)$infantCount;
 
 $actions = '';
 
-nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, analysis, and data-quality reports.', 'eopt_reports', $actions);
+nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, nutrition, and analysis reports.', 'eopt_reports', $actions);
 ?>
 
 <style>
@@ -356,18 +237,10 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 .rp-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rp-chart-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:16px;position:relative;min-height:320px}
 .rp-chart-title{font-size:13px;font-weight:700;color:var(--admin-text);margin-bottom:10px}
-.rp-dqc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
-.rp-dqc-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;padding:14px;text-align:center;text-decoration:none;color:inherit;transition:all 0.15s ease}
-.rp-dqc-card:hover{border-color:rgba(11,110,79,0.2)}
-.rp-dqc-card.is-ok{border-left:3px solid var(--admin-primary)}
-.rp-dqc-card.is-warn{border-left:3px solid #d97706}
-.rp-dqc-card.is-danger{border-left:3px solid var(--admin-danger)}
-.rp-dqc-count{font-size:20px;font-weight:800;color:var(--admin-text)}
-.rp-dqc-label{font-size:11px;color:var(--admin-muted);font-weight:600;margin-top:4px}
 .rp-export-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rp-export-card{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;padding:18px}
-@media(max-width:1200px){.rp-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}.rp-dqc-grid{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:720px){.rp-stat-grid{grid-template-columns:1fr}.rp-monitor-grid{grid-template-columns:1fr}.rp-dqc-grid{grid-template-columns:1fr}.rp-chart-grid{grid-template-columns:1fr}}
+@media(max-width:1200px){.rp-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.rp-monitor-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:720px){.rp-stat-grid{grid-template-columns:1fr}.rp-monitor-grid{grid-template-columns:1fr}.rp-chart-grid{grid-template-columns:1fr}}
 @media print{.nutritionist-sidebar,.nutritionist-topbar,.rp-filter-bar,.rp-tabs,.rp-form-actions,.rp-monitor-actions{display:none!important}.rp-panel{display:block!important}}
 </style>
 
@@ -488,7 +361,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 	<a class="rp-tab <?php echo $activeTab === 'eopt_forms' ? 'is-active' : ''; ?>" data-tab="eopt_forms" href="<?php echo nutritionist_e($tabUrl('eopt_forms')); ?>">EOPT Forms</a>
 	<a class="rp-tab <?php echo $activeTab === 'nutrition' ? 'is-active' : ''; ?>" data-tab="nutrition" href="<?php echo nutritionist_e($tabUrl('nutrition')); ?>">Nutrition Status</a>
 	<a class="rp-tab <?php echo $activeTab === 'monitoring' ? 'is-active' : ''; ?>" data-tab="monitoring" href="<?php echo nutritionist_e($tabUrl('monitoring')); ?>">Monitoring Lists</a>
-	<a class="rp-tab <?php echo $activeTab === 'dqc' ? 'is-active' : ''; ?>" data-tab="dqc" href="<?php echo nutritionist_e($tabUrl('dqc')); ?>">Data Quality</a>
 </div>
 
 <?php if ($activeTab === 'overview'): ?>
@@ -497,7 +369,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 		<div class="rp-stat-card"><div class="rp-stat-label">Total Assessed</div><div class="rp-stat-value"><?php echo (int)$totalAssessed; ?></div><div class="rp-stat-meta">0–59 mo with measurement</div></div>
 		<div class="rp-stat-card"><div class="rp-stat-label">0–23 Months</div><div class="rp-stat-value" style="color:var(--admin-primary);"><?php echo (int)$infantCount; ?></div><div class="rp-stat-meta">Children assessed</div></div>
 		<div class="rp-stat-card"><div class="rp-stat-label">Affected Children</div><div class="rp-stat-value" style="color:#b45309;"><?php echo (int)$affectedCount; ?></div><div class="rp-stat-meta">Wasted, stunted, underweight, or overweight</div></div>
-		<div class="rp-stat-card"><div class="rp-stat-label">Data Quality Issues</div><div class="rp-stat-value" style="<?php echo $dqIssueCount > 0 ? 'color:var(--admin-danger);' : ''; ?>"><?php echo (int)$dqIssueCount; ?></div><div class="rp-stat-meta"><?php echo $dqIssueCount > 0 ? 'Needs review' : 'No issues found'; ?></div></div>
 	</div>
 	<div class="rp-section">
 		<div class="rp-section-head"><div><div class="rp-section-title">Report Categories</div><div class="rp-section-sub">Open a report category for the selected period</div></div></div>
@@ -681,80 +552,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 		<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=prevalence&' . http_build_query($filterParams))); ?>">Generate PDF Report</a>
 	</div>
 </div>
-
-<?php elseif ($activeTab === 'dqc'): ?>
-<?php
-$dqPct = static function (int $num, int $den): string {
-	$d = $den > 0 ? $den : 1;
-	return number_format(($num / $d) * 100, 2) . '%';
-};
-$dqCoverage = $dqPct($dqMeasured6to59, $dqTotalChildren);
-$dqDupPct = $dqPct($dqDupCount, $dqTotalWithMeasurement);
-$dqHnwPct = $dqPct($dqHeightNoWeight, $dqTotalWithMeasurement);
-$dqWnhPct = $dqPct($dqWeightNoHeight, $dqTotalWithMeasurement);
-$dqDobPct = $dqPct($dqMissingDob, $dqTotalChildren);
-$dqSexPct = $dqPct($dqMissingSex, $dqTotalChildren);
-$dqParentPct = $dqPct($dqNoParentAddress, $dqTotalChildren);
-$dqFlaggedPct = count($dqMeasRows) > 0 ? number_format(($dqFlaggedCount / count($dqMeasRows)) * 100, 2) . '%' : '0.00%';
-$dqSkewStr = $dqSkewnessVal !== null ? number_format($dqSkewnessVal, 2) : 'N/A';
-$dqKurtStr = $dqKurtosisVal !== null ? number_format($dqKurtosisVal, 2) : 'N/A';
-$dqPoisStr = $dqPoissonPVal !== null ? number_format($dqPoissonPVal, 4) : 'N/A';
-$dqSdStr = $dqWhzStdDevVal !== null ? number_format($dqWhzStdDevVal, 2) : 'N/A';
-?>
-<div class="rp-panel is-active" data-panel="dqc">
-	<div class="rp-section">
-		<div class="rp-section-head"><div><div class="rp-section-title">Data Quality Check</div><div class="rp-section-sub">Completeness, accuracy, and reliability audit of all child records</div></div>
-			<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_pdf_generate.php?report_type=dqc&' . http_build_query($filterParams))); ?>">Export DQC PDF</a>
-		</div>
-
-		<div class="rp-table-section">
-			<div class="rp-table-title">COMPLETENESS</div>
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
-					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
-					<tbody>
-						<tr><td><strong>A</strong></td><td>% Coverage (population of 6-59 months)</td><td style="text-align:right;font-weight:600;"><?php echo $dqCoverage; ?></td></tr>
-						<tr><td><strong>B</strong></td><td>% Children measured with duplicate cases</td><td style="text-align:right;font-weight:600;"><?php echo $dqDupPct; ?></td></tr>
-						<tr><td><strong>C</strong></td><td>% Children with length/height but no weight</td><td style="text-align:right;font-weight:600;"><?php echo $dqHnwPct; ?></td></tr>
-						<tr><td><strong>D</strong></td><td>% Children with weight but no length/height</td><td style="text-align:right;font-weight:600;"><?php echo $dqWnhPct; ?></td></tr>
-						<tr><td><strong>E</strong></td><td>% Children with no date of birth data</td><td style="text-align:right;font-weight:600;"><?php echo $dqDobPct; ?></td></tr>
-						<tr><td><strong>F</strong></td><td>% Children with no sex data</td><td style="text-align:right;font-weight:600;"><?php echo $dqSexPct; ?></td></tr>
-						<tr><td><strong>G</strong></td><td>% Children with no name of parents/address</td><td style="text-align:right;font-weight:600;"><?php echo $dqParentPct; ?></td></tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-
-		<div class="rp-table-section">
-			<div class="rp-table-title">ACCURACY</div>
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
-					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
-					<tbody>
-						<tr><td><strong>A</strong></td><td>% Children with flagged measurement based on z-scores</td><td style="text-align:right;font-weight:600;"><?php echo $dqFlaggedPct; ?></td></tr>
-						<tr><td><strong>B</strong></td><td>Digit preference score for anthropometric data</td><td style="text-align:right;font-weight:600;"><?php echo $dqDigitPref . '%'; ?></td></tr>
-						<tr><td><strong>C</strong></td><td>Skewness of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqSkewStr; ?></td></tr>
-						<tr><td><strong>D</strong></td><td>Kurtosis of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqKurtStr; ?></td></tr>
-						<tr><td><strong>E</strong></td><td>Poisson distribution (p-value) for WL/H z (< -2)</td><td style="text-align:right;font-weight:600;"><?php echo $dqPoisStr; ?></td></tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-
-		<div class="rp-table-section">
-			<div class="rp-table-title">RELIABILITY</div>
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" data-no-paginate style="min-width:600px;">
-					<thead><tr><th style="width:30px;">#</th><th>Indicator</th><th style="width:80px;text-align:right;">Value</th></tr></thead>
-					<tbody>
-						<tr><td><strong>A</strong></td><td>Standard deviation of weight-for-height/length z-score</td><td style="text-align:right;font-weight:600;"><?php echo $dqSdStr; ?></td></tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-	</div>
-</div>
-
 <?php endif; ?>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>

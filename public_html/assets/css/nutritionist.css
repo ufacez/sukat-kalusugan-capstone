@@ -5313,25 +5313,18 @@
 
 .nsk-overview-head {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  flex-direction: row;
+  align-items: center;
   gap: 12px;
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
-.nsk-overview-title {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  color: var(--admin-text);
-  line-height: 1.2;
-}
 .nsk-overview-subtitle {
-  margin: 4px 0 0;
+  margin: 0;
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--admin-primary);
+  padding-top: 2px;
 }
 
 /* Prevalence-style canvas bar chart (whole-number counts). */
@@ -5354,8 +5347,24 @@
   gap: 14px;
   align-items: stretch;
 }
+/* Indicator switch reuses the export dropdown pattern (same trigger,
+   popover and item language) for consistency across the app. */
+.nsk-indicator-dd .export-dd-pop {
+  left: 0;
+  right: auto;
+  min-width: 280px;
+}
+.nsk-indicator-dd .export-dd-item .fmt {
+  background: rgba(16, 110, 79, 0.12);
+  color: var(--admin-primary);
+}
+.nsk-indicator-dd summary .export-dd-label,
+.nsk-indicator-dd summary span {
+  font-weight: 700;
+}
+
 @media (max-width: 980px) {
-  .nsk-overview-grid {
+.nsk-overview-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -5535,9 +5544,6 @@
 }
 
 /* ---- PNG dark look (follows app theme) ---- */
-html[data-theme="dark"] .nsk-overview-title {
-  color: #f2f7f4;
-}
 html[data-theme="dark"] .nsk-overview-subtitle {
   color: #34d399;
 }

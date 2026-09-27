@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/monitoring_periods.php';
+require_once __DIR__ . '/../includes/export_dropdown.php';
 
 $user = nutritionist_require_access();
 $today = new DateTimeImmutable('today');
@@ -570,31 +571,31 @@ $nskAxes = [
 		'chartTitle' => 'Weight-for-Age',
 		'statusTitle' => 'Latest Status — WFA',
 		'chart' => $nskBars([
-			['label' => 'Severely Underweight', 'short' => 'SUW', 'code' => 'SUW', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['wfa']['SUW']],
-			['label' => 'Moderately Underweight', 'short' => 'MUW', 'code' => 'MUW', 'color' => '#facc15', 'count' => (int)$axisPillCounts['wfa']['MUW']],
-			['label' => 'Use WFL/H column', 'short' => 'REF', 'code' => 'REF', 'color' => '#9ca3af', 'count' => (int)$axisPillCounts['wfa']['REF']],
-			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['wfa']['Normal']],
+			['label' => 'Severely Underweight', 'short' => 'SUW', 'code' => 'SUW', 'color' => '#dc2626', 'count' => (int)$axisPillCounts['wfa']['SUW']],
+			['label' => 'Moderately Underweight', 'short' => 'MUW', 'code' => 'MUW', 'color' => '#ca8a04', 'count' => (int)$axisPillCounts['wfa']['MUW']],
+			['label' => 'Use WFL/H column', 'short' => 'REF', 'code' => 'REF', 'color' => '#6b7280', 'count' => (int)$axisPillCounts['wfa']['REF']],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#059669', 'count' => (int)$axisCounts['wfa']['Normal']],
 		], $axisTotalWfa),
 	],
 	'hfa' => [
 		'chartTitle' => 'Height-for-Age',
 		'statusTitle' => 'Latest Status — HFA',
 		'chart' => $nskBars([
-			['label' => 'Severely Stunted', 'short' => 'SSt', 'code' => 'SSt', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['hfa']['SSt']],
-			['label' => 'Moderately Stunted', 'short' => 'MSt', 'code' => 'MSt', 'color' => '#facc15', 'count' => (int)$axisPillCounts['hfa']['MSt']],
-			['label' => 'Tall', 'short' => 'Tall', 'code' => 'Tall', 'color' => '#9ca3af', 'count' => $nskTallHfa],
-			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['hfa']['Normal']],
+			['label' => 'Severely Stunted', 'short' => 'SSt', 'code' => 'SSt', 'color' => '#dc2626', 'count' => (int)$axisPillCounts['hfa']['SSt']],
+			['label' => 'Moderately Stunted', 'short' => 'MSt', 'code' => 'MSt', 'color' => '#ca8a04', 'count' => (int)$axisPillCounts['hfa']['MSt']],
+			['label' => 'Tall', 'short' => 'Tall', 'code' => 'Tall', 'color' => '#6b7280', 'count' => $nskTallHfa],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#059669', 'count' => (int)$axisCounts['hfa']['Normal']],
 		], $axisTotalHfa),
 	],
 	'wflh' => [
 		'chartTitle' => 'Weight-for-Length/Height',
 		'statusTitle' => 'Latest Status — WFH',
 		'chart' => $nskBars([
-			['label' => 'Severely Wasted', 'short' => 'Severely Wasted', 'code' => 'SW', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['wflh']['SW/SAM']],
-			['label' => 'Moderately Wasted', 'short' => 'Moderately Wasted', 'code' => 'MW', 'color' => '#facc15', 'count' => (int)$axisPillCounts['wflh']['MW/MAM']],
-			['label' => 'Overweight', 'short' => 'Overweight', 'code' => 'OW', 'color' => '#fb923c', 'count' => (int)$axisPillCounts['wflh']['OW']],
-			['label' => 'Obese', 'short' => 'Obese', 'code' => 'OB', 'color' => '#fb923c', 'count' => (int)$axisPillCounts['wflh']['Ob']],
-			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['wflh']['Normal']],
+			['label' => 'Severely Wasted', 'short' => 'Severely Wasted', 'code' => 'SW', 'color' => '#dc2626', 'count' => (int)$axisPillCounts['wflh']['SW/SAM']],
+			['label' => 'Moderately Wasted', 'short' => 'Moderately Wasted', 'code' => 'MW', 'color' => '#ca8a04', 'count' => (int)$axisPillCounts['wflh']['MW/MAM']],
+			['label' => 'Overweight', 'short' => 'Overweight', 'code' => 'OW', 'color' => '#ea580c', 'count' => (int)$axisPillCounts['wflh']['OW']],
+			['label' => 'Obese', 'short' => 'Obese', 'code' => 'OB', 'color' => '#ea580c', 'count' => (int)$axisPillCounts['wflh']['Ob']],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#059669', 'count' => (int)$axisCounts['wflh']['Normal']],
 		], $axisTotalWflh),
 	],
 ];
@@ -659,17 +660,18 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 </section>
 
 <section class="nutritionist-panel-grid nutritionist-dashboard-grid">
+	<?php echo export_dropdown_assets(); ?>
 	<article class="nutritionist-panel nsk-overview-panel" aria-label="Nutritional status overview">
 		<div class="nsk-overview-head">
-			<div>
-				<h2 class="nsk-overview-title" id="nsk-overview-title">Weight-for-Age</h2>
-				<p class="nsk-overview-subtitle">Status for <?php echo date('Y'); ?></p>
-			</div>
-			<div class="who-tab-row" id="nutritionist-chart-tabs" role="tablist" aria-label="WHO indicator">
-				<button type="button" class="who-tab is-active" id="tab-wfa" data-axis="wfa" role="tab" aria-selected="true">WFA</button>
-				<button type="button" class="who-tab" id="tab-hfa" data-axis="hfa" role="tab" aria-selected="false">HFA</button>
-				<button type="button" class="who-tab" id="tab-wflh" data-axis="wflh" role="tab" aria-selected="false">WFH / WFL</button>
-			</div>
+			<details class="export-dd nsk-indicator-dd" id="nskIndicatorDd">
+				<summary class="admin-btn" aria-label="Growth indicator"><span id="nskDdLabel">Weight-for-Age</span></summary>
+				<div class="export-dd-pop" role="menu">
+					<a class="export-dd-item" role="menuitem" href="#" data-nsk-axis-opt="wfa"><span><span class="export-dd-label">Weight-for-Age</span><br><span class="export-dd-sub">Weight-for-age status</span></span><span class="fmt">WFA</span></a>
+					<a class="export-dd-item" role="menuitem" href="#" data-nsk-axis-opt="hfa"><span><span class="export-dd-label">Height-for-Age</span><br><span class="export-dd-sub">Height-for-age status</span></span><span class="fmt">HFA</span></a>
+					<a class="export-dd-item" role="menuitem" href="#" data-nsk-axis-opt="wflh"><span><span class="export-dd-label">Weight-for-Length/Height</span><br><span class="export-dd-sub">Weight-for-length/height status</span></span><span class="fmt">WFH</span></a>
+				</div>
+			</details>
+			<p class="nsk-overview-subtitle">Status for <?php echo date('Y'); ?></p>
 		</div>
 
 		<div class="nsk-overview-grid">
@@ -772,14 +774,16 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 </div><!-- /.nutritionist-dashboard -->
 
 <script>
-/* Prevalence-style animated bar chart (whole-number counts) + tab switcher.
+/* Prevalence-style animated bar chart (whole-number counts) + dropdown switch.
    Canvas fills the card so the graph runs to the bottom, level with the
-   status card. Label padding adapts to wrapped x-label lines. */
+   status card. Label padding adapts to wrapped x-label lines. Repaints
+   instantly on theme toggle via MutationObserver (no page refresh). */
 (function () {
-	var tabsRoot = document.getElementById('nutritionist-chart-tabs');
+	var axisDd = document.getElementById('nskIndicatorDd');
+	var axisLabel = document.getElementById('nskDdLabel');
 	var canvas = document.getElementById('nskChart');
 	var D = window.NSK_DATA;
-	if (!tabsRoot || !canvas || !D) return;
+	if (!axisDd || !canvas || !D) return;
 
 	var TITLES = { wfa: 'Weight-for-Age', hfa: 'Height-for-Age', wflh: 'Weight-for-Length/Height' };
 	var STATUS = { wfa: 'Latest Status \u2014 WFA', hfa: 'Latest Status \u2014 HFA', wflh: 'Latest Status \u2014 WFH' };
@@ -848,12 +852,12 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 			var isHover = nskHover === i;
 
 			ctx.save();
-			ctx.shadowColor = hexToRgba(it.color, 0.3);
-			ctx.shadowBlur = isHover ? 14 : 5;
+			ctx.shadowColor = hexToRgba(it.color, 0.25);
+			ctx.shadowBlur = isHover ? 12 : 3;
 			ctx.shadowOffsetY = 3;
 			var grad = ctx.createLinearGradient(0, by, 0, L.padT + L.cH);
 			grad.addColorStop(0, it.color);
-			grad.addColorStop(1, hexToRgba(it.color, isHover ? 0.6 : 0.75));
+			grad.addColorStop(1, hexToRgba(it.color, isHover ? 0.7 : 0.9));
 			ctx.fillStyle = grad;
 			ctx.beginPath();
 			if (ctx.roundRect) ctx.roundRect(bx, by, L.barW, Math.max(bh, 1), [5,5,0,0]);
@@ -897,22 +901,20 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 
 	function setAxis(key) {
 		if (!TITLES[key]) key = 'wfa';
-		tabsRoot.querySelectorAll('.who-tab').forEach(function (b) {
-			var on = b.getAttribute('data-axis') === key;
-			b.classList.toggle('is-active', on);
-			b.setAttribute('aria-selected', on ? 'true' : 'false');
-		});
+		if (axisLabel) axisLabel.textContent = TITLES[key];
+		if (axisDd.open) axisDd.removeAttribute('open');
 		document.querySelectorAll('[data-nsk-axis]').forEach(function (el) {
 			el.hidden = el.getAttribute('data-nsk-axis') !== key;
 		});
-		var ot = document.getElementById('nsk-overview-title');
-		if (ot) ot.textContent = TITLES[key];
 		var st = document.getElementById('nsk-status-title');
 		if (st) st.textContent = STATUS[key];
 		playAxis(key);
 	}
-	tabsRoot.querySelectorAll('.who-tab').forEach(function (btn) {
-		btn.addEventListener('click', function () { setAxis(btn.getAttribute('data-axis')); });
+	axisDd.querySelectorAll('[data-nsk-axis-opt]').forEach(function (opt) {
+		opt.addEventListener('click', function (e) {
+			e.preventDefault();
+			setAxis(opt.getAttribute('data-nsk-axis-opt'));
+		});
 	});
 
 	/* hover tooltip (whole numbers) */
@@ -959,6 +961,21 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 		if (nskResize) clearTimeout(nskResize);
 		nskResize = setTimeout(function () { renderNsk(nskKey, 1); }, 120);
 	});
+
+	/* Repaint instantly when the theme toggles (canvas keeps stale CSS-var
+	   colors otherwise until a full page refresh). */
+	if (typeof MutationObserver === 'function') {
+		var nskThemeObs = new MutationObserver(function (mutations) {
+			for (var mi = 0; mi < mutations.length; mi++) {
+				if (mutations[mi].attributeName === 'data-theme') {
+					nskHover = -1;
+					renderNsk(nskKey, 1);
+					break;
+				}
+			}
+		});
+		nskThemeObs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+	}
 
 	setAxis('wfa');
 })();
