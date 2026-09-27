@@ -76,12 +76,15 @@ $search = trim((string)($_GET['q'] ?? ''));
 
 $format = strtolower(trim((string)($_GET['format'] ?? 'xlsx')));
 if ($format !== 'csv' && $format !== 'xlsx' && $format !== 'pdf') {
-    $format = 'xlsx';
+	$format = 'xlsx';
 }
 if ($format === 'xlsx' && !class_exists('ZipArchive')) {
     error_log('[SukatKalusugan] Monitoring export: ZipArchive missing, falling back to CSV.');
     $format = 'csv';
 }
+// Drive-style preview modal: CSV/XLSX fetch ?preview=json, PDFs load ?preview=inline in an iframe
+// plus a lightweight ?preview=json metadata fetch for the modal header.
+$isPreviewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
 
 $backParams = ['view' => $view, 'year' => $year];
 if ($view === 'monthly') {
@@ -111,6 +114,25 @@ if ($search !== '') {
 }
 
 if ($roster === []) {
+    if ($isPreviewJson) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => true,
+            'title' => 'Monitoring List - ' . $period['label'],
+            'filename' => $baseName ?? ('monitoring-' . $view . '-' . $periodSlug . '.' . $format),
+            'format' => $format === 'pdf' ? 'pdf' : $format,
+            'total_rows' => 0,
+            'generated' => date('F j, Y g:i A'),
+            'headers' => ['Child Code', 'Full name', 'Sex', 'Barangay', 'Date', 'Weight (kg)', 'Height (cm)', 'WFA', 'HFA', 'WFH', 'Age (mo)', 'Age (days)'],
+            'preview_rows' => [],
+            'preview_count' => 0,
+            'note' => '',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     monitoring_export_fail($backParams, 'Nothing to export — no children in this roster for the selected period.');
 }
 
@@ -155,8 +177,49 @@ foreach ($roster as $entry) {
 
 $baseName = 'monitoring-' . $view . '-' . $periodSlug;
 
+// ── Preview JSON (lightweight, no file generated) ──
+// Handles ?preview=json for xlsx (default), csv, and pdf metadata.
+if ($isPreviewJson) {
+	if ($format === 'pdf') {
+		while (ob_get_level() > 0) {
+			ob_end_clean();
+		}
+		header('Content-Type: application/json; charset=utf-8');
+		echo json_encode([
+			'success' => true,
+			'title' => 'Monitoring List - ' . $period['label'],
+			'filename' => $baseName . '.pdf',
+			'format' => 'pdf',
+			'total_rows' => count($dataRows),
+			'generated' => date('F j, Y g:i A'),
+			'note' => '',
+		], JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	$payload = [
+		'success' => true,
+		'title' => 'Monitoring List - ' . $period['label'],
+		'filename' => $baseName . '.' . $format,
+		'format' => $format,
+		'total_rows' => count($dataRows),
+		'generated' => date('F j, Y g:i A'),
+		'headers' => $header,
+		'preview_rows' => array_slice($dataRows, 0, 20),
+		'preview_count' => min(20, count($dataRows)),
+		'note' => count($dataRows) > 20 ? 'Showing the first 20 of ' . count($dataRows) . ' rows — download for the full file.' : '',
+	];
+	header('Content-Type: application/json; charset=utf-8');
+	echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+	exit;
+}
+
 // ── PDF ──
 if ($format === 'pdf') {
+	require_once __DIR__ . '/../includes/export_preview.php';
+	$previewInline = isset($_GET['preview']) && $_GET['preview'] === 'inline';
     require_once __DIR__ . '/../includes/pdf_generator.php';
 
     $pdf = pdf_base('Monitoring List - ' . $title, 'Landscape');
@@ -189,31 +252,57 @@ if ($format === 'pdf') {
         $pdf->SetFont('helvetica', 'I', 7);
         $pdf->Cell(0, 5, 'Showing the first 1,000 of ' . count($dataRows) . ' rows — use XLSX/CSV for the full table.', 0, 1, 'C');
     }
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    $pdf->Output($baseName . '.pdf', 'D');
-    exit;
+	log_action((int)$user['id'], 'MONITORING_EXPORT', 'info', sprintf('Exported monitoring PDF (%d row(s)).', count($dataRows)));
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	if ($previewInline) {
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: inline; filename="' . $baseName . '.pdf"');
+	} else {
+		header('Content-Type: application/pdf');
+		header('Content-Disposition: attachment; filename="' . $baseName . '.pdf"');
+	}
+	$pdf->Output($baseName . '.pdf', $previewInline ? 'I' : 'D');
 }
 
-// ── CSV ──
+// ── CSV preview / download ──
 if ($format === 'csv') {
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $baseName . '.csv"');
-    header('Cache-Control: no-store, no-cache, must-revalidate');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-    $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, $header);
-    foreach ($dataRows as $dataRow) {
-        fputcsv($out, $dataRow);
-    }
-    fclose($out);
-    exit;
+	require_once __DIR__ . '/../includes/export_preview.php';
+	$previewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	if ($previewJson) {
+		$payload = [
+			'success' => true,
+			'title' => 'Monitoring List - ' . $period['label'],
+			'filename' => $baseName . '.csv',
+			'format' => 'csv',
+			'total_rows' => count($dataRows),
+			'generated' => date('F j, Y g:i A'),
+			'headers' => $header,
+			'preview_rows' => array_slice($dataRows, 0, 20),
+			'preview_count' => min(20, count($dataRows)),
+			'note' => count($dataRows) > 20 ? 'Showing the first 20 of ' . count($dataRows) . ' rows \u2014 download for the full file.' : '',
+		];
+		header('Content-Type: application/json; charset=utf-8');
+		echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+	header('Content-Type: text/csv; charset=utf-8');
+	header('Content-Disposition: attachment; filename="' . $baseName . '.csv"');
+	header('Cache-Control: no-store, no-cache, must-revalidate');
+	header('Pragma: no-cache');
+	header('Expires: 0');
+	$out = fopen('php://output', 'w');
+	fwrite($out, "\xEF\xBB\xBF");
+	fputcsv($out, $header);
+	foreach ($dataRows as $dataRow) {
+		fputcsv($out, $dataRow);
+	}
+	fclose($out);
+	exit;
 }
 
 // ── XLSX ──

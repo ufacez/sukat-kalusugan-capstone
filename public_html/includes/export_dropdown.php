@@ -12,6 +12,8 @@ if (!function_exists('admin_action_icon')) {
 	require_once __DIR__ . '/admin_helpers.php';
 }
 
+require_once __DIR__ . '/export_preview.php';
+
 function export_dropdown_assets(): string
 {
 	static $printed = false;
@@ -72,6 +74,7 @@ function export_dropdown(string $xlsxUrl, ?string $csvUrl = null, ?string $pdfUr
 {
 	$esc = static fn(string $u): string => htmlspecialchars($u, ENT_QUOTES, 'UTF-8');
 	$html = export_dropdown_assets();
+	$html .= export_preview_assets();
 	$isIcon = $variant === 'icon';
 	$triggerClass = $isIcon ? 'admin-icon-btn admin-icon-btn-primary export-dd-trigger-icon' : 'admin-btn';
 	$triggerInner = $isIcon
@@ -79,21 +82,25 @@ function export_dropdown(string $xlsxUrl, ?string $csvUrl = null, ?string $pdfUr
 		: admin_action_icon('export') . ' ' . htmlspecialchars($label, ENT_QUOTES, 'UTF-8');
 	$triggerTitle = $isIcon ? ' title="Save as: XLSX, CSV, PDF" aria-label="Save as: XLSX, CSV, PDF"' : '';
 
+	$previewUrl = export_preview_url($xlsxUrl, 'xlsx');
+	$csvPreviewUrl = $csvUrl !== null && $csvUrl !== '' ? export_preview_url($csvUrl, 'csv') : null;
+	$pdfPreviewUrl = $pdfUrl !== null && $pdfUrl !== '' ? export_preview_url($pdfUrl, 'pdf') : null;
+
 	$html .= '<details class="export-dd">';
 	$html .= '<summary class="' . $triggerClass . '"' . $triggerTitle . '>' . $triggerInner . '</summary>';
 	$html .= '<div class="export-dd-pop" role="menu">';
-	$html .= '<a class="export-dd-item export-dd-xls" role="menuitem" href="' . $esc($xlsxUrl) . '">'
+	$html .= '<a class="export-dd-item export-dd-xls" role="menuitem" data-exp-preview="' . $esc($previewUrl) . '" data-exp-download="' . $esc($xlsxUrl) . '" data-exp-format="xlsx" href="' . $esc($xlsxUrl) . '">'
 		. admin_action_icon('file_xls')
 		. '<span><span class="export-dd-label">Excel workbook</span><br><span class="export-dd-sub">Formatted sheets, ready to print</span></span>'
 		. '<span class="fmt">XLSX</span></a>';
 	if ($csvUrl !== null && $csvUrl !== '') {
-		$html .= '<a class="export-dd-item export-dd-csv" role="menuitem" href="' . $esc($csvUrl) . '">'
+		$html .= '<a class="export-dd-item export-dd-csv" role="menuitem" data-exp-preview="' . $esc($csvPreviewUrl) . '" data-exp-download="' . $esc($csvUrl) . '" data-exp-format="csv" href="' . $esc($csvUrl) . '">'
 			. admin_action_icon('file_csv')
 			. '<span><span class="export-dd-label">Raw data</span><br><span class="export-dd-sub">Opens in Excel &amp; Sheets</span></span>'
 			. '<span class="fmt">CSV</span></a>';
 	}
 	if ($pdfUrl !== null && $pdfUrl !== '') {
-		$html .= '<a class="export-dd-item export-dd-pdf" role="menuitem" href="' . $esc($pdfUrl) . '">'
+		$html .= '<a class="export-dd-item export-dd-pdf" role="menuitem" data-exp-preview="' . $esc($pdfPreviewUrl) . '" data-exp-download="' . $esc($pdfUrl) . '" data-exp-format="pdf" href="' . $esc($pdfUrl) . '">'
 			. admin_action_icon('file_pdf')
 			. '<span><span class="export-dd-label">PDF document</span><br><span class="export-dd-sub">Official printable copy</span></span>'
 			. '<span class="fmt">PDF</span></a>';

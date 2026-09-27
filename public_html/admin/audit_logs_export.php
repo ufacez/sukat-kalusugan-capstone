@@ -12,6 +12,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
+require_once __DIR__ . '/../includes/export_preview.php';
 
 start_secure_session();
 admin_require_access('audit_logs.view');
@@ -21,9 +22,11 @@ if ($format !== 'csv' && $format !== 'xlsx' && $format !== 'pdf') {
     $format = 'xlsx';
 }
 if ($format === 'xlsx' && !class_exists('ZipArchive')) {
-    error_log('[SukatKalusugan] Audit export: ZipArchive missing, falling back to CSV.');
     $format = 'csv';
 }
+// Drive-style preview modal: CSV/XLSX fetch ?preview=json, PDFs load ?preview=inline in an iframe
+// plus a lightweight ?preview=json metadata fetch for the modal header.
+$isPreviewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
 
 $actionFilter = (string)($_GET['action'] ?? '');
 if (!in_array($actionFilter, ['login', 'logout', 'create', 'read', 'update', 'delete'], true)) {
@@ -95,8 +98,45 @@ foreach ($rows as $row) {
 
 $downloadBase = 'audit-logs-' . date('Y-m-d');
 
+// ── Preview JSON (lightweight, no file generated) ──
+// Handles ?preview=json for xlsx (default), csv, and pdf metadata.
+if ($isPreviewJson) {
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	if ($format === 'pdf') {
+		header('Content-Type: application/json; charset=utf-8');
+		echo json_encode([
+			'success' => true,
+			'title' => 'Audit Trail - ' . $downloadBase,
+			'filename' => $downloadBase . '.pdf',
+			'format' => 'pdf',
+			'total_rows' => count($dataRows),
+			'generated' => date('F j, Y g:i A'),
+			'note' => '',
+		], JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+	$payload = [
+		'success' => true,
+		'title' => 'Audit Trail - ' . $downloadBase,
+		'filename' => $downloadBase . '.' . $format,
+		'format' => $format,
+		'total_rows' => count($dataRows),
+		'generated' => date('F j, Y g:i A'),
+		'headers' => $header,
+		'preview_rows' => array_slice($dataRows, 0, 20),
+		'preview_count' => min(20, count($dataRows)),
+		'note' => count($dataRows) > 20 ? 'Showing the first 20 of ' . count($dataRows) . ' rows — download for the full file.' : '',
+	];
+	header('Content-Type: application/json; charset=utf-8');
+	echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+	exit;
+}
+
 if ($format === 'pdf') {
-    require_once __DIR__ . '/../includes/pdf_generator.php';
+	require_once __DIR__ . '/../includes/pdf_generator.php';
+	$previewInline = isset($_GET['preview']) && $_GET['preview'] === 'inline';
     $pdf = pdf_base('Audit Trail - ' . $downloadBase, 'Landscape');
     $pdf->AddPage();
     $pdf->SetFont('helvetica', 'B', 12);
@@ -136,33 +176,60 @@ if ($format === 'pdf') {
         $pdf->Cell(0, 5, 'Showing the first 1,000 of ' . count($dataRows) . ' rows — use CSV/XLSX for the full trail.', 0, 1, 'C');
     }
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'AUDIT_EXPORT', 'info', sprintf('Exported audit trail PDF (%d row(s)).', count($dataRows)));
+	log_action($actor['id'] ?? null, 'AUDIT_EXPORT', 'info', sprintf('Exported audit trail PDF (%d row(s)).', count($dataRows)));
     while (ob_get_level() > 0) {
         ob_end_clean();
     }
-    $pdf->Output($downloadBase . '.pdf', 'D');
+    if ($previewInline) {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $downloadBase . '.pdf"');
+    } else {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $downloadBase . '.pdf"');
+    }
+    $pdf->Output($downloadBase . '.pdf', $previewInline ? 'I' : 'D');
     exit;
 }
 
 if ($format === 'csv') {
-    $actor = current_user();
-    log_action($actor['id'] ?? null, 'AUDIT_EXPORT', 'info', sprintf('Exported audit trail CSV (%d row(s)).', count($dataRows)));
-    while (ob_get_level() > 0) {
-        ob_end_clean();
-    }
-    header('Content-Type: text/csv; charset=utf-8');
-    header('Content-Disposition: attachment; filename="' . $downloadBase . '.csv"');
-    header('Cache-Control: no-store, no-cache, must-revalidate');
-    header('Pragma: no-cache');
-    header('Expires: 0');
-    $out = fopen('php://output', 'w');
-    fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, $header);
-    foreach ($dataRows as $dataRow) {
-        fputcsv($out, $dataRow);
-    }
-    fclose($out);
-    exit;
+	$previewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
+	$actor = current_user();
+	if (!$previewJson) {
+		log_action($actor['id'] ?? null, 'AUDIT_EXPORT', 'info', sprintf('Exported audit trail CSV (%d row(s)).', count($dataRows)));
+	}
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	if ($previewJson) {
+		$payload = [
+			'success' => true,
+			'title' => 'Audit Trail - ' . $downloadBase,
+			'filename' => $downloadBase . '.csv',
+			'format' => 'csv',
+			'total_rows' => count($dataRows),
+			'generated' => date('F j, Y g:i A'),
+			'headers' => $header,
+			'preview_rows' => array_slice($dataRows, 0, 20),
+			'preview_count' => min(20, count($dataRows)),
+			'note' => count($dataRows) > 20 ? 'Showing the first 20 of ' . count($dataRows) . ' rows \u2014 download for the full file.' : '',
+		];
+		header('Content-Type: application/json; charset=utf-8');
+		echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+		exit;
+	}
+	header('Content-Type: text/csv; charset=utf-8');
+	header('Content-Disposition: attachment; filename="' . $downloadBase . '.csv"');
+	header('Cache-Control: no-store, no-cache, must-revalidate');
+	header('Pragma: no-cache');
+	header('Expires: 0');
+	$out = fopen('php://output', 'w');
+	fwrite($out, "\xEF\xBB\xBF");
+	fputcsv($out, $header);
+	foreach ($dataRows as $dataRow) {
+		fputcsv($out, $dataRow);
+	}
+	fclose($out);
+	exit;
 }
 
 $tmpDir = rtrim((string)sys_get_temp_dir(), "/\\");

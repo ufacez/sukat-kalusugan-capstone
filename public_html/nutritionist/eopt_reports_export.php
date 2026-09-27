@@ -4,6 +4,7 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/monitoring_periods.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
+require_once __DIR__ . '/../includes/export_preview.php';
 
 $statusToStyle = [
 	'Normal' => 'cell_green', 'MUW' => 'cell_yellow', 'SUW' => 'cell_red',
@@ -1169,6 +1170,83 @@ $eoptStreamCsv = static function (array $sheets, string $filename): void {
 	fclose($output);
 	exit;
 };
+
+// ── Preview JSON (lightweight, no file generated) ──
+// Drive-style modal: CSV/XLSX buttons fetch ?preview=json (format=xlsx default,
+// format=csv for raw-data). Respond with the active sheet's first 20 rows so the
+// modal grid works for both formats; &sheet= switches multi-sheet tabs.
+$isEoptPreviewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
+if ($isEoptPreviewJson) {
+	$previewSheet = (string)($_GET['sheet'] ?? '');
+	$sheetNames = array_map(static fn(array $s): string => (string)($s['name'] ?? 'Sheet'), $sheets);
+	$activeName = $previewSheet !== '' && in_array($previewSheet, $sheetNames, true) ? $previewSheet : ($sheetNames[0] ?? 'Sheet1');
+	$activeRows = [];
+	foreach ($sheets as $s) {
+		if ((string)($s['name'] ?? '') === $activeName) {
+			$activeRows = (array)($s['rows'] ?? []);
+			break;
+		}
+	}
+	$previewFormat = $exportFormat === 'csv' ? 'csv' : 'xlsx';
+	$previewFilename = $previewFormat === 'csv' ? $csvDownloadName : $xlsxDownloadName;
+	// The modal grid expects rows as {cells:[...], kind:title|label|header|data|total},
+	// but sheet rows are stored in xlsx-writer shape ([{v,s},...]). Convert here so
+	// the preview shows real text instead of blank rows. The sheet title/meta block
+	// is skipped so the grid opens cleanly at the column headers.
+	$convertedRows = array_map(static function ($row): array {
+		$rawCells = is_array($row) ? array_values($row) : [];
+		$cells = [];
+		$styles = [];
+		foreach ($rawCells as $cell) {
+			if (is_array($cell)) {
+				$v = $cell['v'] ?? '';
+				$styles[] = (string)($cell['s'] ?? '');
+			} else {
+				$v = $cell;
+				$styles[] = '';
+			}
+			$cells[] = is_scalar($v) || $v === null ? $v : (string)$v;
+		}
+		$kind = 'data';
+		if (in_array('header', $styles, true) || in_array('header_left', $styles, true)) {
+			$kind = 'header';
+		} elseif (in_array('title', $styles, true) || in_array('subtitle', $styles, true) || in_array('org', $styles, true)) {
+			$kind = 'title';
+		} elseif (in_array('total', $styles, true) || in_array('total_label', $styles, true)) {
+			$kind = 'total';
+		} elseif (in_array('label', $styles, true)) {
+			$kind = 'label';
+		}
+		return ['cells' => $cells, 'kind' => $kind];
+	}, $activeRows);
+	$headerStart = 0;
+	foreach ($convertedRows as $idx => $convertedRow) {
+		if (($convertedRow['kind'] ?? '') === 'header') {
+			$headerStart = $idx;
+			break;
+		}
+	}
+	$previewRows = array_slice($convertedRows, $headerStart, 20);
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	$payload = [
+		'success' => true,
+		'title' => $periodLabel,
+		'filename' => $previewFilename,
+		'format' => $previewFormat,
+		'total_rows' => count($activeRows),
+		'sheets' => $sheetNames,
+		'sheet' => $activeName,
+		'generated' => date('F j, Y g:i A'),
+		'rows' => $previewRows,
+		'preview_count' => min(20, count($activeRows)),
+		'note' => count($activeRows) > 20 ? 'Showing the first 20 rows of "' . $activeName . '" — download for the full workbook.' : '',
+	];
+	header('Content-Type: application/json; charset=utf-8');
+	echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+	exit;
+}
 
 if ($csvRequested) {
 	if ($xlsxFallbackToCsv) {

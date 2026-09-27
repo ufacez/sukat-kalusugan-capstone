@@ -3,6 +3,7 @@
 require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/auth_middleware.php';
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/export_preview.php';
 $pdfGeneratorPath = __DIR__ . '/../includes/pdf_generator.php';
 if (function_exists('opcache_invalidate')) {
 	@opcache_invalidate($pdfGeneratorPath, true);
@@ -90,7 +91,28 @@ if (!$pdf) {
 }
 
 require_once __DIR__ . '/../includes/audit_logger.php';
+$isPdfPreviewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
+if ($isPdfPreviewJson) {
+	while (ob_get_level() > 0) {
+		ob_end_clean();
+	}
+	header('Content-Type: application/json; charset=utf-8');
+	echo json_encode([
+		'success' => true,
+		'title' => $filename,
+		'filename' => $filename,
+		'format' => 'pdf',
+		'generated' => date('F j, Y g:i A'),
+		'note' => '',
+	], JSON_UNESCAPED_UNICODE);
+	exit;
+}
 log_action((int)$user['id'], 'EOPT_PDF_EXPORT', 'info', sprintf('Generated PDF report: %s', $reportType . ($listCode !== '' ? '/' . $listCode : '')));
 
-$pdf->Output($filename, 'D');
+$previewInline = isset($_GET['preview']) && $_GET['preview'] === 'inline';
+if ($previewInline) {
+	$pdf->Output($filename, 'I');
+} else {
+	$pdf->Output($filename, 'D');
+}
 exit;

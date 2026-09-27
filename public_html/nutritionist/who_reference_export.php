@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_reference_import.php';
+require_once __DIR__ . '/../includes/export_preview.php';
 
 nutritionist_require_access();
 
@@ -31,6 +32,10 @@ if ($whoFormat === 'xlsx' && !class_exists('ZipArchive')) {
     $whoFormat = 'csv';
     $whoFallbackToCsv = true;
 }
+// Drive-style preview modal: CSV/XLSX fetch ?preview=json, PDFs load ?preview=inline in an iframe
+// plus a lightweight ?preview=json metadata fetch for the modal header.
+$isWhoPreviewJson = isset($_GET['preview']) && $_GET['preview'] === 'json';
+$isWhoPreviewInline = isset($_GET['preview']) && $_GET['preview'] === 'inline';
 
 $indicators = [
 	'waz'      => ['label' => 'Weight-for-Age (months)',   'table' => 'who_weight_for_age',      'column' => 'age_months', 'columnLabel' => 'Age (months)'],
@@ -150,7 +155,63 @@ $tmpPath = $tmpDir . DIRECTORY_SEPARATOR . 'who_export_' . bin2hex(random_bytes(
 $sheetName = strtoupper($indicator) . '_' . $sex;
 
 if (empty($dataRows)) {
+    if ($isWhoPreviewJson) {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => true,
+            'title' => 'WHO Standard - ' . $config['label'] . ' - ' . $sex,
+            'filename' => 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.' . ($whoFormat === 'pdf' ? 'pdf' : ($whoFormat === 'csv' ? 'csv' : 'xlsx')),
+            'format' => $whoFormat === 'pdf' ? 'pdf' : ($whoFormat === 'csv' ? 'csv' : 'xlsx'),
+            'total_rows' => 0,
+            'generated' => date('F j, Y g:i A'),
+            'headers' => $header,
+            'preview_rows' => [],
+            'preview_count' => 0,
+            'note' => '',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
     who_export_fail($indicator, $sex, $ageRange, 'No standard rows found for this indicator. The standard table may not be seeded yet.');
+}
+
+// ── Preview JSON (lightweight, no file generated) ──
+// Handles ?preview=json for xlsx (default), csv, and pdf metadata.
+if ($isWhoPreviewJson) {
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
+    if ($whoFormat === 'pdf') {
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'success' => true,
+            'title' => 'WHO Standard - ' . $config['label'] . ' - ' . $sex,
+            'filename' => 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.pdf',
+            'format' => 'pdf',
+            'total_rows' => count($dataRows),
+            'generated' => date('F j, Y g:i A'),
+            'note' => '',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    $whoPreviewExt = $whoFormat === 'csv' ? 'csv' : 'xlsx';
+    $payload = [
+        'success' => true,
+        'title' => 'WHO Standard - ' . $config['label'] . ' - ' . $sex,
+        'filename' => 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.' . $whoPreviewExt,
+        'format' => $whoPreviewExt,
+        'total_rows' => count($dataRows),
+        'generated' => date('F j, Y g:i A'),
+        'headers' => $header,
+        'preview_rows' => array_slice($dataRows, 0, 20),
+        'preview_count' => min(20, count($dataRows)),
+        'note' => count($dataRows) > 20 ? 'Showing the first 20 of ' . count($dataRows) . ' rows — download for the full file.' : '',
+    ];
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode($payload, JSON_UNESCAPED_UNICODE);
+    exit;
 }
 
 if ($whoFormat === 'pdf') {
@@ -194,7 +255,16 @@ if ($whoFormat === 'pdf') {
     while (ob_get_level() > 0) {
         ob_end_clean();
     }
-    $pdf->Output('who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.pdf', 'D');
+    $whoPdfName = 'who-' . $indicator . '-' . strtolower($sex) . '-' . $ageRange . '.pdf';
+    if ($isWhoPreviewInline) {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: inline; filename="' . $whoPdfName . '"');
+        $pdf->Output($whoPdfName, 'I');
+    } else {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="' . $whoPdfName . '"');
+        $pdf->Output($whoPdfName, 'D');
+    }
     exit;
 }
 
