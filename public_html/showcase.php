@@ -13,8 +13,8 @@ sort($teamPhotos);
 
 $kioskDemo = is_file(__DIR__ . '/assets/video/kiosk-demo.mp4') ? 'assets/video/kiosk-demo.mp4' : null;
 $kioskSteps = [
-    ['title' => 'Welcome — Simulan', 'text' => 'Checks the clock and connection, then waits for a tap on Simulan.'],
-    ['title' => 'Find the child', 'text' => 'Search by ID or name and confirm the record — scoped to the kiosk\'s barangay.'],
+    ['title' => 'Simulan', 'text' => 'Checks the clock and connection, then waits for a tap on Simulan.'],
+    ['title' => 'Find the child', 'text' => 'Search by ID or name and confirm the record scoped to the kiosk\'s barangay.'],
     ['title' => 'Live height + weight', 'text' => 'TF-Luna reads height, the load cell reads weight. Stability bars turn green when it\'s ready to process.'],
     ['title' => 'Resulta', 'text' => 'Shows weight, height, and WHO status, then syncs straight to the dashboards.'],
 ];
@@ -215,7 +215,7 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
     <section class="sk-section" id="kiosk">
         <p class="eyebrow">Kiosk process</p>
         <h2>At the kiosk</h2>
-        <p class="lead">Watch a full session in seconds — from Simulan to synced result.</p>
+        <p class="lead">Watch a full session in seconds from Start to End of kiosk interactive display.</p>
         <div class="sk-split">
             <div class="sk-side">
                 <div class="sk-video-wrap">
@@ -227,7 +227,6 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
                             <small>Add <code>assets/video/kiosk-demo.mp4</code><br>8&ndash;15s clip, autoplay loop</small>
                         </div>
                     <?php endif; ?>
-                    <div class="device-label">Kiosk walkthrough</div>
                 </div>
             </div>
             <div class="sk-copy">
@@ -242,38 +241,6 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
                         </li>
                     <?php endforeach; ?>
                 </ol>
-            </div>
-        </div>
-    </section>
-
-    <section class="sk-section" id="sensors">
-        <p class="eyebrow">Inside the kiosk</p>
-        <h2>Sensors we use</h2>
-        <p class="lead">Two sensors, no manual tape or scale reading.</p>
-        <div class="sk-spec-grid">
-            <div class="sk-spec">
-                <div class="sensor-shot">
-                    <?php if ($sensorLidar): ?>
-                        <img src="<?php echo htmlspecialchars($sensorLidar, ENT_QUOTES, 'UTF-8'); ?>" alt="TF-Luna LiDAR height sensor" loading="lazy" draggable="false">
-                    <?php else: ?>
-                        <b>LiDAR photo placeholder</b>
-                        <small>Add <code>sensor-lidar.jpg</code></small>
-                    <?php endif; ?>
-                </div>
-                <h3>Height — TF-Luna LiDAR</h3>
-                <p>Laser distance sensor above the child.<br><code>height = mounting (182.88 cm) &minus; distance + offset</code><br>Calibrated on empty platform, tuned without reflash.</p>
-            </div>
-            <div class="sk-spec">
-                <div class="sensor-shot">
-                    <?php if ($sensorWeight): ?>
-                        <img src="<?php echo htmlspecialchars($sensorWeight, ENT_QUOTES, 'UTF-8'); ?>" alt="Load cells and HX711 weight sensor" loading="lazy" draggable="false">
-                    <?php else: ?>
-                        <b>Load cell photo placeholder</b>
-                        <small>Add <code>sensor-weight.jpg</code></small>
-                    <?php endif; ?>
-                </div>
-                <h3>Weight — HX711 + load cell</h3>
-                <p>Platform scale sensor under the feet.<br><code>auto-tare, live calibration factor</code><br>Stable-weight check before processing.</p>
             </div>
         </div>
     </section>

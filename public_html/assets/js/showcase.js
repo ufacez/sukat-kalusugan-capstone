@@ -44,7 +44,7 @@
         { icon: 'height', label: '150cm mount' },
         { icon: 'zap', label: 'Non-contact reading' }
       ],
-      text: 'Uses Time-of-Flight (ToF) technology — it sends out a quick, eye-safe pulse of infrared light and measures how long it takes to bounce back, then converts that into a height reading. No tape, no stadiometer, nothing touching the child. It is calibrated against the empty platform first so every reading stays consistent.'
+      text: 'Uses Time-of-Flight (ToF) technology it sends out a quick, eye-safe pulse of infrared light and measures how long it takes to bounce back, then converts that into a height reading. No tape, no stadiometer, nothing touching the child. It is calibrated against the empty platform first so every reading stays consistent.'
     },
     '2': {
       title: 'Tablet Kiosk screen',
@@ -55,7 +55,7 @@
         { icon: 'list', label: 'Step-by-step guide' },
         { icon: 'chart', label: 'WHO result shown' }
       ],
-      text: 'Walks the family through the whole session — start, find the child record, watch live height and weight, then see the growth result on screen.'
+      text: 'Walks the family through the whole session start, find the child record, watch live height and weight, then see the growth result on screen.'
     },
     '3': {
       title: 'ESP32 microcontroller',
