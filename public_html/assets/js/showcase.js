@@ -1,6 +1,151 @@
 /* Sukat Kalusugan public showcase — vanilla, no dependencies.
- * Team deck + kiosk iPad slider with synced side description. */
+ * Team deck + meet-the-kiosk hotspot modal + lightbox. */
 (function () {
+  /* Theme-aware hero logos, same as auth login: forlight on light bg, fordark on dark bg. */
+  function swapShowcaseLogos() {
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    Array.prototype.forEach.call(document.querySelectorAll('[data-logo-light]'), function (img) {
+      img.src = isDark ? img.getAttribute('data-logo-dark') : img.getAttribute('data-logo-light');
+    });
+  }
+  swapShowcaseLogos();
+  window.addEventListener('storage', function (e) {
+    if (e.key === 'theme') swapShowcaseLogos();
+  });
+
+  /* ---- Meet-the-kiosk part modal ----
+   * EDIT TEXT HERE ONLY. Keys match data-part in showcase.php; dot
+   * positions (--hx/--hy) live in the markup, layout in showcase.css.
+   * Drop photos into assets/img/kiosk-parts/ to replace placeholders. */
+  /* Small stroke icons for the part stat blocks (same style as auth icons).
+   * Keys are referenced by KIOSK_PARTS specs below — add new ones here. */
+  var SK_SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">';
+  function skIcon(inner) { return SK_SVG_OPEN + inner + '</svg>'; }
+  var PART_ICONS = {
+    zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+    height: '<polyline points="8 18 12 22 16 18"/><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="22"/>',
+    eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>',
+    tablet: '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    list: '<line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/>',
+    chart: '<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>',
+    cpu: '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><line x1="9" y1="2" x2="9" y2="6"/><line x1="15" y1="2" x2="15" y2="6"/><line x1="9" y1="18" x2="9" y2="22"/><line x1="15" y1="18" x2="15" y2="22"/><line x1="2" y1="9" x2="6" y2="9"/><line x1="2" y1="15" x2="6" y2="15"/><line x1="18" y1="9" x2="22" y2="9"/><line x1="18" y1="15" x2="22" y2="15"/>',
+    activity: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+    wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.53 16.11a6 6 0 0 1 6.95 0"/><line x1="12" y1="20" x2="12.01" y2="20"/>',
+    layers: '<polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 12 12 17 22 12"/><polyline points="2 17 12 22 22 17"/>',
+    check: '<polyline points="20 6 9 17 4 12"/>'
+  };
+  var KIOSK_PARTS = {
+    '1': {
+      title: 'TF-Luna LiDAR sensor',
+      img: 'assets/img/kiosk-parts/tfluna.jpg',
+      file: 'kiosk-parts/tfluna.jpg',
+      specs: [
+        { icon: 'eye', label: 'Eye-safe sensor' },
+        { icon: 'height', label: '150cm mount' },
+        { icon: 'zap', label: 'Non-contact reading' }
+      ],
+      text: 'Uses Time-of-Flight (ToF) technology — it sends out a quick, eye-safe pulse of infrared light and measures how long it takes to bounce back, then converts that into a height reading. No tape, no stadiometer, nothing touching the child. It is calibrated against the empty platform first so every reading stays consistent.'
+    },
+    '2': {
+      title: 'Tablet Kiosk screen',
+      img: 'assets/img/kiosk-parts/ipad.jpg',
+      file: 'kiosk-parts/ipad.jpg',
+      specs: [
+        { icon: 'tablet', label: 'Touchscreen display' },
+        { icon: 'list', label: 'Step-by-step guide' },
+        { icon: 'chart', label: 'WHO result shown' }
+      ],
+      text: 'Walks the family through the whole session — start, find the child record, watch live height and weight, then see the growth result on screen.'
+    },
+    '3': {
+      title: 'ESP32 microcontroller',
+      img: 'assets/img/kiosk-parts/esp32.jpg',
+      file: 'kiosk-parts/esp32.jpg',
+      specs: [
+        { icon: 'cpu', label: 'ESP32 brain' },
+        { icon: 'activity', label: '10-sample reads' },
+        { icon: 'wifi', label: 'HTTPS data push' }
+      ],
+      text: 'The brain behind the screen mount. It reads both sensors, checks that measurements are stable, then pushes the snapshot straight into the system.'
+    },
+    '4': {
+      title: 'Load cells + HX711',
+      img: 'assets/img/kiosk-parts/loadcell.jpg',
+      file: 'kiosk-parts/loadcell.jpg',
+      specs: [
+        { icon: 'layers', label: 'Four 50 kg cells' },
+        { icon: 'activity', label: 'Live calibration' },
+        { icon: 'check', label: 'Stable-weight check' }
+      ],
+      text: 'Weighs the child standing on the platform. It re-zeroes automatically and only records once the weight holds steady, so wiggles do not skew results.'
+    }
+  };
+  var stage = document.getElementById('kioskStage');
+  if (stage) {
+    var modal = document.getElementById('kioskModal');
+    var modalImg = document.getElementById('kioskModalImg');
+    var modalPh = document.getElementById('kioskModalPh');
+    var modalPhFile = document.getElementById('kioskModalPhFile');
+    var modalTitle = document.getElementById('kioskModalTitle');
+    var modalSpecs = document.getElementById('kioskModalSpecs');
+    var modalText = document.getElementById('kioskModalText');
+    var dots = Array.prototype.slice.call(stage.querySelectorAll('.sk-hotspot'));
+    function closeKioskModal() {
+      modal.hidden = true;
+      dots.forEach(function (d) { d.setAttribute('aria-expanded', 'false'); });
+    }
+    modalImg.addEventListener('error', function () {
+      modalImg.hidden = true;
+      modalPh.hidden = false;
+    });
+    dots.forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var wasOpen = btn.getAttribute('aria-expanded') === 'true' && !modal.hidden;
+        var info = KIOSK_PARTS[btn.getAttribute('data-part')];
+        closeKioskModal();
+        if (wasOpen || !info) return;
+        modalTitle.textContent = info.title;
+        modalSpecs.innerHTML = '';
+        (info.specs || []).slice(0, 3).forEach(function (stat) {
+          var cell = document.createElement('div');
+          cell.className = 'sk-part-stat';
+          var icon = document.createElement('span');
+          icon.setAttribute('aria-hidden', 'true');
+          icon.innerHTML = skIcon(PART_ICONS[stat.icon] || '');
+          var label = document.createElement('span');
+          label.textContent = stat.label;
+          cell.appendChild(icon);
+          cell.appendChild(label);
+          modalSpecs.appendChild(cell);
+        });
+        modalText.textContent = info.text;
+        if (info.img) {
+          modalPhFile.textContent = info.file || info.img;
+          modalImg.hidden = false;
+          modalPh.hidden = true;
+          modalImg.alt = info.title;
+          if (modalImg.getAttribute('src') !== info.img) {
+            modalImg.setAttribute('src', info.img);
+          } else if (!modalImg.complete || modalImg.naturalWidth === 0) {
+            modalImg.hidden = true;
+            modalPh.hidden = false;
+          }
+        } else {
+          modalImg.hidden = true;
+          modalPh.hidden = false;
+        }
+        modal.hidden = false;
+        btn.setAttribute('aria-expanded', 'true');
+      });
+    });
+    document.getElementById('kioskModalClose').addEventListener('click', closeKioskModal);
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) closeKioskModal();
+    });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && !modal.hidden) closeKioskModal();
+    });
+  }
   var lastSwipeAt = 0;
   function markSwiped() { lastSwipeAt = Date.now(); }
   function justSwiped() { return Date.now() - lastSwipeAt < 350; }
@@ -61,67 +206,7 @@
   renderDots();
   go(0);
 
-  /* ---- Kiosk iPad slider: swipe screenshots, side description follows ---- */
-  var kDeck = document.getElementById('kioskDeck');
-  if (kDeck) {
-    var kTrack = document.getElementById('kioskTrack');
-    var kSlides = Array.prototype.slice.call(kTrack.children);
-    var kPrev = document.getElementById('kioskPrev');
-    var kNext = document.getElementById('kioskNext');
-    var kDots = document.getElementById('kioskDots');
-    var kPos = document.getElementById('kioskPos');
-    var kBox = document.getElementById('kioskDesc');
-    var kN = document.getElementById('kioskStepN');
-    var kTitle = document.getElementById('kioskTitle');
-    var kText = document.getElementById('kioskText');
-    var kIdx = 0;
-    var copy = [
-      { t: 'Welcome — Simulan', d: 'Live clock and device online check. Tap Simulan to start. Privacy notice follows before measuring.' },
-      { t: 'Find the child', d: 'Search by Child ID or name, confirm the record. Scoped to the kiosk barangay; double-check override if not due.' },
-      { t: 'Live height + weight', d: 'TF-Luna LiDAR reads height while the HX711 load cell reads weight. Stability bars turn green, then I-process.' },
-      { t: 'Resulta', d: 'Weight, height, and WHO status — WFA / HFA / WFH. Session closes as COMPLETE and syncs to dashboards.' }
-    ];
-
-    function kRenderDots() {
-      kDots.innerHTML = '';
-      kSlides.forEach(function (_, i) {
-        var b = document.createElement('button');
-        b.type = 'button';
-        b.setAttribute('aria-label', 'Go to kiosk step ' + (i + 1));
-        b.setAttribute('aria-current', i === kIdx ? 'true' : 'false');
-        b.addEventListener('click', function () { kGo(i); });
-        kDots.appendChild(b);
-      });
-    }
-
-    function kGo(i) {
-      kIdx = (i + kSlides.length) % kSlides.length;
-      kTrack.style.transform = 'translateX(' + (-kIdx * 100) + '%)';
-      Array.prototype.forEach.call(kDots.children, function (dt, di) {
-        dt.setAttribute('aria-current', di === kIdx ? 'true' : 'false');
-      });
-      if (kPos) kPos.textContent = (kIdx + 1) + ' / ' + kSlides.length;
-      var c = copy[kIdx % copy.length];
-      if (kBox && c) {
-        kBox.classList.add('is-switching');
-        setTimeout(function () {
-          kN.textContent = String(kIdx + 1);
-          kTitle.textContent = c.t;
-          kText.textContent = c.d;
-          kBox.classList.remove('is-switching');
-        }, 160);
-      }
-    }
-
-    if (kPrev) kPrev.addEventListener('click', function () { kGo(kIdx - 1); });
-    if (kNext) kNext.addEventListener('click', function () { kGo(kIdx + 1); });
-    makeSwipeable(kDeck, function () { kGo(kIdx + 1); }, function () { kGo(kIdx - 1); });
-    kRenderDots();
-    kTrack.style.transform = 'translateX(0%)';
-    if (kPos) kPos.textContent = '1 / ' + kSlides.length;
-  }
-
-  /* ---- Click-to-enlarge lightbox (tap any kiosk / team photo) ---- */
+  /* ---- Click-to-enlarge lightbox (tap any team photo) ---- */
   var lb = document.getElementById('skLightbox');
   if (lb) {
     var lbImg = document.getElementById('skLbImg');
@@ -184,8 +269,6 @@
         });
       });
     }
-    var kT = document.getElementById('kioskTrack');
-    if (kT) bindSlides(kT, '.tablet-slide', 'Kiosk screen');
     if (track) bindSlides(track, '.sk-card', 'Team photo');
     function bindSingle(imgSel, label) {
       Array.prototype.forEach.call(document.querySelectorAll(imgSel), function (one) {
@@ -198,6 +281,7 @@
       });
     }
     bindSingle('#kioskUnitSolo img', 'Kiosk unit');
+    bindSingle('.sk-feature-visuals img', 'Showcase photo');
     bindSingle('.sk-spec .sensor-shot img', 'Sensor');
     bindSingle('.device-cluster .screen-slot img', 'Dashboard');
   }

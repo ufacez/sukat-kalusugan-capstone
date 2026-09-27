@@ -4,14 +4,25 @@ Supported: .jpg, .jpeg, .png, .webp
 The showcase deck (showcase.php #team) auto-loads team-* images.
 If empty, placeholder cards are shown.
 
-Kiosk iPad screenshots (real kiosk interface, 4 steps):
-  kiosk-01.jpg = Welcome / Simulan
-  kiosk-02.jpg = Find the child
-  kiosk-03.jpg = Live height + weight
-  kiosk-04.jpg = Resulta
-Portrait 3:4, < 500KB each. Auto-loads into the iPad slider (#kiosk).
-If empty, placeholder slides are shown.
-NOTE: kiosk-unit.png is the unit photo (problem section) — never a step.
+Kiosk walkthrough video (At the kiosk section):
+  assets/video/kiosk-demo.mp4 = full session clip
+8-15 seconds, compressed, loops seamlessly. Autoplays muted + playsinline.
+If empty, a placeholder box is shown. (Legacy kiosk-*. screenshots are unused.)
+NOTE: kiosk-unit.png is the unit photo (Meet the kiosk hotspot stage) — never a step.
+
+Meet the kiosk part photos (hotspot modal, fixed-height cover):
+  assets/img/kiosk-parts/tfluna.jpg = TF-Luna LiDAR module
+  assets/img/kiosk-parts/ipad.jpg = iPad kiosk screen
+  assets/img/kiosk-parts/esp32.jpg = ESP32 board
+  assets/img/kiosk-parts/loadcell.jpg = load cells / HX711
+Landscape, < 500KB each. If empty, a placeholder is shown in the modal.
+Text lives in KIOSK_PARTS (assets/js/showcase.js) — no layout edits needed.
+
+Problem section visuals (dark feature grid, up to 3, auto-loaded):
+  problem-01.jpg = paper OPT form
+  problem-02.jpg = manual weighing
+  problem-03.jpg = manual measuring
+Landscape, < 500KB each. If empty, placeholder cells are shown.
 
 Sensor close-ups (inside-the-kiosk section, 16:9):
   sensor-lidar.jpg = TF-Luna LiDAR module

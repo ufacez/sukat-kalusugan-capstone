@@ -11,18 +11,115 @@ foreach (glob(__DIR__ . '/assets/img/showcase/team-*.{jpg,jpeg,png,webp}', GLOB_
 }
 sort($teamPhotos);
 
-$kioskShots = [];
-foreach (glob(__DIR__ . '/assets/img/showcase/kiosk-*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [] as $f) {
-    if (strpos(basename($f), 'kiosk-unit') === 0) continue; // unit photo is not a step
-    $kioskShots[] = 'assets/img/showcase/' . basename($f);
-}
-sort($kioskShots);
-$kioskShots = array_slice($kioskShots, 0, 4);
+$kioskDemo = is_file(__DIR__ . '/assets/video/kiosk-demo.mp4') ? 'assets/video/kiosk-demo.mp4' : null;
+$kioskSteps = [
+    ['title' => 'Welcome — Simulan', 'text' => 'Checks the clock and connection, then waits for a tap on Simulan.'],
+    ['title' => 'Find the child', 'text' => 'Search by ID or name and confirm the record — scoped to the kiosk\'s barangay.'],
+    ['title' => 'Live height + weight', 'text' => 'TF-Luna reads height, the load cell reads weight. Stability bars turn green when it\'s ready to process.'],
+    ['title' => 'Resulta', 'text' => 'Shows weight, height, and WHO status, then syncs straight to the dashboards.'],
+];
 
 function showcase_first(string $pattern): ?string {
     $found = glob(__DIR__ . '/assets/img/showcase/' . $pattern, GLOB_BRACE) ?: [];
     sort($found);
     return $found ? 'assets/img/showcase/' . basename($found[0]) : null;
+}
+
+/**
+ * Reusable two-column feature section (problem / solution / …).
+ * Same structure every time — only the data array changes:
+ *   id, label, heading, paragraph, points, images, placeholders, flip.
+ * - points: list of ['title' => ..., 'text' => ...] (optional, rendered as-is when empty)
+ * - images: list of ['src' => ..., 'alt' => ...] (auto-loaded via glob at top)
+ * - placeholders: list of ['file' => ..., 'caption' => ...] filling empty image
+ *   slots, so dropping files into assets/img/showcase/ needs no layout edits.
+ * - flip: mirror columns (visuals left, text right).
+ * - follow: compact closing paragraph (string) or ['label' => ..., 'heading' => ...,
+ *   'paragraph' => ...] rendered below the split, no visuals — e.g. the
+ *   solution bridge inside the problem container.
+ */
+function showcase_feature_section(array $s): void {
+    $id = (string)($s['id'] ?? 'feature');
+    $flip = !empty($s['flip']) ? ' sk-feature--flip' : '';
+    $points = $s['points'] ?? [];
+    $images = array_slice(array_values($s['images'] ?? []), 0, 3);
+    $slots = $images;
+    foreach (($s['placeholders'] ?? []) as $ph) {
+        if (count($slots) >= 3) break;
+        $slots[] = ['placeholder' => true, 'file' => (string)($ph['file'] ?? ''), 'caption' => (string)($ph['caption'] ?? '')];
+    }
+    ?>
+    <section class="sk-section sk-feature<?php echo $flip; ?>" id="<?php echo htmlspecialchars($id, ENT_QUOTES, 'UTF-8'); ?>">
+        <div class="sk-split">
+            <div class="sk-copy">
+                <p class="eyebrow"><?php echo htmlspecialchars((string)($s['label'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></p>
+                <h2><?php echo htmlspecialchars((string)($s['heading'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></h2>
+                <p class="lead"><?php echo htmlspecialchars((string)($s['paragraph'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php if ($points): ?>
+                    <ul>
+                        <?php foreach ($points as $pt): ?>
+                            <li><strong><?php echo htmlspecialchars((string)($pt['title'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></strong> &mdash; <?php echo htmlspecialchars((string)($pt['text'] ?? ''), ENT_QUOTES, 'UTF-8'); ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php endif; ?>
+            </div>
+            <div class="sk-side">
+                <div class="sk-feature-visuals">
+                    <?php foreach ($slots as $cell): ?>
+                        <?php if (!empty($cell['placeholder'])): ?>
+                            <div class="sk-feature-ph">
+                                <b><?php echo htmlspecialchars($cell['caption'], ENT_QUOTES, 'UTF-8'); ?></b>
+                                <small>Add <code><?php echo htmlspecialchars($cell['file'], ENT_QUOTES, 'UTF-8'); ?></code></small>
+                            </div>
+                        <?php else: ?>
+                            <div class="sk-feature-cell">
+                                <img src="<?php echo htmlspecialchars($cell['src'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cell['alt'] ?? '', ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" draggable="false">
+                            </div>
+                        <?php endif; ?>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
+        <?php
+        $follow = $s['follow'] ?? null;
+        $followLabel = '';
+        $followHeading = '';
+        $followPara = '';
+        if (is_string($follow)) {
+            $followPara = $follow;
+        } elseif (is_array($follow)) {
+            $followLabel = (string)($follow['label'] ?? '');
+            $followHeading = (string)($follow['heading'] ?? '');
+            $followPara = (string)($follow['paragraph'] ?? '');
+        }
+        ?>
+        <?php if ($followPara !== ''): ?>
+            <div class="sk-feature-follow">
+                <?php if ($followLabel !== ''): ?>
+                    <p class="eyebrow"><?php echo htmlspecialchars($followLabel, ENT_QUOTES, 'UTF-8'); ?></p>
+                <?php endif; ?>
+                <?php if ($followHeading !== ''): ?>
+                    <h3><?php echo htmlspecialchars($followHeading, ENT_QUOTES, 'UTF-8'); ?></h3>
+                <?php endif; ?>
+                <p><?php echo htmlspecialchars($followPara, ENT_QUOTES, 'UTF-8'); ?></p>
+            </div>
+        <?php endif; ?>
+    </section>
+    <?php
+}
+$problemShots = [];
+foreach (glob(__DIR__ . '/assets/img/showcase/problem-*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [] as $f) {
+    $problemShots[] = 'assets/img/showcase/' . basename($f);
+}
+sort($problemShots);
+$problemAlts = [
+    'Paper OPT form used during manual growth monitoring',
+    'Manual weighing of a child on a platform scale',
+    'Manual height measuring with a tape or stadiometer',
+];
+$problemImages = [];
+foreach (array_slice($problemShots, 0, 3) as $i => $src) {
+    $problemImages[] = ['src' => $src, 'alt' => $problemAlts[$i] ?? ('Problem photo ' . ($i + 1))];
 }
 $sensorLidar = showcase_first('sensor-lidar.{jpg,jpeg,png,webp}');
 $sensorWeight = showcase_first('sensor-weight.{jpg,jpeg,png,webp}');
@@ -35,13 +132,13 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-    <title>Sukat Kalusugan Showcase | Group A4Tech</title>
-    <meta name="description" content="Public showcase of Sukat Kalusugan by Group A4Tech: auto anthropometry kiosk, sensors, dashboards, and team build montage.">
+    <title>Sukat Kalusugan Showcase</title>
+    <meta name="description" content="Public showcase of Sukat Kalusugan: auto anthropometry kiosk, sensors, and dashboards.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/showcase.css?v=10">
+    <link rel="stylesheet" href="assets/css/showcase.css?v=18">
     <link rel="icon" type="image/svg+xml" href="assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){
@@ -56,39 +153,60 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
 <body>
 <main class="sk-showcase">
 
-    <header class="sk-hero">
-        <img class="sk-hero-logo" src="assets/img/logo/logo_forlight.svg?v=2" alt="Sukat Kalusugan logo">
-        <p class="eyebrow">Group A4Tech &middot; OLFU Capstone</p>
-        <h1>Sukat Kalusugan</h1>
-        <p class="sub">Automatic height + weight kiosk for child growth monitoring, with WHO standards and dashboards for staff and parents.</p>
-        <div class="sk-hero-cta">
-            <a class="sk-btn" href="#kiosk">See how it works</a>
-            <a class="sk-btn ghost" href="#team">Team montage</a>
-        </div>
-        <div class="sk-badges">
-            <span>Public showcase only</span>
-            <span>Capstone project</span>
-            <span>Not an official OLFU system</span>
-        </div>
+    <header class="sk-hero sk-hero--dark">
+        <svg class="hero-pattern" viewBox="0 0 400 400" preserveAspectRatio="none" aria-hidden="true">
+            <path d="M0,320 C80,300 120,340 200,260 C260,200 300,220 400,140" />
+            <path d="M0,360 C90,330 140,370 220,300 C280,250 330,270 400,190" />
+            <path d="M0,280 C70,260 110,300 190,220 C250,160 290,180 400,100" />
+        </svg>
+        <img class="sk-hero-logo" src="assets/img/logo/logo_forlight.svg?v=2" data-logo-light="assets/img/logo/logo_forlight.svg?v=2" data-logo-dark="assets/img/logo/logo_fordark.svg?v=2" alt="Sukat Kalusugan logo">
+        <h1 class="sk-hero-title">
+            <img class="sk-hero-logotext" src="assets/img/logo/logotext_forlight.svg?v=2" data-logo-light="assets/img/logo/logotext_forlight.svg?v=2" data-logo-dark="assets/img/logo/logotext_fordark.svg?v=2" alt="Sukat Kalusugan">
+        </h1>
+        <p class="sk-hero-tagline">Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.</p>
+        <p class="sub">A Smart Kiosk-Based Anthropometric Monitoring System with a Web Application for the City Health Office in the City of San Fernando, Pampanga</p>
     </header>
 
-    <section class="sk-section" id="problem">
-        <p class="eyebrow">Why we built this</p>
-        <h2>The problem</h2>
-        <p class="lead">Manual weighing and measuring during growth monitoring is slow and error-prone. Paper records make WHO tracking hard.</p>
-        <div class="sk-split">
-            <div class="sk-copy">
-                <ul>
-                    <li><strong>Manual errors</strong> — different staff, different readings for weight and height.</li>
-                    <li><strong>Slow records</strong> — paper lists delay reports and follow-ups.</li>
-                    <li><strong>No clear history</strong> — parents cannot easily see growth over time.</li>
-                    <li><strong>Our answer</strong> — one kiosk that measures automatically, then clean dashboards for admin, nutritionist, and parent.</li>
-                </ul>
-            </div>
-            <div class="sk-side">
-                <div class="kiosk-unit-solo" id="kioskUnitSolo">
-                    <img src="assets/img/showcase/kiosk-unit.png?v=2" alt="Sukat Kalusugan kiosk unit — height pole, screen, weighing platform" loading="lazy" draggable="false">
-                    <div class="device-label">Our kiosk unit — tap to enlarge</div>
+    <?php showcase_feature_section([
+        'id' => 'problem',
+        'label' => 'Why we built this',
+        'heading' => 'The Problem',
+        'paragraph' => 'The eOPT Plus program still depends on manual logging and paper-based records for monthly and quarterly growth monitoring. Even with careful measuring, tracking this data by hand makes reporting slow, consolidation error-prone, and growth history hard for both nutritionists and parents to follow over time.',
+        'images' => $problemImages,
+        'placeholders' => [
+            ['file' => 'problem-01.jpg', 'caption' => 'Paper OPT form'],
+            ['file' => 'problem-02.jpg', 'caption' => 'Manual weighing'],
+            ['file' => 'problem-03.jpg', 'caption' => 'Manual measuring'],
+        ],
+        'follow' => [
+            'heading' => 'The solution',
+            'paragraph' => 'To solve this, the team built an automatic measurement kiosk that logs height and weight directly into the system, following the WHO Child Growth Standards and the eOPT Plus program guidelines. This replaces manual paper logging with centralized, real-time records making reporting faster and giving parents, nutritionists, and administrators a clear, consistent view of each child\'s growth history.',
+        ],
+    ]); ?>
+
+    <section class="sk-section sk-feature" id="meet-kiosk">
+        <p class="eyebrow">Meet the kiosk</p>
+        <h2>What&apos;s inside</h2>
+        <p class="lead">Tap a marker to learn about that part.</p>
+        <div class="sk-hotspot-stage" id="kioskStage">
+            <img src="assets/img/showcase/kiosk-unit.png?v=2" alt="Sukat Kalusugan kiosk unit — height pole, screen, weighing platform" loading="lazy" draggable="false">
+            <button class="sk-hotspot" type="button" style="--hx:50%;--hy:4%;" data-part="1" aria-expanded="false" aria-label="Part 1: TF-Luna LiDAR sensor">1</button>
+            <button class="sk-hotspot" type="button" style="--hx:50%;--hy:26%;" data-part="2" aria-expanded="false" aria-label="Part 2: Tablet Kiosk screen">2</button>
+            <button class="sk-hotspot" type="button" style="--hx:64%;--hy:31%;" data-part="3" aria-expanded="false" aria-label="Part 3: ESP32 microcontroller">3</button>
+            <button class="sk-hotspot" type="button" style="--hx:50%;--hy:79%;" data-part="4" aria-expanded="false" aria-label="Part 4: Load cells and HX711">4</button>
+            <div class="sk-part-modal" id="kioskModal" hidden>
+                <div class="sk-part-modal-card" role="dialog" aria-labelledby="kioskModalTitle">
+                    <button class="sk-hotspot-close" id="kioskModalClose" type="button" aria-label="Close part details">&times;</button>
+                    <div class="sk-part-modal-media">
+                        <img id="kioskModalImg" src="" alt="" loading="lazy" draggable="false">
+                        <div class="sk-part-modal-ph" id="kioskModalPh" hidden>
+                            <b>Part photo placeholder</b>
+                            <small>Add <code id="kioskModalPhFile"></code></small>
+                        </div>
+                    </div>
+                    <h3 id="kioskModalTitle"></h3>
+                    <div class="sk-part-stats" id="kioskModalSpecs"></div>
+                    <p id="kioskModalText" aria-live="polite"></p>
                 </div>
             </div>
         </div>
@@ -97,45 +215,33 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
     <section class="sk-section" id="kiosk">
         <p class="eyebrow">Kiosk process</p>
         <h2>At the kiosk</h2>
-        <p class="lead">Swipe the iPad — real kiosk screens. Description changes every slide. Add screenshots as <code>assets/img/showcase/kiosk-01.jpg</code> … <code>kiosk-04.jpg</code>.</p>
+        <p class="lead">Watch a full session in seconds — from Simulan to synced result.</p>
         <div class="sk-split">
             <div class="sk-side">
-                <div class="device device-tablet" aria-hidden="false">
-                    <div class="tablet-screen" id="kioskDeck">
-                        <div class="tablet-track" id="kioskTrack">
-                            <?php if ($kioskShots): ?>
-                                <?php foreach ($kioskShots as $i => $src): ?>
-                                    <div class="tablet-slide">
-                                        <img src="<?php echo htmlspecialchars($src, ENT_QUOTES, 'UTF-8'); ?>" alt="Kiosk screen <?php echo $i + 1; ?>" loading="lazy" draggable="false">
-                                    </div>
-                                <?php endforeach; ?>
-                            <?php else: ?>
-                                <?php for ($i = 1; $i <= 4; $i++): ?>
-                                    <div class="tablet-slide is-placeholder">
-                                        <b>Step <?php echo $i; ?> — screenshot placeholder</b>
-                                        <small>Add <code>kiosk-0<?php echo $i; ?>.jpg</code><br>real kiosk interface</small>
-                                    </div>
-                                <?php endfor; ?>
-                            <?php endif; ?>
+                <div class="sk-video-wrap">
+                    <?php if ($kioskDemo): ?>
+                        <video src="<?php echo htmlspecialchars($kioskDemo, ENT_QUOTES, 'UTF-8'); ?>" autoplay muted loop playsinline preload="metadata" aria-label="Kiosk walkthrough video"></video>
+                    <?php else: ?>
+                        <div class="sk-video-ph">
+                            <b>Kiosk walkthrough</b>
+                            <small>Add <code>assets/video/kiosk-demo.mp4</code><br>8&ndash;15s clip, autoplay loop</small>
                         </div>
-                    </div>
-                    <div class="device-label">Kiosk iPad — swipeable</div>
+                    <?php endif; ?>
+                    <div class="device-label">Kiosk walkthrough</div>
                 </div>
             </div>
             <div class="sk-copy">
-                <div class="kiosk-desc" id="kioskDesc" aria-live="polite">
-                    <span class="sk-step-n" id="kioskStepN">1</span>
-                    <div>
-                        <strong id="kioskTitle">Welcome — Simulan</strong>
-                        <small id="kioskText">Live clock and device online check. Tap Simulan to start.</small>
-                    </div>
-                </div>
-                <div class="sk-deck-ctrl" style="margin-top:.8rem;">
-                    <button class="sk-arrow" id="kioskPrev" type="button" aria-label="Previous kiosk step">&#8592;</button>
-                    <div class="sk-dots" id="kioskDots"></div>
-                    <button class="sk-arrow" id="kioskNext" type="button" aria-label="Next kiosk step">&#8594;</button>
-                </div>
-                <div class="sk-hint"><span id="kioskPos">1 / <?php echo $kioskShots ? count($kioskShots) : 4; ?></span> &middot; swipe the iPad or tap arrows &middot; tap photo to enlarge</div>
+                <ol class="sk-steps">
+                    <?php foreach ($kioskSteps as $i => $step): ?>
+                        <li>
+                            <span class="sk-step-n"><?php echo $i + 1; ?></span>
+                            <div>
+                                <strong><?php echo htmlspecialchars($step['title'], ENT_QUOTES, 'UTF-8'); ?></strong>
+                                <small><?php echo htmlspecialchars($step['text'], ENT_QUOTES, 'UTF-8'); ?></small>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
             </div>
         </div>
     </section>
@@ -294,8 +400,8 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
                 <button class="sk-arrow" id="teamPrev" type="button" aria-label="Previous photo">&#8592;</button>
                 <div class="sk-dots" id="teamDots"></div>
                 <button class="sk-arrow" id="teamNext" type="button" aria-label="Next photo">&#8594;</button>
+                </div>
             </div>
-            <div class="sk-hint"><span id="teamPos">1 / <?php echo $teamPhotos ? count($teamPhotos) : 5; ?></span> &middot; swipe or tap arrows &middot; tap photo to enlarge</div>
         </div>
     </section>
 
@@ -317,6 +423,6 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
     <button class="sk-lb-btn sk-lb-next" id="skLbNext" type="button" aria-label="Next photo">&#8594;</button>
 </div>
 
-<script src="assets/js/showcase.js?v=7" defer></script>
+<script src="assets/js/showcase.js?v=14" defer></script>
 </body>
 </html>

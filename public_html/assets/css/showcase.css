@@ -16,7 +16,81 @@
   padding: 2.4rem 1.4rem;
   margin-bottom: 1rem;
 }
-.sk-hero img.sk-hero-logo { width: 120px; height: 120px; object-fit: contain; }
+.sk-hero img.sk-hero-logo { width: 120px; height: 120px; object-fit: contain; position: relative; z-index: 1; }
+/* Same look as auth login hero: light gradient + WHO curve bands,
+ * dark variant follows [data-theme="dark"] like auth.css. */
+.sk-hero--dark {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(145deg, rgba(255, 255, 255, 0.98), rgba(240, 248, 244, 0.95)),
+    radial-gradient(
+      circle at top right,
+      rgba(11, 110, 79, 0.08),
+      transparent 24%
+    );
+  border: 1px solid rgba(216, 228, 221, 0.9);
+  color: var(--text);
+}
+.sk-hero--dark::after {
+  content: "";
+  position: absolute;
+  inset: auto -8% -18% auto;
+  width: 240px;
+  height: 240px;
+  border-radius: 50%;
+  background: rgba(11, 110, 79, 0.04);
+  pointer-events: none;
+}
+.sk-hero--dark .hero-pattern {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  opacity: 0.9;
+  pointer-events: none;
+}
+.sk-hero--dark .hero-pattern path {
+  fill: none;
+  stroke: rgba(11, 110, 79, 0.06);
+  stroke-width: 2;
+}
+.sk-hero--dark .hero-pattern path:nth-child(2) { stroke: rgba(11, 110, 79, 0.04); }
+.sk-hero--dark .hero-pattern path:nth-child(3) { stroke: rgba(11, 110, 79, 0.03); }
+[data-theme="dark"] .sk-hero--dark {
+  background:
+    linear-gradient(145deg, rgba(22, 32, 25, 0.98), rgba(15, 26, 20, 0.95)),
+    radial-gradient(
+      circle at top right,
+      rgba(46, 197, 122, 0.12),
+      transparent 24%
+    );
+  border-color: rgba(42, 61, 50, 0.6);
+  color: #dce8e1;
+}
+[data-theme="dark"] .sk-hero--dark::after { background: rgba(46, 197, 122, 0.06); }
+[data-theme="dark"] .sk-hero--dark .hero-pattern path { stroke: rgba(46, 197, 122, 0.06); }
+[data-theme="dark"] .sk-hero--dark .hero-pattern path:nth-child(2) { stroke: rgba(46, 197, 122, 0.04); }
+[data-theme="dark"] .sk-hero--dark .hero-pattern path:nth-child(3) { stroke: rgba(46, 197, 122, 0.03); }
+.sk-hero-title { margin: 0.8rem 0 0.4rem; position: relative; z-index: 1; }
+.sk-hero-logotext { width: min(100%, 340px); height: auto; display: inline-block; }
+.sk-hero-tagline {
+  margin: 0 0 0.6rem;
+  font-style: italic;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+  text-align: center;
+  color: var(--muted);
+  position: relative;
+  z-index: 1;
+  line-height: 1.3;
+}
+.sk-hero-tagline .hl { color: var(--primary-strong); font-style: normal; }
+[data-theme="dark"] .sk-hero-tagline { color: rgba(220, 232, 225, 0.7); }
+[data-theme="dark"] .sk-hero-tagline .hl { color: #2ec57a; }
+.sk-hero--dark p.sub { position: relative; z-index: 1; }
 .sk-hero h1 { margin: 0.6rem 0 0.3rem; font-size: clamp(1.7rem, 4vw, 2.6rem); font-weight: 900; }
 .sk-hero p.sub { margin: 0 auto; max-width: 640px; color: var(--muted); line-height: 1.6; }
 .sk-hero-cta { display: flex; gap: 0.6rem; justify-content: center; flex-wrap: wrap; margin-top: 1.1rem; }
@@ -52,6 +126,242 @@
 }
 .sk-section h2 { margin: 0 0 0.3rem; font-size: 1.35rem; font-weight: 900; }
 .sk-section p.lead { margin: 0 0 1rem; color: var(--muted); line-height: 1.6; }
+
+/* ---- Reusable dark feature section (problem / solution) ----
+ * Forced-dark card that scopes the existing dark-theme token values, so
+ * every reused class inside (.eyebrow, h2, .lead, ul, code) resolves to
+ * dark surfaces automatically. Only the card background is fixed (#0d1912
+ * per spec, next to dark --bg #0f1a14) — all else flows through var(--…).
+ * Reuse: same markup via showcase_feature_section(); add .sk-feature--flip
+ * to mirror columns for the solution section. */
+.sk-section.sk-feature {
+  background: #0d1912;
+  --text: #dce8e1;
+  --muted: #8fa89a;
+  --primary: #2ec57a;
+  --primary-strong: #3dd88a;
+  --surface: #162019;
+  --surface-alt: #1c2b23;
+  --border: #2a3d32;
+}
+.sk-feature--flip .sk-split > .sk-copy { order: 2; }
+.sk-feature--flip .sk-split > .sk-side { order: 1; }
+/* Right-column visual grid: 3 swappable slots (tall lead + 2 stacked).
+ * Real photos and placeholders are interchangeable cells, so adding
+ * problem-*.jpg files later never touches layout code. */
+.sk-feature-visuals {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.6rem;
+  width: 100%;
+  min-height: 340px;
+}
+.sk-feature-visuals > :first-child { grid-row: span 2; }
+.sk-feature-cell {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  min-height: 0;
+}
+.sk-feature-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  cursor: zoom-in;
+}
+.sk-feature-ph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  text-align: center;
+  padding: 1rem;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--muted);
+  min-height: 0;
+}
+.sk-feature-ph b { color: var(--text); font-size: 0.9rem; }
+.sk-feature-ph small { font-size: 0.78rem; }
+.sk-feature-ph code { color: var(--primary); font-weight: 700; }
+/* Compact follow-up block (solution bridge): sits inside the same dark
+ * container below the split, no visuals. Green accent bar + surface fill,
+ * all through scoped tokens. */
+.sk-feature-follow {
+  margin-top: 1rem;
+  padding: 0.85rem 1.1rem;
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: var(--surface);
+}
+.sk-feature-follow p { margin: 0; color: var(--text); line-height: 1.65; font-size: 0.95rem; }
+.sk-feature-follow .eyebrow { margin-bottom: 0.25rem; }
+.sk-feature-follow h3 { margin: 0 0 0.25rem; font-size: 1.05rem; font-weight: 900; color: var(--text); }
+
+/* ---- Meet-the-kiosk hotspots (scoped to the photo stage) ----
+ * Dots use --hx/--hy percentages from markup (never fixed pixels), so
+ * they track the photo at any size. Info card is absolute inside the
+ * stage only — never full-page. All colors via scoped tokens. */
+#meet-kiosk { text-align: center; }
+#meet-kiosk .lead { max-width: 52ch; margin-left: auto; margin-right: auto; }
+.sk-hotspot-stage {
+  position: relative;
+  width: min(100%, 300px);
+  margin: 0.4rem auto 0;
+}
+.sk-hotspot-stage > img {
+  width: 100%;
+  display: block;
+  user-select: none;
+  filter: drop-shadow(0 22px 22px rgba(0, 0, 0, 0.35));
+}
+.sk-hotspot {
+  position: absolute;
+  top: var(--hy);
+  left: var(--hx);
+  transform: translate(-50%, -50%);
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  background: var(--primary);
+  color: #fff;
+  font-weight: 900;
+  font-size: 0.95rem;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0 0 1px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+}
+.sk-hotspot::after {
+  content: "";
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--primary);
+  opacity: 0.7;
+  animation: sk-hotspot-ping 2.2s ease-out infinite;
+}
+.sk-hotspot[aria-expanded="true"] { background: var(--accent); border-color: #fff; }
+.sk-hotspot[aria-expanded="true"]::after { animation: none; opacity: 0; }
+/* ---- Part modal: absolute overlay scoped to the photo stage only ----
+ * Backdrop dims just the stage (inset 0, never fixed). Card matches the
+ * scoped dark tokens: surface fill, hairline spec rows, radius tokens. */
+.sk-part-modal {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-items: center;
+  padding: 0.6rem;
+  background: rgba(0, 0, 0, 0.85);
+}
+.sk-part-modal[hidden] { display: none; }
+.sk-part-modal-card {
+  position: relative;
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  text-align: left;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 0 0.95rem 0.95rem;
+}
+.sk-part-modal-media {
+  height: 150px;
+  margin: 0 -0.95rem 0.7rem;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  overflow: hidden;
+  background: var(--surface-alt);
+}
+.sk-part-modal-media img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.sk-part-modal-media img[hidden] { display: none; }
+.sk-part-modal-ph {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  text-align: center;
+  color: var(--muted);
+  border-bottom: 1px dashed var(--border);
+  padding: 1rem;
+}
+.sk-part-modal-ph[hidden] { display: none; }
+.sk-part-modal-ph b { color: var(--text); font-size: 0.9rem; }
+.sk-part-modal-ph small { font-size: 0.78rem; }
+.sk-part-modal-ph code { color: var(--primary); font-weight: 700; }
+.sk-part-modal-card h3 {
+  margin: 0 1.6rem 0.45rem 0;
+  font-size: 1rem;
+  font-weight: 900;
+}
+.sk-part-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.5rem;
+  margin: 0 0 0.6rem;
+  padding: 0.65rem 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+}
+.sk-part-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.32rem;
+  text-align: center;
+  min-width: 0;
+}
+.sk-part-stat svg { width: 22px; height: 22px; color: var(--primary); flex: none; }
+.sk-part-stat span:last-child {
+  font-size: 0.74rem;
+  font-weight: 800;
+  line-height: 1.35;
+  color: var(--text);
+}
+.sk-part-modal-card > p { margin: 0; font-size: 0.85rem; line-height: 1.6; color: var(--muted); }
+.sk-hotspot-close {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  background: var(--surface-alt);
+  color: var(--text);
+  font-size: 1.05rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0 0 2px;
+}
+.sk-hotspot-close:hover { border-color: var(--primary); color: var(--primary); }
+@keyframes sk-hotspot-ping {
+  0% { transform: scale(0.7); opacity: 0.8; }
+  70% { transform: scale(1.15); opacity: 0; }
+  100% { transform: scale(1.15); opacity: 0; }
+}
 
 .sk-split {
   display: grid;
@@ -315,22 +625,29 @@
 }
 .device-label { text-align: center; font-size: 0.78rem; color: var(--muted); margin-top: 0.5rem; font-weight: 700; }
 
-/* ---- iPad / tablet frame + swipeable kiosk screens, synced side description ---- */
-.device-tablet { width: min(100%, 300px); }
-.tablet-screen {
-  border: 10px solid #1c2420;
-  border-radius: 22px;
-  background: var(--surface-alt);
-  overflow: hidden;
-  touch-action: pan-y;
-  box-shadow: var(--shadow);
-  cursor: grab;
+/* ---- At the kiosk only: looping demo video + static step list ----
+ * Vertically centered split (video left, steps right). All colors,
+ * radii, and type through existing tokens. Scoped to #kiosk. */
+#kiosk .sk-split {
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr);
+  gap: 1.5rem;
 }
-.tablet-screen:active { cursor: grabbing; }
-.tablet-track { display: flex; transition: transform 0.35s cubic-bezier(0.32, 0.72, 0, 1); }
-.tablet-slide {
-  flex: 0 0 100%;
-  aspect-ratio: 5 / 8;
+.sk-video-wrap { width: min(100%, 220px); margin: 0 auto; }
+.sk-video-wrap video {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  object-fit: cover;
+  border-radius: 22px;
+  display: block;
+  background: #000;
+  box-shadow: var(--shadow);
+}
+.sk-video-ph {
+  aspect-ratio: 9 / 16;
+  border: 2px dashed var(--border);
+  border-radius: 22px;
+  background: linear-gradient(145deg, var(--surface), var(--surface-alt));
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -338,40 +655,11 @@
   gap: 0.3rem;
   text-align: center;
   color: var(--muted);
-  background: #101614;
-  padding: 0;
-  user-select: none;
-  overflow: hidden;
+  padding: 1rem;
 }
-.tablet-slide.is-placeholder {
-  background: linear-gradient(145deg, var(--surface), var(--surface-alt));
-  padding: 1.2rem 1rem;
-}
-.tablet-slide img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 6px;
-  pointer-events: none;
-  display: block;
-}
-.tablet-slide b { color: var(--text); }
-.tablet-slide small { font-size: 0.8rem; line-height: 1.5; }
-.kiosk-desc {
-  display: grid;
-  grid-template-columns: 34px 1fr;
-  gap: 0.7rem;
-  align-items: start;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface-alt);
-  padding: 0.9rem 1rem;
-  min-height: 96px;
-  transition: opacity 0.18s ease;
-}
-.kiosk-desc.is-switching { opacity: 0; }
-.kiosk-desc strong { display: block; font-size: 1.02rem; }
-.kiosk-desc small { color: var(--muted); line-height: 1.55; display: block; margin-top: 0.15rem; }
+.sk-video-ph b { color: var(--text); font-size: 0.95rem; }
+.sk-video-ph small { font-size: 0.78rem; line-height: 1.5; }
+.sk-video-ph code { color: var(--primary); font-weight: 700; }
 
 /* ---- Overlapping device cluster: desktop + laptop + phone showcase ---- */
 .device-cluster {
@@ -483,8 +771,12 @@
 
 @media (max-width: 860px) {
   .sk-split { grid-template-columns: 1fr; }
+  #kiosk .sk-split { grid-template-columns: 1fr; }
   .sk-split.flip > .sk-copy { order: 1; }
   .sk-split.flip > .sk-side { order: 2; }
+  .sk-feature--flip .sk-split > .sk-copy { order: 1; }
+  .sk-feature--flip .sk-split > .sk-side { order: 2; }
+  .sk-feature-visuals { min-height: 300px; }
   .sk-spec-grid { grid-template-columns: 1fr; }
   .sk-section { padding: 1.15rem; }
   .sk-hero { padding: 1.8rem 1rem; }
@@ -492,6 +784,7 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .sk-deck-track { transition: none; }
+  .sk-hotspot::after { animation: none; opacity: 0; }
 }
 
 @keyframes sk-floaty {
@@ -502,8 +795,7 @@
   .kiosk-unit-solo img { animation: none; }
 }
 
-/* ---- Click-to-enlarge lightbox (kiosk + team photos) ---- */
-.tablet-slide:not(.is-placeholder),
+/* ---- Click-to-enlarge lightbox (team photos + showcase images) ---- */
 .sk-card:has(img),
 .kiosk-unit-solo img { cursor: zoom-in; }
 .sk-lightbox[hidden] { display: none !important; }
