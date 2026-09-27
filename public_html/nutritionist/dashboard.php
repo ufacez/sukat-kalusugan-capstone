@@ -291,12 +291,6 @@ $axisTotalWfa  = max(1, count($measurements));
 $axisTotalHfa  = max(1, count($measurements));
 $axisTotalWflh = max(1, count($measurements));
 
-$axisLabels = [
-	'wfa'  => ['Normal' => 'Normal WFA', 'Moderate' => 'Moderate WFA', 'Severe' => 'Severe WFA'],
-	'hfa'  => ['Normal' => 'Normal HFA', 'Moderate' => 'Moderate HFA', 'Severe' => 'Severe HFA'],
-	'wflh' => ['Normal' => 'Normal WFH', 'Moderate' => 'Moderate WFH', 'Severe' => 'Severe WFH'],
-];
-
 /**
  * Classify a single axis status into a {label, level, axis, full} tuple.
  * level is 'normal' | 'moderate' | 'severe' | 'refer'.
@@ -367,69 +361,6 @@ function combinedStatusPills(?string $wfa, ?string $hfa, ?string $wfh): array {
 	}
 	return $pills;
 }
-
-// WHO chart data — real computed from measurements for three axes
-$chartMonths = [];
-for ($offset = 11; $offset >= 0; $offset--) {
-	$month = $today->modify('-' . abs($offset) . ' months');
-	$chartMonths[] = $month->format('M');
-}
-
-function buildChartData(array $measurements, string $statusField): array {
-	$months = [];
-	$today = new DateTimeImmutable('today');
-	for ($offset = 11; $offset >= 0; $offset--) {
-		$month = $today->modify('-' . abs($offset) . ' months');
-		$months[$month->format('Y-m')] = 0;
-	}
-	// WFA gains a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2).
-	// HFA gains a fourth "Tall" series (HAZ > +2, exclusive from Normal).
-	// The unused series just stays at zero on the other tabs.
-	$monthly = [
-		'Normal' => $months,
-		'Moderate' => array_map(fn($v) => 0, $months),
-		'Severe' => array_map(fn($v) => 0, $months),
-		'Refer' => array_map(fn($v) => 0, $months),
-		'Tall' => array_map(fn($v) => 0, $months),
-	];
-	foreach ($measurements as $m) {
-		$key = (new DateTimeImmutable((string)($m['measurement_date'])))->format('Y-m');
-		if (!array_key_exists($key, $monthly['Normal'])) continue;
-		$status = strtolower(trim((string)($m[$statusField] ?? '')));
-		if (str_contains($status, 'refer')) {
-			$monthly['Refer'][$key] = ($monthly['Refer'][$key] ?? 0) + 1;
-		} elseif ($status === 'normal' || $status === 'n' || $status === '') {
-			$monthly['Normal'][$key] = ($monthly['Normal'][$key] ?? 0) + 1;
-		} elseif ($status === 'tall' || $status === 't') {
-			// HFA Tall is its own series so Normal + Moderate + Severe + Tall
-			// always equals the measured children count for that month.
-			$monthly['Tall'][$key] = ($monthly['Tall'][$key] ?? 0) + 1;
-		} elseif (str_contains($status, 'severe') || $status === 'sst' || $status === 'sw' || $status === 'suw' || $status === 'ob') {
-			$monthly['Severe'][$key] = ($monthly['Severe'][$key] ?? 0) + 1;
-		} else {
-			// Moderate / MUW / MSt / MW / OW / etc.
-			$monthly['Moderate'][$key] = ($monthly['Moderate'][$key] ?? 0) + 1;
-		}
-	}
-	return $monthly;
-}
-
-$wfaData = buildChartData($measurements, 'wfa_status');
-$hfaData = buildChartData($measurements, 'hfa_status');
-$wflhData = buildChartData($measurements, 'wfh_status');
-
-$chartSeriesColors = [
-	'Normal' => 'var(--admin-primary)',
-	'Moderate' => 'var(--admin-accent)',
-	'Severe' => 'var(--admin-danger)',
-	// Gray for the WFA "Refer to WFL/H" overflow series.
-	'Refer' => 'var(--admin-muted)',
-	// Blue for the HFA "Tall" series (matches Tall pill color).
-	'Tall' => '#2563eb',
-];
-
-$chartXs = [56, 110, 164, 218, 272, 326, 380, 420]; // kept for any external legacy references
-$toY = static fn(int $value): float => 152 - (min($value, 20) / 20) * 136;
 
 // Calendar setup
 $firstWeekday = (int)$calendarDate->format('w');
@@ -588,6 +519,86 @@ $actions = implode(' ', [
 	'<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/eopt_reports.php')) . '">' . admin_action_icon('document') . ' EOPT Reports</a>',
 ]);
 
+// PNG-style "Nutritional Status Overview" config — one bar/status set per WHO
+// axis, all sourced from the existing pill counts above (no new queries).
+// Large type + high contrast so the cards stay readable for older staff.
+$nskPct = static function (int $count, int $total): string {
+	if ($total <= 0 || $count <= 0) {
+		return '0%';
+	}
+	return rtrim(rtrim(number_format($count / $total * 100, 2), '0'), '.') . '%';
+};
+$nskBars = static function (array $defs, int $total) use ($nskPct): array {
+	$max = 1;
+	foreach ($defs as $d) {
+		$max = max($max, (int)($d['count'] ?? 0));
+	}
+	// Nice y-axis scale (round steps, ~4 intervals) so ticks read cleanly.
+	$rough = $max / 4;
+	$mag = pow(10, (int)floor(log10(max($rough, 0.1))));
+	$step = 1;
+	foreach ([1, 2, 5, 10] as $m) {
+		if ($m * $mag >= $rough) {
+			$step = max(1, (int)($m * $mag));
+			break;
+		}
+		$step = max(1, (int)(10 * $mag));
+	}
+	$niceMax = max($step, (int)ceil($max / $step) * $step);
+	$ticks = [];
+	for ($v = $niceMax; $v >= 0; $v -= $step) {
+		$ticks[] = $v;
+	}
+	$bars = [];
+	foreach ($defs as $d) {
+		$count = (int)($d['count'] ?? 0);
+		$bars[] = [
+			'label' => (string)($d['label'] ?? ''),
+			'short' => (string)($d['short'] ?? $d['label'] ?? ''),
+			'code' => (string)($d['code'] ?? ''),
+			'color' => (string)($d['color'] ?? '#34d399'),
+			'count' => $count,
+			'height' => $count > 0 ? max(6, (int)round($count / $niceMax * 100)) : 2,
+			'pct' => $nskPct($count, $total),
+		];
+	}
+	return ['bars' => $bars, 'ticks' => $ticks, 'niceMax' => $niceMax];
+};
+$nskTallHfa = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
+$nskAxes = [
+	'wfa' => [
+		'chartTitle' => 'Weight-for-Age',
+		'statusTitle' => 'Latest Status — WFA',
+		'chart' => $nskBars([
+			['label' => 'Severely Underweight', 'short' => 'SUW', 'code' => 'SUW', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['wfa']['SUW']],
+			['label' => 'Moderately Underweight', 'short' => 'MUW', 'code' => 'MUW', 'color' => '#facc15', 'count' => (int)$axisPillCounts['wfa']['MUW']],
+			['label' => 'Use WFL/H column', 'short' => 'REF', 'code' => 'REF', 'color' => '#9ca3af', 'count' => (int)$axisPillCounts['wfa']['REF']],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['wfa']['Normal']],
+		], $axisTotalWfa),
+	],
+	'hfa' => [
+		'chartTitle' => 'Height-for-Age',
+		'statusTitle' => 'Latest Status — HFA',
+		'chart' => $nskBars([
+			['label' => 'Severely Stunted', 'short' => 'SSt', 'code' => 'SSt', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['hfa']['SSt']],
+			['label' => 'Moderately Stunted', 'short' => 'MSt', 'code' => 'MSt', 'color' => '#facc15', 'count' => (int)$axisPillCounts['hfa']['MSt']],
+			['label' => 'Tall', 'short' => 'Tall', 'code' => 'Tall', 'color' => '#9ca3af', 'count' => $nskTallHfa],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['hfa']['Normal']],
+		], $axisTotalHfa),
+	],
+	'wflh' => [
+		'chartTitle' => 'Weight-for-Length/Height',
+		'statusTitle' => 'Latest Status — WFH',
+		'chart' => $nskBars([
+			['label' => 'Severely Wasted', 'short' => 'Severely Wasted', 'code' => 'SW', 'color' => '#ef4444', 'count' => (int)$axisPillCounts['wflh']['SW/SAM']],
+			['label' => 'Moderately Wasted', 'short' => 'Moderately Wasted', 'code' => 'MW', 'color' => '#facc15', 'count' => (int)$axisPillCounts['wflh']['MW/MAM']],
+			['label' => 'Overweight', 'short' => 'Overweight', 'code' => 'OW', 'color' => '#fb923c', 'count' => (int)$axisPillCounts['wflh']['OW']],
+			['label' => 'Obese', 'short' => 'Obese', 'code' => 'OB', 'color' => '#fb923c', 'count' => (int)$axisPillCounts['wflh']['Ob']],
+			['label' => 'Normal', 'short' => 'Normal', 'code' => 'N', 'color' => '#34d399', 'count' => (int)$axisCounts['wflh']['Normal']],
+		], $axisTotalWflh),
+	],
+];
+
 nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth analysis, and appointment oversight.', 'dashboard', $actions);
 ?>
 
@@ -647,149 +658,94 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 	</article>
 </section>
 
-<section class="nutritionist-panel-grid">
-	<article class="nutritionist-panel">
-		<div class="nutritionist-toolbar" style="margin-bottom:12px;">
+<section class="nutritionist-panel-grid nutritionist-dashboard-grid">
+	<article class="nutritionist-panel nsk-overview-panel" aria-label="Nutritional status overview">
+		<div class="nsk-overview-head">
 			<div>
-				<h2 class="admin-section-title" style="margin-bottom:2px;">WHO Growth Indicators Overview</h2>
-				<p class="admin-section-subtitle" style="margin-top:4px;">Latest growth-indicator classification by month</p>
+				<h2 class="nsk-overview-title" id="nsk-overview-title">Weight-for-Age</h2>
+				<p class="nsk-overview-subtitle">Status for <?php echo date('Y'); ?></p>
 			</div>
-			<div class="dashboard-chart-tabs" id="nutritionist-chart-tabs" role="tablist" aria-label="WHO indicator">
-				<button type="button" class="dashboard-chart-tab is-active" id="tab-wfa" data-axis="wfa" role="tab" aria-selected="true">WFA</button>
-				<button type="button" class="dashboard-chart-tab" id="tab-hfa" data-axis="hfa" role="tab" aria-selected="false">HFA</button>
-				<button type="button" class="dashboard-chart-tab" id="tab-wflh" data-axis="wflh" role="tab" aria-selected="false">WFH / WFL</button>
+			<div class="who-tab-row" id="nutritionist-chart-tabs" role="tablist" aria-label="WHO indicator">
+				<button type="button" class="who-tab is-active" id="tab-wfa" data-axis="wfa" role="tab" aria-selected="true">WFA</button>
+				<button type="button" class="who-tab" id="tab-hfa" data-axis="hfa" role="tab" aria-selected="false">HFA</button>
+				<button type="button" class="who-tab" id="tab-wflh" data-axis="wflh" role="tab" aria-selected="false">WFH / WFL</button>
 			</div>
 		</div>
 
-		<div class="dashboard-who-grid">
-			<!-- Wave Chart -->
-			<div class="audit-chart-wrap">
-				<div class="audit-chart-header">
-					<div class="audit-chart-title" id="nutritionist-chart-title">Weight-for-Age</div>
-					<div class="audit-chart-legend">
-						<div class="audit-legend-item"><span class="audit-legend-dot is-primary"></span>Normal</div>
-						<div class="audit-legend-item"><span class="audit-legend-dot is-accent"></span>Moderate</div>
-						<div class="audit-legend-item"><span class="audit-legend-dot is-danger"></span>Severe</div>
-						<div class="audit-legend-item" data-legend-row="Refer"><span class="audit-legend-dot is-gray"></span>Refer to WFL/H</div>
-						<div class="audit-legend-item" data-legend-row="Tall" hidden><span class="audit-legend-dot" style="background:#2563eb;"></span>Tall</div>
+		<div class="nsk-overview-grid">
+			<div class="nsk-card nsk-chart-card">
+				<div class="nsk-chart-wrap">
+					<canvas id="nskChart"></canvas>
+				</div>
+			</div>
+<?php
+// Canvas data for the prevalence-style bar chart (whole-number counts).
+// X labels use full names word-wrapped (no codes) to match the page text.
+$nskWrapLabel = static function (string $text, int $width = 12): string {
+	$words = preg_split('/\s+/', trim($text)) ?: [];
+	$lines = [];
+	$cur = '';
+	foreach ($words as $w) {
+		if ($cur === '') { $cur = $w; }
+		elseif (strlen($cur . ' ' . $w) <= $width) { $cur .= ' ' . $w; }
+		else { $lines[] = $cur; $cur = $w; }
+	}
+	if ($cur !== '') { $lines[] = $cur; }
+	return implode("\n", $lines);
+};
+$nskChartJson = [];
+foreach ($nskAxes as $nskAxisKey => $nskAxis) {
+	$nskItems = [];
+	foreach ($nskAxis['chart']['bars'] as $nskBar) {
+		$nskItems[] = [
+			'label' => $nskWrapLabel($nskBar['label']),
+			'count' => (int)$nskBar['count'],
+			'color' => $nskBar['color'],
+		];
+	}
+	$nskChartJson[$nskAxisKey] = [
+		'title' => $nskAxis['chartTitle'],
+		'niceMax' => (int)$nskAxis['chart']['niceMax'],
+		'ticks' => array_map('intval', $nskAxis['chart']['ticks']),
+		'items' => $nskItems,
+	];
+}
+?>
+<script>
+window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); ?>;
+</script>
+
+			<div class="nsk-card nsk-status-card">
+				<div class="nsk-status-title" id="nsk-status-title">Latest Status — WFA</div>
+				<?php foreach ($nskAxes as $nskAxisKey => $nskAxis): ?>
+				<div data-nsk-axis="<?php echo nutritionist_e($nskAxisKey); ?>"<?php echo $nskAxisKey !== 'wfa' ? ' hidden' : ''; ?>>
+					<?php foreach ($nskAxis['chart']['bars'] as $nskBar): ?>
+					<div class="nsk-status-row">
+						<span class="nsk-status-dot" style="background:<?php echo nutritionist_e($nskBar['color']); ?>;" aria-hidden="true"></span>
+						<span class="nsk-status-label"><?php echo nutritionist_e($nskBar['label']); ?></span>
+						<span class="nsk-status-code"><?php echo nutritionist_e($nskBar['code']); ?></span>
+						<span class="nsk-status-count"><?php echo (int)$nskBar['count']; ?></span>
+						<span class="nsk-status-pct"><?php echo nutritionist_e($nskBar['pct']); ?></span>
 					</div>
-					<div class="audit-chart-badge">
-						<span style="width:6px;height:6px;border-radius:50%;background:var(--admin-primary);animation:pulse-dot 2s infinite;"></span>Live
+					<?php endforeach; ?>
+				</div>
+				<?php endforeach; ?>
+
+				<div class="nsk-mini-cal">
+					<div class="nsk-mini-cal-head">
+						<span class="nsk-mini-cal-title">Calendar</span>
+						<span class="nsk-mini-cal-nav">
+							<a class="nsk-mini-cal-btn" href="<?php echo nutritionist_e($prevMonthLink); ?>" aria-label="Previous month">‹</a>
+							<span class="nsk-mini-cal-month"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
+							<a class="nsk-mini-cal-btn" href="<?php echo nutritionist_e($nextMonthLink); ?>" aria-label="Next month">›</a>
+						</span>
+					</div>
+					<div class="sk-cal-wrap" data-sk-calendar>
+						<?php echo nutritionist_render_calendar_grid($calendarDate, $calendarEntries, $today); ?>
 					</div>
 				</div>
-				<div class="audit-chart-body">
-					<canvas id="nutritionist-wave-chart" class="audit-chart-canvas"></canvas>
-					<div class="audit-chart-y-axis" id="nutritionist-chart-y-axis"></div>
-					<div class="audit-chart-tooltip" id="nutritionist-chart-tooltip"></div>
-				</div>
-				<div class="audit-chart-x-axis" id="nutritionist-chart-x-axis"></div>
-			</div>
-
-			<!-- Sidebar Stats — reactive to the active WFA / HFA / WFLH tab -->
-			<div class="dashboard-chart-sidebar dashboard-chart-sidebar-large" id="nutritionist-chart-sidebar">
-				<div class="admin-mini" style="font-weight:800;color:var(--admin-text);font-size:0.78rem;text-transform:uppercase;letter-spacing:0.06em;" id="nutritionist-sidebar-title">Latest Status — WFA</div>
-				<div class="stat-row" data-axis-row="wfa">
-					<div class="stat-label"><span class="stat-dot is-primary"></span><span data-axis-label="wfa"><strong>Normal</strong> <span class="stat-code">N</span></span></div>
-					<div class="stat-count" data-axis-count="wfa" data-axis-key="Normal"><?php echo (int)$axisCounts['wfa']['Normal']; ?><span class="stat-pct"><?php echo $axisTotalWfa > 0 ? round($axisCounts['wfa']['Normal'] / $axisTotalWfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wfa">
-					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wfa"><strong>Moderately Underweight</strong> <span class="stat-code">MUW</span></span></div>
-					<div class="stat-count" data-axis-count="wfa" data-axis-key="MUW"><?php echo (int)$axisPillCounts['wfa']['MUW']; ?><span class="stat-pct"><?php echo $axisTotalWfa > 0 ? round($axisPillCounts['wfa']['MUW'] / $axisTotalWfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wfa">
-					<div class="stat-label"><span class="stat-dot is-gray"></span><span data-axis-label="wfa"><strong>Use WFL/H column</strong> <span class="stat-code">REF</span></span></div>
-					<div class="stat-count" data-axis-count="wfa" data-axis-key="REF"><?php echo (int)$axisPillCounts['wfa']['REF']; ?><span class="stat-pct"><?php echo $axisTotalWfa > 0 ? round($axisPillCounts['wfa']['REF'] / $axisTotalWfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wfa">
-					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wfa"><strong>Severely Underweight</strong> <span class="stat-code">SUW</span></span></div>
-					<div class="stat-count" data-axis-count="wfa" data-axis-key="SUW"><?php echo (int)$axisPillCounts['wfa']['SUW']; ?><span class="stat-pct"><?php echo $axisTotalWfa > 0 ? round($axisPillCounts['wfa']['SUW'] / $axisTotalWfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-
-				<div class="stat-row" data-axis-row="hfa" hidden>
-					<div class="stat-label"><span class="stat-dot is-primary"></span><span data-axis-label="hfa"><strong>Normal</strong> <span class="stat-code">N</span></span></div>
-					<div class="stat-count" data-axis-count="hfa" data-axis-key="Normal"><?php echo (int)$axisCounts['hfa']['Normal']; ?><span class="stat-pct"><?php echo $axisTotalHfa > 0 ? round($axisCounts['hfa']['Normal'] / $axisTotalHfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="hfa" hidden>
-					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="hfa"><strong>Moderately Stunted</strong> <span class="stat-code">MSt</span></span></div>
-					<div class="stat-count" data-axis-count="hfa" data-axis-key="MSt"><?php echo (int)$axisPillCounts['hfa']['MSt']; ?><span class="stat-pct"><?php echo $axisTotalHfa > 0 ? round($axisPillCounts['hfa']['MSt'] / $axisTotalHfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="hfa" hidden>
-					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="hfa"><strong>Severely Stunted</strong> <span class="stat-code">SSt</span></span></div>
-					<div class="stat-count" data-axis-count="hfa" data-axis-key="SSt"><?php echo (int)$axisPillCounts['hfa']['SSt']; ?><span class="stat-pct"><?php echo $axisTotalHfa > 0 ? round($axisPillCounts['hfa']['SSt'] / $axisTotalHfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="hfa" hidden>
-					<div class="stat-label"><span class="stat-dot is-primary"></span><span data-axis-label="hfa"><strong>Tall</strong> <span class="stat-code">Tall</span></span></div>
-					<div class="stat-count" data-axis-count="hfa" data-axis-key="Tall"><?php
-						$tallCount = (int)($axisCounts['hfa']['Tall'] ?? $axisPillCounts['hfa']['Tall'] ?? 0);
-						echo $tallCount;
-					?><span class="stat-pct"><?php echo $axisTotalHfa > 0 ? round($tallCount / $axisTotalHfa * 100, 0) : 0; ?>%</span></div>
-				</div>
-
-				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-primary"></span><span data-axis-label="wflh"><strong>Normal</strong> <span class="stat-code">N</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="Normal"><?php echo (int)$axisCounts['wflh']['Normal']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisCounts['wflh']['Normal'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Moderately Wasted / MAM</strong> <span class="stat-code">MW/MAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="MW/MAM"><?php echo (int)$axisPillCounts['wflh']['MW/MAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['MW/MAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Severely Wasted / SAM</strong> <span class="stat-code">SW/SAM</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="SW/SAM"><?php echo (int)$axisPillCounts['wflh']['SW/SAM']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['SW/SAM'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-accent"></span><span data-axis-label="wflh"><strong>Overweight</strong> <span class="stat-code">OW</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="OW"><?php echo (int)$axisPillCounts['wflh']['OW']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['OW'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
-				</div>
-				<div class="stat-row" data-axis-row="wflh" hidden>
-					<div class="stat-label"><span class="stat-dot is-danger"></span><span data-axis-label="wflh"><strong>Obese</strong> <span class="stat-code">Ob</span></span></div>
-					<div class="stat-count" data-axis-count="wflh" data-axis-key="Ob"><?php echo (int)$axisPillCounts['wflh']['Ob']; ?><span class="stat-pct"><?php echo $axisTotalWflh > 0 ? round($axisPillCounts['wflh']['Ob'] / $axisTotalWflh * 100, 0) : 0; ?>%</span></div>
-				</div>
-
-				<div class="nutritionist-ai-insights-block dashboard-ai-compact" id="ai-insights">
-					<div class="dashboard-ai-heading">
-						<span class="dashboard-ai-icon" aria-hidden="true"><?php echo admin_action_icon('lightbulb'); ?></span>
-						<span>AI Quick insights</span>
-					</div>
-					<ul class="nutritionist-ai-bullets">
-						<?php foreach (array_slice($aiBullets, 0, 2) as $bullet): ?>
-						<li class="nutritionist-ai-bullet"><?php echo $bullet; ?></li>
-						<?php endforeach; ?>
-					</ul>
-				</div>
 			</div>
 		</div>
-	</article>
-
-	<article class="nutritionist-panel">
-		<div class="nutritionist-toolbar" style="margin-bottom:12px;">
-			<h2 class="admin-section-title" style="margin:0;">Calendar</h2>
-			<div style="display:flex;align-items:center;gap:6px;">
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($prevMonthLink); ?>" style="min-height:28px;padding:0 8px;line-height:28px;">‹</a>
-				<span style="font-size:12px;font-weight:600;color:var(--admin-text);min-width:110px;text-align:center;"><?php echo nutritionist_e($calendarDate->format('F Y')); ?></span>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e($nextMonthLink); ?>" style="min-height:28px;padding:0 8px;line-height:28px;">›</a>
-			</div>
-		</div>
-
-		<?php
-		$todayStr = $today->format('Y-m-d');
-		?>
-
-		<div class="sk-cal-wrap" data-sk-calendar>
-			<?php echo nutritionist_render_calendar_grid($calendarDate, $calendarEntries, $today); ?>
-		</div>
-
-		<div id="cal-detail-panel" class="sk-cal-detail-panel"></div>
-
-		<div class="sk-cal-detail-legend" style="margin-top:12px;">
-			<?php foreach (nutritionist_calendar_legend() as $legendItem): ?>
-				<div class="sk-cal-detail-legend-item">
-					<span class="sk-cal-detail-legend-dot" style="background:<?php echo nutritionist_e($legendItem['color']); ?>;"></span>
-					<?php echo nutritionist_e($legendItem['label']); ?>
-				</div>
-			<?php endforeach; ?>
-		</div>
-
 	</article>
 </section>
 
@@ -816,482 +772,195 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 </div><!-- /.nutritionist-dashboard -->
 
 <script>
-// Chart data embedded from PHP for interactive Canvas switching.
-// WFA gets a fourth "Refer" series (DOH eOPT Plus overflow: WAZ > +2
-// routes the operator to the WFL/H axis). HFA gets a fourth "Tall"
-// series (HAZ > +2, exclusive from Normal). The unused series stays
-// at zero on the other tabs.
-var chartMonths = <?php echo json_encode($chartMonths); ?>;
-var chartXs = [56, 110, 164, 218, 272, 326, 380, 420];
-var chartColors = {
-	Normal: 'var(--admin-primary)',
-	Moderate: 'var(--admin-accent)',
-	Severe: 'var(--admin-danger)',
-	// Gray for the WFA "Refer to WFL/H" overflow series.
-	Refer: 'var(--admin-muted)',
-	// Blue for the HFA "Tall" series.
-	Tall: '#2563eb'
-};
-var chartDataEmbedded = {
-	wfa: {
-		Normal: <?php echo json_encode(array_values($wfaData['Normal'])); ?>,
-		Moderate: <?php echo json_encode(array_values($wfaData['Moderate'])); ?>,
-		Severe: <?php echo json_encode(array_values($wfaData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($wfaData['Refer'] ?? [])); ?>,
-		Tall: <?php echo json_encode(array_values($wfaData['Tall'] ?? [])); ?>
-	},
-	hfa: {
-		Normal: <?php echo json_encode(array_values($hfaData['Normal'])); ?>,
-		Moderate: <?php echo json_encode(array_values($hfaData['Moderate'])); ?>,
-		Severe: <?php echo json_encode(array_values($hfaData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($hfaData['Refer'] ?? [])); ?>,
-		Tall: <?php echo json_encode(array_values($hfaData['Tall'] ?? [])); ?>
-	},
-	wflh: {
-		Normal: <?php echo json_encode(array_values($wflhData['Normal'])); ?>,
-		Moderate: <?php echo json_encode(array_values($wflhData['Moderate'])); ?>,
-		Severe: <?php echo json_encode(array_values($wflhData['Severe'])); ?>,
-		Refer: <?php echo json_encode(array_values($wflhData['Refer'] ?? [])); ?>,
-		Tall: <?php echo json_encode(array_values($wflhData['Tall'] ?? [])); ?>
-	}
-};
-
-// WHO Growth Indicators — wave chart with WFA / HFA / WFLH switching
-// Mirrors the audit_logs chart pattern: smooth Catmull-Rom waves, hover
-// tooltip, vertical guide line, and a legend of counts.
+/* Prevalence-style animated bar chart (whole-number counts) + tab switcher.
+   Canvas fills the card so the graph runs to the bottom, level with the
+   status card. Label padding adapts to wrapped x-label lines. */
 (function () {
-	var canvas = document.getElementById('nutritionist-wave-chart');
-	if (!canvas) return;
-	var ctx = canvas.getContext('2d');
-	var tooltip = document.getElementById('nutritionist-chart-tooltip');
-	var yAxisEl = document.getElementById('nutritionist-chart-y-axis');
-	var xAxisEl = document.getElementById('nutritionist-chart-x-axis');
-	var titleEl = document.getElementById('nutritionist-chart-title');
 	var tabsRoot = document.getElementById('nutritionist-chart-tabs');
+	var canvas = document.getElementById('nskChart');
+	var D = window.NSK_DATA;
+	if (!tabsRoot || !canvas || !D) return;
 
-	var months = chartMonths && chartMonths.length ? chartMonths : ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug'];
+	var TITLES = { wfa: 'Weight-for-Age', hfa: 'Height-for-Age', wflh: 'Weight-for-Length/Height' };
+	var STATUS = { wfa: 'Latest Status \u2014 WFA', hfa: 'Latest Status \u2014 HFA', wflh: 'Latest Status \u2014 WFH' };
+	var nskKey = 'wfa', nskHover = -1, nskAnimStart = null;
 
-	// Resolve a CSS variable (e.g. var(--admin-primary)) to its real value.
-	function resolveColor(value) {
-		if (typeof value !== 'string') return value;
-		if (value.indexOf('var(') !== 0) return value;
-		var name = value.slice(4, -1).split(',')[0].trim();
-		return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#94a3b8';
-	}
-
-	// Convert "#0b6e4f" / "rgb(11, 110, 79)" into an {r,g,b} object so we can
-	// derive translucent fill colors that match the design system exactly.
-	function parseRgb(value) {
-		if (!value) return { r: 148, g: 163, b: 184 };
-		value = value.trim();
-		if (value[0] === '#') {
-			var hex = value.slice(1);
-			if (hex.length === 3) {
-				hex = hex.split('').map(function (c) { return c + c; }).join('');
-			}
-			if (hex.length >= 6) {
-				return {
-					r: parseInt(hex.slice(0, 2), 16),
-					g: parseInt(hex.slice(2, 4), 16),
-					b: parseInt(hex.slice(4, 6), 16)
-				};
-			}
-		}
-		var m = value.match(/rgba?\(([^)]+)\)/i);
-		if (m) {
-			var parts = m[1].split(',').map(function (s) { return parseFloat(s.trim()); });
-			return { r: parts[0] || 0, g: parts[1] || 0, b: parts[2] || 0 };
-		}
-		return { r: 148, g: 163, b: 184 };
-	}
-
-	function rgbaFromVar(varName, alpha) {
-		var c = parseRgb(resolveColor(varName));
-		return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + alpha + ')';
-	}
-
-	// Pull the live theme palette so colors adapt to light/dark mode.
-	// The "Refer" series (gray) only renders a non-zero line for the WFA
-	// tab -- it is a WFA-specific overflow ("Refer to WFL/H"). The "Tall"
-	// series (blue) only renders for the HFA tab (HAZ > +2, exclusive
-	// from Normal). Both are hidden from the legend on the other tabs
-	// via the `[data-legend-row]` toggle in the tab switcher below.
-	function palette() {
-		return [
-			{ key: 'Normal',   color: resolveColor('var(--admin-primary)'), fill: rgbaFromVar('--admin-primary', 0.14), label: 'Normal' },
-			{ key: 'Moderate', color: resolveColor('var(--admin-accent)'),  fill: rgbaFromVar('--admin-accent', 0.18),  label: 'Moderate' },
-			{ key: 'Severe',   color: resolveColor('var(--admin-danger)'),  fill: rgbaFromVar('--admin-danger', 0.14),  label: 'Severe' },
-			{ key: 'Refer',    color: resolveColor('var(--admin-muted)'),   fill: rgbaFromVar('--admin-muted', 0.10),   label: 'Refer to WFL/H' },
-			{ key: 'Tall',     color: '#2563eb',                            fill: 'rgba(37,99,235,0.12)',               label: 'Tall' }
-		];
-	}
-
-	var TITLES = {
-		wfa:  'Weight-for-Age',
-		hfa:  'Height-for-Age',
-		wflh: 'Weight-for-Height/Length'
-	};
-
-	var padL = 36, padR = 14, padT = 16, padB = 26;
-	var W = 0, H = 320, cW = 0, cH = 0, dpr = 1, maxVal = 1;
-	var yInterval = 1, yTickCount = 4; // nice-axis state
-	var currentKey = 'wfa';
-	var currentSeries = []; // [{key,color,fill,label,values:[n]}]
-	var catData = []; // [{Normal:n,Moderate:n,Severe:n,Refer:n,Tall:n,label:'Jan'}]
-	var hoverIndex = -1;
-	var lastWidth = 0;
-
-	function catmullRom(p0, p1, p2, p3, t) {
-		var t2 = t * t, t3 = t2 * t;
-		return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
-	}
-
-	function buildSeries(key) {
-		var raw = (chartDataEmbedded && chartDataEmbedded[key]) || { Normal: [], Moderate: [], Severe: [], Refer: [], Tall: [] };
-		var cats = palette();
-		catData = months.map(function (m, i) {
-			return {
-				label: m,
-				Normal: Number(raw.Normal[i] || 0),
-				Moderate: Number(raw.Moderate[i] || 0),
-				Severe: Number(raw.Severe[i] || 0),
-				Refer: Number(raw.Refer[i] || 0),
-				Tall: Number(raw.Tall[i] || 0)
-			};
-		});
-		currentSeries = cats.map(function (c) {
-			return { key: c.key, color: c.color, fill: c.fill, label: c.label, values: catData.map(function (d) { return d[c.key]; }) };
-		});
-		// Compute a "nice" Y-axis maximum so tick labels are always clean
-		// round numbers (1, 2, 5, 10, 15, 20, 25, …) instead of awkward
-		// fractional artifacts like 3, 5, 8.
-		var rawMax = 1;
-		currentSeries.forEach(function (s) {
-			s.values.forEach(function (v) { if (v > rawMax) rawMax = v; });
-		});
-		rawMax = rawMax * 1.15; // 15 % headroom
-
-		// Pick a nice tick interval: 1, 2, 5, 10, 20, 25, 50, 100, …
-		function niceInterval(range, targetTicks) {
-			var roughStep = range / targetTicks;
-			var mag = Math.pow(10, Math.floor(Math.log10(roughStep)));
-			var frac = roughStep / mag;
-			var nice;
-			if (frac <= 1)       nice = 1;
-			else if (frac <= 2)  nice = 2;
-			else if (frac <= 5)  nice = 5;
-			else                 nice = 10;
-			return Math.max(nice * mag, 1);
-		}
-
-		var DESIRED_TICKS = 5; // aim for ~5 horizontal grid lines
-		yInterval = niceInterval(rawMax, DESIRED_TICKS);
-		yTickCount = Math.ceil(rawMax / yInterval);
-		if (yTickCount < 2) yTickCount = 2;
-		maxVal = yTickCount * yInterval;
-	}
-
-	function sizeCanvas() {
-		dpr = window.devicePixelRatio || 1;
-		var parent = canvas.parentElement;
-		var rectW = parent ? parent.getBoundingClientRect().width : 420;
-		W = Math.max(rectW, 220);
-		H = window.matchMedia && window.matchMedia('(max-width: 700px)').matches ? 280 : 320;
-		lastWidth = W;
-		canvas.width = Math.round(W * dpr);
-		canvas.height = Math.round(H * dpr);
-		canvas.style.width = W + 'px';
-		canvas.style.height = H + 'px';
-		ctx.setTransform(1, 0, 0, 1, 0, 0);
+	function getCSS(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+	function setupCanvas(cv, w, h){
+		var dpr = window.devicePixelRatio || 1;
+		cv.width = w * dpr;
+		cv.height = h * dpr;
+		cv.style.width = w + 'px';
+		cv.style.height = h + 'px';
+		var ctx = cv.getContext('2d');
 		ctx.scale(dpr, dpr);
-		cW = W - padL - padR;
-		cH = H - padT - padB;
+		return ctx;
 	}
+	function hexToRgba(hex, a){
+		var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+		return 'rgba('+r+','+g+','+b+','+a+')';
+	}
+	function easeOutCubic(t){ return 1 - Math.pow(1 - t, 3); }
 
-	function buildPoints(values) {
-		return values.map(function (v, i) {
-			return {
-				x: padL + (i / Math.max(values.length - 1, 1)) * cW,
-				y: padT + cH - (v / maxVal) * cH
-			};
+	function maxLabelLines(items){
+		var m = 1;
+		items.forEach(function(it){
+			m = Math.max(m, String(it.label).split('\n').length);
 		});
+		return m;
+	}
+	function nskLayout(items){
+		var rect = canvas.parentElement.getBoundingClientRect();
+		var w = Math.max(rect.width, 220);
+		var h = Math.max(Math.round(rect.height) || 0, 280);
+		var padL = 46, padR = 14, padT = 24;
+		var padB = 26 + maxLabelLines(items) * 15;
+		var cW = w - padL - padR, cH = h - padT - padB;
+		var groupW = cW / Math.max(items.length, 1);
+		return { w: w, h: h, padL: padL, padR: padR, padT: padT, padB: padB, cW: cW, cH: cH, groupW: groupW, barW: Math.min(groupW * 0.5, 54) };
 	}
 
-	function drawSmoothLine(points, color, fill, lineWidth) {
-		if (points.length < 2) return;
-		ctx.beginPath();
-		ctx.moveTo(points[0].x, H - padB);
-		ctx.lineTo(points[0].x, points[0].y);
-		for (var i = 0; i < points.length - 1; i++) {
-			var p0 = points[Math.max(i - 1, 0)];
-			var p1 = points[i];
-			var p2 = points[i + 1];
-			var p3 = points[Math.min(i + 2, points.length - 1)];
-			for (var t = 0; t <= 1; t += 0.05) {
-				ctx.lineTo(catmullRom(p0.x, p1.x, p2.x, p3.x, t), catmullRom(p0.y, p1.y, p2.y, p3.y, t));
-			}
-		}
-		ctx.lineTo(points[points.length - 1].x, H - padB);
-		ctx.closePath();
-		ctx.fillStyle = fill;
-		ctx.fill();
+	function renderNsk(key, animPct){
+		animPct = animPct === undefined ? 1 : animPct;
+		var data = D[key] || D.wfa;
+		var items = data.items, niceMax = Math.max(data.niceMax, 1), ticks = data.ticks || [];
+		var L = nskLayout(items);
+		var ctx = setupCanvas(canvas, L.w, L.h);
 
-		ctx.beginPath();
-		ctx.moveTo(points[0].x, points[0].y);
-		for (var j = 0; j < points.length - 1; j++) {
-			var q0 = points[Math.max(j - 1, 0)];
-			var q1 = points[j];
-			var q2 = points[j + 1];
-			var q3 = points[Math.min(j + 2, points.length - 1)];
-			for (var tt = 0; tt <= 1; tt += 0.05) {
-				ctx.lineTo(catmullRom(q0.x, q1.x, q2.x, q3.x, tt), catmullRom(q0.y, q1.y, q2.y, q3.y, tt));
-			}
-		}
-		ctx.strokeStyle = color;
-		ctx.lineWidth = lineWidth || 2.25;
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-		ctx.stroke();
-	}
-
-	function drawAxes() {
-		// Horizontal grid — uses the resolved surface border so the chart
-		// matches both light and dark themes.
-		var borderRgb = parseRgb(resolveColor('var(--admin-border)'));
-		ctx.strokeStyle = 'rgba(' + borderRgb.r + ',' + borderRgb.g + ',' + borderRgb.b + ',0.55)';
-		ctx.lineWidth = 0.5;
-		for (var g = 0; g <= yTickCount; g++) {
-			var gy = padT + cH * (g / yTickCount);
-			ctx.beginPath();
-			ctx.moveTo(padL, gy);
-			ctx.lineTo(W - padR, gy);
-			ctx.stroke();
-		}
-
-		// Y-axis labels (DOM) — uses nice tick intervals
-		if (yAxisEl) {
-			yAxisEl.innerHTML = '';
-			for (var i = yTickCount; i >= 0; i--) {
-				var lbl = document.createElement('div');
-				lbl.className = 'audit-chart-y-label';
-				lbl.textContent = i * yInterval;
-				yAxisEl.appendChild(lbl);
-			}
-		}
-
-		// X-axis labels (DOM) — show all months, highlight current
-		if (xAxisEl) {
-			xAxisEl.innerHTML = '';
-			var currentMonthIndex = months.length - 1;
-			// Determine label skip: show all months when there's enough room,
-			// otherwise show every-other to avoid overlap.
-			var perLabel = cW / Math.max(months.length, 1);
-			var skipStep = perLabel < 32 ? 2 : 1; // 32px min per label
-			months.forEach(function (m, i) {
-				var lbl = document.createElement('div');
-				lbl.className = 'audit-chart-x-label';
-				// Always show the current month and the first month;
-				// skip others only when the chart is narrow.
-				var showLabel = (skipStep <= 1) || (i % skipStep === 0) || (i === currentMonthIndex) || (i === 0);
-				lbl.textContent = showLabel ? m : '';
-				// Highlight the current (most recent) month
-				if (i === currentMonthIndex) {
-					lbl.style.color = resolveColor('var(--admin-primary)');
-					lbl.style.fontWeight = '700';
-				}
-				xAxisEl.appendChild(lbl);
-			});
-		}
-	}
-
-	function drawChart() {
-		ctx.clearRect(0, 0, W, H);
-		drawAxes();
-
-		currentSeries.forEach(function (s) {
-			var pts = buildPoints(s.values);
-			drawSmoothLine(pts, s.color, s.fill, 2.25);
-		});
-
-		// Highlighted series dots
-		if (hoverIndex >= 0 && hoverIndex < catData.length) {
-			var dotCenter = resolveColor('var(--admin-surface)');
-			currentSeries.forEach(function (s) {
-				var pts = buildPoints(s.values);
-				var p = pts[hoverIndex];
-				ctx.beginPath();
-				ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
-				ctx.fillStyle = s.color;
-				ctx.fill();
-				ctx.beginPath();
-				ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2);
-				ctx.fillStyle = dotCenter;
-				ctx.fill();
-			});
-
-			// Vertical hover guide
-			var pts0 = buildPoints(currentSeries[0].values);
-			var xPos = pts0[hoverIndex].x;
-			ctx.beginPath();
-			ctx.setLineDash([3, 3]);
-			ctx.moveTo(xPos, padT);
-			ctx.lineTo(xPos, padT + cH);
-			ctx.strokeStyle = rgbaFromVar('--admin-muted', 0.45);
-			ctx.lineWidth = 1;
-			ctx.stroke();
+		/* dashed grid + whole-number y labels */
+		ctx.strokeStyle = hexToRgba(getCSS('--admin-muted') || '#94a3b8', 0.12);
+		ctx.lineWidth = 1;
+		ticks.forEach(function(t){
+			var gy = L.padT + L.cH - (t / niceMax) * L.cH;
+			ctx.beginPath(); ctx.setLineDash([4,4]); ctx.moveTo(L.padL, gy); ctx.lineTo(L.w-L.padR, gy); ctx.stroke();
 			ctx.setLineDash([]);
-		}
-	}
-
-	function refreshLegend() {
-		if (!tabsRoot) return;
-		var items = tabsRoot.querySelectorAll('.nutritionist-legend-dot');
-		// The static legend lives outside the tabs; nothing to mutate here.
-		// Reserved for future inline legend state.
-		items.forEach(function () {});
-	}
-
-	function showTooltip(idx) {
-		if (!tooltip) return;
-		if (idx < 0 || idx >= catData.length) {
-			tooltip.style.opacity = '0';
-			return;
-		}
-		var d = catData[idx];
-		var textOnDark = resolveColor('var(--admin-surface)');
-		// Axis-specific abbreviations matching the DOH eOPT Plus codes
-		var ABBR = {
-			wfa:  { Normal: 'N', Moderate: 'MUW', Severe: 'SUW', Refer: 'REF', Tall: 'T' },
-			hfa:  { Normal: 'N', Moderate: 'MSt', Severe: 'SSt', Refer: 'REF', Tall: 'T' },
-			wflh: { Normal: 'N', Moderate: 'MW',  Severe: 'SW',  Refer: 'REF', Tall: 'T' }
-		};
-		var abbr = ABBR[currentKey] || ABBR.wfa;
-		var parts = ['<strong style="color:' + textOnDark + ';">' + d.label + '</strong>'];
-		currentSeries.forEach(function (s) {
-			if (d[s.key] > 0) {
-				var shortLabel = abbr[s.key] || s.key;
-				parts.push('<span style="color:' + s.color + '">●</span> ' + shortLabel + ' ' + d[s.key]);
-			}
+			ctx.fillStyle = getCSS('--admin-muted') || '#94a3b8';
+			ctx.font = '10px Inter, sans-serif';
+			ctx.textAlign = 'right';
+			ctx.fillText(String(t), L.padL-6, gy+3);
 		});
-		if (parts.length === 1) parts.push('No data');
-		tooltip.innerHTML = parts.join(' &nbsp; ');
-		var pts0 = buildPoints(currentSeries[0].values);
-		var xPos = pts0[idx].x;
 
-		// Position the tooltip centered on xPos, then clamp so it
-		// stays fully visible within the chart body (no overflow clipping).
-		tooltip.style.transform = 'none';       // remove centering so we can measure
-		tooltip.style.left = '0px';
-		tooltip.style.top = (padT + 4) + 'px';
-		tooltip.style.opacity = '1';
+		items.forEach(function(it, i){
+			var cx = L.padL + L.groupW*i + L.groupW/2;
+			var bh = (it.count / niceMax) * L.cH * animPct;
+			var bx = cx - L.barW/2;
+			var by = L.padT + L.cH - bh;
+			var isHover = nskHover === i;
 
-		var tw = tooltip.offsetWidth;
-		var idealLeft = xPos - tw / 2;           // centered position
-		var minLeft = 4;                          // small gap from left edge
-		var maxLeft = W - tw - 4;                 // small gap from right edge
-		var clampedLeft = Math.max(minLeft, Math.min(idealLeft, maxLeft));
+			ctx.save();
+			ctx.shadowColor = hexToRgba(it.color, 0.3);
+			ctx.shadowBlur = isHover ? 14 : 5;
+			ctx.shadowOffsetY = 3;
+			var grad = ctx.createLinearGradient(0, by, 0, L.padT + L.cH);
+			grad.addColorStop(0, it.color);
+			grad.addColorStop(1, hexToRgba(it.color, isHover ? 0.6 : 0.75));
+			ctx.fillStyle = grad;
+			ctx.beginPath();
+			if (ctx.roundRect) ctx.roundRect(bx, by, L.barW, Math.max(bh, 1), [5,5,0,0]);
+			else ctx.rect(bx, by, L.barW, Math.max(bh, 1));
+			ctx.fill();
+			ctx.restore();
 
-		tooltip.style.left = clampedLeft + 'px';
+			/* whole-number count on top */
+			ctx.fillStyle = isHover ? it.color : (getCSS('--admin-text') || '#1e293b');
+			ctx.font = (isHover ? 'bold ' : '') + '12px Inter, sans-serif';
+			ctx.textAlign = 'center';
+			if (animPct >= 0.95) ctx.fillText(String(it.count), cx, by - 10);
 
-		// Move the arrow so it still points at the data point
-		var arrowPct = ((xPos - clampedLeft) / tw) * 100;
-		arrowPct = Math.max(10, Math.min(90, arrowPct)); // keep arrow within tooltip
-		tooltip.style.setProperty('--arrow-left', arrowPct + '%');
+			/* x label — full name, wrapped */
+			ctx.fillStyle = getCSS('--admin-text') || '#1e293b';
+			ctx.font = '600 12px Inter, sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'top';
+			var lines = String(it.label).split('\n');
+			var lineH = 14;
+			var startY = L.padT + L.cH + 16 - ((lines.length * lineH) - lineH) / 2;
+			lines.forEach(function(line, li){
+				ctx.fillText(line, cx, startY + li * lineH);
+			});
+			ctx.textBaseline = 'alphabetic';
+		});
 	}
 
-	function onMove(e) {
-		var rect = canvas.getBoundingClientRect();
-		var mx = e.clientX - rect.left;
-		var closest = -1, closestDist = Infinity;
-		for (var i = 0; i < catData.length; i++) {
-			var pts = buildPoints(currentSeries[0].values);
-			var d = Math.abs(pts[i].x - mx);
-			if (d < closestDist) { closestDist = d; closest = i; }
-		}
-		if (closest >= 0 && closestDist < 40) {
-			hoverIndex = closest;
-			showTooltip(closest);
-		} else {
-			hoverIndex = -1;
-			showTooltip(-1);
-		}
-		drawChart();
+	function nskLoop(ts){
+		if (!nskAnimStart) nskAnimStart = ts;
+		var pct = Math.min((ts - nskAnimStart) / 700, 1);
+		renderNsk(nskKey, easeOutCubic(pct));
+		if (pct < 1) requestAnimationFrame(nskLoop);
 	}
-
-	function onLeave() {
-		hoverIndex = -1;
-		showTooltip(-1);
-		drawChart();
+	function playAxis(key){
+		nskKey = TITLES[key] ? key : 'wfa';
+		nskHover = -1;
+		nskAnimStart = null;
+		requestAnimationFrame(nskLoop);
 	}
 
 	function setAxis(key) {
-		currentKey = key;
-		if (titleEl && TITLES[key]) titleEl.textContent = TITLES[key];
-		buildSeries(key);
-		sizeCanvas();
-		drawChart();
-		if (tooltip) tooltip.style.opacity = '0';
-		hoverIndex = -1;
-
-		// Update the sidebar — only show rows for the active axis.
-		var sidebar = document.getElementById('nutritionist-chart-sidebar');
-		if (sidebar) {
-			var sidebarTitle = document.getElementById('nutritionist-sidebar-title');
-			if (sidebarTitle) {
-				var axisName = key === 'wflh' ? 'WFH / WFL' : key.toUpperCase();
-				sidebarTitle.textContent = 'Latest Status — ' + axisName;
-			}
-			sidebar.querySelectorAll('[data-axis-row]').forEach(function (row) {
-				var rowAxis = row.getAttribute('data-axis-row');
-				row.hidden = rowAxis !== key;
-			});
-		}
-
-		// The "Refer to WFL/H" legend item is a WFA-specific overflow
-		// (WAZ > +2). Hide it on HFA / WFL/H where it's never meaningful.
-		// The "Tall" legend item is HFA-specific (HAZ > +2, exclusive
-		// from Normal). Hide it everywhere except the HFA tab.
-		document.querySelectorAll('[data-legend-row]').forEach(function (item) {
-			var row = item.getAttribute('data-legend-row');
-			if (row === 'Refer') item.hidden = key !== 'wfa';
-			else if (row === 'Tall') item.hidden = key !== 'hfa';
+		if (!TITLES[key]) key = 'wfa';
+		tabsRoot.querySelectorAll('.who-tab').forEach(function (b) {
+			var on = b.getAttribute('data-axis') === key;
+			b.classList.toggle('is-active', on);
+			b.setAttribute('aria-selected', on ? 'true' : 'false');
 		});
-	}
-
-	// Wire up tab buttons
-	if (tabsRoot) {
-		tabsRoot.querySelectorAll('.dashboard-chart-tab').forEach(function (btn) {
-			btn.addEventListener('click', function () {
-				var axis = btn.getAttribute('data-axis');
-				if (!axis) return;
-				tabsRoot.querySelectorAll('.dashboard-chart-tab').forEach(function (b) {
-					var active = b === btn;
-					b.classList.toggle('is-active', active);
-					b.setAttribute('aria-selected', active ? 'true' : 'false');
-				});
-				setAxis(axis);
-			});
+		document.querySelectorAll('[data-nsk-axis]').forEach(function (el) {
+			el.hidden = el.getAttribute('data-nsk-axis') !== key;
 		});
+		var ot = document.getElementById('nsk-overview-title');
+		if (ot) ot.textContent = TITLES[key];
+		var st = document.getElementById('nsk-status-title');
+		if (st) st.textContent = STATUS[key];
+		playAxis(key);
 	}
-
-	canvas.addEventListener('mousemove', onMove);
-	canvas.addEventListener('mouseleave', onLeave);
-	canvas.addEventListener('touchstart', function (e) { if (e.touches && e.touches[0]) onMove(e.touches[0]); }, { passive: true });
-	canvas.addEventListener('touchmove', function (e) { if (e.touches && e.touches[0]) onMove(e.touches[0]); }, { passive: true });
-	canvas.addEventListener('touchend', onLeave, { passive: true });
-
-	var resizeTimer = null;
-	window.addEventListener('resize', function () {
-		if (resizeTimer) clearTimeout(resizeTimer);
-		resizeTimer = setTimeout(function () {
-			sizeCanvas();
-			drawChart();
-		}, 100);
+	tabsRoot.querySelectorAll('.who-tab').forEach(function (btn) {
+		btn.addEventListener('click', function () { setAxis(btn.getAttribute('data-axis')); });
 	});
 
-	// Initial render
+	/* hover tooltip (whole numbers) */
+	(function(){
+		var tooltip = document.createElement('div');
+		tooltip.className = 'who-chart-tooltip';
+		canvas.parentElement.style.position = 'relative';
+		canvas.parentElement.appendChild(tooltip);
+		canvas.addEventListener('mousemove', function(e){
+			var data = D[nskKey] || D.wfa;
+			var items = data.items, niceMax = Math.max(data.niceMax, 1);
+			var rect = canvas.getBoundingClientRect();
+			var mx = e.clientX - rect.left, my = e.clientY - rect.top;
+			var L = nskLayout(items);
+			var found = false;
+			items.forEach(function(it, i){
+				var cx = L.padL + L.groupW*i + L.groupW/2;
+				var bh = (it.count / niceMax) * L.cH;
+				var bx = cx - L.barW/2;
+				var by = L.padT + L.cH - bh;
+				if (mx >= bx && mx <= bx+L.barW && my >= by && my <= L.padT+L.cH){
+					tooltip.innerHTML = '<strong>' + it.label.replace(/\n/g, ' ') + '</strong><br>' + it.count + ' children';
+					tooltip.style.left = (bx + L.barW/2) + 'px';
+					tooltip.style.top = (by - 10) + 'px';
+					tooltip.classList.add('is-visible');
+					if (nskHover !== i) { nskHover = i; renderNsk(nskKey, 1); }
+					found = true;
+				}
+			});
+			if (!found){
+				tooltip.classList.remove('is-visible');
+				if (nskHover !== -1) { nskHover = -1; renderNsk(nskKey, 1); }
+			}
+		});
+		canvas.addEventListener('mouseleave', function(){
+			tooltip.classList.remove('is-visible');
+			nskHover = -1;
+			renderNsk(nskKey, 1);
+		});
+	})();
+
+	var nskResize = null;
+	window.addEventListener('resize', function () {
+		if (nskResize) clearTimeout(nskResize);
+		nskResize = setTimeout(function () { renderNsk(nskKey, 1); }, 120);
+	});
+
 	setAxis('wfa');
-	refreshLegend();
 })();
 </script>
 

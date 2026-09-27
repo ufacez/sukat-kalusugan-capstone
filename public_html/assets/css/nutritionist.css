@@ -5280,3 +5280,284 @@
     transition:none !important;
   }
 }
+
+/* ==========================================================================
+ * NSK — Nutritional Status Overview (PNG-style refactored dashboard block)
+ * Readable-first: large type, high contrast, roomy touch targets for older
+ * staff, modern rounded cards. Light defaults; PNG-dark look under
+ * html[data-theme="dark"] (follows the app theme toggle).
+ * ========================================================================== */
+
+/* Wider overview column so the chart + status list get the room back. */
+.nutritionist-page .nutritionist-dashboard-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (max-width: 1100px) {
+  .nutritionist-page .nutritionist-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .nutritionist-page .nutritionist-dashboard-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Overview wrapper stays transparent; the two inner cards carry the surface. */
+.nutritionist-page .nsk-overview-panel {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 0;
+}
+
+.nsk-overview-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.nsk-overview-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--admin-text);
+  line-height: 1.2;
+}
+.nsk-overview-subtitle {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--admin-primary);
+}
+
+/* Prevalence-style canvas bar chart (whole-number counts). */
+.nsk-chart-card {
+  display: flex;
+  flex-direction: column;
+}
+.nsk-chart-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 280px;
+}
+.nsk-chart-wrap canvas {
+  display: block;
+  max-width: 100%;
+}
+.nsk-overview-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: stretch;
+}
+@media (max-width: 980px) {
+  .nsk-overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.nsk-card {
+  background: var(--admin-surface);
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: var(--admin-shadow);
+  min-width: 0;
+}
+/* Prevalence-style canvas bar chart (whole-number counts). */
+.nsk-chart-card {
+  display: flex;
+  flex-direction: column;
+}
+.nsk-chart-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.nsk-chart-wrap canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* Status card stretches so rows fill to the bottom with no dead space. */
+.nsk-status-card {
+  display: flex;
+  flex-direction: column;
+}
+.nsk-status-card > [data-nsk-axis] {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.nsk-status-card > [data-nsk-axis][hidden] {
+  display: none;
+}
+.nsk-status-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--admin-text);
+  margin-bottom: 6px;
+}
+.nsk-status-row {
+  display: flex;
+  align-items: center;
+  flex: 1 1 auto;
+  gap: 10px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--admin-border);
+}
+.nsk-status-dot {
+  width: 11px;
+  height: 11px;
+  min-width: 11px;
+  border-radius: 50%;
+}
+.nsk-status-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--admin-text);
+  line-height: 1.3;
+}
+.nsk-status-code {
+  flex: none;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.07);
+  color: var(--admin-muted);
+}
+.nsk-status-count {
+  flex: none;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--admin-text);
+  min-width: 2.2ch;
+  text-align: right;
+  line-height: 1.1;
+}
+.nsk-status-pct {
+  flex: none;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--admin-muted);
+  min-width: 56px;
+  text-align: right;
+}
+
+/* Mini calendar tucked under the status list — grid only, day details
+   open in a modal (calendar.js switches automatically with no detail
+   panel on the page). */
+.nsk-mini-cal {
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--admin-border);
+}
+.nsk-mini-cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.nsk-mini-cal-title {
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--admin-text);
+}
+.nsk-mini-cal-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.nsk-mini-cal-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  min-height: 26px;
+  padding: 0 6px;
+  border-radius: 8px;
+  border: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+  color: var(--admin-text);
+  font-size: 14px;
+  line-height: 1;
+  text-decoration: none;
+}
+.nsk-mini-cal-btn:hover {
+  border-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+.nsk-mini-cal-month {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--admin-text);
+  min-width: 86px;
+  text-align: center;
+}
+.nsk-mini-cal .sk-cal-weekday {
+  font-size: 8px;
+  padding: 1px 0 3px;
+}
+.nsk-mini-cal .sk-cal-grid {
+  gap: 3px;
+}
+.nsk-mini-cal .sk-cal-day {
+  min-height: 26px;
+  font-size: 10px;
+  padding: 2px 1px;
+  border-radius: 6px;
+  gap: 1px;
+}
+.nsk-mini-cal .sk-cal-day-dots {
+  margin-top: 1px;
+  gap: 2px;
+}
+.nsk-mini-cal .sk-cal-day-dot {
+  width: 4px;
+  height: 4px;
+}
+.nsk-mini-cal .sk-cal-day-more {
+  font-size: 8px;
+}
+
+/* ---- PNG dark look (follows app theme) ---- */
+html[data-theme="dark"] .nsk-overview-title {
+  color: #f2f7f4;
+}
+html[data-theme="dark"] .nsk-overview-subtitle {
+  color: #34d399;
+}
+html[data-theme="dark"] .nsk-card {
+  background: #0d1a14;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: none;
+}
+html[data-theme="dark"] .nsk-status-title,
+html[data-theme="dark"] .nsk-status-label,
+html[data-theme="dark"] .nsk-status-count {
+  color: #eef5f1;
+}
+html[data-theme="dark"] .nsk-status-pct {
+  color: #9db8ab;
+}
+html[data-theme="dark"] .nsk-status-row {
+  border-bottom-color: rgba(255, 255, 255, 0.08);
+}
+html[data-theme="dark"] .nsk-status-code {
+  background: rgba(255, 255, 255, 0.1);
+  color: #c8d8cf;
+}
