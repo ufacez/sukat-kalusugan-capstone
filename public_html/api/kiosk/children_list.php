@@ -12,27 +12,28 @@ $deviceCode = api_string(
     $_GET['device']
         ?? $_GET['device_id']
         ?? $_GET['deviceCode']
-        ?? 'ESP32-KIOSK-01',
-    'ESP32-KIOSK-01'
+        ?? '',
+    ''
 );
 
-if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
+if ($deviceCode !== '' && !preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
     api_error('Invalid device ID.', 400);
 }
 
 $conn = get_db_connection();
 
-$kioskBarangay = kiosk_resolve_device_barangay($deviceCode);
+$kioskBarangay = ($deviceCode !== '') ? kiosk_resolve_device_barangay($deviceCode) : null;
 
-if ($kioskBarangay !== null) {
-    $childrenScopeSql = ' WHERE c.barangay_id = ? AND c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
-    $childrenScopeParams = [$kioskBarangay['id'], 'active'];
-    $childrenScopeTypes = 'is';
-} else {
-    $childrenScopeSql = ' WHERE c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
-    $childrenScopeParams = ['active'];
-    $childrenScopeTypes = 's';
+// Unregistered/unknown devices get an empty list. Previously this fell back
+// to an unscoped full dump of every child — a PII leak on the public
+// internet (initial page payload was fixed the same way in kiosk_index.php).
+if ($kioskBarangay === null) {
+    api_success(['children' => []], 'Device not registered.');
 }
+
+$childrenScopeSql = ' WHERE c.barangay_id = ? AND c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
+$childrenScopeParams = [$kioskBarangay['id'], 'active'];
+$childrenScopeTypes = 'is';
 
 $children = kiosk_fetch_all(
     "SELECT c.id,c.child_code,c.first_name,c.last_name,c.birthdate,c.sex,c.barangay_id,bg.name AS barangay,
