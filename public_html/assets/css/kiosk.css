@@ -105,7 +105,15 @@ body {
   opacity: 1;
   transform: translateX(0);
   pointer-events: auto;
-  position: relative;
+  position: absolute;
+  inset: 0;
+  overflow-y: auto;
+}
+
+/* True centering: margin auto keeps content centered when it fits
+   and still reachable by scroll when it overflows (tall screens). */
+.kiosk-screen.is-active > * {
+  margin: auto;
 }
 
 .kiosk-screen.is-exit-left {
