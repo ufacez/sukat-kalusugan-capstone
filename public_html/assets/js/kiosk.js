@@ -1254,12 +1254,18 @@
           }
         }
 
-        // Hide after transition
-        setTimeout(() => {
-          if (!screen.classList.contains("is-active")) {
-            screen.hidden = true;
-          }
-        }, 450);
+        // Hide after transition — except when heading home: hide
+        // immediately so the previous screen (e.g. thank-you) can't
+        // linger/flash behind welcome during the 450ms overlap.
+        if (step === "welcome") {
+          screen.hidden = true;
+        } else {
+          setTimeout(() => {
+            if (!screen.classList.contains("is-active")) {
+              screen.hidden = true;
+            }
+          }, 450);
+        }
       }
 
       screen.setAttribute("aria-hidden", String(!active));
@@ -6110,7 +6116,10 @@ function finishResults(
             action === "back-to-welcome"
           ) {
             event.preventDefault();
-            setStep("welcome");
+            // Full reset (not bare setStep): clears pending timers
+            // (thank-you/countdown/backend) and any session, so no
+            // stale screen can pop up after landing on welcome.
+            resetKioskToIdle();
             return;
           }
 
