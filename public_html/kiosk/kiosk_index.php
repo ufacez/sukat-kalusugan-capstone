@@ -641,6 +641,7 @@ $appData = [
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-lg" type="button" data-kiosk-action="reset">
                         Balik sa Home
                     </button>
+                    <div class="kiosk-thankyou-progress" aria-hidden="true"><span id="thankyouProgressBar"></span></div>
                     <p class="kiosk-thankyou-sub" id="thankyouCountdown" aria-live="polite"></p>
                     <p class="kiosk-thankyou-sub">Tamang Sukat, Gabay sa wastong Kalusugan</p>
                 </div>

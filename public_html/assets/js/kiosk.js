@@ -1254,10 +1254,11 @@
           }
         }
 
-        // Hide after transition — except when heading home: hide
-        // immediately so the previous screen (e.g. thank-you) can't
-        // linger/flash behind welcome during the 450ms overlap.
-        if (step === "welcome") {
+        // Hide after transition — except when heading home or to the
+        // thank-you screen: hide immediately so the previous screen
+        // (e.g. results behind thank-you) can't linger/flash during
+        // the 450ms overlap.
+        if (step === "welcome" || step === "thankyou") {
           screen.hidden = true;
         } else {
           setTimeout(() => {
@@ -6466,16 +6467,20 @@ function finishResults(
             }
 
             // Manual-primary pacing: the operator taps "Balik sa Home"
-            // when the panel is done reading. The 60s timer is only a
+            // when the panel is done reading. The 15s timer is only a
             // safety net so the kiosk never gets stuck on thank-you.
-            var thankyouAutoSeconds = 60;
+            var thankyouAutoSeconds = 15;
             var thankyouCountdownEl = document.getElementById("thankyouCountdown");
+            var thankyouProgressBar = document.getElementById("thankyouProgressBar");
             var updateThankyouCountdown = function () {
               if (!thankyouCountdownEl) return;
               var elapsed = Math.floor((Date.now() - state.thankyouShownAt) / 1000);
               var remaining = thankyouAutoSeconds - elapsed;
               if (remaining < 0) remaining = 0;
               thankyouCountdownEl.textContent = "Babalik sa home sa " + remaining + "s — o pindutin ang Balik sa Home.";
+              if (thankyouProgressBar) {
+                thankyouProgressBar.style.width = ((remaining / thankyouAutoSeconds) * 100) + "%";
+              }
             };
             updateThankyouCountdown();
             state.thankyouCountdownTimer = setInterval(updateThankyouCountdown, 1000);

@@ -121,6 +121,21 @@ body {
   position: absolute;
 }
 
+/* Thank-you appears instantly centered — no slide-in (flash fix). */
+.kiosk-screen[data-kiosk-screen="thankyou"],
+.kiosk-screen[data-kiosk-screen="thankyou"][hidden] {
+  transform: none;
+  transition: opacity 0.15s ease;
+}
+
+.kiosk-screen[data-kiosk-screen="thankyou"].is-active {
+  transform: none;
+}
+
+.kiosk-screen[data-kiosk-screen="thankyou"].is-active .kiosk-thankyou {
+  animation: none;
+}
+
 /* ================================================================
    WELCOME SCREEN
    ================================================================ */
@@ -1288,7 +1303,7 @@ body {
 
 .kiosk-thankyou-check {
   margin-bottom: 28px;
-  animation: kioskCheckPop 0.6s var(--sk-bounce) 0.2s both;
+  animation: kioskCheckPop 0.35s var(--sk-bounce) 0s both;
 }
 
 @keyframes kioskCheckPop {
@@ -1316,6 +1331,24 @@ body {
   color: var(--sk-muted);
   margin-top: 18px;
   font-weight: 500;
+}
+
+.kiosk-thankyou-progress {
+  width: min(280px, 80%);
+  height: 6px;
+  border-radius: 999px;
+  background: var(--sk-border-light);
+  margin: 14px auto 0;
+  overflow: hidden;
+}
+
+.kiosk-thankyou-progress span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--sk-green), var(--sk-green-light));
+  transition: width 1s linear;
 }
 
 /* Ghost-tap cool-down: block taps on thank-you buttons right after the screen swap. */
