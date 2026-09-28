@@ -523,6 +523,11 @@ unset($sf);
 
 </main>
 
+<footer style="text-align:center;padding:1.2rem .8rem 1.6rem;font-size:.8rem;color:#64748b;line-height:1.7;">
+    Student capstone by <strong>Group A4Tech</strong> (Our Lady of Fatima University) &mdash; not an official City Health Office system. No public registration.<br>
+    <a href="about.php" style="color:inherit;">About</a> &middot; <a href="privacy.php" style="color:inherit;">Privacy</a> &middot; <a href="terms.php" style="color:inherit;">Terms</a> &middot; <a href="contact.php" style="color:inherit;">Contact</a> &mdash; espirituean@gmail.com / 09614730364, Philippines.
+</footer>
+
 <div class="sk-lightbox" id="skLightbox" hidden>
     <div class="sk-lightbox-backdrop" id="skLbBackdrop"></div>
     <figure class="sk-lightbox-fig" role="dialog" aria-modal="true" aria-label="Enlarged photo">

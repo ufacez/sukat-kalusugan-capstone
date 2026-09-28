@@ -4,21 +4,26 @@ require_once __DIR__ . '/../includes/firebase_sync.php';
 require_once __DIR__ . '/../includes/kiosk_helpers.php';
 require_once __DIR__ . '/../includes/auth_middleware.php';
 
-$deviceCode = trim((string)($_GET['device'] ?? 'ESP32-KIOSK-01'));
-$kioskBarangay = kiosk_resolve_device_barangay($deviceCode);
+$deviceCode = trim((string)($_GET['device'] ?? ''));
+$kioskBarangay = ($deviceCode !== '') ? kiosk_resolve_device_barangay($deviceCode) : null;
+// Unregistered/unknown devices see no child data. Previously this fell back
+// to an unscoped full dump so fresh kiosks showed every child — a PII leak
+// on the public internet. Registered devices stay barangay-scoped.
+$kioskRegistered = ($deviceCode !== '' && $kioskBarangay !== null);
 
 $childrenScopeSql = '';
 $childrenScopeParams = [];
 $childrenScopeTypes = '';
 
-if ($kioskBarangay !== null) {
+if ($kioskRegistered) {
     $childrenScopeSql = ' WHERE c.barangay_id = ? AND c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
     $childrenScopeParams = [$kioskBarangay['id'], 'active'];
     $childrenScopeTypes = 'is';
 } else {
-    $childrenScopeSql = ' WHERE c.status = ? AND TIMESTAMPDIFF(MONTH, c.birthdate, CURDATE()) <= 59';
-    $childrenScopeParams = ['active'];
-    $childrenScopeTypes = 's';
+    // Impossible predicate: returns zero rows without a full-table scan.
+    $childrenScopeSql = ' WHERE 1 = 0';
+    $childrenScopeParams = [];
+    $childrenScopeTypes = '';
 }
 
 $children = kiosk_fetch_all(
@@ -67,10 +72,14 @@ $devicesScopeSql = '';
 $devicesScopeParams = [];
 $devicesScopeTypes = '';
 
-if ($kioskBarangay !== null) {
+if ($kioskRegistered) {
     $devicesScopeSql = ' WHERE barangay_id = ?';
     $devicesScopeParams = [$kioskBarangay['id']];
     $devicesScopeTypes = 'i';
+} else {
+    $devicesScopeSql = ' WHERE 1 = 0';
+    $devicesScopeParams = [];
+    $devicesScopeTypes = '';
 }
 
 $devices = kiosk_fetch_all(
@@ -123,6 +132,7 @@ $appData = [
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
     'websocket' => ['enabled' => true, 'esp32_ip' => $esp32LocalIp],
     'barangay' => $kioskBarangay,
+    'registered' => $kioskRegistered,
     'endpoints' => [
         'ping' => '../api/kiosk/device_status.php',
         'command' => '../api/esp32/get_command.php',
@@ -301,6 +311,9 @@ $appData = [
                         <div class="kiosk-lookup-location">
                             <span class="kiosk-device-dot online"></span>
                             <span data-kiosk-lookup-barangay><?php echo kiosk_e($kioskBarangay['name'] ?? ''); ?></span>
+                            <?php if (!$kioskRegistered): ?>
+                                <span style="display:block;font-size:.8rem;color:#b91c1c;">Device not registered — contact admin to assign this kiosk.</span>
+                            <?php endif; ?>
                         </div>
                         <div class="kiosk-lookup-status">
                             <span class="kiosk-device-dot online"></span>
