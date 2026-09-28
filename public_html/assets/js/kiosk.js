@@ -10,8 +10,13 @@
   const data = window.KIOSK_DATA || {};
   const body = document.body;
 
-  const deviceId =
-    data?.defaults?.deviceId || "ESP32-KIOSK-01";
+  // No hardcoded fallback: an unregistered/empty device must stay empty.
+  // Previously this fell back to "ESP32-KIOSK-01", so a bare kiosk URL
+  // showed the "Device not registered" banner yet silently loaded that
+  // device's scoped children via every API call. Now banner and data agree.
+  const deviceId = String(
+    data?.defaults?.deviceId ?? ""
+  ).trim();
 
   const firebaseBaseUrl =
     typeof data?.firebase?.databaseUrl === "string"
@@ -740,6 +745,13 @@
 
   async function refreshChildrenList() {
     if (state.childrenRefreshRequestInProgress) {
+      return;
+    }
+
+    // Unregistered device: no silent fallback, no fetch. The PHP banner
+    // already explains the kiosk needs admin assignment.
+    if (!deviceId) {
+      state.children = [];
       return;
     }
 
