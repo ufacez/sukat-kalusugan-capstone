@@ -726,6 +726,10 @@
 
     lastBlockedStaleSessionId: null,
 
+    liveBlankUntil: 0,
+
+    liveBlankSessionId: 0,
+
     destroyed: false,
 
     childrenRefreshTimer: null,
@@ -1999,6 +2003,64 @@
   // FIREBASE PAYLOAD
   // ============================================================
 
+  /*
+   * Stale-reading blanking: for a few seconds after a NEW session
+   * starts, Firebase/WS still carry the previous child's values
+   * (single shared latest_measurements node; the ESP32 only learns
+   * the new session_id on its next get_command poll). While blanking
+   * is active, live payloads whose session_id is stale must not
+   * paint the readouts — they stay at "--.--"/"--.-".
+   *
+   * Returns true when the payload's sensor values should be painted.
+   * Payloads with no session_id (older firmware) always pass so the
+   * readout can't get stuck, and the window expires on its own.
+   */
+  function shouldPaintLivePayload(payload) {
+    const blankUntil = Number(state.liveBlankUntil || 0);
+
+    if (!blankUntil) {
+      return true;
+    }
+
+    if (Date.now() >= blankUntil) {
+      state.liveBlankUntil = 0;
+      state.liveBlankSessionId = 0;
+
+      return true;
+    }
+
+    const payloadSessionId = Number(
+      payload.session_id ||
+      payload.sessionId ||
+      0
+    );
+
+    // No session tag (older firmware): can't prove staleness.
+    if (!(payloadSessionId > 0)) {
+      return true;
+    }
+
+    const expectedSessionId = Number(
+      state.liveBlankSessionId ||
+      state.firebaseSessionId ||
+      getCurrentSessionId() ||
+      0
+    );
+
+    if (
+      expectedSessionId > 0 &&
+      payloadSessionId === expectedSessionId
+    ) {
+      // Fresh data for this session — lift the blank early.
+      state.liveBlankUntil = 0;
+      state.liveBlankSessionId = 0;
+
+      return true;
+    }
+
+    return false;
+  }
+
   function applyFirebaseStatus(
     payload
   ) {
@@ -2133,7 +2195,13 @@
           ? payload.height_stable
           : undefined;
 
-      if (hasWeight) {
+      // Stale-reading blanking: while a fresh session waits for its
+      // own sensor data, don't paint or feed stability with values
+      // tagged to a previous session.
+      const paintLive =
+        shouldPaintLivePayload(payload);
+
+      if (paintLive && hasWeight) {
         const locked =
           updateStability(
             "weight",
@@ -2149,7 +2217,7 @@
         );
       }
 
-      if (hasHeight) {
+      if (paintLive && hasHeight) {
         const locked =
           updateStability(
             "height",
@@ -2174,6 +2242,7 @@
       const finalHeight = Number(payload.final_height_cm);
 
       if (
+        paintLive &&
         finalReady &&
         finalSequence > 0 &&
         finalSequence <= sequence &&
@@ -2230,6 +2299,11 @@
     // ==========================================================
 
     if (status === "COMPLETE") {
+      // Same stale-session blanking as the live branches above.
+      if (!shouldPaintLivePayload(payload)) {
+        return;
+      }
+
       if (hasWeight) {
         state.weightLocked =
           true;
@@ -2438,12 +2512,26 @@
        *    next safeFirebaseUpdate() call, after which normal matching resumes.
        */
 
+      // Stale-reading blanking: a fresh session just started and
+      // Firebase still holds the previous child's values. Consume
+      // the payload (signature bookkeeping below) but don't paint —
+      // readouts stay at "--.--"/"--.-" until fresh data arrives.
+      let blankStalePayload = false;
+
       if (
         expectedSessionId > 0 &&
         payloadSessionId > 0 &&
         payloadSessionId !==
           expectedSessionId
       ) {
+        if (
+          Number(state.liveBlankUntil || 0) > Date.now() &&
+          Number(state.liveBlankSessionId || 0) ===
+            expectedSessionId
+        ) {
+          blankStalePayload = true;
+        }
+
         const payloadStatus =
           normalizeStatus(payload.status);
 
@@ -2577,6 +2665,10 @@
       if (timestamp) {
         state.lastFirebaseTimestamp =
           timestamp;
+      }
+
+      if (blankStalePayload) {
+        return payload;
       }
 
       applyFirebaseStatus(
@@ -2933,7 +3025,12 @@
 
     state.firebaseOnline = true;
 
-    if (hasWeight) {
+    // Stale-reading blanking (same as Firebase path): the WS fast
+    // path has no upstream session gate, so check here directly.
+    const paintLive =
+      shouldPaintLivePayload(payload);
+
+    if (paintLive && hasWeight) {
       const locked =
         updateStability(
           "weight",
@@ -2949,7 +3046,7 @@
       );
     }
 
-    if (hasHeight) {
+    if (paintLive && hasHeight) {
       const locked =
         updateStability(
           "height",
@@ -2997,6 +3094,7 @@
       }
 
       if (
+        paintLive &&
         finalReady &&
         finalSequence > 0 &&
         finalSequence <= sequence &&
@@ -3061,6 +3159,12 @@
     }
 
     if (status === "COMPLETE") {
+      // A COMPLETE tagged to a previous session must not paint or
+      // lock during the blanking window of a fresh session.
+      if (!paintLive) {
+        return;
+      }
+
       if (hasWeight) {
         state.weightLocked = true;
 
@@ -3711,6 +3815,16 @@
         payload;
 
       state.firebaseSessionId =
+        newSessionId;
+
+      // Blank the live readouts until fresh data for THIS session
+      // arrives. Firebase/WS still hold the previous child's values
+      // until the ESP32 polls get_command.php, so without this the
+      // first poll paints stale readings instantly.
+      state.liveBlankUntil =
+        Date.now() + 3000;
+
+      state.liveBlankSessionId =
         newSessionId;
 
       state.awaitingLiveResult =
@@ -5401,6 +5515,12 @@ function finishResults(
 
     state.lastFirebaseSignature =
       "";
+
+    state.liveBlankUntil =
+      0;
+
+    state.liveBlankSessionId =
+      0;
 
     state.weight =
       null;
