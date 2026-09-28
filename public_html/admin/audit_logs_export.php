@@ -52,7 +52,7 @@ if ($actionFilter === 'login') {
 } elseif ($actionFilter === 'logout') {
     $filterWhere = "AND a.action = 'LOGOUT'";
 } elseif ($actionFilter === 'create') {
-    $filterWhere = "AND (a.action LIKE 'CREATE_%' OR a.action = 'measurement.create')";
+    $filterWhere = "AND (a.action LIKE 'CREATE_%' OR a.action = 'measurement.create' OR a.action LIKE 'MEASUREMENT%')";
 } elseif ($actionFilter === 'read') {
     $filterWhere = "AND a.action IN ('EOPT_EXPORT','EOPT_LIST_EXPORT','FOLLOWUP_SYNC','PASSWORD_RESET_REQUEST','PASSWORD_RESET_COMPLETE')";
 } elseif ($actionFilter === 'update') {

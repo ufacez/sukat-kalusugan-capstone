@@ -30,6 +30,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'ii',
 			[$appointmentId, (int)$user['id']]
 		);
+		if ($ok) {
+			$actor = current_user();
+			log_action($actor['id'] ?? null, 'UPDATE_APPOINTMENT', 'info', 'Confirmed appointment #' . $appointmentId);
+		}
 		admin_redirect('/nutritionist/appointments.php?tab=incoming', $ok ? ['notice' => 'Appointment confirmed.'] : ['notice' => 'Could not confirm appointment.', 'type' => 'error']);
 	}
 
@@ -40,6 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'ii',
 			[$appointmentId, (int)$user['id']]
 		);
+		if ($ok) {
+			$actor = current_user();
+			log_action($actor['id'] ?? null, 'UPDATE_APPOINTMENT', 'warning', 'Cancelled appointment #' . $appointmentId);
+		}
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment cancelled.'] : ['notice' => 'Could not cancel appointment.', 'type' => 'error']);
 	}
 
@@ -51,6 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'sii',
 			[$recommendations, $appointmentId, (int)$user['id']]
 		);
+		if ($ok) {
+			$actor = current_user();
+			log_action($actor['id'] ?? null, 'UPDATE_APPOINTMENT', 'info', 'Completed appointment #' . $appointmentId);
+		}
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment marked as completed.'] : ['notice' => 'Could not complete appointment.', 'type' => 'error']);
 	}
 
@@ -92,6 +104,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'iiissss',
 			[$childId, (int)$childRecord['parent_id'], (int)$user['id'], $scheduledAt, 'pending', $notes, $location]
 		);
+
+		if ($ok) {
+			$actor = current_user();
+			$newAppointmentId = (int)get_db_connection()->insert_id;
+			log_action($actor['id'] ?? null, 'CREATE_APPOINTMENT', 'info', 'Scheduled appointment #' . $newAppointmentId . ' for child #' . $childId);
+		}
 
 		admin_redirect('/nutritionist/appointments.php?tab=outgoing', $ok ? ['notice' => 'Appointment scheduled.'] : ['notice' => 'Appointment could not be scheduled.', 'type' => 'error']);
 	}

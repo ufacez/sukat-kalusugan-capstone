@@ -87,6 +87,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
 	$ok = admin_execute($sql, $types, $params);
 
 	if ($ok) {
+		$actor = current_user();
+		log_action($actor['id'] ?? null, 'UPDATE_OWN_ACCOUNT', 'info', 'Parent updated their own account details');
 		$_SESSION['auth']['name'] = $name;
 		$_SESSION['auth']['email'] = $email;
 		$_SESSION['auth']['phone'] = $phone;

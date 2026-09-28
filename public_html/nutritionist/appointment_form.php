@@ -80,6 +80,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			[$childId, $parentId, $scheduledAt, $status, $notes, $location, $editId]
 		);
 
+		if ($ok) {
+			$actor = current_user();
+			log_action($actor['id'] ?? null, 'UPDATE_APPOINTMENT', 'info', 'Updated appointment #' . $editId . ' for child #' . $childId . ' via nutritionist form');
+		}
+
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment updated.'] : ['notice' => 'Appointment could not be updated.', 'type' => 'error']);
 	}
 
@@ -90,6 +95,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 			'iiissss',
 			[$childId, $parentId, (int)$user['id'], $scheduledAt, 'pending', $notes, $location]
 		);
+
+		if ($ok) {
+			$actor = current_user();
+			$newAppointmentId = (int)get_db_connection()->insert_id;
+			log_action($actor['id'] ?? null, 'CREATE_APPOINTMENT', 'info', 'Scheduled appointment #' . $newAppointmentId . ' for child #' . $childId . ' via nutritionist form');
+		}
 
 		admin_redirect('/nutritionist/appointments.php', $ok ? ['notice' => 'Appointment scheduled.'] : ['notice' => 'Appointment could not be scheduled.', 'type' => 'error']);
 	}

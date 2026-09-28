@@ -265,6 +265,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             ]
         );
 
+        if ($ok) {
+            $actor = current_user();
+            log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'info', 'Updated child ' . $childCode . ' (' . $childId . ') via nutritionist form');
+        }
+
         admin_redirect(
             '/nutritionist/children.php',
             $ok
@@ -316,6 +321,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 $validatedHouseholdId
             ]
         );
+
+        if ($ok) {
+            $actor = current_user();
+            $newChildId = (int)get_db_connection()->insert_id;
+            log_action($actor['id'] ?? null, 'CREATE_CHILD', 'info', 'Created child ' . $childCode . ' (' . $newChildId . ') via nutritionist form');
+        }
 
         admin_redirect(
             '/nutritionist/children.php',

@@ -47,6 +47,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 		[$childId, (int)$user['id'], $nutritionistId, $scheduledAt, 'pending', $notes, 'parent']
 	);
 
+	if ($ok) {
+		$actor = current_user();
+		$newAppointmentId = (int)get_db_connection()->insert_id;
+		log_action($actor['id'] ?? null, 'CREATE_APPOINTMENT', 'info', 'Parent requested appointment #' . $newAppointmentId . ' for child #' . $childId);
+	}
+
 	admin_redirect('/parent/appointments.php', $ok ? ['notice' => 'Appointment requested successfully.'] : ['notice' => 'Appointment could not be created.', 'type' => 'error']);
 }
 

@@ -18,12 +18,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if ($formAction === 'cancel') {
         $cancelId = (int)($_POST['id'] ?? 0);
         if ($cancelId > 0) {
-            $inv = admin_fetch_one("SELECT id, invitee_name, code, status FROM invitations WHERE id = ? LIMIT 1", 'i', [$cancelId]);
+            $inv = admin_fetch_one("SELECT id, status FROM invitations WHERE id = ? LIMIT 1", 'i', [$cancelId]);
             if ($inv !== null && $inv['status'] === 'pending') {
                 $ok = admin_execute("UPDATE invitations SET status = 'cancelled' WHERE id = ? AND status = 'pending'", 'i', [$cancelId]);
                 if ($ok) {
                     $actor = current_user();
-                    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'danger', sprintf('Cancelled invitation for %s (code: %s)', $inv['invitee_name'], $inv['code']));
+                    log_action($actor['id'] ?? null, 'DELETE_INVITATION', 'danger', sprintf(
+                        // Privacy: invitation id only — never the invitee
+                        // name/email, and never the activation code.
+                        'Cancelled invitation #%d',
+                        $cancelId
+                    ));
                 }
                 admin_redirect('/admin/invitations.php', ['notice' => $ok ? 'Invitation cancelled.' : 'Could not cancel invitation.', 'type' => $ok ? 'success' : 'error']);
             }
