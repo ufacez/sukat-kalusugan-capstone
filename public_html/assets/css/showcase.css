@@ -661,6 +661,124 @@
 .sk-video-ph small { font-size: 0.78rem; line-height: 1.5; }
 .sk-video-ph code { color: var(--primary); font-weight: 700; }
 
+/* ---- Feature cards ("What it does") — mobile first ----
+ * A swipeable row: native scroll-snap (no JS needed to swipe), one card per
+ * feature, peek of the next card so it reads as swipeable. Dots and arrows
+ * reuse the team deck's .sk-dots / .sk-arrow. Dark card via the scoped
+ * .sk-feature tokens; every color and radius comes from tokens. */
+.sk-feat-track {
+  --feat-w: min(78vw, 400px);
+  position: relative;
+  display: flex;
+  gap: 0.9rem;
+  margin: 1.1rem -1.6rem 0;
+  padding: 0.2rem 0 0.7rem;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+/* Invisible spacers: let the first and last card scroll to the center. */
+.sk-feat-track::before,
+.sk-feat-track::after {
+  content: "";
+  flex: 0 0 calc(50% - var(--feat-w) / 2 - 0.9rem);
+}
+.sk-feat-track::-webkit-scrollbar { display: none; }
+@media (hover: hover) and (pointer: fine) {
+  .sk-feat-track { cursor: grab; }
+}
+/* Mouse drag: snapping is paused while dragging, then re-applied on release. */
+.sk-feat-track.is-dragging { cursor: grabbing; scroll-snap-type: none; user-select: none; }
+.sk-feat-track:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.sk-feat-card {
+  flex: 0 0 var(--feat-w);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  scroll-snap-align: center;
+  scroll-snap-stop: always;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  transition: opacity 0.3s ease, border-color 0.3s ease;
+}
+.sk-feat-media {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 380px;
+  padding: 0.9rem;
+  box-sizing: border-box;
+  background: linear-gradient(160deg, var(--surface-alt), var(--surface));
+}
+.sk-feat-media img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: zoom-in;
+  user-select: none;
+}
+/* Portrait phone screenshots are shown whole and height-limited. */
+.sk-feat-media.is-phone img { width: auto; height: 100%; max-width: 100%; border-radius: 20px; }
+/* Desktop screenshots: fill the card edge to edge, cropped Apple-style.
+ * Tweak object-position (e.g. "top left") to move the visible area. */
+.sk-feat-media:not(.is-phone) {
+  height: auto;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+}
+.sk-feat-media:not(.is-phone):has(img) { background: #000; }
+.sk-feat-media:not(.is-phone) img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  object-position: top center;
+  border: 0;
+  border-radius: 0;
+}
+.sk-feat-ph {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  text-align: center;
+  padding: 1rem;
+  color: var(--muted);
+  border: 2px dashed var(--border);
+  border-radius: 14px;
+}
+.sk-feat-ph b { color: var(--text); font-size: 0.95rem; }
+.sk-feat-ph small { font-size: 0.78rem; line-height: 1.5; }
+.sk-feat-ph code { color: var(--primary); font-weight: 700; }
+.sk-feat-body {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  flex: 1;
+  padding: 1rem 1.1rem 1.2rem;
+  border-top: 1px solid var(--border);
+}
+.sk-feat-body h3 { margin: 0; font-size: 1.25rem; font-weight: 900; line-height: 1.2; color: var(--text); }
+.sk-feat-body p { margin: 0; color: var(--muted); font-size: 0.95rem; line-height: 1.55; }
+.sk-feat-ctrl { justify-content: center; margin-top: 0.7rem; }
+@media (max-width: 860px) {
+  .sk-feat-track { margin: 1rem -1.15rem 0; }
+  /* Focus the eye on the card in the middle. */
+  .sk-feat-card { opacity: 0.55; }
+  .sk-feat-card.is-active { opacity: 1; border-color: var(--primary); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-feat-card { transition: none; }
+}
+
 /* ---- Overlapping device cluster: desktop + laptop + phone showcase ---- */
 .device-cluster {
   position: relative;
@@ -816,7 +934,7 @@
   position: relative;
   z-index: 1;
   margin: 0;
-  max-width: min(92vw, 700px);
+  max-width: min(94vw, 1100px);
   max-height: 88vh;
   display: flex;
   flex-direction: column;
@@ -824,7 +942,7 @@
 }
 .sk-lightbox-fig img {
   max-width: 100%;
-  max-height: 78vh;
+  max-height: 82vh;
   object-fit: contain;
   border-radius: 12px;
   background: #101614;
@@ -855,3 +973,97 @@
 .sk-lb-close { top: 1rem; right: 1rem; }
 .sk-lb-prev { left: 0.75rem; top: 50%; transform: translateY(-50%); }
 .sk-lb-next { right: 0.75rem; top: 50%; transform: translateY(-50%); }
+
+/* ==== "What it does": Apple-style full-bleed gallery (no outer box) ====
+ * Breaks out of the 1120px column to the full viewport width. Cards have no
+ * border or background: rounded screenshot on top, bold title + gray text
+ * underneath. Placed last so it overrides the earlier feature-card rules. */
+.sk-showcase { overflow-x: clip; }
+
+.sk-section.sk-features {
+  width: 100vw;
+  margin-left: calc(50% - 50vw);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 3.5rem 0 2.5rem;
+}
+/* Heading stays aligned with the rest of the page */
+.sk-section.sk-features > .eyebrow,
+.sk-section.sk-features > h2,
+.sk-section.sk-features > .lead {
+  box-sizing: border-box;
+  max-width: 1120px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 0 1.6rem;
+}
+.sk-section.sk-features > h2 { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.1; }
+
+.sk-features .sk-feat-track {
+  --feat-w: min(82vw, 460px);
+  margin: 1.6rem 0 0;
+  gap: 1.1rem;
+}
+.sk-features .sk-feat-track::before,
+.sk-features .sk-feat-track::after {
+  flex: 0 0 calc(50% - var(--feat-w) / 2 - 1.1rem);
+}
+
+/* Card: no box */
+.sk-features .sk-feat-card {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  border-radius: 0;
+  overflow: visible;
+}
+
+/* Screenshot: big rounded panel, same shape for phone and desktop */
+.sk-features .sk-feat-media,
+.sk-features .sk-feat-media:not(.is-phone) {
+  height: auto;
+  aspect-ratio: 4 / 5;
+  padding: 0;
+  border-radius: 28px;
+  overflow: hidden;
+  background: linear-gradient(160deg, var(--surface-alt), var(--surface));
+}
+.sk-features .sk-feat-media:has(img) { background: #000; }
+.sk-features .sk-feat-media img,
+.sk-features .sk-feat-media:not(.is-phone) img {
+  width: 100%;
+  height: 100%;
+  max-height: none;
+  object-fit: cover;
+  object-position: top center; /* try "top left" or "center" to move the crop */
+  border: 0;
+  border-radius: 0;
+}
+/* Phone cards fill the panel too (no black bars). Crop screenshots to about 4:5. */
+.sk-features .sk-feat-media.is-phone { padding: 0; }
+.sk-features .sk-feat-media.is-phone img {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: cover;
+  object-position: top center;
+  border-radius: 0;
+}
+
+/* Text under the image: bold lead-in, gray sentence, no divider */
+.sk-features .sk-feat-body {
+  display: block;
+  padding: 1.1rem 0.3rem 0;
+  border: 0;
+}
+.sk-features .sk-feat-body h3,
+.sk-features .sk-feat-body p {
+  display: inline;
+  margin: 0;
+  font-size: 1.05rem;
+  line-height: 1.5;
+}
+.sk-features .sk-feat-body h3 { margin-right: 0.35em; }
+
+.sk-features .sk-feat-ctrl { margin-top: 1.4rem; }

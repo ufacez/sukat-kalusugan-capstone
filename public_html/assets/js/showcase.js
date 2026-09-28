@@ -1,5 +1,5 @@
 /* Sukat Kalusugan public showcase — vanilla, no dependencies.
- * Team deck + meet-the-kiosk hotspot modal + lightbox. */
+ * Team deck + meet-the-kiosk hotspot modal + feature cards + lightbox. */
 (function () {
   /* Theme-aware hero logos, same as auth login: forlight on light bg, fordark on dark bg. */
   function swapShowcaseLogos() {
@@ -146,6 +146,88 @@
       if (e.key === 'Escape' && !modal.hidden) closeKioskModal();
     });
   }
+  /* ---- Feature cards ("What it does") ----
+   * Swiping is native scroll-snap (touch and trackpad). This keeps the dots
+   * and the "active" card in step with the scroll position, and adds
+   * click-and-drag for mouse users since a mouse can't swipe. */
+  var featTrack = document.getElementById('skFeatTrack');
+  if (featTrack) {
+    var featCards = Array.prototype.slice.call(featTrack.children);
+    var featDots = document.getElementById('skFeatDots');
+    var featReduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    var featIdx = -1;
+    var featRaf = 0;
+    var featDrag = null;
+
+    function featGo(i) {
+      i = Math.max(0, Math.min(featCards.length - 1, i));
+      var c = featCards[i];
+      featTrack.scrollTo({
+        left: c.offsetLeft - (featTrack.clientWidth - c.offsetWidth) / 2,
+        behavior: featReduce.matches ? 'auto' : 'smooth'
+      });
+    }
+    function featShow(i) {
+      if (i === featIdx) return;
+      featIdx = i;
+      featCards.forEach(function (c, k) { c.classList.toggle('is-active', k === i); });
+      Array.prototype.forEach.call(featDots.children, function (d, k) {
+        d.setAttribute('aria-current', k === i ? 'true' : 'false');
+      });
+    }
+    function featSync() {
+      var mid = featTrack.scrollLeft + featTrack.clientWidth / 2;
+      var best = 0, bestD = Infinity;
+      featCards.forEach(function (c, k) {
+        var d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+        if (d < bestD) { bestD = d; best = k; }
+      });
+      featShow(best);
+    }
+
+    featCards.forEach(function (_, i) {
+      var b = document.createElement('button');
+      b.type = 'button';
+      b.setAttribute('aria-label', 'Go to feature ' + (i + 1));
+      b.setAttribute('aria-current', 'false');
+      b.addEventListener('click', function () { featGo(i); });
+      featDots.appendChild(b);
+    });
+    featTrack.addEventListener('scroll', function () {
+      if (featRaf) return;
+      featRaf = window.requestAnimationFrame(function () { featRaf = 0; featSync(); });
+    }, { passive: true });
+    window.addEventListener('resize', featSync);
+
+    /* Mouse only: touch and trackpad already scroll natively. */
+    featTrack.addEventListener('pointerdown', function (e) {
+      if (e.pointerType !== 'mouse' || e.button !== 0) return;
+      featDrag = { x: e.clientX, left: featTrack.scrollLeft, moved: false };
+    });
+    window.addEventListener('pointermove', function (e) {
+      if (!featDrag) return;
+      var dx = e.clientX - featDrag.x;
+      if (!featDrag.moved && Math.abs(dx) > 5) {
+        featDrag.moved = true;
+        featTrack.classList.add('is-dragging');
+      }
+      if (featDrag.moved) featTrack.scrollLeft = featDrag.left - dx;
+    });
+    function featDragEnd() {
+      if (!featDrag) return;
+      var moved = featDrag.moved;
+      featDrag = null;
+      if (!moved) return;
+      markSwiped(); /* so releasing the drag doesn't open the lightbox */
+      featTrack.classList.remove('is-dragging');
+      featGo(featIdx);
+    }
+    window.addEventListener('pointerup', featDragEnd);
+    window.addEventListener('pointercancel', featDragEnd);
+
+    featSync();
+  }
+
   var lastSwipeAt = 0;
   function markSwiped() { lastSwipeAt = Date.now(); }
   function justSwiped() { return Date.now() - lastSwipeAt < 350; }
@@ -284,5 +366,6 @@
     bindSingle('.sk-feature-visuals img', 'Showcase photo');
     bindSingle('.sk-spec .sensor-shot img', 'Sensor');
     bindSingle('.device-cluster .screen-slot img', 'Dashboard');
+    if (featTrack) bindSlides(featTrack, '.sk-feat-media', 'Feature screenshot');
   }
 })();

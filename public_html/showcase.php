@@ -126,6 +126,70 @@ $sensorWeight = showcase_first('sensor-weight.{jpg,jpeg,png,webp}');
 $dashDesktop = showcase_first('dash-desktop.{jpg,jpeg,png,webp}');
 $dashLaptop = showcase_first('dash-laptop.{jpg,jpeg,png,webp}');
 $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
+
+/**
+ * Feature cards ("What it does") — a swipeable row, one card per feature
+ * (screenshot on top, role chips + title + one line below). Mobile first.
+ * Add/edit features here only.
+ *   slug     screenshot file: assets/img/showcase/feature-<slug>.jpg (png/webp ok)
+ *   device   'phone' (portrait shot, shown whole) or 'desktop' (landscape, top-cropped)
+ *   fallback [role, index] borrows an existing role-<role>-N.jpg until the
+ *            feature-<slug> file exists (null = show the labeled placeholder)
+ */
+function showcase_role_images(string $role): array {
+    $found = glob(__DIR__ . '/assets/img/showcase/role-' . $role . '-*.{jpg,jpeg,png,webp}', GLOB_BRACE) ?: [];
+    sort($found);
+    $out = [];
+    foreach ($found as $f) {
+        $out[] = 'assets/img/showcase/' . basename($f);
+    }
+    return $out;
+}
+$spotFeatures = [
+    [
+        'slug' => 'kali', 'device' => 'phone',
+        'title' => 'Ask Kali, anytime.',
+        'text' => 'Quick answers about a child’s growth, based on their own measurement history.',
+        'alt' => 'Kali AI chat answering a question about a child’s growth',
+        'fallback' => ['parent', 1],
+    ],
+    [
+        'slug' => 'who', 'device' => 'desktop',
+        'title' => 'WHO-standard, automatic.',
+        'text' => 'WFA, HFA, and WFH are calculated and classified for every child.',
+        'alt' => 'WHO growth analysis with weight, height, and nutritional status per child',
+        'fallback' => ['nutritionist', 0],
+    ],
+    [
+        'slug' => 'reports', 'device' => 'desktop',
+        'title' => 'Reports that match DOH.',
+        'text' => 'eOPT Plus-ready exports, with no retyping from paper lists.',
+        'alt' => 'DOH and eOPT Plus report export page',
+        'fallback' => null,
+    ],
+    [
+        'slug' => 'kiosks', 'device' => 'desktop',
+        'title' => 'Every kiosk, one glance.',
+        'text' => 'See which kiosks are online across every barangay in real time.',
+        'alt' => 'Admin map showing kiosk status across barangays',
+        'fallback' => ['admin', 0],
+    ],
+    [
+        'slug' => 'growth', 'device' => 'phone',
+        'title' => 'Growth, over time.',
+        'text' => 'Weight and height history for your child, all in one view.',
+        'alt' => 'Parent dashboard with a child’s weight and height history chart',
+        'fallback' => ['parent', 0],
+    ],
+];
+foreach ($spotFeatures as &$sf) {
+    $sf['img'] = showcase_first('feature-' . $sf['slug'] . '.{jpg,jpeg,png,webp}');
+    if (!$sf['img'] && !empty($sf['fallback'])) {
+        $pool = showcase_role_images($sf['fallback'][0]);
+        $sf['img'] = $pool[$sf['fallback'][1]] ?? null;
+    }
+}
+unset($sf);
 ?>
 <!doctype html>
 <html lang="en">
@@ -138,7 +202,7 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="assets/css/app.css">
-    <link rel="stylesheet" href="assets/css/showcase.css?v=18">
+    <link rel="stylesheet" href="assets/css/showcase.css?v=22">
     <link rel="icon" type="image/svg+xml" href="assets/img/logo/logo_forlight.svg?v=2">
     <script>
     (function(){
@@ -245,70 +309,34 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
         </div>
     </section>
 
-    <section class="sk-section" id="roles">
-        <p class="eyebrow">Who sees what</p>
-        <h2>Dashboards</h2>
-        <p class="lead">Three views. Same data, different needs.</p>
+    <section class="sk-section sk-feature sk-features" id="features">
+        <p class="eyebrow">What it does</p>
+        <h2>Built for the whole workflow</h2>
+        <p class="lead">Swipe to see what each role gets. Tap a screenshot to enlarge it.</p>
 
-        <div class="sk-split">
-            <div class="sk-copy">
-                <h3 style="margin:0 0 .3rem;">Admin — desktop</h3>
-                <ul>
-                    <li>Fleet status — which kiosks are online</li>
-                    <li>Families and children counts per barangay</li>
-                    <li>Staff accounts and activity logs</li>
-                </ul>
-                <h3 style="margin:.9rem 0 .3rem;">Nutritionist — laptop</h3>
-                <ul>
-                    <li>WHO charts — WFA / HFA / WFH trends</li>
-                    <li>Monitoring lists and eOPT reports</li>
-                    <li>Record and verify measurements</li>
-                </ul>
-                <h3 style="margin:.9rem 0 .3rem;">Parent — phone</h3>
-                <ul>
-                    <li>Child growth history in simple charts</li>
-                    <li>Book and track appointments</li>
-                    <li>Ask Kali AI about growth</li>
-                </ul>
-            </div>
-            <div class="sk-side">
-                <div class="device-cluster" aria-hidden="true">
-                    <div class="device device-desktop cluster-desktop">
-                        <div class="screen-slot">
-                            <?php if ($dashDesktop): ?>
-                                <img src="<?php echo htmlspecialchars($dashDesktop, ENT_QUOTES, 'UTF-8'); ?>" alt="Admin dashboard screenshot" loading="lazy" draggable="false">
-                            <?php else: ?>
-                                <b>Desktop placeholder</b>
-                                <small>Admin screenshot<br>Add <code>dash-desktop.jpg</code></small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="stand"></div>
-                        <div class="base"></div>
+        <div class="sk-feat-track" id="skFeatTrack" tabindex="0" role="group" aria-label="Feature highlights, swipe sideways to browse">
+            <?php foreach ($spotFeatures as $i => $f): ?>
+                <article class="sk-feat-card<?php echo $i === 0 ? ' is-active' : ''; ?>">
+                    <div class="sk-feat-media<?php echo $f['device'] === 'phone' ? ' is-phone' : ''; ?>">
+                        <?php if ($f['img']): ?>
+                            <img src="<?php echo htmlspecialchars($f['img'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($f['alt'], ENT_QUOTES, 'UTF-8'); ?>"<?php echo $i < 2 ? '' : ' loading="lazy"'; ?> draggable="false">
+                        <?php else: ?>
+                            <div class="sk-feat-ph">
+                                <b><?php echo htmlspecialchars($f['title'], ENT_QUOTES, 'UTF-8'); ?></b>
+                                <small>Add <code>assets/img/showcase/feature-<?php echo htmlspecialchars($f['slug'], ENT_QUOTES, 'UTF-8'); ?>.jpg</code></small>
+                            </div>
+                        <?php endif; ?>
                     </div>
-                    <div class="device device-laptop cluster-laptop">
-                        <div class="screen-slot">
-                            <?php if ($dashLaptop): ?>
-                                <img src="<?php echo htmlspecialchars($dashLaptop, ENT_QUOTES, 'UTF-8'); ?>" alt="Nutritionist dashboard screenshot" loading="lazy" draggable="false">
-                            <?php else: ?>
-                                <b>Laptop placeholder</b>
-                                <small>Nutritionist screenshot<br>Add <code>dash-laptop.jpg</code></small>
-                            <?php endif; ?>
-                        </div>
-                        <div class="keyboard"></div>
+                    <div class="sk-feat-body">
+                        <h3><?php echo htmlspecialchars($f['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                        <p><?php echo htmlspecialchars($f['text'], ENT_QUOTES, 'UTF-8'); ?></p>
                     </div>
-                    <div class="device device-phone cluster-phone">
-                        <div class="screen-slot">
-                            <?php if ($dashPhone): ?>
-                                <img src="<?php echo htmlspecialchars($dashPhone, ENT_QUOTES, 'UTF-8'); ?>" alt="Parent dashboard screenshot" loading="lazy" draggable="false">
-                            <?php else: ?>
-                                <b>Phone placeholder</b>
-                                <small>Parent screenshot<br>Add <code>dash-phone.jpg</code></small>
-                            <?php endif; ?>
-                        </div>
-                    </div>
-                    <div class="device-label cluster-label">Admin &middot; Nutritionist &middot; Parent — placeholders</div>
-                </div>
-            </div>
+                </article>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="sk-deck-ctrl sk-feat-ctrl">
+            <div class="sk-dots" id="skFeatDots"></div>
         </div>
     </section>
 
@@ -390,6 +418,6 @@ $dashPhone = showcase_first('dash-phone.{jpg,jpeg,png,webp}');
     <button class="sk-lb-btn sk-lb-next" id="skLbNext" type="button" aria-label="Next photo">&#8594;</button>
 </div>
 
-<script src="assets/js/showcase.js?v=14" defer></script>
+<script src="assets/js/showcase.js?v=17" defer></script>
 </body>
 </html>
