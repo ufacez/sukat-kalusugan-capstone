@@ -6593,11 +6593,12 @@ function finishResults(
             var thankyouCountdownEl = document.getElementById("thankyouCountdown");
             var thankyouProgressBar = document.getElementById("thankyouProgressBar");
             var updateThankyouCountdown = function () {
-              if (!thankyouCountdownEl) return;
               var elapsed = Math.floor((Date.now() - state.thankyouShownAt) / 1000);
               var remaining = thankyouAutoSeconds - elapsed;
               if (remaining < 0) remaining = 0;
-              thankyouCountdownEl.textContent = "Babalik sa home sa " + remaining + "s — o pindutin ang Balik sa Home.";
+              if (thankyouCountdownEl) {
+                thankyouCountdownEl.textContent = "Babalik sa home sa " + remaining + "s — o pindutin ang Balik sa Home.";
+              }
               if (thankyouProgressBar) {
                 thankyouProgressBar.style.width = ((remaining / thankyouAutoSeconds) * 100) + "%";
               }

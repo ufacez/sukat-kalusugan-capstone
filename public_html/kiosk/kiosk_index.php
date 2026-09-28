@@ -636,14 +636,12 @@ $appData = [
                         </svg>
                     </div>
                     <p class="kiosk-thankyou-msg">Nai-save na ang sukat<br>sa system.</p>
-                    <p class="kiosk-thankyou-thanks">Maraming Salamat!</p>
 
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-lg" type="button" data-kiosk-action="reset">
                         Balik sa Home
                     </button>
                     <div class="kiosk-thankyou-progress" aria-hidden="true"><span id="thankyouProgressBar"></span></div>
-                    <p class="kiosk-thankyou-sub" id="thankyouCountdown" aria-live="polite"></p>
-                    <p class="kiosk-thankyou-sub">Tamang Sukat, Gabay sa wastong Kalusugan</p>
+                    <p class="sr-only" id="thankyouCountdown" aria-live="polite"></p>
                 </div>
             </section>
 
