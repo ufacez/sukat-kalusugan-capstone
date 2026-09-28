@@ -974,96 +974,223 @@
 .sk-lb-prev { left: 0.75rem; top: 50%; transform: translateY(-50%); }
 .sk-lb-next { right: 0.75rem; top: 50%; transform: translateY(-50%); }
 
-/* ==== "What it does": Apple-style full-bleed gallery (no outer box) ====
- * Breaks out of the 1120px column to the full viewport width. Cards have no
- * border or background: rounded screenshot on top, bold title + gray text
- * underneath. Placed last so it overrides the earlier feature-card rules. */
-.sk-showcase { overflow-x: clip; }
-
-.sk-section.sk-features {
-  width: 100vw;
-  margin-left: calc(50% - 50vw);
-  border: 0;
-  border-radius: 0;
-  box-shadow: none;
-  padding: 3.5rem 0 2.5rem;
-}
-/* Heading stays aligned with the rest of the page */
-.sk-section.sk-features > .eyebrow,
-.sk-section.sk-features > h2,
-.sk-section.sk-features > .lead {
-  box-sizing: border-box;
-  max-width: 1120px;
-  margin-left: auto;
-  margin-right: auto;
-  padding: 0 1.6rem;
-}
-.sk-section.sk-features > h2 { font-size: clamp(1.7rem, 4vw, 2.6rem); line-height: 1.1; }
-
+/* ==== "What it does": same boxed container as the other sections ====
+ * Normal .sk-section box (like "At the kiosk"), 3 cards visible on desktop,
+ * swipe / drag / dots for the rest. On mobile: 1 card with the next peeking. */
+.sk-features { --pad: 1.6rem; }
 .sk-features .sk-feat-track {
-  --feat-w: min(82vw, 460px);
-  margin: 1.6rem 0 0;
-  gap: 1.1rem;
+  margin: 1.2rem calc(var(--pad) * -1) 0;
+  padding: 0.2rem var(--pad) 0.7rem;
+  scroll-padding-inline: var(--pad);
+  gap: 1rem;
 }
 .sk-features .sk-feat-track::before,
-.sk-features .sk-feat-track::after {
-  flex: 0 0 calc(50% - var(--feat-w) / 2 - 1.1rem);
-}
+.sk-features .sk-feat-track::after { display: none; }
 
-/* Card: no box */
+/* Card: no box, screenshot on top, text underneath */
 .sk-features .sk-feat-card {
+  flex: 0 0 calc((100% - 2rem) / 3);
+  scroll-snap-align: start;
   border: 0;
   background: transparent;
   box-shadow: none;
   border-radius: 0;
   overflow: visible;
+  opacity: 1;
 }
-
-/* Screenshot: big rounded panel, same shape for phone and desktop */
 .sk-features .sk-feat-media,
-.sk-features .sk-feat-media:not(.is-phone) {
+.sk-features .sk-feat-media:not(.is-phone),
+.sk-features .sk-feat-media.is-phone {
   height: auto;
   aspect-ratio: 4 / 5;
   padding: 0;
-  border-radius: 28px;
+  border-radius: 20px;
   overflow: hidden;
   background: linear-gradient(160deg, var(--surface-alt), var(--surface));
 }
 .sk-features .sk-feat-media:has(img) { background: #000; }
 .sk-features .sk-feat-media img,
-.sk-features .sk-feat-media:not(.is-phone) img {
+.sk-features .sk-feat-media:not(.is-phone) img,
+.sk-features .sk-feat-media.is-phone img {
   width: 100%;
   height: 100%;
+  max-width: none;
   max-height: none;
   object-fit: cover;
   object-position: top center; /* try "top left" or "center" to move the crop */
   border: 0;
   border-radius: 0;
 }
-/* Phone cards fill the panel too (no black bars). Crop screenshots to about 4:5. */
-.sk-features .sk-feat-media.is-phone { padding: 0; }
-.sk-features .sk-feat-media.is-phone img {
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: cover;
-  object-position: top center;
-  border-radius: 0;
-}
-
-/* Text under the image: bold lead-in, gray sentence, no divider */
 .sk-features .sk-feat-body {
   display: block;
-  padding: 1.1rem 0.3rem 0;
+  padding: 0.9rem 0.2rem 0;
   border: 0;
 }
 .sk-features .sk-feat-body h3,
 .sk-features .sk-feat-body p {
   display: inline;
   margin: 0;
-  font-size: 1.05rem;
+  font-size: 0.95rem;
   line-height: 1.5;
 }
-.sk-features .sk-feat-body h3 { margin-right: 0.35em; }
+.sk-features .sk-feat-body h3 { margin-right: 0.3em; }
+.sk-features .sk-feat-ctrl { margin-top: 1rem; }
 
-.sk-features .sk-feat-ctrl { margin-top: 1.4rem; }
+@media (max-width: 860px) {
+  .sk-features { --pad: 1.15rem; }
+  .sk-features .sk-feat-card { flex: 0 0 min(78%, 320px); }
+}
+
+
+/* ---- Hardware & software: data-flow strip + stats + collapsed full specs ---- */
+.sk-flow {
+  display: grid;
+  grid-template-columns: 1fr 26px 1fr 26px 1fr 26px 1fr;
+  align-items: center;
+  margin-top: 1.1rem;
+}
+.sk-flow-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.9rem 0.4rem;
+  font: inherit;
+  color: var(--text);
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-alt);
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+.sk-flow-node svg { width: 24px; height: 24px; color: var(--muted); }
+.sk-flow-node b { font-size: 0.92rem; font-weight: 800; }
+.sk-flow-node small { font-size: 0.74rem; color: var(--muted); font-weight: 700; }
+.sk-flow-node:hover { border-color: var(--primary); }
+.sk-flow-node:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.sk-flow-node.is-on {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 10%, var(--surface));
+}
+.sk-flow-node.is-on svg,
+.sk-flow-node.is-on b { color: var(--primary); }
+.sk-flow-link { position: relative; height: 1px; background: var(--border); }
+.sk-flow-link i {
+  position: absolute;
+  top: -2px;
+  left: 0;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--primary);
+  opacity: 0;
+  animation: sk-flow-dot 2.4s linear infinite;
+}
+@keyframes sk-flow-dot {
+  0% { left: 0; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 1; }
+  100% { left: calc(100% - 5px); opacity: 0; }
+}
+.sk-flow-panels {
+  margin-top: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  padding: 0.85rem 0.95rem;
+}
+.sk-flow-panel[hidden] { display: none; }
+.sk-flow-panel h3 { margin: 0 0 0.25rem; font-size: 0.98rem; }
+.sk-flow-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.8rem;
+}
+.sk-flow-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-alt);
+  padding: 0.7rem 0.85rem;
+}
+.sk-flow-stat-label { font-size: 0.76rem; font-weight: 700; color: var(--muted); }
+.sk-flow-stat-num { font-size: 1.5rem; font-weight: 900; color: var(--text); line-height: 1.2; }
+.sk-fullspecs { margin-top: 0.9rem; }
+.sk-fullspecs summary {
+  cursor: pointer;
+  width: fit-content;
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--primary);
+}
+.sk-fullspecs summary:focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.sk-fullspecs .sk-spec-grid { margin-top: 0.7rem; }
+@media (max-width: 560px) {
+  .sk-flow { grid-template-columns: 1fr 12px 1fr 12px 1fr 12px 1fr; }
+  .sk-flow-node { padding: 0.75rem 0.2rem; }
+  .sk-flow-node b { font-size: 0.78rem; }
+  .sk-flow-node small { display: none; }
+  .sk-flow-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sk-flow-link i { animation: none; left: 50%; opacity: 1; }
+  .sk-flow-node { transition: none; }
+}
+
+
+/* ---- Team: member cards + build photo deck ---- */
+.sk-members {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0.8rem;
+  margin-top: 1rem;
+}
+.sk-member {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-alt);
+  padding: 1.1rem 0.8rem;
+  text-align: center;
+}
+.sk-member-av {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 12%, var(--surface));
+}
+.sk-member-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sk-member-name { margin: 0; font-size: 0.98rem; font-weight: 900; color: var(--text); }
+.sk-member-role { margin: 0.15rem 0 0; font-size: 0.82rem; font-weight: 700; color: var(--muted); }
+.sk-build { margin-top: 1.6rem; padding-top: 1.3rem; border-top: 1px solid var(--border); }
+.sk-build h3 { margin: 0 0 0.25rem; font-size: 1.1rem; font-weight: 900; }
+
+/* Build deck: full-width 16:9 slides with captions */
+.sk-build .sk-deck { width: 100%; }
+.sk-build .sk-card { position: relative; aspect-ratio: 16 / 9; padding: 0; }
+.sk-build .sk-card img { border-radius: 0; }
+.sk-build .sk-card--ph { padding: 1rem; }
+.sk-card--ph svg { width: 30px; height: 30px; color: var(--muted); }
+.sk-card--ph small { font-size: 0.78rem; color: var(--muted); }
+.sk-card-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.55rem 0.9rem;
+  text-align: left;
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+}

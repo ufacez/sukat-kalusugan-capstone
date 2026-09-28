@@ -159,11 +159,13 @@
     var featRaf = 0;
     var featDrag = null;
 
+    function featPad() {
+      return parseFloat(window.getComputedStyle(featTrack).paddingLeft) || 0;
+    }
     function featGo(i) {
       i = Math.max(0, Math.min(featCards.length - 1, i));
-      var c = featCards[i];
       featTrack.scrollTo({
-        left: c.offsetLeft - (featTrack.clientWidth - c.offsetWidth) / 2,
+        left: featCards[i].offsetLeft - featPad(),
         behavior: featReduce.matches ? 'auto' : 'smooth'
       });
     }
@@ -176,10 +178,12 @@
       });
     }
     function featSync() {
-      var mid = featTrack.scrollLeft + featTrack.clientWidth / 2;
+      var max = featTrack.scrollWidth - featTrack.clientWidth;
+      if (featTrack.scrollLeft >= max - 2) { featShow(featCards.length - 1); return; }
+      var pos = featTrack.scrollLeft + featPad();
       var best = 0, bestD = Infinity;
       featCards.forEach(function (c, k) {
-        var d = Math.abs(c.offsetLeft + c.offsetWidth / 2 - mid);
+        var d = Math.abs(c.offsetLeft - pos);
         if (d < bestD) { bestD = d; best = k; }
       });
       featShow(best);
@@ -250,9 +254,8 @@
     });
   }
   var deck = document.getElementById('teamDeck');
-  if (!deck) return;
-  var track = deck.querySelector('.sk-deck-track');
-  var cards = Array.prototype.slice.call(track.children);
+  var track = deck ? deck.querySelector('.sk-deck-track') : null;
+  var cards = track ? Array.prototype.slice.call(track.children) : [];
   var prev = document.getElementById('teamPrev');
   var next = document.getElementById('teamNext');
   var dotsWrap = document.getElementById('teamDots');
@@ -283,10 +286,11 @@
   if (prev) prev.addEventListener('click', function () { go(idx - 1); });
   if (next) next.addEventListener('click', function () { go(idx + 1); });
 
-  makeSwipeable(deck, function () { go(idx + 1); }, function () { go(idx - 1); });
-
-  renderDots();
-  go(0);
+  if (deck) {
+    makeSwipeable(deck, function () { go(idx + 1); }, function () { go(idx - 1); });
+    renderDots();
+    go(0);
+  }
 
   /* ---- Click-to-enlarge lightbox (tap any team photo) ---- */
   var lb = document.getElementById('skLightbox');
@@ -341,6 +345,7 @@
       slides.forEach(function (s) {
         s.addEventListener('click', function () {
           if (justSwiped()) return;
+          if (!s.querySelector('img')) return;
           var items = collect(track, slideSel, label);
           if (!items.length) return;
           var img = s.querySelector('img');
@@ -368,4 +373,48 @@
     bindSingle('.device-cluster .screen-slot img', 'Dashboard');
     if (featTrack) bindSlides(featTrack, '.sk-feat-media', 'Feature screenshot');
   }
+})();
+
+/* ---- Hardware & software: flow strip + count-up stats ---- */
+(function () {
+  var flow = document.getElementById('skFlow');
+  if (!flow) return;
+  var nodes = Array.prototype.slice.call(flow.querySelectorAll('.sk-flow-node'));
+  function pick(i) {
+    nodes.forEach(function (n, k) {
+      var on = k === i;
+      n.classList.toggle('is-on', on);
+      n.setAttribute('aria-pressed', on ? 'true' : 'false');
+      var panel = document.getElementById('skFlowPanel' + k);
+      if (panel) panel.hidden = !on;
+    });
+  }
+  nodes.forEach(function (n, i) {
+    n.addEventListener('click', function () { pick(i); });
+  });
+
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var nums = Array.prototype.slice.call(document.querySelectorAll('.sk-flow-stat-num'));
+  function countUp(el) {
+    var v = parseInt(el.getAttribute('data-value'), 10) || 0;
+    var suf = el.getAttribute('data-suffix') || '';
+    var t0 = null;
+    function step(t) {
+      if (t0 === null) t0 = t;
+      var p = Math.min((t - t0) / 900, 1);
+      el.textContent = Math.round(v * p) + suf;
+      if (p < 1) window.requestAnimationFrame(step);
+    }
+    el.textContent = '0' + suf;
+    window.requestAnimationFrame(step);
+  }
+  if (reduce || !('IntersectionObserver' in window)) return;
+  var io = new IntersectionObserver(function (entries) {
+    entries.forEach(function (e) {
+      if (!e.isIntersecting) return;
+      io.unobserve(e.target);
+      countUp(e.target);
+    });
+  }, { threshold: 0.6 });
+  nums.forEach(function (n) { io.observe(n); });
 })();

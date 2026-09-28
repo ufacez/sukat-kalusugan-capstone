@@ -155,16 +155,23 @@ $spotFeatures = [
     ],
     [
         'slug' => 'who', 'device' => 'desktop',
-        'title' => 'WHO-standard, automatic.',
-        'text' => 'WFA, HFA, and WFH are calculated and classified for every child.',
+        'title' => 'WHO Child Growth Standards.',
+        'text' => 'Every child is measured and classified against the international WHO standard, covering WFA, HFA, and WFH.',
         'alt' => 'WHO growth analysis with weight, height, and nutritional status per child',
         'fallback' => ['nutritionist', 0],
     ],
     [
+        'slug' => 'monitoring', 'device' => 'desktop',
+        'title' => 'Monthly and quarterly, automatic.',
+        'text' => 'Growth monitoring is tracked every month and quarter on its own, with no paper logs or manual tallying.',
+        'alt' => 'Monthly and quarterly growth monitoring summary',
+        'fallback' => null,
+    ],
+    [
         'slug' => 'reports', 'device' => 'desktop',
-        'title' => 'Reports that match DOH.',
-        'text' => 'eOPT Plus-ready exports, with no retyping from paper lists.',
-        'alt' => 'DOH and eOPT Plus report export page',
+        'title' => 'Reports that match eOPT forms.',
+        'text' => 'Ready-to-submit exports, with no retyping from paper lists.',
+        'alt' => 'eOPT form report export page',
         'fallback' => null,
     ],
     [
@@ -309,10 +316,10 @@ unset($sf);
         </div>
     </section>
 
-    <section class="sk-section sk-feature sk-features" id="features">
-        <p class="eyebrow">What it does</p>
-        <h2>Built for the whole workflow</h2>
-        <p class="lead">Swipe to see what each role gets. Tap a screenshot to enlarge it.</p>
+    <section class="sk-section sk-features" id="features">
+        <p class="eyebrow">The Web App</p>
+        <h2>What Sukat Kalusugan can do</h2>
+        <p class="lead">Take a look around. Tap any screen to see it bigger.</p>
 
         <div class="sk-feat-track" id="skFeatTrack" tabindex="0" role="group" aria-label="Feature highlights, swipe sideways to browse">
             <?php foreach ($spotFeatures as $i => $f): ?>
@@ -340,70 +347,179 @@ unset($sf);
         </div>
     </section>
 
+    <?php
+    $flowSteps = [
+        [
+            'label' => 'Sensors', 'sub' => 'Measure',
+            'icon' => '<polyline points="8 18 12 22 16 18"/><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="22"/>',
+            'title' => 'Sensors on the kiosk',
+            'rows' => [['Height sensor', 'TF-Luna LiDAR'], ['Weight sensors', '4× 50kg load cells + HX711 amp']],
+        ],
+        [
+            'label' => 'ESP32', 'sub' => 'Process',
+            'icon' => '<rect x="6" y="6" width="12" height="12" rx="2"/><rect x="10" y="10" width="4" height="4"/><line x1="9" y1="2" x2="9" y2="6"/><line x1="15" y1="2" x2="15" y2="6"/><line x1="9" y1="18" x2="9" y2="22"/><line x1="15" y1="18" x2="15" y2="22"/><line x1="2" y1="9" x2="6" y2="9"/><line x1="2" y1="15" x2="6" y2="15"/><line x1="18" y1="9" x2="22" y2="9"/><line x1="18" y1="15" x2="22" y2="15"/>',
+            'title' => 'ESP32 reads and checks',
+            'rows' => [['Microcontroller', 'ESP32'], ['Reading method', '10 raw samples, stable snapshot']],
+        ],
+        [
+            'label' => 'Firebase', 'sub' => 'Relay',
+            'icon' => '<path d="M18 10h-1.26A8 8 0 1 0 9 20h9a5 5 0 0 0 0-10z"/>',
+            'title' => 'Firebase passes it along',
+            'rows' => [['Transport', 'HTTPS → Firebase Realtime DB'], ['Live bridge', 'Firebase (transient only)']],
+        ],
+        [
+            'label' => 'Web app', 'sub' => 'Record',
+            'icon' => '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
+            'title' => 'Web app stores and shows it',
+            'rows' => [['Backend', 'PHP + MySQL'], ['Frontend', 'Vanilla HTML / CSS / JS'], ['Hosting', 'Azure Virtual Machine'], ['Auth', 'SHA-256 hashing, prepared statements']],
+        ],
+    ];
+    $flowStats = [
+        ['value' => 10, 'suffix' => '', 'label' => 'Samples per reading'],
+        ['value' => 4, 'suffix' => '', 'label' => 'Load cells'],
+        ['value' => 150, 'suffix' => ' cm', 'label' => 'Sensor mount'],
+        ['value' => 1, 'suffix' => '', 'label' => 'Stable snapshot'],
+    ];
+    ?>
     <section class="sk-section" id="hardware">
         <p class="eyebrow">Under the hood</p>
         <h2>Hardware &amp; software</h2>
-        <p class="lead">What the kiosk is made of and where the system runs.</p>
-        <div class="sk-spec-grid">
-            <div class="sk-spec">
-                <h3>Hardware</h3>
-                <dl class="hw-table">
-                    <div><dt>Microcontroller</dt><dd>ESP32</dd></div>
-                    <div><dt>Height sensor</dt><dd>TF-Luna LiDAR</dd></div>
-                    <div><dt>Weight sensors</dt><dd>4&times; 50kg load cells + HX711 amp</dd></div>
-                    <div><dt>Reading method</dt><dd>10 raw samples, stable snapshot</dd></div>
-                    <div><dt>Transport</dt><dd>HTTPS &rarr; Firebase Realtime DB</dd></div>
-                </dl>
-            </div>
-            <div class="sk-spec">
-                <h3>Software &amp; hosting</h3>
-                <dl class="hw-table">
-                    <div><dt>Backend</dt><dd>PHP + MySQL</dd></div>
-                    <div><dt>Frontend</dt><dd>Vanilla HTML / CSS / JS</dd></div>
-                    <div><dt>Live bridge</dt><dd>Firebase (transient only)</dd></div>
-                    <div><dt>Hosting</dt><dd>Azure Virtual Machine</dd></div>
-                    <div><dt>Auth</dt><dd>SHA-256 hashing, prepared statements</dd></div>
-                </dl>
-            </div>
+        <p class="lead">Follow one measurement from the kiosk to the web app. Tap a step to see what&apos;s inside.</p>
+
+        <div class="sk-flow" id="skFlow">
+            <?php foreach ($flowSteps as $i => $st): ?>
+                <?php if ($i > 0): ?><span class="sk-flow-link" aria-hidden="true"><i style="animation-delay:<?php echo ($i - 1) * 0.8; ?>s"></i></span><?php endif; ?>
+                <button class="sk-flow-node<?php echo $i === 0 ? ' is-on' : ''; ?>" type="button" data-step="<?php echo $i; ?>" aria-pressed="<?php echo $i === 0 ? 'true' : 'false'; ?>" aria-controls="skFlowPanel<?php echo $i; ?>">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><?php echo $st['icon']; ?></svg>
+                    <b><?php echo htmlspecialchars($st['label'], ENT_QUOTES, 'UTF-8'); ?></b>
+                    <small><?php echo htmlspecialchars($st['sub'], ENT_QUOTES, 'UTF-8'); ?></small>
+                </button>
+            <?php endforeach; ?>
         </div>
+
+        <div class="sk-flow-panels">
+            <?php foreach ($flowSteps as $i => $st): ?>
+                <div class="sk-flow-panel" id="skFlowPanel<?php echo $i; ?>"<?php echo $i === 0 ? '' : ' hidden'; ?>>
+                    <h3><?php echo htmlspecialchars($st['title'], ENT_QUOTES, 'UTF-8'); ?></h3>
+                    <dl class="hw-table">
+                        <?php foreach ($st['rows'] as $row): ?>
+                            <div><dt><?php echo htmlspecialchars($row[0], ENT_QUOTES, 'UTF-8'); ?></dt><dd><?php echo htmlspecialchars($row[1], ENT_QUOTES, 'UTF-8'); ?></dd></div>
+                        <?php endforeach; ?>
+                    </dl>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="sk-flow-stats">
+            <?php foreach ($flowStats as $stat): ?>
+                <div class="sk-flow-stat">
+                    <span class="sk-flow-stat-label"><?php echo htmlspecialchars($stat['label'], ENT_QUOTES, 'UTF-8'); ?></span>
+                    <span class="sk-flow-stat-num" data-value="<?php echo (int)$stat['value']; ?>" data-suffix="<?php echo htmlspecialchars($stat['suffix'], ENT_QUOTES, 'UTF-8'); ?>"><?php echo (int)$stat['value'] . htmlspecialchars($stat['suffix'], ENT_QUOTES, 'UTF-8'); ?></span>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <details class="sk-fullspecs">
+            <summary>Full specs</summary>
+    <div class="sk-spec-grid">
+                <div class="sk-spec">
+                    <h3>Hardware</h3>
+                    <dl class="hw-table">
+                        <div><dt>Microcontroller</dt><dd>ESP32</dd></div>
+                        <div><dt>Height sensor</dt><dd>TF-Luna LiDAR</dd></div>
+                        <div><dt>Weight sensors</dt><dd>4&times; 50kg load cells + HX711 amp</dd></div>
+                        <div><dt>Reading method</dt><dd>10 raw samples, stable snapshot</dd></div>
+                        <div><dt>Transport</dt><dd>HTTPS &rarr; Firebase Realtime DB</dd></div>
+                    </dl>
+                </div>
+                <div class="sk-spec">
+                    <h3>Software &amp; hosting</h3>
+                    <dl class="hw-table">
+                        <div><dt>Backend</dt><dd>PHP + MySQL</dd></div>
+                        <div><dt>Frontend</dt><dd>Vanilla HTML / CSS / JS</dd></div>
+                        <div><dt>Live bridge</dt><dd>Firebase (transient only)</dd></div>
+                        <div><dt>Hosting</dt><dd>Azure Virtual Machine</dd></div>
+                        <div><dt>Auth</dt><dd>SHA-256 hashing, prepared statements</dd></div>
+                    </dl>
+                </div>
+            </div>
+        </details>
     </section>
 
+    <?php
+    /* Team members. Put each person's full name in 'name' (leave '' to show only the role).
+     * Photos: assets/img/showcase/member-01.jpg ... member-04.jpg (png/webp ok).
+     * Until a photo exists, the round avatar shows the initials below. */
+    $teamMembers = [
+        ['name' => 'Shekainah Gonzales', 'role' => 'Principal investigator', 'initials' => 'SG'],
+        ['name' => 'Ean Paolo Espiritu', 'role' => 'Developer', 'initials' => 'EE'],
+        ['name' => 'Christian Rulloda', 'role' => 'Hardware specialist', 'initials' => 'CR'],
+        ['name' => 'Laurence Tapang', 'role' => 'Hardware specialist', 'initials' => 'LT'],
+    ];
+    /* Captions for the "How we built it" deck, in photo order (team-01.jpg, team-02.jpg, ...).
+     * A slide without a photo shows a placeholder with its caption. */
+    $buildCaptions = ['Wiring the Sensors', 'Calibrating the Load Cell', 'Finishing Touches on the Kiosk', 'Initial Kiosk Design', 'Kiosk at the Barangay Health Center'];
+    $buildCount = max(count($buildCaptions), count($teamPhotos));
+    foreach ($teamMembers as $mi => &$tm) {
+        $tm['photo'] = showcase_first(sprintf('member-%02d.{jpg,jpeg,png,webp}', $mi + 1));
+    }
+    unset($tm);
+    ?>
     <section class="sk-section" id="team">
-        <p class="eyebrow">Build montage</p>
-        <h2>Team &amp; how we made it</h2>
-        <p class="lead">Swipe the cards like a deck. Add photos to <code>assets/img/showcase/team-*.jpg</code>.</p>
-        <div class="sk-deck-wrap">
-            <div class="sk-deck" id="teamDeck">
-                <div class="sk-deck-track">
-                    <?php if ($teamPhotos): ?>
-                        <?php foreach ($teamPhotos as $i => $src): ?>
-                            <div class="sk-card">
-                                <img src="<?php echo htmlspecialchars($src, ENT_QUOTES, 'UTF-8'); ?>" alt="Team build photo <?php echo $i + 1; ?>" loading="lazy">
-                            </div>
-                        <?php endforeach; ?>
+        <p class="eyebrow">The team</p>
+        <h2>The people behind Sukat Kalusugan</h2>
+
+        <div class="sk-members">
+            <?php foreach ($teamMembers as $tm): ?>
+                <div class="sk-member">
+                    <div class="sk-member-av">
+                        <?php if ($tm['photo']): ?>
+                            <img src="<?php echo htmlspecialchars($tm['photo'], ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($tm['name'] !== '' ? $tm['name'] : $tm['role'], ENT_QUOTES, 'UTF-8'); ?>" loading="lazy" draggable="false">
+                        <?php else: ?>
+                            <span aria-hidden="true"><?php echo htmlspecialchars($tm['initials'], ENT_QUOTES, 'UTF-8'); ?></span>
+                        <?php endif; ?>
+                    </div>
+                    <?php if ($tm['name'] !== ''): ?>
+                        <p class="sk-member-name"><?php echo htmlspecialchars($tm['name'], ENT_QUOTES, 'UTF-8'); ?></p>
+                        <p class="sk-member-role"><?php echo htmlspecialchars($tm['role'], ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php else: ?>
-                        <?php for ($i = 1; $i <= 5; $i++): ?>
-                            <div class="sk-card">
-                                <b>Photo <?php echo $i; ?> — placeholder</b>
-                                <small>Add <code>assets/img/showcase/team-0<?php echo $i; ?>.jpg</code> to show the team and build montage here.</small>
-                            </div>
-                        <?php endfor; ?>
+                        <p class="sk-member-name"><?php echo htmlspecialchars($tm['role'], ENT_QUOTES, 'UTF-8'); ?></p>
                     <?php endif; ?>
                 </div>
-            </div>
-            <div class="sk-deck-ctrl">
-                <button class="sk-arrow" id="teamPrev" type="button" aria-label="Previous photo">&#8592;</button>
-                <div class="sk-dots" id="teamDots"></div>
-                <button class="sk-arrow" id="teamNext" type="button" aria-label="Next photo">&#8594;</button>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="sk-build">
+            <h3>How we built it</h3>
+            <p class="lead">Photos from the build. Tap one to see it bigger.</p>
+            <div class="sk-deck-wrap">
+                <div class="sk-deck" id="teamDeck">
+                    <div class="sk-deck-track">
+                        <?php for ($i = 0; $i < $buildCount; $i++): ?>
+                            <?php $src = $teamPhotos[$i] ?? null; $cap = $buildCaptions[$i] ?? ''; ?>
+                            <?php if ($src): ?>
+                                <div class="sk-card">
+                                    <img src="<?php echo htmlspecialchars($src, ENT_QUOTES, 'UTF-8'); ?>" alt="<?php echo htmlspecialchars($cap !== '' ? $cap : 'Build photo ' . ($i + 1), ENT_QUOTES, 'UTF-8'); ?>" loading="lazy">
+                                    <?php if ($cap !== ''): ?><span class="sk-card-cap"><?php echo htmlspecialchars($cap, ENT_QUOTES, 'UTF-8'); ?></span><?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <div class="sk-card sk-card--ph">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                    <b><?php echo htmlspecialchars($cap !== '' ? $cap : 'Build photo', ENT_QUOTES, 'UTF-8'); ?></b>
+                                    <small>Photo slot</small>
+                                </div>
+                            <?php endif; ?>
+                        <?php endfor; ?>
+                    </div>
+                </div>
+                <div class="sk-deck-ctrl">
+                    <button class="sk-arrow" id="teamPrev" type="button" aria-label="Previous photo">&#8592;</button>
+                    <div class="sk-dots" id="teamDots"></div>
+                    <button class="sk-arrow" id="teamNext" type="button" aria-label="Next photo">&#8594;</button>
                 </div>
             </div>
         </div>
     </section>
-
-    <footer class="sk-footer">
-        Sukat Kalusugan by Group A4Tech &middot; OLFU Capstone<br>
-        Public showcase only — capstone project, not an official OLFU system.
-    </footer>
 
 </main>
 
