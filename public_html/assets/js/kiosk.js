@@ -736,7 +736,9 @@
 
     thankyouShownAt: 0,
 
-    thankyouCooldownTimer: null
+    thankyouCooldownTimer: null,
+
+    thankyouCountdownTimer: null
   };
 
   // ============================================================
@@ -5353,6 +5355,13 @@ function finishResults(
       state.thankyouCooldownTimer = null;
     }
 
+    if (state.thankyouCountdownTimer) {
+      clearInterval(
+        state.thankyouCountdownTimer
+      );
+      state.thankyouCountdownTimer = null;
+    }
+
     state.statusTimer =
       null;
 
@@ -6425,6 +6434,11 @@ function finishResults(
               state.thankyouTimer = null;
             }
 
+            if (state.thankyouCountdownTimer) {
+              clearInterval(state.thankyouCountdownTimer);
+              state.thankyouCountdownTimer = null;
+            }
+
             if (state.thankyouCooldownTimer) {
               clearTimeout(state.thankyouCooldownTimer);
               state.thankyouCooldownTimer = null;
@@ -6442,10 +6456,29 @@ function finishResults(
               }, 1200);
             }
 
+            // Manual-primary pacing: the operator taps "Balik sa Home"
+            // when the panel is done reading. The 60s timer is only a
+            // safety net so the kiosk never gets stuck on thank-you.
+            var thankyouAutoSeconds = 60;
+            var thankyouCountdownEl = document.getElementById("thankyouCountdown");
+            var updateThankyouCountdown = function () {
+              if (!thankyouCountdownEl) return;
+              var elapsed = Math.floor((Date.now() - state.thankyouShownAt) / 1000);
+              var remaining = thankyouAutoSeconds - elapsed;
+              if (remaining < 0) remaining = 0;
+              thankyouCountdownEl.textContent = "Babalik sa home sa " + remaining + "s — o pindutin ang Balik sa Home.";
+            };
+            updateThankyouCountdown();
+            state.thankyouCountdownTimer = setInterval(updateThankyouCountdown, 1000);
+
             state.thankyouTimer = setTimeout(() => {
               state.thankyouTimer = null;
+              if (state.thankyouCountdownTimer) {
+                clearInterval(state.thankyouCountdownTimer);
+                state.thankyouCountdownTimer = null;
+              }
               resetKioskToIdle();
-            }, 8000);
+            }, thankyouAutoSeconds * 1000);
 
             return;
           }
