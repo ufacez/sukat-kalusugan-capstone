@@ -371,8 +371,11 @@ function renderSheetRows(rows){
 	gridWrap.hidden = false;
 }
 
+// Any element carrying data-exp-preview opens the modal (export dropdown
+// items everywhere, plus standalone "View template" buttons), so pages
+// can reuse the viewer without adopting .export-dd-item's styling.
 document.addEventListener('click', function(e){
-	var item = e.target && e.target.closest ? e.target.closest('.export-dd-item[data-exp-preview]') : null;
+	var item = e.target && e.target.closest ? e.target.closest('[data-exp-preview]') : null;
 	if (!item) return;
 	if (!els()) return;
 	e.preventDefault();

@@ -22,6 +22,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
+require_once __DIR__ . '/../includes/export_preview.php';
 
 const ML_IMPORT_DEFAULT_PASSWORD = 'PalitanMo@123';
 const ML_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -390,30 +391,98 @@ function ml_import_resolve_barangay(array $user, bool $isAdmin): ?int
     return $picked > 0 ? $picked : null;
 }
 
-/* Template download: same column layout as the OPT Plus master list. */
-if (($_GET['action'] ?? '') === 'template') {
-    $header = [
-        'Child Seq. (ignored)',
-        'Address / Purok (barangay check only)',
-        'Name of Mother or Caregiver (Surname, First Name)',
-        "Child's Full Name (Surname, First Name)",
-        'Belongs to IP Group? (ignored)',
-        'Sex (M/F)',
-        'Date of Birth (YYYY-MM-DD)',
-    ];
-    $examples = [
-        ['', 'Purok 2 Dela Paz Norte', 'Arconado, Isagani', 'Arconado, Jonalky', '', 'M', '2022-05-14'],
-        ['', 'Purok 5 Dela Paz Norte', 'Dela Cruz, Maria', 'Dela Cruz, Juan Santos', '', 'F', '2023-01-30'],
-    ];
+/* ------------------------------------------------------------------
+ * Template (single source of truth for BOTH view and download)
+ * ------------------------------------------------------------------ */
 
-    $tmp = (string)sys_get_temp_dir() . '/ml_template_' . (string)getmypid() . '.xlsx';
-    if (!xlsx_lite_write($tmp, $header, $examples, 'Master List')) {
+/**
+ * The recommended master-list layout: the same column set an OPT Plus
+ * sheet already has, so a downloaded template round-trips through
+ * ml_import_map_columns() unchanged. The template is only a
+ * convenience -- any .xlsx with mother/child name, sex and birthdate
+ * columns imports fine.
+ *
+ * @return array{header: string[], examples: array<int, string[]>}
+ */
+function ml_import_template_definition(): array
+{
+    return [
+        'header' => [
+            'Child Seq. (ignored)',
+            'Address / Purok (barangay check only)',
+            'Name of Mother or Caregiver (Surname, First Name)',
+            "Child's Full Name (Surname, First Name)",
+            'Belongs to IP Group? (ignored)',
+            'Sex (M/F)',
+            'Date of Birth (YYYY-MM-DD)',
+        ],
+        'examples' => [
+            ['', 'Purok 2 (example)', 'Test, Juan', 'Test, Juanito', '', 'M', '2022-05-14'],
+            ['', 'Purok 5 (example)', 'Sample, Maria', 'Sample, Mariel', '', 'F', '2023-01-30'],
+        ],
+    ];
+}
+
+/* Template: ?action=template[&preview=json] -- view (JSON for the shared
+ * preview modal) or download the real .xlsx. Available to every user who
+ * can open this page, including read-only staff -- nothing is written. */
+if (($_GET['action'] ?? '') === 'template') {
+    $template = ml_import_template_definition();
+
+    if (($_GET['preview'] ?? '') === 'json') {
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: application/json; charset=utf-8');
+        header('Cache-Control: no-store, no-cache, must-revalidate');
+        header('Pragma: no-cache');
+        header('Expires: 0');
+        echo json_encode([
+            'success' => true,
+            'title' => 'Master-list import template',
+            'filename' => 'master_list_template.xlsx',
+            'format' => 'xlsx',
+            'total_rows' => count($template['examples']),
+            'generated' => date('F j, Y g:i A'),
+            'headers' => $template['header'],
+            'preview_rows' => $template['examples'],
+            'preview_count' => count($template['examples']),
+            'note' => 'Recommended format, not required. Only mother/child name, sex and birthdate are read -- column order does not matter.',
+        ], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $tmpDir = rtrim((string)sys_get_temp_dir(), "/\\");
+    if ($tmpDir === '' || !is_dir($tmpDir) || !is_writable($tmpDir)) {
+        $fallback = realpath(__DIR__ . '/../../logs');
+        if ($fallback !== false && is_writable($fallback)) {
+            $tmpDir = $fallback;
+        }
+    }
+    $tmp = $tmpDir . DIRECTORY_SEPARATOR . 'ml_template_' . bin2hex(random_bytes(8)) . '.xlsx';
+
+    try {
+        $written = xlsx_lite_write($tmp, $template['header'], $template['examples'], 'Master List');
+    } catch (Throwable $e) {
+        error_log('[SukatKalusugan] family_import.php template write: ' . $e->getMessage());
+        $written = false;
+    }
+
+    if (!$written) {
+        @unlink($tmp);
         admin_redirect('/nutritionist/family_import.php', ['notice' => 'Template could not be generated. Try again.', 'type' => 'error']);
     }
 
+    // Clear any buffered output so the xlsx isn't corrupted.
+    while (ob_get_level() > 0) {
+        ob_end_clean();
+    }
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     header('Content-Disposition: attachment; filename="master_list_template.xlsx"');
     header('Content-Length: ' . (string)filesize($tmp));
+    header('Cache-Control: no-store, no-cache, must-revalidate');
+    header('Pragma: no-cache');
+    header('Expires: 0');
     readfile($tmp);
     @unlink($tmp);
     exit;
@@ -805,6 +874,13 @@ nutritionist_layout_start(
 .ml-table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
 .ml-table th,.ml-table td{padding:8px 10px;border-bottom:1px solid var(--admin-border);text-align:left;vertical-align:top}
 .ml-table thead th{background:var(--admin-surface-alt);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--admin-muted)}
+.ml-template-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px dashed var(--admin-border);background:var(--admin-surface-alt);border-radius:12px;padding:14px 16px;margin-bottom:18px}
+.ml-template-text{min-width:0;flex:1}
+.ml-template-text strong{display:block;font-size:13px;font-weight:800;color:var(--admin-text);margin-bottom:2px}
+.ml-template-text .admin-field-hint{display:block;max-width:62ch}
+.ml-template-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0}
+.ml-template-btn{margin:0;white-space:nowrap}
+@media(max-width:640px){.ml-template-bar{flex-direction:column;align-items:stretch}.ml-template-actions .ml-template-btn{width:100%}}
 .ml-guide{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0 0}
 .ml-guide td{border:1px solid var(--admin-border);padding:6px 10px}
 .ml-guide td:first-child{font-weight:700;white-space:nowrap;background:var(--admin-surface-alt)}
@@ -972,6 +1048,30 @@ nutritionist_layout_start(
         </form>
 
     <?php else: ?>
+        <?php
+        $mlTemplateUrl = app_url('/nutritionist/family_import.php') . '?action=template';
+        $mlTemplatePreviewUrl = $mlTemplateUrl . '&preview=json';
+        ?>
+        <div class="ml-template-bar">
+            <div class="ml-template-text">
+                <strong>Walang master list file?</strong>
+                <span class="admin-field-hint">Recommended, pero hindi required — kahit anong .xlsx na may mother/child name, sex at birthdate ang tinatanggap. I-preview muna, tapos i-download ang template.</span>
+            </div>
+            <div class="ml-template-actions">
+                <a
+                    class="admin-btn-secondary ml-template-btn"
+                    data-exp-preview="<?php echo nutritionist_e($mlTemplatePreviewUrl); ?>"
+                    data-exp-download="<?php echo nutritionist_e($mlTemplateUrl); ?>"
+                    data-exp-format="xlsx"
+                    href="<?php echo nutritionist_e($mlTemplateUrl); ?>"
+                    title="Preview the template, then download it from the preview window"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                    View &amp; download template
+                </a>
+            </div>
+        </div>
+
         <form method="post" enctype="multipart/form-data" action="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>" class="nutritionist-form-grid">
             <input type="hidden" name="action" value="preview">
 
@@ -1067,6 +1167,9 @@ nutritionist_layout_start(
         </script>
     <?php endif; ?>
 </section>
+
+<?php /* Drive-style "view then download" modal for the template file. */ ?>
+<?php echo export_preview_assets(); ?>
 
 <?php
 
