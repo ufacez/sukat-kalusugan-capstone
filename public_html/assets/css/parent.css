@@ -303,6 +303,20 @@
   color: var(--admin-primary);
   font-size: 1.2rem;
   font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Gender-coded avatar (inline background + color): fixed hexes so the
+ * initial stays readable in both light and dark mode. The inline
+ * `color` wins here; this is only a fallback + edge definition. */
+.parent-page .parent-child-avatar[style*="background"] {
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+[data-theme="dark"] .parent-page .parent-child-avatar[style*="background"] {
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .parent-page .parent-child-switcher-copy {
@@ -1994,6 +2008,18 @@
   background: var(--admin-primary-soft);
   color: var(--admin-primary);
   font-weight: 800;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
+/* Same fixed-contrast treatment as the main avatar above. */
+.parent-page .parent-child-option-avatar[style*="background"] {
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+[data-theme="dark"] .parent-page .parent-child-option-avatar[style*="background"] {
+  border-color: rgba(255, 255, 255, 0.28);
 }
 
 .parent-page .parent-child-option-copy {

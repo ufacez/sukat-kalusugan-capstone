@@ -178,7 +178,7 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 	<?php foreach ($childrenJson as $c): ?>
 		<button class="parent-child-card" type="button" data-child-id="<?php echo $c['id']; ?>">
 			<div class="parent-child-card-top">
-				<div class="parent-child-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($c['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr($c['first_name'], 0, 1))); ?></div>
+				<div class="parent-child-avatar" style="background:<?php echo parent_e(child_avatar_color((string)($c['sex'] ?? ''))); ?>;color:<?php echo parent_e(child_avatar_text_color((string)($c['sex'] ?? ''))); ?>;" aria-hidden="true"><?php echo parent_e(strtoupper(substr($c['first_name'], 0, 1))); ?></div>
 				<div class="parent-child-card-info">
 					<div class="parent-child-card-name"><?php echo parent_e($c['first_name'] . ' ' . $c['last_name']); ?></div>
 					<div class="parent-child-card-sub"><?php echo parent_e($c['age_label']); ?> · <?php echo parent_e($c['sex']); ?></div>
@@ -303,7 +303,13 @@ parent_layout_start('Children', 'All children linked to your parent account and 
 		});
 
 		document.getElementById('modalAvatar').textContent = c.first_name.charAt(0).toUpperCase();
-		document.getElementById('modalAvatar').style.background = (String(c.sex || '').toLowerCase().charAt(0) === 'm' ? '#0B6E4F' : (String(c.sex || '').toLowerCase().charAt(0) === 'f' ? '#52B788' : '#94a3b8'));
+		var modalSex = String(c.sex || '').toLowerCase();
+		var modalBg = '#94a3b8';
+		var modalFg = '#1E293B';
+		if (modalSex.charAt(0) === 'm') { modalBg = '#0B6E4F'; modalFg = '#FFFFFF'; }
+		else if (modalSex.charAt(0) === 'f') { modalBg = '#52B788'; modalFg = '#06281C'; }
+		document.getElementById('modalAvatar').style.background = modalBg;
+		document.getElementById('modalAvatar').style.color = modalFg;
 		document.getElementById('modalName').textContent = c.first_name + ' ' + c.last_name;
 		document.getElementById('modalSub').textContent = c.age_label + ' · ' + c.sex;
 		document.getElementById('modalStatus').textContent = c.status;

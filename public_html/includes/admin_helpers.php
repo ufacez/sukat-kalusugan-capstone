@@ -176,6 +176,27 @@ function child_avatar_color(?string $sex): string
     return '#94a3b8';
 }
 
+/**
+ * Contrasting initial letter color for the gender-coded avatar above.
+ * Fixed hexes (not theme vars) so the letter stays readable in both
+ * light and dark mode: white on dark-green male, very dark green/slate
+ * on the lighter female/unknown backgrounds.
+ */
+function child_avatar_text_color(?string $sex): string
+{
+    $normalized = strtolower(trim((string)$sex));
+
+    if ($normalized === 'male' || $normalized === 'm') {
+        return '#FFFFFF';
+    }
+
+    if ($normalized === 'female' || $normalized === 'f') {
+        return '#06281C';
+    }
+
+    return '#1E293B';
+}
+
 function admin_grouped_nav_items(): array
 {
     return [

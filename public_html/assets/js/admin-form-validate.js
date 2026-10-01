@@ -44,35 +44,64 @@
     return ok;
   }
 
+  // ---- Touched-gated errors (no red while typing) ----
+  // Red (is-invalid) only appears after blur or submit. While the user is
+  // still typing in an untouched field, intermediate values ("J", "juan@",
+  // "ab") stay neutral instead of flashing red/green on every keystroke.
+  // Once touched, live feedback resumes so fixing an error clears it.
+  const touchedInputs = new WeakSet();
+
+  function markTouched(input) {
+    if (input) touchedInputs.add(input);
+  }
+
+  function isTouched(input) {
+    return touchedInputs.has(input);
+  }
+
+  function clearState(input) {
+    const wrap = fieldWrapper(input);
+    const msg = messageEl(input);
+    if (wrap) wrap.classList.remove("is-valid", "is-invalid");
+    if (msg) msg.textContent = "";
+    return true;
+  }
+
+  function setStateLenient(input, ok, message) {
+    if (ok) return setState(input, true, "");
+    if (!isTouched(input)) return clearState(input);
+    return setState(input, false, message);
+  }
+
   function validateNamePart(input, label) {
     const value = input.value.trim();
     const required = input.required;
 
     if (value === "") {
-      return setState(input, !required, label + " is required.");
+      return setStateLenient(input, !required, label + " is required.");
     }
 
-    return setState(input, NAME_RE.test(value), label + " may only contain letters, spaces, hyphens, and periods.");
+    return setStateLenient(input, NAME_RE.test(value), label + " may only contain letters, spaces, hyphens, and periods.");
   }
 
   function validateEmail(input) {
     const value = input.value.trim();
 
     if (value === "") {
-      return setState(input, !input.required, "Email is required.");
+      return setStateLenient(input, !input.required, "Email is required.");
     }
 
-    return setState(input, EMAIL_RE.test(value), "Enter a valid email address (e.g. juan@example.com).");
+    return setStateLenient(input, EMAIL_RE.test(value), "Enter a valid email address (e.g. juan@example.com).");
   }
 
   function validateUsername(input) {
     const value = input.value.trim();
 
     if (value === "") {
-      return setState(input, !input.required, "Username is required.");
+      return setStateLenient(input, !input.required, "Username is required.");
     }
 
-    return setState(
+    return setStateLenient(
       input,
       USERNAME_RE.test(value),
       "3-30 characters: letters, numbers, dot, or underscore only."
@@ -136,19 +165,15 @@
     const raw = input.value.trim();
 
     if (raw === "") {
-      return setState(input, !input.required, "Mobile number is required.");
+      return setStateLenient(input, !input.required, "Mobile number is required.");
     }
 
     if (!strict && normalizePhMobile(raw) === null && isPotentialPhMobile(raw)) {
       // Still typing a plausible number — clear any state, no error.
-      const wrap = fieldWrapper(input);
-      const msg = messageEl(input);
-      if (wrap) wrap.classList.remove("is-valid", "is-invalid");
-      if (msg) msg.textContent = "";
-      return true;
+      return clearState(input);
     }
 
-    return setState(
+    return setStateLenient(
       input,
       normalizePhMobile(raw) !== null,
       "Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)."
@@ -225,13 +250,14 @@
     if (!rules.number) missing.push("a number");
     if (!rules.special) missing.push("a special character");
 
-    setState(
+    setStateLenient(
       input,
       optional || isStrongPassword(value),
       missing.length > 0 ? "Password must have " + missing.join(", ") : ""
     );
 
-      // Re-check confirm password whenever the password changes
+      // Re-check confirm password whenever the password changes, but keep
+      // it neutral too when the confirm field itself is still untouched.
       const confirmInput = document.querySelector('[data-match="' + input.id + '"]');
       if (confirmInput && confirmInput.value !== "") {
         validateConfirmPassword(confirmInput);
@@ -239,6 +265,15 @@
     }
 
     input.addEventListener("input", update);
+    input.addEventListener("blur", () => {
+      markTouched(input);
+      update();
+    });
+    // Exposed for the submit handler so it can force strict validation.
+    input._skValidateStrict = () => {
+      markTouched(input);
+      update();
+    };
     update();
   }
 
@@ -248,12 +283,40 @@
     const value = input.value;
 
     if (value === "") {
-      return setState(input, !input.required, "Please re-enter the password.");
+      return setStateLenient(input, !input.required, "Please re-enter the password.");
     }
 
     const matches = target ? value === target.value : true;
 
-    return setState(input, matches, "Passwords do not match.");
+    return setStateLenient(input, matches, "Passwords do not match.");
+  }
+
+  // Strict runner for submit: marks touched first so lenient suppression
+  // is lifted, then runs the canonical validator for the field kind.
+  function validateInputStrict(input) {
+    const kind = input.getAttribute("data-validate");
+    markTouched(input);
+    if (typeof input._skValidateStrict === "function") {
+      input._skValidateStrict();
+      return;
+    }
+    if (kind === "name") {
+      validateNamePart(input, input.getAttribute("data-label") || "This field");
+    } else if (kind === "email") {
+      validateEmail(input);
+    } else if (kind === "username") {
+      validateUsername(input);
+    } else if (kind === "phone-ph") {
+      validatePhone(input, true);
+    } else if (kind === "confirm-password") {
+      validateConfirmPassword(input);
+    } else if (kind === "password") {
+      // Fallback if setupPasswordField did not wire this input (e.g.
+      // dynamically added rows): enforce required/strength strictly.
+      const val = input.value;
+      const optional = !input.required && val === "";
+      setState(input, optional || isStrongPassword(val), "Password must have 8+ characters, one lowercase letter, one uppercase letter, a number, a special character.");
+    }
   }
 
   // ---- Wire up every field with a data-validate attribute ----
@@ -262,17 +325,26 @@
     scope.querySelectorAll('[data-validate="name"]').forEach((input) => {
       const label = input.getAttribute("data-label") || "This field";
       input.addEventListener("input", () => validateNamePart(input, label));
-      input.addEventListener("blur", () => validateNamePart(input, label));
+      input.addEventListener("blur", () => {
+        markTouched(input);
+        validateNamePart(input, label);
+      });
     });
 
     scope.querySelectorAll('[data-validate="email"]').forEach((input) => {
       input.addEventListener("input", () => validateEmail(input));
-      input.addEventListener("blur", () => validateEmail(input));
+      input.addEventListener("blur", () => {
+        markTouched(input);
+        validateEmail(input);
+      });
     });
 
     scope.querySelectorAll('[data-validate="username"]').forEach((input) => {
       input.addEventListener("input", () => validateUsername(input));
-      input.addEventListener("blur", () => validateUsername(input));
+      input.addEventListener("blur", () => {
+        markTouched(input);
+        validateUsername(input);
+      });
     });
 
     scope.querySelectorAll('[data-validate="phone-ph"]').forEach((input) => {
@@ -281,7 +353,10 @@
       input.setAttribute("inputmode", "tel");
       // Lenient while typing (partial "+63…" stays neutral), strict on blur.
       input.addEventListener("input", () => validatePhone(input, false));
-      input.addEventListener("blur", () => validatePhone(input, true));
+      input.addEventListener("blur", () => {
+        markTouched(input);
+        validatePhone(input, true);
+      });
     });
 
     scope.querySelectorAll('[data-validate="password"]').forEach((input) => {
@@ -290,17 +365,20 @@
 
     scope.querySelectorAll('[data-validate="confirm-password"]').forEach((input) => {
       input.addEventListener("input", () => validateConfirmPassword(input));
-      input.addEventListener("blur", () => validateConfirmPassword(input));
+      input.addEventListener("blur", () => {
+        markTouched(input);
+        validateConfirmPassword(input);
+      });
     });
 
     // Block submission if any wired field is currently marked invalid.
     scope.querySelectorAll("form[data-validate-form]").forEach((form) => {
       form.addEventListener("submit", (event) => {
-        const invalid = form.querySelectorAll(".admin-field.is-invalid");
-
-        // Trigger validation on any required-but-untouched fields too.
+        // Strict-validate everything (including untouched fields) so no
+        // required-but-untouched field slips through. Marking touched
+        // first lifts the lenient "no red while typing" suppression.
         form.querySelectorAll("[data-validate]").forEach((input) => {
-          input.dispatchEvent(new Event("blur"));
+          validateInputStrict(input);
         });
 
         const stillInvalid = form.querySelectorAll(".admin-field.is-invalid");
