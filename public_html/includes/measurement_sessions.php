@@ -2,6 +2,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/api_helpers.php';
+require_once __DIR__ . '/crypto.php';
 
 if (!defined('MEASUREMENT_SESSION_TIMEOUT_SECONDS')) {
     define('MEASUREMENT_SESSION_TIMEOUT_SECONDS', 180);
@@ -18,6 +19,10 @@ function measurement_session_is_active_status(string $status): bool
 
 function measurement_session_row_to_payload(array $row): array
 {
+    // AES-256-GCM PII arrives decrypted so kiosk polling responses, result
+    // cards, and toasts never render SK1:... ciphertext (no-op while the
+    // key is unset or rows are plaintext).
+    sk_decrypt_pii_row($row);
     $childName = trim((string)($row['child_first_name'] ?? '') . ' ' . (string)($row['child_last_name'] ?? ''));
 
     $measurement = null;

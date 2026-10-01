@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/who_calculator.php';
+require_once __DIR__ . '/crypto.php';
 
 function kiosk_e(string $value): string
 {
@@ -30,6 +31,10 @@ function kiosk_fetch_all(string $sql, string $types = '', array $params = []): a
 
     if ($result instanceof mysqli_result) {
         while ($row = mysqli_fetch_assoc($result)) {
+            // Kiosk search filters decrypted names in the browser
+            // (kiosk.js), so SQL stays on plaintext keys (child_code,
+            // barangay_id) and PII is decrypted here on read.
+            sk_decrypt_pii_row($row);
             $rows[] = $row;
         }
     }

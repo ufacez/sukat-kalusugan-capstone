@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
 
@@ -100,6 +101,11 @@ mysqli_stmt_execute($childStmt);
 $childResult = mysqli_stmt_get_result($childStmt);
 $child = $childResult instanceof mysqli_result ? mysqli_fetch_assoc($childResult) : null;
 mysqli_stmt_close($childStmt);
+// AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+// Without this, child_name in the success payload renders as SK1:... ciphertext.
+if (is_array($child)) {
+    sk_decrypt_pii_row($child);
+}
 
 if (!is_array($child)) {
     api_error('Child not found.', 404);

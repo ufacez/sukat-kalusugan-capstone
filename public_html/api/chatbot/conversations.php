@@ -92,6 +92,8 @@ if ($method === 'GET') {
 
     $conversations = [];
     while ($row = mysqli_fetch_assoc($result)) {
+        // AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+        sk_decrypt_pii_row($row);
         $conversations[] = [
             'id'         => (int)$row['id'],
             'title'      => $row['title'] ?? 'New Conversation',

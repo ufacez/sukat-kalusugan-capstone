@@ -3,6 +3,7 @@
 require_once __DIR__ . '/auth_middleware.php';
 require_once __DIR__ . '/audit_logger.php';
 require_once __DIR__ . '/confirm_modal.php';
+require_once __DIR__ . '/crypto.php';
 
 function admin_e(string $value): string
 {
@@ -232,6 +233,55 @@ function admin_grouped_nav_items(): array
     ];
 }
 
+/**
+ * Encryption health banner (admin dashboard). Silent when healthy; loud
+ * when enveloped PII rows exist but this host cannot decrypt them (missing
+ * or wrong APP_ENCRYPTION_KEY) — that state would otherwise surface as raw
+ * "SK1:..." ciphertext across lists, toasts, and reports.
+ */
+function admin_encryption_health_banner(): string
+{
+    static $html = null;
+    if ($html !== null) {
+        return $html;
+    }
+    $html = '';
+
+    if (sk_pii_encryption_enabled()) {
+        return $html;
+    }
+
+    try {
+        $conn = get_db_connection();
+        $res = mysqli_query(
+            $conn,
+            "SELECT (SELECT COUNT(*) FROM parents WHERE name LIKE 'SK1:%')"
+            . " + (SELECT COUNT(*) FROM children WHERE first_name LIKE 'SK1:%') AS sealed"
+        );
+        $row = $res instanceof mysqli_result ? mysqli_fetch_assoc($res) : null;
+        if ($res instanceof mysqli_result) {
+            mysqli_free_result($res);
+        }
+        $sealed = is_array($row) ? (int)($row['sealed'] ?? 0) : 0;
+    } catch (Throwable $e) {
+        return $html;
+    }
+
+    if ($sealed <= 0) {
+        return $html;
+    }
+
+    $html = '<div class="admin-card" role="alert" style="border-left:4px solid #dc2626;margin-bottom:16px;">'
+        . '<div class="admin-card-row"><div class="admin-card-content">'
+        . '<div class="admin-card-label" style="color:#dc2626;">PII decryption unavailable</div>'
+        . '<div class="admin-card-meta">' . (int)$sealed . ' encrypted name value(s) cannot be decrypted on this host. '
+        . 'Set the correct APP_ENCRYPTION_KEY in .env (same key used for encryption) and reload. '
+        . 'Names will show as raw ciphertext until then.</div>'
+        . '</div></div></div>';
+
+    return $html;
+}
+
 function admin_bind_params(mysqli_stmt $stmt, string $types, array &$params): void
 {
     if ($types === '' || $params === []) {
@@ -273,6 +323,9 @@ function admin_fetch_all(string $sql, string $types = '', array $params = []): a
 
     if ($result instanceof mysqli_result) {
         while ($row = mysqli_fetch_assoc($result)) {
+            // AES-256-GCM at-rest PII arrives decrypted; plaintext rows
+            // (pre-migration or key-unset hosts) pass through untouched.
+            sk_decrypt_pii_row($row);
             $rows[] = $row;
         }
     }
@@ -426,6 +479,34 @@ function child_duplicate_identity(string $firstName, string $lastName, string $b
         return null;
     }
 
+    // Encrypted mode: GCM ciphertext (random IV) can never match SQL
+    // LOWER() comparisons, so narrow by the plaintext keys (birthdate +
+    // status) and compare decrypted names in PHP. Plaintext mode keeps
+    // the single indexed SQL lookup.
+    if (sk_pii_encryption_enabled()) {
+        $sql = "SELECT id, child_code, first_name, middle_name, last_name, birthdate FROM children
+                 WHERE birthdate = ? AND status = 'active'";
+        $types = 's';
+        $params = [$birthdate];
+        if ($excludeChildId !== null && $excludeChildId > 0) {
+            $sql .= ' AND id != ? LIMIT 50';
+            $types .= 'i';
+            $params[] = $excludeChildId;
+        } else {
+            $sql .= ' LIMIT 50';
+        }
+        $candidates = admin_fetch_all($sql, $types, $params);
+        foreach ($candidates as $candidate) {
+            if (
+                mb_strtolower(trim((string)($candidate['first_name'] ?? ''))) === mb_strtolower($firstName)
+                && mb_strtolower(trim((string)($candidate['last_name'] ?? ''))) === mb_strtolower($lastName)
+            ) {
+                return $candidate;
+            }
+        }
+        return null;
+    }
+
     if ($excludeChildId !== null && $excludeChildId > 0) {
         $hit = admin_fetch_one(
             "SELECT id, child_code, first_name, middle_name, last_name, birthdate FROM children
@@ -445,6 +526,59 @@ function child_duplicate_identity(string $firstName, string $lastName, string $b
     }
 
     return $hit;
+}
+
+/**
+ * DQC "repeated name and birthdate" groups.
+ *
+ * Plaintext mode keeps the single GROUP BY query. Encrypted mode cannot
+ * group on GCM ciphertext (random IV per value), so names are grouped in
+ * PHP after the admin_fetch_all() decrypt layer. Same result shape:
+ * rows of [first_name, last_name, birthdate, cnt] with cnt > 1.
+ */
+function dqc_duplicate_name_dob_groups(string $extraWhere, string $types = '', array $params = []): array
+{
+    if (!sk_pii_encryption_enabled()) {
+        return admin_fetch_all(
+            "SELECT c1.first_name, c1.last_name, c1.birthdate, COUNT(*) AS cnt
+             FROM children c1
+             WHERE c1.first_name != '' AND c1.last_name != '' AND c1.birthdate IS NOT NULL
+             {$extraWhere}
+             GROUP BY c1.first_name, c1.last_name, c1.birthdate
+             HAVING cnt > 1",
+            $types,
+            $params
+        );
+    }
+
+    $where = "WHERE c1.birthdate IS NOT NULL {$extraWhere}";
+    $rows = admin_fetch_all(
+        "SELECT c1.first_name, c1.last_name, c1.birthdate FROM children c1 {$where}",
+        $types,
+        $params
+    );
+
+    $groups = [];
+    foreach ($rows as $row) {
+        $first = mb_strtolower(trim((string)($row['first_name'] ?? '')));
+        $last = mb_strtolower(trim((string)($row['last_name'] ?? '')));
+        $dob = trim((string)($row['birthdate'] ?? ''));
+        if ($first === '' || $last === '' || $dob === '') {
+            continue;
+        }
+        $key = $first . '|' . $last . '|' . $dob;
+        if (!isset($groups[$key])) {
+            $groups[$key] = [
+                'first_name' => trim((string)($row['first_name'] ?? '')),
+                'last_name' => trim((string)($row['last_name'] ?? '')),
+                'birthdate' => $dob,
+                'cnt' => 0,
+            ];
+        }
+        $groups[$key]['cnt']++;
+    }
+
+    return array_values(array_filter($groups, static fn(array $g): bool => (int)$g['cnt'] > 1));
 }
 
 /**

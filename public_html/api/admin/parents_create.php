@@ -105,6 +105,10 @@ if (admin_email_in_use($email)) {
 }
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
+// AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+$name = (string)sk_encrypt_value($name);
+$phone = (string)sk_encrypt_value($phone);
+$address = (string)sk_encrypt_value($address);
 $ok = admin_execute(
     'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
     'ssssssiis',

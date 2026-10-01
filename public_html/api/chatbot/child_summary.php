@@ -11,6 +11,7 @@
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
+require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
 
 api_require_method(['GET']);
@@ -55,6 +56,10 @@ mysqli_stmt_bind_param($stmt, 'i', $childId);
 mysqli_stmt_execute($stmt);
 $child = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 mysqli_stmt_close($stmt);
+// AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+if (is_array($child)) {
+    sk_decrypt_pii_row($child);
+}
 
 if ($child === null) {
     api_error('Child not found.', 404);

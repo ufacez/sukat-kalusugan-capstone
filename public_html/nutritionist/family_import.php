@@ -560,13 +560,30 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
         $mLast = (string)$firstKid['mother']['last'];
         $mName = admin_combine_name($mFirst, $mMiddle, $mLast);
 
-        /* Reuse a live parent with the same name — never double-mint. */
-        $existing = admin_fetch_one(
-            "SELECT id FROM parents WHERE barangay_id = ? AND LOWER(name) = LOWER(?) AND status = 'active' LIMIT 1",
-            'is',
-            [$barangayId, $mName]
-        );
-        $parentId = $existing !== null ? (int)$existing['id'] : 0;
+        /* Reuse a live parent with the same name — never double-mint.
+         * Encrypted mode: GCM ciphertext never matches SQL LOWER(), so scan
+         * the barangay's parents and compare decrypted names in PHP. */
+        $parentId = 0;
+        if (sk_pii_encryption_enabled()) {
+            $candidates = admin_fetch_all(
+                "SELECT id, name FROM parents WHERE barangay_id = ? AND status = 'active' LIMIT 500",
+                'i',
+                [$barangayId]
+            );
+            foreach ($candidates as $candidate) {
+                if (mb_strtolower(trim((string)($candidate['name'] ?? ''))) === mb_strtolower($mName)) {
+                    $parentId = (int)$candidate['id'];
+                    break;
+                }
+            }
+        } else {
+            $existing = admin_fetch_one(
+                "SELECT id FROM parents WHERE barangay_id = ? AND LOWER(name) = LOWER(?) AND status = 'active' LIMIT 1",
+                'is',
+                [$barangayId, $mName]
+            );
+            $parentId = $existing !== null ? (int)$existing['id'] : 0;
+        }
 
         mysqli_begin_transaction($conn);
         try {
@@ -583,7 +600,9 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
                 if ($insParent === false) {
                     throw new RuntimeException('Hindi ma-save ang parent (' . $mName . ').');
                 }
-                mysqli_stmt_bind_param($insParent, 'ssssisii', $mName, $email, $hash, $pType, $barangayId, $pStatus, $one, $one);
+                // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+                $mNameEnc = (string)sk_encrypt_value($mName);
+                mysqli_stmt_bind_param($insParent, 'ssssisii', $mNameEnc, $email, $hash, $pType, $barangayId, $pStatus, $one, $one);
                 if (!mysqli_stmt_execute($insParent)) {
                     mysqli_stmt_close($insParent);
                     throw new RuntimeException('Hindi ma-save ang parent (' . $mName . ').');
@@ -620,7 +639,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
                 if ($insChild === false) {
                     throw new RuntimeException('Hindi ma-save ang bata (' . $cFirst . ' ' . $cLast . ').');
                 }
-                mysqli_stmt_bind_param($insChild, 'ssssssiiii', $childCode, $cFirst, $cMiddle, $cLast, $cBirth, $cSex, $barangayId, $zero, $zero, $parentId);
+                // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+                $cFirstEnc = (string)sk_encrypt_value($cFirst);
+                $cMiddleEnc = $cMiddle !== null && $cMiddle !== '' ? (string)sk_encrypt_value($cMiddle) : $cMiddle;
+                $cLastEnc = (string)sk_encrypt_value($cLast);
+                mysqli_stmt_bind_param($insChild, 'ssssssiiii', $childCode, $cFirstEnc, $cMiddleEnc, $cLastEnc, $cBirth, $cSex, $barangayId, $zero, $zero, $parentId);
                 if (!mysqli_stmt_execute($insChild)) {
                     mysqli_stmt_close($insChild);
                     throw new RuntimeException('Hindi ma-save ang bata (' . $cFirst . ' ' . $cLast . ').');

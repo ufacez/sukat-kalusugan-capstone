@@ -18,6 +18,7 @@
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/auth_middleware.php';
+require_once __DIR__ . '/crypto.php';
 require_once __DIR__ . '/email_template.php';
 
 if (!defined('PASSWORD_RESET_TOKEN_TTL_MINUTES')) {
@@ -73,7 +74,9 @@ function password_reset_find_account(string $email): ?array
             return [
                 'type' => 'parent',
                 'id' => (int)$parent['id'],
-                'name' => (string)$parent['name'],
+                // AES-256-GCM PII arrives decrypted for the "Hi {name}" email
+                // greeting (no-op while key unset / plaintext rows).
+                'name' => (string)sk_decrypt_value((string)($parent['name'] ?? '')),
                 'email' => (string)$parent['email'],
             ];
         }

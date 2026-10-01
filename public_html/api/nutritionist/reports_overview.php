@@ -110,15 +110,9 @@ $owObRows = admin_fetch_all(
 $affectedCount = $malnourishedCount + count($owObRows);
 
 $dqIssues = 0;
-$dqDuplicateRows = admin_fetch_all(
-	"SELECT c1.first_name, c1.last_name, c1.birthdate, COUNT(*) AS cnt
-	 FROM children c1
-	 WHERE c1.barangay_id IS NOT NULL
-	 GROUP BY c1.first_name, c1.last_name, c1.birthdate
-	 HAVING cnt > 1",
-	'',
-	[]
-);
+// Encrypted mode regroups decrypted names in PHP (see helper); plaintext
+// mode keeps the SQL GROUP BY. Same [first_name, last_name, birthdate, cnt] shape.
+$dqDuplicateRows = dqc_duplicate_name_dob_groups('AND c1.barangay_id IS NOT NULL', '', []);
 $dqIssues += count($dqDuplicateRows);
 
 $dqMissingSex = admin_scalar(

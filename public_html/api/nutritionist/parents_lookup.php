@@ -48,6 +48,36 @@ if ($singleId > 0) {
 }
 
 $like = '%' . $query . '%';
+
+// Encrypted mode: GCM ciphertext never matches SQL LIKE, so filter the
+// decrypted names in PHP (scoped + capped; picker scale, not a dump).
+if (sk_pii_encryption_enabled() && $query !== '') {
+    $candidates = admin_fetch_all(
+        'SELECT ' . $columns . ' ' . $from . ' ORDER BY p.id DESC LIMIT 500',
+        $scopeTypes,
+        $scopeParams
+    );
+    $needle = mb_strtolower($query);
+    $matched = [];
+    foreach ($candidates as $candidate) {
+        if (mb_strstrpos(mb_strtolower(trim((string)($candidate['name'] ?? ''))), $needle) !== false) {
+            $matched[] = $candidate;
+        }
+    }
+    usort($matched, static fn(array $a, array $b): int => strcasecmp((string)($a['name'] ?? ''), (string)($b['name'] ?? '')));
+    $total = count($matched);
+    $pages = max(1, (int)ceil($total / $pageSize));
+    $page = min($page, $pages);
+    $rows = array_slice($matched, ($page - 1) * $pageSize, $pageSize);
+
+    api_success([
+        'parents' => array_map('parent_lookup_format', $rows),
+        'page' => $page,
+        'pages' => $pages,
+        'total' => (int)$total,
+    ]);
+}
+
 $total = admin_scalar(
     'SELECT COUNT(*) ' . $from . ' AND p.name LIKE ?',
     $scopeTypes . 's',

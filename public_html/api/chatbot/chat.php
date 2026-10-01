@@ -146,6 +146,10 @@ if ($childId !== null && $childId > 0) {
     mysqli_stmt_execute($stmt);
     $child = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
     mysqli_stmt_close($stmt);
+    // AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+    if (is_array($child)) {
+        sk_decrypt_pii_row($child);
+    }
 
     if ($child === null && $isParentUser) {
         api_error('That child could not be found.', 404);

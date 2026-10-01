@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 
 api_require_method(['POST']);
@@ -52,12 +53,14 @@ try {
         if (empty($birthdate)) throw new RuntimeException('Birthdate is required.');
         if (!in_array($sex, ['Male', 'Female'], true)) throw new RuntimeException('Sex must be Male or Female.');
 
-        // Find or create a generic kiosk walk-in parent
-        $parentStmt = mysqli_prepare($conn, 'SELECT id FROM parents WHERE name = ? AND email = ? LIMIT 1');
+        // Find or create a generic kiosk walk-in parent.
+        // Email-only lookup: parents.name is AES-256-GCM encrypted when
+        // enabled (random IV, never SQL-matchable); email stays plaintext.
+        $parentStmt = mysqli_prepare($conn, 'SELECT id FROM parents WHERE email = ? LIMIT 1');
         if ($parentStmt === false) throw new RuntimeException('Unable to prepare walk-in parent lookup.');
         $kioskParentName = 'Kiosk Walk-In Parent';
         $kioskParentEmail = 'walkin@sukat-kiosk.local';
-        mysqli_stmt_bind_param($parentStmt, 'ss', $kioskParentName, $kioskParentEmail);
+        mysqli_stmt_bind_param($parentStmt, 's', $kioskParentEmail);
         mysqli_stmt_execute($parentStmt);
         $parentResult = mysqli_stmt_get_result($parentStmt);
         $parentRow = ($parentResult instanceof mysqli_result ? mysqli_fetch_assoc($parentResult) : null);
@@ -72,7 +75,9 @@ try {
             );
             if ($insParent === false) throw new RuntimeException('Unable to create walk-in parent.');
             $dummyHash = password_hash('kiosk_walkin_' . time(), PASSWORD_DEFAULT);
-            mysqli_stmt_bind_param($insParent, 'sssi', $kioskParentName, $kioskParentEmail, $dummyHash, $barangayId);
+            // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+            $kioskParentNameEnc = (string)sk_encrypt_value($kioskParentName);
+            mysqli_stmt_bind_param($insParent, 'sssi', $kioskParentNameEnc, $kioskParentEmail, $dummyHash, $barangayId);
             if (!mysqli_stmt_execute($insParent)) {
                 $err = mysqli_stmt_error($insParent);
                 mysqli_stmt_close($insParent);
@@ -97,7 +102,10 @@ try {
              VALUES (?, ?, ?, ?, ?, ?, ?, NOW(), NOW())'
         );
         if ($insChild === false) throw new RuntimeException('Unable to prepare child insert.');
-        mysqli_stmt_bind_param($insChild, 'sssssii', $childCode, $firstName, $lastName, $birthdate, $sex, $barangayId, $parentId);
+        // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+        $firstNameEnc = (string)sk_encrypt_value($firstName);
+        $lastNameEnc = (string)sk_encrypt_value($lastName);
+        mysqli_stmt_bind_param($insChild, 'sssssii', $childCode, $firstNameEnc, $lastNameEnc, $birthdate, $sex, $barangayId, $parentId);
         if (!mysqli_stmt_execute($insChild)) {
             $err = mysqli_stmt_error($insChild);
             mysqli_stmt_close($insChild);

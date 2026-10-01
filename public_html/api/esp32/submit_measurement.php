@@ -289,6 +289,12 @@ mysqli_stmt_close(
     $sessionStmt
 );
 
+// AES-256-GCM PII arrives decrypted for the child_name response field and
+// the Firebase mirror payload (no-op while key unset / plaintext rows).
+if (is_array($sessionRow)) {
+    sk_decrypt_pii_row($sessionRow);
+}
+
 /*
 |--------------------------------------------------------------------------
 | SESSION NOT FOUND

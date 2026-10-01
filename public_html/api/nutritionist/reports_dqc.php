@@ -45,15 +45,7 @@ $completeRecords = admin_scalar(
 	array_merge($scopeParams, $barangayFilterParams)
 );
 
-$dqDuplicateRows = admin_fetch_all(
-	"SELECT c1.first_name, c1.last_name, c1.birthdate, COUNT(*) AS cnt
-	 FROM children c1
-	 WHERE c1.first_name != '' AND c1.last_name != '' AND c1.birthdate IS NOT NULL
-	 GROUP BY c1.first_name, c1.last_name, c1.birthdate
-	 HAVING cnt > 1",
-	'',
-	[]
-);
+$dqDuplicateRows = dqc_duplicate_name_dob_groups('', '', []);
 
 $dqMissingSex = admin_scalar(
 	"SELECT COUNT(*) FROM children c WHERE c.sex IS NULL AND {$scope}{$barangayFilterSql}",

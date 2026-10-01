@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
+require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
 
@@ -253,6 +254,11 @@ try {
     );
 
     mysqli_stmt_close($childStmt);
+
+    // AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+    if (is_array($child)) {
+        sk_decrypt_pii_row($child);
+    }
 
     if (!is_array($child)) {
         throw new RuntimeException(

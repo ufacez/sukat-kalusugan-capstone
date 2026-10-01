@@ -371,7 +371,7 @@ unset($sf);
             'label' => 'Web app', 'sub' => 'Record',
             'icon' => '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>',
             'title' => 'Web app stores and shows it',
-            'rows' => [['Backend', 'PHP + MySQL'], ['Frontend', 'Vanilla HTML / CSS / JS'], ['Hosting', 'Azure Virtual Machine'], ['Auth', 'SHA-256 hashing, prepared statements']],
+            'rows' => [['Backend', 'PHP + MySQL'], ['Frontend', 'Vanilla HTML / CSS / JS'], ['Hosting', 'Azure Virtual Machine'], ['Auth', 'bcrypt hashing, AES-256-GCM PII encryption, prepared statements']],
         ],
     ];
     $flowStats = [
@@ -439,7 +439,7 @@ unset($sf);
                         <div><dt>Frontend</dt><dd>Vanilla HTML / CSS / JS</dd></div>
                         <div><dt>Live bridge</dt><dd>Firebase (transient only)</dd></div>
                         <div><dt>Hosting</dt><dd>Azure Virtual Machine</dd></div>
-                        <div><dt>Auth</dt><dd>SHA-256 hashing, prepared statements</dd></div>
+                        <div><dt>Auth</dt><dd>bcrypt hashing, AES-256-GCM PII encryption, prepared statements</dd></div>
                     </dl>
                 </div>
             </div>

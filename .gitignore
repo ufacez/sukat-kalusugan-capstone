@@ -36,3 +36,5 @@ public_html/data/*
 
 # --- Local-only docs (never deployed to Azure) ---
 docs/
+
+backup_*.sql

@@ -172,6 +172,8 @@ $actions = '';
 admin_layout_start('Admin Dashboard', 'City families, kiosk fleet, and activity at a glance.', 'dashboard', $actions);
 ?>
 
+<?php echo admin_encryption_health_banner(); ?>
+
 <?php
 /* ─── TOP SUMMARY CARDS ───────────────────────────────────────────── */
 ?>

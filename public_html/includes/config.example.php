@@ -27,6 +27,8 @@ define('APP_ENV', 'development'); // 'development' | 'staging' | 'production'
 // Leave empty for request-host fallback (dev only).
 define('APP_URL', '');
 
+define('APP_ENCRYPTION_KEY', '');
+
 define('ESP32_DEVICE_KEY', '');
 
 define('FIREBASE_DATABASE_URL', '');

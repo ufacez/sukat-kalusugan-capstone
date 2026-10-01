@@ -123,6 +123,10 @@ mysqli_stmt_execute($childStmt);
 $childResult = mysqli_stmt_get_result($childStmt);
 $child = $childResult instanceof mysqli_result ? mysqli_fetch_assoc($childResult) : null;
 mysqli_stmt_close($childStmt);
+// AES-256-GCM PII arrives decrypted (no-op while key unset / plaintext rows).
+if (is_array($child)) {
+    sk_decrypt_pii_row($child);
+}
 
 if (!is_array($child)) {
     api_error('Child not found.', 404);

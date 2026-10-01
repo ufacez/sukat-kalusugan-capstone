@@ -95,6 +95,11 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
 }
 
+// AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+$name = (string)sk_encrypt_value($name);
+$phone = (string)sk_encrypt_value($phone);
+$address = (string)sk_encrypt_value($address);
+
 if ($password !== '') {
     $hash = password_hash($password, PASSWORD_DEFAULT);
     $ok = admin_execute(

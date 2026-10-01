@@ -116,6 +116,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 	$phone = (string)admin_normalize_ph_mobile($phone);
 
+	// AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+	$name = (string)sk_encrypt_value($name);
+	$phone = (string)sk_encrypt_value($phone);
+	$address = (string)sk_encrypt_value($address);
+
 	if ($action === 'create' && $password === '') {
 		admin_redirect($redirectBack, ['notice' => 'Password is required.', 'type' => 'error']);
 	}

@@ -8,6 +8,7 @@
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
 require_once __DIR__ . '/../../includes/login_throttle.php';
+require_once __DIR__ . '/../../includes/crypto.php';
 
 function login_respond_error(string $message, int $statusCode = 401): void
 {
@@ -169,7 +170,10 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
     $_SESSION['auth'] = [
         'type' => 'parent',
         'id' => (int)$parent['id'],
-        'name' => (string)$parent['name'],
+        // parents.name is AES-256-GCM encrypted when enabled — the session
+        // must carry plaintext for greetings/headers (direct mysqli query
+        // bypasses the admin_fetch_all decrypt layer).
+        'name' => (string)sk_decrypt_value((string)($parent['name'] ?? '')),
         'email' => (string)$parent['email'],
         'role' => 'parent',
         'parent_type' => (string)($parent['parent_type'] ?? ''),

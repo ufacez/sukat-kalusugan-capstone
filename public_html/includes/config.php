@@ -78,6 +78,14 @@ define('FORCE_HTTPS', env('FORCE_HTTPS', ''));
 // behind a proxy where $_SERVER['HTTPS'] sniffing is unreliable.
 define('APP_URL', rtrim(env('APP_URL', ''), '/'));
 
+// ── PII At-Rest Encryption (AES-256-GCM, see includes/crypto.php) ─────────
+// Base64 of 32 random bytes. Generate: php -r "echo base64_encode(random_bytes(32)), PHP_EOL;"
+// Empty (default) = encryption disabled; reads/writes behave as plaintext so
+// XAMPP and Azure hosts without the key keep working. Set the SAME value in
+// .env on every host (and Azure App Settings) or encrypted rows become
+// unreadable there. Never commit the real key — .env is gitignored.
+define('APP_ENCRYPTION_KEY', env('APP_ENCRYPTION_KEY', ''));
+
 // ── ESP32 Kiosk Device Auth ──────────────────────────────────────────────────
 define('ESP32_DEVICE_KEY', env('ESP32_DEVICE_KEY', ''));
 

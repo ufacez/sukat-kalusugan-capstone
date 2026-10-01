@@ -292,6 +292,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             throw new RuntimeException('Hindi ma-save ang parent record. Subukan muli.');
         }
         $pStatus = 'active';
+        // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+        $pName = (string)sk_encrypt_value($pName);
+        $pPhone = $pPhone !== null && $pPhone !== '' ? (string)sk_encrypt_value($pPhone) : $pPhone;
+        $pAddress = $pAddress !== null && $pAddress !== '' ? (string)sk_encrypt_value($pAddress) : $pAddress;
         mysqli_stmt_bind_param($insParent, 'ssssssiiis', $pName, $pEmail, $hash, $pParentType, $pPhone, $pAddress, $pBarangayId, $pLocalAreaId, $pHouseholdId, $pStatus);
         if (!mysqli_stmt_execute($insParent)) {
             mysqli_stmt_close($insParent);
@@ -374,6 +378,10 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             $cFirst = $child['first_name'];
             $cMiddle = $child['middle_name'];
             $cLast = $child['last_name'];
+            // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+            $cFirst = (string)sk_encrypt_value($cFirst);
+            $cMiddle = $cMiddle !== null && $cMiddle !== '' ? (string)sk_encrypt_value($cMiddle) : $cMiddle;
+            $cLast = (string)sk_encrypt_value($cLast);
             $cBirth = $child['birthdate'];
             $cSex = $child['sex'];
             $cIp = (int)$child['is_ip'];
