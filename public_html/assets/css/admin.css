@@ -1618,6 +1618,33 @@
   opacity: 1;
 }
 
+/* Toolbar row that sits above a list table (search + filters).
+   Shared by children.php, monitoring.php, appointments.php and the
+   master-list import. Pages that declared their own copy of these rules
+   keep them; the declarations are identical, so nothing shifts. */
+.children-toolbar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.children-toolbar .admin-search {
+  flex: 0 1 280px;
+  max-width: 280px;
+  min-width: 200px;
+  min-height: 44px;
+  font-size: 0.875rem;
+}
+
+.children-toolbar .admin-select {
+  min-width: 200px;
+  max-width: 260px;
+  min-height: 44px;
+  font-size: 0.875rem;
+}
+
 .admin-select {
   border: 1px solid var(--admin-border);
   border-radius: 8px;

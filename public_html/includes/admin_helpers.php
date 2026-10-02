@@ -62,6 +62,7 @@ function admin_action_icon(string $key): string
         'open'   => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>',
         'print'  => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0 1 10.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0 .229 2.523a1.125 1.125 0 0 1-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0 0 21 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 0 0-1.913-.247M6.34 18H5.25A2.25 2.25 0 0 1 3 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 0 1 1.913-.247m10.5 0a48.536 48.536 0 0 0-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5Zm-3 0h.008v.008H15V10.5Z"/></svg>',
         'verify' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>',
+        'done'   => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.35 3.836c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m8.9-4.414c.376.023.75.05 1.124.08 1.131.094 1.976 1.057 1.976 2.192V16.5A2.25 2.25 0 0 1 19.5 18.75h-2.25m-7.5-10.5H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V18.75m-7.5-10.5h6.375c.621 0 1.125.504 1.125 1.125v9.375m-8.25-3 1.5 1.5 3-3"/></svg>',
         'sync'   => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>',
         'save'   => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>',
         'cancel' => '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>',
@@ -460,6 +461,9 @@ function admin_username_in_use(string $username, ?int $excludeUserId = null): bo
     return $hit !== null;
 }
 
+/** Page size for the paged encrypted-mode duplicate-child scan (no total cap). */
+const ML_IDENTITY_SCAN_CHUNK = 200;
+
 /**
  * Duplicate-child identity check used by every staff registration path.
  *
@@ -489,22 +493,37 @@ function child_duplicate_identity(string $firstName, string $lastName, string $b
         $types = 's';
         $params = [$birthdate];
         if ($excludeChildId !== null && $excludeChildId > 0) {
-            $sql .= ' AND id != ? LIMIT 50';
+            $sql .= ' AND id != ?';
             $types .= 'i';
             $params[] = $excludeChildId;
-        } else {
-            $sql .= ' LIMIT 50';
         }
-        $candidates = admin_fetch_all($sql, $types, $params);
-        foreach ($candidates as $candidate) {
-            if (
-                mb_strtolower(trim((string)($candidate['first_name'] ?? ''))) === mb_strtolower($firstName)
-                && mb_strtolower(trim((string)($candidate['last_name'] ?? ''))) === mb_strtolower($lastName)
-            ) {
-                return $candidate;
+
+        // Paged so there is no row cap: a single LIMIT used to make this
+        // check fail OPEN (silently registering a duplicate) once a
+        // birthdate had more active children than the cap.
+        $lastId = 0;
+        while (true) {
+            $page = admin_fetch_all(
+                $sql . ' AND id > ? ORDER BY id ASC LIMIT ' . ML_IDENTITY_SCAN_CHUNK,
+                $types . 'i',
+                [...$params, $lastId]
+            );
+            if ($page === []) {
+                return null;
+            }
+            foreach ($page as $candidate) {
+                $lastId = max($lastId, (int)($candidate['id'] ?? 0));
+                if (
+                    mb_strtolower(trim((string)($candidate['first_name'] ?? ''))) === mb_strtolower($firstName)
+                    && mb_strtolower(trim((string)($candidate['last_name'] ?? ''))) === mb_strtolower($lastName)
+                ) {
+                    return $candidate;
+                }
+            }
+            if (count($page) < ML_IDENTITY_SCAN_CHUNK) {
+                return null;
             }
         }
-        return null;
     }
 
     if ($excludeChildId !== null && $excludeChildId > 0) {

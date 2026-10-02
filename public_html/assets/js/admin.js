@@ -324,14 +324,17 @@
       };
     }
 
-    function show(message, title) {
+    function show(message, title, timeoutMs) {
       var s = shell();
       if (!s) return;
       if (s.title) s.title.textContent = title || "Please wait…";
       if (s.msg) s.msg.textContent = message || "Working — please don't close this window.";
       s.overlay.hidden = false;
       if (failsafe) window.clearTimeout(failsafe);
-      failsafe = window.setTimeout(hide, 30000);
+      // Bulk imports can legitimately outlive the default 30s failsafe, so a
+      // form may opt into a longer ceiling via data-progress-timeout.
+      var ms = Number(timeoutMs);
+      failsafe = window.setTimeout(hide, isFinite(ms) && ms > 0 ? ms : 30000);
     }
 
     function hide() {
@@ -348,6 +351,57 @@
   window.SKConfirm = SKConfirm;
   window.SKProgress = SKProgress;
 
+  /* "All finished" notice for long bulk actions (master-list import, etc.).
+   * Same shell as the other two modals but there is nothing to decide, so it
+   * has a single dismiss button and never falls back to anything native. */
+  var SKDone = (function () {
+    var lastFocus = null;
+
+    function shell() {
+      var overlay = document.getElementById("sk-done-overlay");
+      if (!overlay) return null;
+      return {
+        overlay: overlay,
+        title: document.getElementById("sk-done-title"),
+        msg: document.getElementById("sk-done-msg"),
+        ok: overlay.querySelector("[data-sk-done-ok]"),
+      };
+    }
+
+    function close() {
+      var s = shell();
+      if (s) s.overlay.hidden = true;
+      if (lastFocus && typeof lastFocus.focus === "function") {
+        try { lastFocus.focus(); } catch (error) { /* focus restore is best-effort */ }
+      }
+    }
+
+    function done(message, title) {
+      var s = shell();
+      if (!s) return;
+      lastFocus = document.activeElement;
+      if (s.title) s.title.textContent = title || "All done";
+      if (s.msg) s.msg.textContent = message || "";
+      s.overlay.hidden = false;
+      try { if (s.ok) s.ok.focus(); } catch (error) { /* focus is best-effort */ }
+    }
+
+    document.addEventListener("keydown", function (e) {
+      var s = shell();
+      if (s && !s.overlay.hidden && (e.key === "Escape")) { e.stopPropagation(); close(); }
+    });
+    document.addEventListener("click", function (e) {
+      var s = shell();
+      if (!s || s.overlay.hidden) return;
+      var t = e.target;
+      if (t === s.overlay || (t && t.hasAttribute && t.hasAttribute("data-sk-done-ok"))) close();
+    });
+
+    return done;
+  })();
+
+  window.SKDone = SKDone;
+
   function progressMessageFor(form, submitter) {
     var custom = form.getAttribute("data-progress") ||
       (submitter && submitter.getAttribute && submitter.getAttribute("data-progress"));
@@ -357,6 +411,16 @@
     if (label.length > 80) label = label.slice(0, 77) + "…";
     if (label) return label + " — please don't close this window.";
     return "Working — please don't close this window.";
+  }
+
+  /* Optional per-form ceiling for the progress modal's failsafe, so a bulk
+   * action can keep its spinner up for as long as the server legitimately
+   * takes. Falls back to the 30s default inside SKProgress.show(). */
+  function progressTimeoutFor(form, submitter) {
+    var raw = form.getAttribute("data-progress-timeout") ||
+      (submitter && submitter.getAttribute && submitter.getAttribute("data-progress-timeout"));
+    var ms = Number(raw);
+    return isFinite(ms) && ms > 0 ? ms : 0;
   }
 
   function wireConfirms(scope) {
@@ -746,7 +810,7 @@
           if (e.defaultPrevented) return;
           setBusy(submitter, true);
           if (!form.hasAttribute("data-no-progress")) {
-            SKProgress.show(progressMessageFor(form, submitter));
+            SKProgress.show(progressMessageFor(form, submitter), null, progressTimeoutFor(form, submitter));
           }
         }, 0);
       });

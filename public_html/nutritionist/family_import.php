@@ -29,6 +29,8 @@ const ML_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
 const ML_IMPORT_MAX_ROWS = 2000;
 const ML_IMPORT_SESSION_KEY = 'ml_import_preview';
 const ML_IMPORT_RESULT_KEY = 'ml_import_result';
+/** Page size for the encrypted-mode parent/dup scans (no total row cap). */
+const ML_IMPORT_SCAN_CHUNK = 500;
 
 /* ------------------------------------------------------------------
  * Local helpers (ml_ prefix — single-purpose page functions)
@@ -363,6 +365,81 @@ function ml_import_parse_sheet(array $sheet, array $map, string $targetBarangay,
     return $rows;
 }
 
+/**
+ * Builds a lowercase-name => parent id map of every ACTIVE parent in a
+ * barangay, for encrypted-mode reuse during an import.
+ *
+ * Needed because GCM ciphertext (random IV per value) can never satisfy
+ * SQL LOWER(name) = LOWER(?), so matching has to happen in PHP on
+ * decrypted values. Paged by id in ML_IMPORT_SCAN_CHUNK slices so there
+ * is NO row cap: the previous LIMIT 500 silently failed to find a mother
+ * once a barangay passed 500 active parents, which minted a duplicate
+ * parent account (and re-parented her children) with no error at all.
+ *
+ * Called once per batch, not once per family — the scan used to repeat
+ * inside the family loop.
+ *
+ * @return array<string, int>
+ */
+function ml_import_existing_parent_index(int $barangayId): array
+{
+    $index = [];
+    $lastId = 0;
+
+    while (true) {
+        $page = admin_fetch_all(
+            'SELECT id, name FROM parents
+              WHERE barangay_id = ? AND status = \'active\' AND id > ?
+              ORDER BY id ASC LIMIT ' . ML_IMPORT_SCAN_CHUNK,
+            'ii',
+            [$barangayId, $lastId]
+        );
+
+        if ($page === []) {
+            break;
+        }
+
+        foreach ($page as $row) {
+            $id = (int)($row['id'] ?? 0);
+            if ($id > $lastId) {
+                $lastId = $id;
+            }
+            $name = mb_strtolower(trim((string)($row['name'] ?? '')));
+            if ($name !== '' && !isset($index[$name])) {
+                $index[$name] = $id;
+            }
+        }
+
+        if (count($page) < ML_IMPORT_SCAN_CHUNK) {
+            break;
+        }
+    }
+
+    return $index;
+}
+
+/**
+ * Decrypts the AES-256-GCM name columns of import_staging_rows rows.
+ * These column names are deliberately absent from sk_pii_columns()
+ * (they are staging-only, never queried by name in SQL), so
+ * admin_fetch_all() leaves them as ciphertext — unwrap them here.
+ * Plaintext rows from before the encryption migration pass through
+ * untouched because sk_decrypt_value() no-ops on non-enveloped input.
+ */
+function ml_import_decrypt_staging_rows(array $rows): array
+{
+    foreach ($rows as &$row) {
+        foreach (['mother_raw', 'child_raw'] as $col) {
+            if (isset($row[$col]) && is_string($row[$col])) {
+                $row[$col] = (string)sk_decrypt_value($row[$col]);
+            }
+        }
+    }
+    unset($row);
+
+    return $rows;
+}
+
 /* ------------------------------------------------------------------
  * Guards + routing
  * ------------------------------------------------------------------ */
@@ -622,6 +699,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
     $graduatedChildren = 0;
     $commitErrors = [];
 
+    /* Encrypted mode only: one paged scan for the whole batch (no row cap)
+     * instead of a per-family LIMIT 500 lookup. */
+    $existingParentIndex = sk_pii_encryption_enabled()
+        ? ml_import_existing_parent_index($barangayId)
+        : [];
+
     foreach ($families as $motherKey => $kids) {
         $firstKid = $kids[0];
         $mFirst = (string)$firstKid['mother']['first'];
@@ -630,21 +713,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
         $mName = admin_combine_name($mFirst, $mMiddle, $mLast);
 
         /* Reuse a live parent with the same name — never double-mint.
-         * Encrypted mode: GCM ciphertext never matches SQL LOWER(), so scan
-         * the barangay's parents and compare decrypted names in PHP. */
+         * Encrypted mode: GCM ciphertext never matches SQL LOWER(), so look
+         * the mother up in the paged PHP-computed name index. */
         $parentId = 0;
         if (sk_pii_encryption_enabled()) {
-            $candidates = admin_fetch_all(
-                "SELECT id, name FROM parents WHERE barangay_id = ? AND status = 'active' LIMIT 500",
-                'i',
-                [$barangayId]
-            );
-            foreach ($candidates as $candidate) {
-                if (mb_strtolower(trim((string)($candidate['name'] ?? ''))) === mb_strtolower($mName)) {
-                    $parentId = (int)$candidate['id'];
-                    break;
-                }
-            }
+            $parentId = $existingParentIndex[mb_strtolower(trim($mName))] ?? 0;
         } else {
             $existing = admin_fetch_one(
                 "SELECT id FROM parents WHERE barangay_id = ? AND LOWER(name) = LOWER(?) AND status = 'active' LIMIT 1",
@@ -684,6 +757,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
                 $importedParents++;
             }
             $parentCache[$motherKey] = $parentId;
+            // Keep the encrypted-mode index current so a later family with the
+            // same mother reuses the account just minted in this batch.
+            if (sk_pii_encryption_enabled()) {
+                $existingParentIndex[mb_strtolower(trim($mName))] = $parentId;
+            }
 
             foreach ($kids as $kid) {
                 $cFirst = (string)$kid['child']['first'];
@@ -735,7 +813,12 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
         }
     }
 
-    /* Staged rows wait in the staging table for staff completion. */
+    /* Staged rows wait in the staging table for staff completion.
+     * The 8 name columns are AES-256-GCM enveloped exactly like
+     * parents.name / children.*_name — otherwise the same PII sits in
+     * cleartext one table over (see db/20261002_staging_pii_encryption.sql,
+     * which widens these columns to TEXT so envelopes are not truncated).
+     * sex_raw / dob_raw / reason stay plaintext: not PII, no headroom needed. */
     $stagedCount = 0;
     foreach ($staged as $row) {
         $ok = admin_execute(
@@ -747,16 +830,16 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
             [
                 $batchId,
                 (int)($row['row'] ?? 0),
-                (string)($row['mother_raw'] ?? ''),
-                (string)($row['child_raw'] ?? ''),
+                (string)sk_encrypt_value((string)($row['mother_raw'] ?? '')),
+                (string)sk_encrypt_value((string)($row['child_raw'] ?? '')),
                 (string)($row['sex_raw'] ?? ''),
                 (string)($row['dob_raw'] ?? ''),
-                (string)($row['mother']['first'] ?? ''),
-                (string)($row['mother']['middle'] ?? ''),
-                (string)($row['mother']['last'] ?? ''),
-                (string)($row['child']['first'] ?? ''),
-                (string)($row['child']['middle'] ?? ''),
-                (string)($row['child']['last'] ?? ''),
+                (string)sk_encrypt_value((string)($row['mother']['first'] ?? '')),
+                (string)sk_encrypt_value((string)($row['mother']['middle'] ?? '')),
+                (string)sk_encrypt_value((string)($row['mother']['last'] ?? '')),
+                (string)sk_encrypt_value((string)($row['child']['first'] ?? '')),
+                (string)sk_encrypt_value((string)($row['child']['middle'] ?? '')),
+                (string)sk_encrypt_value((string)($row['child']['last'] ?? '')),
                 $row['sex'] !== null ? (string)$row['sex'] : null,
                 $row['dob'] !== null ? (string)$row['dob'] : null,
                 mb_substr((string)($row['note'] ?? ''), 0, 250),
@@ -797,10 +880,15 @@ if ($doneBatchId > 0 && ($_SERVER['REQUEST_METHOD'] ?? '') === 'GET') {
         }
         $result = [
             'batch' => $batch,
-            'staged' => admin_fetch_all(
-                "SELECT row_num, mother_raw, child_raw, sex_raw, dob_raw, reason FROM import_staging_rows WHERE batch_id = ? AND status = 'pending' ORDER BY row_num LIMIT 200",
-                'i',
-                [$doneBatchId]
+            // Staged names are stored AES-256-GCM encrypted. admin_fetch_all's
+            // automatic row decryptor keys off sk_pii_columns(), which does not
+            // list these staging columns, so decrypt them explicitly here.
+            'staged' => ml_import_decrypt_staging_rows(
+                admin_fetch_all(
+                    "SELECT row_num, mother_raw, child_raw, sex_raw, dob_raw, reason FROM import_staging_rows WHERE batch_id = ? AND status = 'pending' ORDER BY row_num LIMIT 200",
+                    'i',
+                    [$doneBatchId]
+                )
             ),
             'details' => $_SESSION[ML_IMPORT_RESULT_KEY] ?? null,
         ];
@@ -918,6 +1006,49 @@ nutritionist_layout_start(
         </div>
 
         <p class="admin-section-subtitle">Skipped: <strong><?php echo (int)($batch['skipped_rows'] ?? 0); ?></strong></p>
+
+        <?php
+        /* "It's finished" check modal, driven by the PERSISTENT import_batches
+         * counters (not $_SESSION, which is one-shot) so a refresh re-shows it
+         * with the same numbers as the cards above. */
+        $mlDoneParts = [];
+        if ((int)($batch['imported_children'] ?? 0) > 0) {
+            $mlDoneParts[] = (int)$batch['imported_children'] . ' na bata ang na-save';
+        }
+        if ((int)($batch['imported_parents'] ?? 0) > 0) {
+            $mlDoneParts[] = (int)$batch['imported_parents'] . ' na parent account';
+        }
+        if ((int)($batch['graduated_children'] ?? 0) > 0) {
+            $mlDoneParts[] = (int)$batch['graduated_children'] . ' graduated (60+ mo)';
+        }
+        if ((int)($batch['staged_rows'] ?? 0) > 0) {
+            $mlDoneParts[] = (int)$batch['staged_rows'] . ' na kailangang kumpletuhin';
+        }
+        if ((int)($batch['skipped_rows'] ?? 0) > 0) {
+            $mlDoneParts[] = (int)$batch['skipped_rows'] . ' na na-skip';
+        }
+        $mlDoneParts = $mlDoneParts === []
+            ? ['Walang naitalang pagbabago sa file na ito.']
+            : $mlDoneParts;
+        ?>
+        <script>
+        (function () {
+            function showDone() {
+                if (!window.SKDone) return;
+                window.SKDone(
+                    <?php echo json_encode(implode(' · ', $mlDoneParts), JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>,
+                    <?php echo json_encode((int)($batch['imported_children'] ?? 0) > 0 ? 'Tapos na ang import' : 'Tapos na ang pagsusuri', JSON_HEX_TAG | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_HEX_AMP | JSON_UNESCAPED_UNICODE); ?>
+                );
+            }
+            // admin.js is printed at the very end of the layout, so SKDone may
+            // not exist yet at parse time — wait for it either way.
+            if (window.SKDone) {
+                showDone();
+            } else {
+                document.addEventListener('DOMContentLoaded', showDone);
+            }
+        })();
+        </script>
 
         <?php if ($result['staged'] !== []): ?>
             <h3 class="admin-section-title" style="font-size:14px;margin:16px 0 8px;">Kailangang kumpletuhin (<?php echo count($result['staged']); ?>)</h3>
@@ -1041,9 +1172,26 @@ nutritionist_layout_start(
             </table>
         </div>
 
-        <form method="post" action="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>" data-admin-confirm="Save <?php echo (int)$counts['ok']; ?> new child record(s) into <?php echo nutritionist_e((string)($preview['barangay_name'] ?? '')); ?>?">
+        <?php
+        /* Zero ready rows would import nothing — say so instead of a
+         * cheerful "Save 0 record(s) into BARANGAY?". */
+        $mlConfirmMessage = (int)$counts['ok'] > 0
+            ? 'Save ' . (int)$counts['ok'] . ' new child record(s) into ' . (string)($preview['barangay_name'] ?? '') . '?'
+            : 'Walang row na ma-i-import sa file na ito. Walang bagong tala na gagawin.';
+        $mlProgressMessage = (int)$counts['ok'] > 0
+            ? 'Nag-i-import ng ' . (int)$counts['ok'] . ' na bata sa database. Papatigilin namin ang pahina — pakisabay ng ilang minuto.'
+            : 'Sinusuri pa ang file. Pakisabay ng ilang segundo.';
+        ?>
+        <form
+            method="post"
+            action="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>"
+            data-admin-confirm="<?php echo nutritionist_e($mlConfirmMessage); ?>"
+            data-validate-form
+            data-progress="<?php echo nutritionist_e($mlProgressMessage); ?>"
+            data-progress-timeout="180000"
+        >
             <input type="hidden" name="action" value="commit">
-            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Confirm &amp; save <?php echo (int)$counts['ok']; ?> record(s)</button>
+            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Confirm</button>
             <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php?action=cancel')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
         </form>
 

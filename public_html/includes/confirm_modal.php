@@ -42,5 +42,19 @@ function confirm_modal_shell(): string
         </div>
     </div>
 </div>
+<div class="admin-modal-overlay" id="sk-done-overlay" hidden>
+	<div class="admin-modal" style="max-width:400px;" role="status" aria-live="polite" aria-labelledby="sk-done-title" aria-describedby="sk-done-msg">
+		<div style="padding:26px 24px 20px;text-align:center;">
+			<span class="sk-done-check" aria-hidden="true">
+				<svg viewBox="0 0 24 24" fill="none" stroke-width="2.4" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="m4.5 12.75 6 6 9-13.5"/></svg>
+			</span>
+			<div id="sk-done-title" style="margin-top:14px;font-size:1rem;font-weight:800;color:var(--admin-text);">All done</div>
+			<div id="sk-done-msg" style="margin-top:6px;font-size:0.82rem;color:var(--admin-muted);line-height:1.5;"></div>
+			<div style="display:flex;justify-content:center;margin-top:18px;">
+				<button class="admin-btn" data-sk-done-ok type="button">Okay</button>
+			</div>
+		</div>
+	</div>
+</div>
 HTML;
 }
