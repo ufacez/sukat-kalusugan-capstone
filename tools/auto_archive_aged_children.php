@@ -21,6 +21,7 @@ if (PHP_SAPI !== 'cli') {
 
 require __DIR__ . '/../public_html/includes/config.php';
 require __DIR__ . '/../public_html/includes/db.php';
+require __DIR__ . '/../public_html/includes/crypto.php';
 require __DIR__ . '/../public_html/includes/audit_logger.php';
 
 $dryRun = in_array('--dry-run', $argv, true);
@@ -46,9 +47,11 @@ $total = 0;
 $archived = 0;
 
 while ($row = mysqli_fetch_assoc($res)) {
+	// Decrypt SK1: AES-256-GCM names for console output; passthrough when key unset.
+	sk_decrypt_pii_row($row);
 	$total++;
 	$childId = (int)$row['id'];
-	$name = trim($row['first_name'] . ' ' . $row['last_name']);
+	$name = trim((string)($row['first_name'] ?? '') . ' ' . (string)($row['last_name'] ?? ''));
 
 	echo "#{$childId} {$name} ({$row['child_code']}) — {$row['age_months']} months old\n";
 

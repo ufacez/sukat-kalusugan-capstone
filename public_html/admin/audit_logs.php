@@ -200,7 +200,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 
 .admin-table th,.admin-table td{padding:8px 12px;vertical-align:middle}
 
-#audit-table-zone{transition:opacity .15s}
+#audit-table-zone{transition:opacity .15s;min-height:260px}
 #audit-table-zone.is-loading{opacity:.45;pointer-events:none}
 
 .audit-filter-wrap{display:flex;align-items:center;gap:10px;margin-bottom:14px;flex-wrap:wrap}
@@ -217,8 +217,9 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 .audit-dropdown-chevron{transition:transform .2s}
 .audit-dropdown.is-open .audit-dropdown-chevron{transform:rotate(180deg)}
 
-.audit-dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:50;padding:4px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .15s}
-.audit-dropdown.is-open .audit-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.audit-dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;min-width:200px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:50;padding:4px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:opacity .15s ease,transform .15s ease;will-change:opacity,transform;pointer-events:none}
+.audit-dropdown.is-open .audit-dropdown-menu{opacity:1;visibility:visible;transform:translateY(0);pointer-events:auto}
+@media (prefers-reduced-motion:reduce){.audit-dropdown-menu,.audit-dropdown-chevron,#audit-table-zone{transition:none}}
 .audit-dropdown-group-label{font-size:9px;font-weight:600;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.5px;padding:6px 10px 2px;user-select:none}
 .audit-dropdown-divider{height:1px;background:var(--admin-border);margin:3px 8px}
 .audit-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:6px 10px;border:none;background:transparent;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;color:var(--admin-text);font-family:Inter,sans-serif;text-align:left;transition:background .1s;text-decoration:none}
@@ -934,18 +935,38 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
     document.querySelectorAll('.audit-dropdown').forEach(function(dropdown){
         var trigger = dropdown.querySelector('.audit-dropdown-trigger');
         if(!trigger) return;
+        trigger.setAttribute('aria-expanded','false');
         trigger.addEventListener('click',function(e){
             e.stopPropagation();
             var wasOpen = dropdown.classList.contains('is-open');
             document.querySelectorAll('.audit-dropdown.is-open').forEach(function(other){
                 other.classList.remove('is-open');
+                var ot = other.querySelector('.audit-dropdown-trigger');
+                if(ot) ot.setAttribute('aria-expanded','false');
             });
-            if(!wasOpen) dropdown.classList.add('is-open');
+            if(!wasOpen) {
+                dropdown.classList.add('is-open');
+                trigger.setAttribute('aria-expanded','true');
+            } else {
+                trigger.setAttribute('aria-expanded','false');
+            }
         });
     });
     document.addEventListener('click',function(e){
         document.querySelectorAll('.audit-dropdown.is-open').forEach(function(dropdown){
-            if(!dropdown.contains(e.target)) dropdown.classList.remove('is-open');
+            if(!dropdown.contains(e.target)) {
+                dropdown.classList.remove('is-open');
+                var t = dropdown.querySelector('.audit-dropdown-trigger');
+                if(t) t.setAttribute('aria-expanded','false');
+            }
+        });
+    });
+    document.addEventListener('keydown',function(e){
+        if(e.key !== 'Escape') return;
+        document.querySelectorAll('.audit-dropdown.is-open').forEach(function(dropdown){
+            dropdown.classList.remove('is-open');
+            var t = dropdown.querySelector('.audit-dropdown-trigger');
+            if(t) t.setAttribute('aria-expanded','false');
         });
     });
 
@@ -1035,7 +1056,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         var item = e.target.closest('.audit-dropdown-item');
         if(item && item.getAttribute('href')){
             e.preventDefault();
-            document.querySelectorAll('.audit-dropdown.is-open').forEach(function(d){ d.classList.remove('is-open'); });
+            document.querySelectorAll('.audit-dropdown.is-open').forEach(function(d){ d.classList.remove('is-open'); var t = d.querySelector('.audit-dropdown-trigger'); if(t) t.setAttribute('aria-expanded','false'); });
             auditSwapTable(item.getAttribute('href'), {dropdown: item.closest('.audit-dropdown'), label: item.textContent.trim()});
             return;
         }

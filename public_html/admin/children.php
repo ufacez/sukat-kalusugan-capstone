@@ -214,7 +214,7 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                 <div class="admin-card-label">Archived</div>
                 <div class="admin-card-value"><?php echo $archivedCount; ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend"><a href="<?php echo admin_e(app_url('/admin/children_archived.php')); ?>" style="color:var(--admin-primary);text-decoration:underline;">View archived children</a></span>
+                    <span class="admin-card-trend"><a href="<?php echo admin_e(app_url('/admin/archive.php?tab=archived#archive-table-wrap')); ?>" style="color:var(--admin-primary);text-decoration:underline;">View archived children</a></span>
                 </div>
             </div>
         </div>

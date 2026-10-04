@@ -163,7 +163,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                 <div class="admin-card-label">Archived</div>
                 <div class="admin-card-value"><?php echo $archivedStaffCount + $archivedParentCount; ?></div>
                 <div class="admin-card-meta">
-                    <span class="admin-card-trend"><a href="<?php echo admin_e(app_url('/admin/users_archived.php')); ?>" style="color:var(--admin-primary);text-decoration:underline;">Staff</a><?php if ($canViewParents): ?> &middot; <a href="<?php echo admin_e(app_url('/admin/parents_archived.php')); ?>" style="color:var(--admin-primary);text-decoration:underline;">Parents</a><?php endif; ?></span>
+                    <span class="admin-card-trend"><a href="<?php echo admin_e(app_url('/admin/archive.php?tab=archived#archive-table-wrap')); ?>" style="color:var(--admin-primary);text-decoration:underline;">Go to Archive &rarr;</a></span>
                 </div>
             </div>
         </div>
@@ -252,9 +252,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                                 <?php if (has_permission('users.delete')): ?>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/users_archive.php')); ?>" data-admin-confirm="Archive <?php echo admin_e($user['name']); ?>?" style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$user['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-                                    </button>
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit"><?php echo admin_action_icon('archive'); ?></button>
                                 </form>
                                 <?php endif; ?>
                             </div>
@@ -291,9 +289,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                                 <?php if ($canArchiveParent): ?>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_archive.php')); ?>" data-admin-confirm="Archive <?php echo admin_e($parent['name']); ?>? Linked children are archived too." style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
-                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5m6 4.125l2.25 2.25m0 0l2.25 2.25M12 13.875l2.25-2.25M12 13.875l-2.25 2.25M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
-                                    </button>
+                                    <button class="admin-icon-btn admin-icon-btn-danger" title="Archive" type="submit"><?php echo admin_action_icon('archive'); ?></button>
                                 </form>
                                 <?php endif; ?>
                             </div>
