@@ -6,6 +6,7 @@ header('Content-Type: application/json');
 require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/admin_helpers.php';
+require_once __DIR__ . '/../../includes/audit_logger.php';
 
 start_secure_session();
 $user = current_user();
@@ -172,6 +173,11 @@ if ($severeCount > 0) {
     $riskLevel = 'moderate';
     $riskLabel = 'Moderate';
 }
+
+// Privacy audit: household detail views expose names + exact coords +
+// health status, so every successful view is logged (barangay scope
+// already enforced above; audit writes never break the response).
+log_action($user['id'] ?? null, 'VIEW_HOUSEHOLD', 'info', 'Viewed household #' . (int)$hh['id'] . ' (' . ($hh['household_code'] ?? '') . ') map details');
 
 echo json_encode([
     'success' => true,

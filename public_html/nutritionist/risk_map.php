@@ -4,6 +4,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
 $user = nutritionist_require_access();
+$canWrite = nutritionist_can_write();
 
 $scopeParams = [];
 $scope = nutritionist_scope_fragment($user, 'h.barangay_id', $scopeParams);
@@ -242,17 +243,23 @@ foreach ($spotRows as $sr) {
     $worstCode = $hasMeasured ? ($worstCodeMap[$worstStatus] ?? 'N') : '—';
 
     $spots[] = [
+        // Privacy: list payload carries only aggregated counts + rounded pin.
+        // Child names, z-scores, and per-child status are NOT embedded here
+        // (they used to leak in view-source); the panel fetches them on demand
+        // via api/households/get_details.php which is barangay-scoped + audited.
+        // Coords are rounded to 3 decimals (~100m grid) so view-source never
+        // reveals the exact house; the exact pin self-corrects on click once
+        // the scoped + audited detail response arrives (see syncSpotFromDetails).
         'id' => $spotId,
         'code' => 'HH-' . str_pad((string)$spotId, 4, '0', STR_PAD_LEFT),
         'address' => (string)($sr['address'] ?? ''),
         'local_area_id' => $sr['local_area_id'] !== null ? (int)$sr['local_area_id'] : null,
         'barangay_id' => (int)($sr['barangay_id'] ?? 0),
-        'lat' => $sr['lat'] !== null ? (float)$sr['lat'] : null,
-        'lng' => $sr['lng'] !== null ? (float)$sr['lng'] : null,
+        'lat' => $sr['lat'] !== null ? round((float)$sr['lat'], 3) : null,
+        'lng' => $sr['lng'] !== null ? round((float)$sr['lng'], 3) : null,
         'barangay' => $sr['barangay_name'],
         'purok' => $purok,
         'child_count' => $childCount,
-        'children' => $spotChildren,
         'normal' => $normalCount,
         'moderate' => $moderateCount,
         'severe' => $severeCount,
@@ -291,7 +298,7 @@ function risk_map_url(array $params): string
 $spotsJson = json_encode($displaySpots, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 $geoJsonUrl = app_url('/assets/data/sanfernando_barangays.geojson');
 
-nutritionist_layout_start('Barangay Risk Map', 'View the distribution of children and nutritional risk status per household in your assigned barangay.', 'risk_map');
+nutritionist_layout_start('Barangay Spot Map', '', 'risk_map');
 ?>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
@@ -353,28 +360,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
 
 <section class="admin-section" style="margin-top:12px;">
     <div class="admin-section-head">
-        <div>
-            <h2 class="admin-section-title"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;vertical-align:-3px;margin-right:6px;opacity:.6"><path stroke-linecap="round" stroke-linejoin="round" d="M9 6.75V15m6-6v8.25m.503 2.499 4.012-3.749a1.125 1.125 0 0 1 1.538-.028l3.499 3.25a1.125 1.125 0 0 1-.05 1.664l-3.499 2a1.125 1.125 0 0 1-1.588-.5V6.75a1.125 1.125 0 0 1 .503-.999Z"/></svg>Barangay Risk Map</h2>
-            <p class="admin-section-subtitle">View the distribution of children and nutritional risk status per household in your assigned barangay.</p>
-        </div>
-        <div class="admin-section-actions">
-            <button class="admin-btn admin-btn-sm" id="spotmap-add-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                Add Spot
-            </button>
-            <button class="admin-btn-secondary admin-btn-sm" id="spotmap-import-btn">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
-                Import Spot Map
-            </button>
-        </div>
-    </div>
-
-    <p class="admin-mini" style="margin:-4px 0 12px;color:var(--admin-muted);">
-        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:13px;height:13px;vertical-align:-2px;margin-right:3px;opacity:.5"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z"/></svg>
-        Digital map from registered data (not a manual sketch)
-    </p>
-
-    <div class="admin-spotmap-filters">
+        <div class="admin-spotmap-filters" style="margin:0;padding:0;background:none;border:none;">
         <div class="admin-spotmap-filter">
             <label class="admin-spotmap-filter-label" for="filter-barangay">Barangay</label>
             <?php if ($lockedBarangay): ?>
@@ -405,6 +391,19 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             Clear Filters
         </a>
         <?php endif; ?>
+        </div>
+        <div class="admin-section-actions">
+            <?php if ($canWrite): ?>
+            <button class="admin-btn admin-btn-sm" id="spotmap-add-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                Add Spot
+            </button>
+            <button class="admin-btn-secondary admin-btn-sm" id="spotmap-import-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:15px;height:15px;vertical-align:-2px;margin-right:4px"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"/></svg>
+                Import Spot Map
+            </button>
+            <?php endif; ?>
+        </div>
     </div>
 
     <div class="admin-riskmap-layout">
@@ -486,7 +485,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                         <td>
                             <div class="admin-actions">
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View on map" data-spot-id="<?php echo (int)$spot['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
+                                <?php if ($canWrite): ?>
                                 <button type="button" class="admin-icon-btn" title="Edit spot details" data-spot-edit="<?php echo (int)$spot['id']; ?>"><?php echo admin_action_icon('edit'); ?></button>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>
@@ -544,6 +545,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 </div>
             </div>
             <p class="admin-mini" style="color:var(--admin-muted);margin:8px 0 12px;">Or click on the map to auto-fill coordinates.</p>
+            <p class="admin-mini" style="color:var(--admin-muted);margin:0 0 12px;">Privacy: only pin households with consent. Exact location + health details are visible to assigned-barangay staff only (RA 10173).</p>
             <div class="admin-spotmap-modal-footer">
                 <button type="button" class="admin-btn admin-btn-sm" data-close-modal="spot-add-modal" style="background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">Cancel</button>
                 <button type="submit" class="admin-btn admin-btn-sm" style="background:var(--admin-valid);color:#fff;border:none;">Save Spot</button>
@@ -605,6 +607,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
     var BASE_URL = <?php echo json_encode(app_url('/')); ?>;
     var LOCKED_BARANGAY_NAME = <?php echo json_encode($lockedBarangayName); ?>;
     var IS_LOCKED = <?php echo $lockedBarangay ? 'true' : 'false'; ?>;
+    var CAN_WRITE = <?php echo $canWrite ? 'true' : 'false'; ?>;
     var activeMarker = null;
 
     var STATUS_DOT_COLORS = {
@@ -763,7 +766,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         html += '<div class="admin-spotmap-panel-meta-row"><span>Barangay</span><strong>' + escapeHtml(spot.barangay) + '</strong></div>';
         html += '<div class="admin-spotmap-panel-meta-row"><span>Street / Landmark</span><strong>' + escapeHtml(spot.address || '—') + '</strong></div>';
         html += '</div>';
-        html += '<div style="margin:0 0 12px;"><button class="admin-btn admin-btn-sm" data-spot-panel-edit="' + spot.id + '" style="width:100%;background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">Edit spot details</button></div>';
+        if (CAN_WRITE) {
+            html += '<div style="margin:0 0 12px;"><button class="admin-btn admin-btn-sm" data-spot-panel-edit="' + spot.id + '" style="width:100%;background:var(--admin-surface);color:var(--admin-text);border:1px solid var(--admin-border);">Edit spot details</button></div>';
+        }
 
         html += '<div id="spot-panel-loading" style="text-align:center;padding:16px;color:var(--admin-muted);font-size:11px;">';
         html += 'Loading household members…';
@@ -796,6 +801,17 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
         if (!target) return;
         if (typeof h.address !== 'undefined') target.address = h.address || '';
         if (typeof h.purok !== 'undefined') target.purok = h.purok || target.purok;
+        // Privacy self-correct: the list payload only carries 3-decimal pins,
+        // so upgrade to the exact coords once the scoped + audited detail
+        // response arrives. renderMapMarkers() below moves the pin.
+        if (h.lat !== null && typeof h.lat !== 'undefined' && h.lng !== null && typeof h.lng !== 'undefined') {
+            target.lat = parseFloat(h.lat);
+            target.lng = parseFloat(h.lng);
+            target._exact = true;
+            if (typeof map !== 'undefined' && map) {
+                map.setView([target.lat, target.lng], Math.max(map.getZoom(), 16));
+            }
+        }
         if (typeof summary.child_count !== 'undefined') target.child_count = parseInt(summary.child_count, 10) || 0;
         if (typeof summary.normal !== 'undefined') target.normal = parseInt(summary.normal, 10) || 0;
         if (typeof summary.moderate !== 'undefined') target.moderate = parseInt(summary.moderate, 10) || 0;
@@ -857,14 +873,18 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 html += '<div class="admin-spotmap-person-name">' + escapeHtml(p.name) + '</div>';
                 html += '<div class="admin-spotmap-person-meta">' + escapeHtml(meta) + '</div>';
                 html += '</div>';
-                html += '<button class="admin-spotmap-person-remove" data-action="unassign-parent" data-id="' + p.id + '" title="Remove from household">&times;</button>';
+                if (CAN_WRITE) {
+                    html += '<button class="admin-spotmap-person-remove" data-action="unassign-parent" data-id="' + p.id + '" title="Remove from household">&times;</button>';
+                }
                 html += '</div>';
             });
             html += '</div>';
         } else {
             html += '<div class="admin-spotmap-empty">No parents assigned yet.</div>';
         }
-        html += '<button class="admin-spotmap-add-person" data-action="open-assign-parents" data-hh="' + h.id + '">+ Add Parent</button>';
+        if (CAN_WRITE) {
+            html += '<button class="admin-spotmap-add-person" data-action="open-assign-parents" data-hh="' + h.id + '">+ Add Parent</button>';
+        }
 
         html += '<h4 class="admin-spotmap-panel-section-title">';
         html += '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:12px;height:12px;vertical-align:-2px;margin-right:3px;"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg>';
@@ -984,6 +1004,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
     })();
 
     function submitAssignForm() {
+        if (!CAN_WRITE) return;
         var form = document.getElementById('assign-parents-form');
         if (!form) return;
 
@@ -1018,7 +1039,31 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             .catch(function () { AdminToast.error('Network error.'); });
     }
 
+    // Privacy: the list payload only carries 3-decimal pins, so an edit
+    // must never prefill (and re-save) rounded coords. Fetch-then-open:
+    // upgrade to exact coords first, then show the modal. If the spot was
+    // already synced exact (panel open / assign flow), open immediately.
     function openEditModal(spot) {
+        if (!CAN_WRITE) return;
+        if (spot._exact) {
+            openEditModalWithCoords(spot);
+            return;
+        }
+        fetch(BASE_URL + 'api/households/get_details.php?id=' + spot.id, { credentials: 'same-origin' })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.success && res.household) {
+                    syncSpotFromDetails(res);
+                    var fresh = SPOTS.find(function (s) { return s.id === spot.id; }) || spot;
+                    openEditModalWithCoords(fresh);
+                } else {
+                    AdminToast.error((res && res.message) || 'Failed to load spot details.');
+                }
+            })
+            .catch(function () { AdminToast.error('Network error loading spot details.'); });
+    }
+
+    function openEditModalWithCoords(spot) {
         var modal = document.getElementById('spot-add-modal');
         var title = document.getElementById('spot-modal-title');
         var form = document.getElementById('spot-add-form');
@@ -1144,7 +1189,10 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             attribution: '&copy; OpenStreetMap contributors, SRTM &mdash; &copy; OpenTopoMap (CC-BY-SA)'
         });
 
-        var activeBase = satellite.addTo(map);
+        // Privacy: default to Street (not Satellite) so house rooftops are
+        // not shown on load. Staff can still opt into Satellite for field
+        // navigation via the basemap gallery.
+        var activeBase = street.addTo(map);
 
         var BasemapGallery = L.Control.extend({
             options: { position: 'topright' },
@@ -1160,7 +1208,7 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                     btn.type = 'button';
                     btn.textContent = opt.label;
                     btn.dataset.basemap = opt.key;
-                    if (opt.key === 'satellite') btn.classList.add('is-active');
+                    if (opt.key === 'street') btn.classList.add('is-active');
                     L.DomEvent.on(btn, 'click', function (e) {
                         L.DomEvent.stopPropagation(e);
                         if (baseLayers[opt.key] === activeBase) return;
@@ -1257,14 +1305,20 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             });
         });
 
-        document.getElementById('spotmap-add-btn').addEventListener('click', function () {
-            resetAddModal();
-            document.getElementById('spot-add-modal').style.display = 'flex';
-        });
+        var addBtn = document.getElementById('spotmap-add-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', function () {
+                resetAddModal();
+                document.getElementById('spot-add-modal').style.display = 'flex';
+            });
+        }
 
-        document.getElementById('spotmap-import-btn').addEventListener('click', function () {
-            document.getElementById('spot-import-modal').style.display = 'flex';
-        });
+        var importBtn = document.getElementById('spotmap-import-btn');
+        if (importBtn) {
+            importBtn.addEventListener('click', function () {
+                document.getElementById('spot-import-modal').style.display = 'flex';
+            });
+        }
 
         var tempPin = null;
         var boundaryWarnTimer = null;
@@ -1354,6 +1408,9 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
             var form = document.getElementById('spot-add-form');
             form.querySelector('[name="lat"]').value = lat;
             form.querySelector('[name="lng"]').value = lng;
+            // Read-only staff can preview coordinates but never open the
+            // Add Spot modal (backend also rejects forged POSTs).
+            if (!CAN_WRITE) return;
             document.getElementById('spot-add-modal').style.display = 'flex';
         });
 
@@ -1383,22 +1440,12 @@ nutritionist_layout_start('Barangay Risk Map', 'View the distribution of childre
                 }
             }
 
-            var dupLatRaw = this.querySelector('[name="lat"]').value;
-            var dupLngRaw = this.querySelector('[name="lng"]').value;
+            // Privacy note: no client-side same-spot pre-check here. The list
+            // payload only carries 3-decimal pins, so a 15m comparison would
+            // false-positive on nearby houses. The backend (create/update.php)
+            // still enforces the ~15m guard against exact stored coords and
+            // returns a friendly "may spot na" message on conflict.
             var dupEditId = document.getElementById('spot-form-id').value;
-            if (dupLatRaw !== '' && dupLngRaw !== '') {
-                var dupHit = findNearSpot(parseFloat(dupLatRaw), parseFloat(dupLngRaw), dupEditId ? parseInt(dupEditId, 10) : 0);
-                if (dupHit) {
-                    var dupCode = dupHit.code || ('HH-' + String(dupHit.id).padStart(4, '0'));
-                    AdminToast.error('May spot na sa coordinates na ito (' + dupCode + '). Pinili na lang ang existing spot.');
-                    document.getElementById('spot-add-modal').style.display = 'none';
-                    resetAddModal();
-                    if (tempPin) { map.removeLayer(tempPin); tempPin = null; }
-                    map.setView([dupHit.lat, dupHit.lng], Math.max(map.getZoom(), 16));
-                    openSpotPanel(dupHit);
-                    return;
-                }
-            }
 
             var formData = new FormData(this);
             var editId = dupEditId;

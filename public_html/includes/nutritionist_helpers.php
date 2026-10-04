@@ -14,7 +14,7 @@ function nutritionist_nav_items(): array
         ['key' => 'children', 'label' => 'Children', 'href' => app_url('/nutritionist/children.php')],
         ['key' => 'parents', 'label' => 'Parents', 'href' => app_url('/nutritionist/parents.php')],
         ['key' => 'monitoring', 'label' => 'Monitoring List', 'href' => app_url('/nutritionist/monitoring.php')],
-        ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php')],
+        ['key' => 'risk_map', 'label' => 'Barangay Spot Map', 'href' => app_url('/nutritionist/risk_map.php')],
         ['key' => 'appointments', 'label' => 'Appointments', 'href' => app_url('/nutritionist/appointments.php')],
         ['key' => 'eopt_reports', 'label' => 'EOPT Reports', 'href' => app_url('/nutritionist/eopt_reports.php')],
         ['key' => 'who_analysis', 'label' => 'WHO Analysis', 'href' => app_url('/nutritionist/who_analysis.php')],
@@ -43,7 +43,7 @@ function nutritionist_grouped_nav_items(): array
         [
             'label' => 'Community',
             'items' => [
-                ['key' => 'risk_map', 'label' => 'Barangay Risk Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
+                ['key' => 'risk_map', 'label' => 'Barangay Spot Map', 'href' => app_url('/nutritionist/risk_map.php'), 'icon' => 'map'],
             ],
         ],
         [
