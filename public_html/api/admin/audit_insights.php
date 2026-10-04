@@ -18,6 +18,27 @@ if ($user === null || ($user['type'] ?? '') === 'parent') {
 
 $conn = get_db_connection();
 
+// ── Insights cache (10-min TTL) ─────────────────────────────────────
+// The admin page hits this endpoint on every visit + every 60s poll, and
+// the payload costs ~15 aggregation queries plus an external AI call.
+// Serve the cached payload when fresh; recompute only on miss/expiry.
+// Fully defensive: when the audit_insights_cache table is absent (older
+// DB without the migration), every step below no-ops and we compute live.
+define('AUDIT_INSIGHTS_CACHE_TTL_SECONDS', 600);
+
+$cacheHit = admin_fetch_one(
+    "SELECT payload_json FROM audit_insights_cache
+      WHERE scope_key = 'global' AND cache_key = 'default' AND expires_at > NOW() LIMIT 1"
+);
+if (is_array($cacheHit) && isset($cacheHit['payload_json'])) {
+    $cached = json_decode((string)$cacheHit['payload_json'], true);
+    if (is_array($cached)) {
+        $cached['cached'] = true;
+        echo json_encode($cached, JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+}
+
 $chartRows = admin_fetch_all(
     "SELECT DATE(created_at) AS day, COUNT(*) AS cnt
      FROM audit_logs
@@ -67,7 +88,8 @@ $cardStats = [
         'SELECT COUNT(DISTINCT user_id) FROM audit_logs WHERE user_id IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL ' . $onlineWindowMinutes . ' MINUTE)'
     ),
     'exports_total' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%'"),
-    'exports_today' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%' AND DATE(created_at) = CURDATE()"),
+    // Range (not DATE(created_at) = ...) so idx_audit_created is usable.
+    'exports_today' => admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%' AND created_at >= CURDATE()"),
     'measurements_total' => admin_scalar("SELECT COUNT(*) FROM measurements"),
     'measurements_today' => admin_scalar("SELECT COUNT(*) FROM measurements WHERE measurement_date = CURDATE()"),
 ];
@@ -130,8 +152,9 @@ $aiInsights = ai_insights_generate([
     },
 ]);
 
-echo json_encode([
+$response = [
     'success' => true,
+    'cached' => false,
     'chart' => $chartData,
     'category_chart' => $categoryData,
     'stats' => ['total' => $totalLogs, 'last_7_days' => $last7, 'last_30_days' => $last30],
@@ -141,7 +164,22 @@ echo json_encode([
     'level_breakdown' => $levelBreakdown,
     'recent_activity' => $recentActivity,
     'ai_insights' => $aiInsights,
-], JSON_UNESCAPED_UNICODE);
+];
+
+// Persist for the next hits; REPLACE keeps exactly one live row.
+// No-op when the cache table is absent (prepare fails inside admin_execute).
+$payloadJson = json_encode($response, JSON_UNESCAPED_UNICODE);
+if (is_string($payloadJson)) {
+    $cacheSource = (isset($aiInsights['source']) && $aiInsights['source'] === 'ai') ? 'ai' : 'rule_based';
+    admin_execute(
+        'REPLACE INTO audit_insights_cache (scope_key, cache_key, payload_json, source, expires_at)
+         VALUES (\'global\', \'default\', ?, ?, DATE_ADD(NOW(), INTERVAL ' . (int)AUDIT_INSIGHTS_CACHE_TTL_SECONDS . ' SECOND))',
+        'ss',
+        [$payloadJson, $cacheSource]
+    );
+}
+
+echo $payloadJson;
 
 
 function generate_audit_rule_based_insights(

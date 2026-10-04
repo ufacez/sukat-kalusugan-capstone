@@ -20,7 +20,8 @@ $onlineCount = admin_scalar(
 );
 
 $exportsTotal = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%'");
-$exportsToday = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%' AND DATE(created_at) = CURDATE()");
+// Range (not DATE(created_at) = ...) so idx_audit_created is usable.
+$exportsToday = admin_scalar("SELECT COUNT(*) FROM audit_logs WHERE action LIKE 'EOPT%' AND created_at >= CURDATE()");
 
 $measurementsTotal = admin_scalar("SELECT COUNT(*) FROM measurements");
 $measurementsToday = admin_scalar("SELECT COUNT(*) FROM measurements WHERE measurement_date = CURDATE()");
@@ -734,7 +735,19 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
 
     function setupHover(){
         var tooltip = document.getElementById('audit-tooltip');
+        // Coalesce rapid mousemove events to one redraw per frame so
+        // hovering never janks the page on slower machines.
+        var hoverRaf = null;
+        var lastHoverEvent = null;
         canvas.addEventListener('mousemove', function(e){
+            lastHoverEvent = e;
+            if(hoverRaf) return;
+            hoverRaf = requestAnimationFrame(function(){
+                hoverRaf = null;
+                handleHover(lastHoverEvent);
+            });
+        });
+        function handleHover(e){
             var rect = canvas.getBoundingClientRect();
             var mx = e.clientX - rect.left;
             var my = e.clientY - rect.top;
@@ -771,9 +784,10 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                 document.querySelectorAll('.audit-legend-item').forEach(function(li){li.style.opacity='1';});
             }
             drawAll();
-        });
+        }
 
         canvas.addEventListener('mouseleave', function(){
+            if(hoverRaf){ cancelAnimationFrame(hoverRaf); hoverRaf = null; }
             hoverIndex=-1;
             tooltip.style.opacity='0';
             document.querySelectorAll('.audit-legend-item').forEach(function(li){li.style.opacity='1';});
@@ -888,8 +902,18 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         box.innerHTML = html;
     }
 
+    // One in-flight insights request at a time; aborted on pagehide so
+    // leaving the page never waits on a slow AI/aggregation response.
+    // A single retry (not an infinite 10s loop) covers transient failures.
+    var insightsController = null;
+    var insightsRetryCount = 0;
+    var pageHiding = false;
+
     function loadInsights(){
+        if(document.hidden || pageHiding) return;
+        if(insightsController){ try { insightsController.abort(); } catch(e){} insightsController = null; }
         var controller = ('AbortController' in window) ? new AbortController() : null;
+        insightsController = controller;
         var timer = controller ? setTimeout(function(){ controller.abort(); }, 25000) : null;
         var fetchOpts = {credentials:'same-origin'};
         if(controller) fetchOpts.signal = controller.signal;
@@ -897,6 +921,9 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
             .then(function(r){return r.json()})
             .then(function(result){
                 if(timer) clearTimeout(timer);
+                if(controller && insightsController !== controller) return; // superseded
+                insightsController = null;
+                insightsRetryCount = 0;
                 if(result.success && result.category_chart) initChart(result.category_chart);
                 renderInsights(result);
                 renderDetails(result);
@@ -904,10 +931,17 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
             })
             .catch(function(){
                 if(timer) clearTimeout(timer);
+                if(controller && insightsController === controller) insightsController = null;
+                if(pageHiding) return;
                 var panel=document.getElementById('audit-ai-panel');
-                if(panel&&!panel.querySelector('.audit-ai-item'))
-                    panel.innerHTML='<div class="audit-ai-item">Unable to load insights. Retrying...</div>';
-                setTimeout(loadInsights,10000);
+                if(insightsRetryCount < 1){
+                    insightsRetryCount++;
+                    if(panel&&!panel.querySelector('.audit-ai-item'))
+                        panel.innerHTML='<div class="audit-ai-item">Unable to load insights. Retrying...</div>';
+                    setTimeout(loadInsights,10000);
+                } else if(panel&&!panel.querySelector('.audit-ai-item')) {
+                    panel.innerHTML='<div class="audit-ai-item">Insights are unavailable right now.</div>';
+                }
             });
     }
 
@@ -924,13 +958,24 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
         Object.keys(map).forEach(function(id){
             var el = document.getElementById(id);
             if(el && map[id] !== undefined && map[id] !== null) {
-                el.textContent = Number(map[id]).toLocaleString('en-US');
+                // Skip identical rewrites so the numbers don't visibly
+                // flash/repaint on every poll when nothing changed.
+                var formatted = Number(map[id]).toLocaleString('en-US');
+                if(el.textContent !== formatted) el.textContent = formatted;
             }
         });
     }
 
     loadInsights();
-    setInterval(loadInsights,60000);
+    // Visibility-aware poll: no background hammering while the tab is
+    // hidden; the in-flight request (if any) is aborted on pagehide above.
+    setInterval(function(){
+        if(!document.hidden && !pageHiding) loadInsights();
+    },60000);
+    window.addEventListener('pagehide', function(){
+        pageHiding = true;
+        if(insightsController){ try { insightsController.abort(); } catch(e){} insightsController = null; }
+    });
 
     document.querySelectorAll('.audit-dropdown').forEach(function(dropdown){
         var trigger = dropdown.querySelector('.audit-dropdown-trigger');
