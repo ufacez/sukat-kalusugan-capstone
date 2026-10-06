@@ -191,6 +191,58 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
         [(int)$currentUser['id']]
     );
 
+    $notificationToday = new DateTimeImmutable('today');
+    $notificationMonthStart = $notificationToday->modify('first day of this month')->format('Y-m-d');
+    $notificationQuarterStartMonth = ((int)$notificationToday->format('n') - 1) - (((int)$notificationToday->format('n') - 1) % 3) + 1;
+    $notificationQuarterStart = $notificationToday
+        ->setDate((int)$notificationToday->format('Y'), $notificationQuarterStartMonth, 1)
+        ->format('Y-m-d');
+    $notificationQuarterEnd = $notificationToday
+        ->setDate((int)$notificationToday->format('Y'), $notificationQuarterStartMonth, 1)
+        ->modify('+2 months')
+        ->modify('last day of this month')
+        ->format('Y-m-d');
+    $newChildrenParams = [];
+    $newChildrenScope = nutritionist_scope_fragment($currentUser, 'c.barangay_id', $newChildrenParams);
+    $newChildrenParams[] = $notificationToday->format('Y-m-d');
+    $newChildrenParams[] = $notificationMonthStart;
+    $newChildrenParams[] = $notificationMonthStart;
+    $newChildrenParams[] = $notificationToday->format('Y-m-d');
+    $newChildrenParams[] = $notificationToday->format('Y-m-d');
+    $newChildrenParams[] = $notificationQuarterStart;
+    $newChildrenParams[] = $notificationQuarterStart;
+    $newChildrenParams[] = $notificationQuarterEnd;
+    $newChildrenCount = admin_scalar(
+        "SELECT COUNT(*)
+         FROM children c
+         WHERE {$newChildrenScope}
+           AND c.status = 'active'
+           AND (
+               (
+                   TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 0 AND 23
+                   AND c.created_at >= ?
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM measurements m
+                       WHERE m.child_id = c.id
+                         AND m.measurement_date BETWEEN ? AND ?
+                   )
+               )
+               OR (
+                   TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN 24 AND 59
+                   AND c.created_at >= ?
+                   AND NOT EXISTS (
+                       SELECT 1
+                       FROM measurements m
+                       WHERE m.child_id = c.id
+                         AND m.measurement_date BETWEEN ? AND ?
+                   )
+               )
+           )",
+        str_repeat('s', count($newChildrenParams)),
+        $newChildrenParams
+    );
+
     echo '<!doctype html>';
     echo '<html lang="en">';
     echo '<head>';
@@ -251,6 +303,12 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
             if ($item['key'] === 'appointments' && $apptPendingCount > 0) {
                 $badgeLabel = $apptPendingCount > 9 ? '9+' : (string)$apptPendingCount;
                 echo '<span class="admin-nav-bell" title="' . $apptPendingCount . ' pending parent request' . ($apptPendingCount === 1 ? '' : 's') . '">'
+                    . admin_action_icon('bell')
+                    . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
+            }
+            if ($item['key'] === 'monitoring' && $newChildrenCount > 0) {
+                $badgeLabel = $newChildrenCount > 9 ? '9+' : (string)$newChildrenCount;
+                echo '<span class="admin-nav-bell" title="' . $newChildrenCount . ' new child' . ($newChildrenCount === 1 ? '' : 'ren') . ' needs measurement">'
                     . admin_action_icon('bell')
                     . '<span class="admin-nav-count">' . $badgeLabel . '</span></span>';
             }

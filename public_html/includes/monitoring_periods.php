@@ -218,6 +218,7 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
             c.last_name,
             c.birthdate,
             c.sex,
+            c.created_at,
             c.barangay_id,
             bg.name AS barangay_name,
             p.name AS parent_name,
@@ -277,6 +278,37 @@ function monitoring_fetch_list(array $user, string $kind, string $periodStart, s
             $row['wfh_status'] ?? null
         );
         $hasMeasurement = !empty($row['last_measurement_date']);
+
+        if ($kind === 'new') {
+            if (
+                (string)($row['created_at'] ?? '') < $periodStart
+                || !empty($row['measured_in_period'])
+            ) {
+                continue;
+            }
+
+            $result[] = [
+                'id' => (int)$row['id'],
+                'child_code' => (string)$row['child_code'],
+                'first_name' => (string)$row['first_name'],
+                'last_name' => (string)$row['last_name'],
+                'birthdate' => (string)$row['birthdate'],
+                'sex' => (string)$row['sex'],
+                'barangay_name' => (string)($row['barangay_name'] ?? ''),
+                'parent_name' => (string)($row['parent_name'] ?? ''),
+                'parent_phone' => (string)($row['parent_phone'] ?? ''),
+                'last_measurement_date' => $row['last_measurement_date'],
+                'last_weight' => $row['last_weight'],
+                'last_height' => $row['last_height'],
+                'wfa_status' => $row['wfa_status'],
+                'hfa_status' => $row['hfa_status'],
+                'wfh_status' => $row['wfh_status'],
+                'nutritional_status' => $row['nutritional_status'],
+                'measured_in_period' => false,
+                'period_measurement_date' => null,
+            ];
+            continue;
+        }
 
         // Registered but never-measured children stay off the roster
         // until their first weighing.

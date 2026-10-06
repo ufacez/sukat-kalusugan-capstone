@@ -9,7 +9,7 @@ $user = nutritionist_require_access();
 
 // ── Params ──
 $view = (string)($_GET['view'] ?? 'monthly');
-if (!in_array($view, ['monthly', 'quarterly'], true)) {
+if (!in_array($view, ['monthly', 'quarterly', 'new'], true)) {
     $view = 'monthly';
 }
 
@@ -39,23 +39,38 @@ $perPage = 5;
 if ($view === 'monthly') {
     $period = monitoring_month_range($year, $month);
     $periodMonths = [$month];
-} else {
+} elseif ($view === 'quarterly') {
     $period = monitoring_quarter_range($year, $quarter);
     $periodMonths = $period['months'];
+} else {
+    $period = monitoring_month_range((int)date('Y'), $nowMonth);
+    $periodMonths = [$nowMonth];
 }
 
 // ── Roster ──
-$roster = monitoring_fetch_list($user, $view, $period['start'], $period['end']);
-
-// ── Period coverage (full roster, unaffected by search) ──
-$coverageTotal = count($roster);
-$coverageMeasured = 0;
-foreach ($roster as $covRow) {
-    if (!empty($covRow['measured_in_period'])) {
-        $coverageMeasured++;
+if ($view === 'new') {
+    $newMonthly = monitoring_fetch_list($user, 'new', $period['start'], $period['end']);
+    $currentQuarterRange = monitoring_quarter_range((int)date('Y'), $nowQuarter);
+    $newQuarterly = monitoring_fetch_list($user, 'new', $currentQuarterRange['start'], $currentQuarterRange['end']);
+    $roster = [];
+    foreach (array_merge($newMonthly, $newQuarterly) as $newChild) {
+        $roster[(int)$newChild['id']] = $newChild;
     }
+    $roster = array_values($roster);
+} else {
+    $roster = monitoring_fetch_list($user, $view, $period['start'], $period['end']);
 }
-$coveragePct = $coverageTotal > 0 ? (int)round(($coverageMeasured / $coverageTotal) * 100) : 0;
+
+if ($view !== 'new') {
+    $coverageTotal = count($roster);
+    $coverageMeasured = 0;
+    foreach ($roster as $covRow) {
+        if (!empty($covRow['measured_in_period'])) {
+            $coverageMeasured++;
+        }
+    }
+    $coveragePct = $coverageTotal > 0 ? (int)round(($coverageMeasured / $coverageTotal) * 100) : 0;
+}
 
 if ($search !== '') {
     $needle = sk_strtolower($search);
@@ -256,9 +271,11 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 <div class="rp-tabs">
     <a class="rp-tab <?php echo $view === 'monthly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('monthly')); ?>">Monthly</a>
     <a class="rp-tab <?php echo $view === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('quarterly')); ?>">Quarterly</a>
+    <a class="rp-tab <?php echo $view === 'new' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('new')); ?>">New Children</a>
 </div>
 
 <!-- ============ SUB TABS ============ -->
+<?php if ($view !== 'new'): ?>
 <div class="mon-subtabs">
     <?php if ($view === 'monthly'): ?>
         <?php foreach ($monthNames as $mNo => $mName): ?>
@@ -273,6 +290,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
         <?php endfor; ?>
     <?php endif; ?>
 </div>
+<?php endif; ?>
 
 <!-- ============ ROSTER TABLE (filters + table in one card to save space) ============ -->
 <div class="mon-card">
@@ -280,7 +298,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
     <input type="hidden" name="view" value="<?php echo nutritionist_e($view); ?>">
     <?php if ($view === 'monthly'): ?>
         <input type="hidden" name="month" value="<?php echo $month; ?>">
-    <?php else: ?>
+    <?php elseif ($view === 'quarterly'): ?>
         <input type="hidden" name="quarter" value="<?php echo $quarter; ?>">
     <?php endif; ?>
     <input
@@ -303,6 +321,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
             <option value="<?php echo $y; ?>" <?php echo $year === $y ? 'selected' : ''; ?>><?php echo $y; ?></option>
         <?php endfor; ?>
     </select>
+    <?php if ($view !== 'new'): ?>
     <div class="mon-coverage">
         <div class="mon-coverage-head">
             <span class="mon-coverage-label">Children Measured</span>
@@ -312,6 +331,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
             <span class="mon-coverage-fill" style="width:<?php echo (int)$coveragePct; ?>%;"></span>
         </div>
     </div>
+    <?php endif; ?>
     <?php if ($search !== ''): ?>
     <div style="display:flex;gap:6px;align-items:center;">
             <a class="admin-btn-secondary" href="<?php echo nutritionist_e($view === 'monthly' ? $subLink($month) : $subLink($quarter)); ?>">Clear</a>
