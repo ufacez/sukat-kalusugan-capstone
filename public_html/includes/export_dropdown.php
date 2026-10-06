@@ -27,8 +27,27 @@ function export_dropdown_assets(): string
 .export-dd summary{list-style:none;cursor:pointer;display:inline-flex;align-items:center;gap:8px}
 .export-dd summary::-webkit-details-marker{display:none}
 .export-dd summary::after{content:'';width:7px;height:7px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(45deg) translateY(-2px);opacity:.7;flex:none}
+.export-dd[open]{position:relative;z-index:80}
 .export-dd[open] summary::after{transform:rotate(-135deg) translateY(-1px)}
-.export-dd-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:60;min-width:230px;padding:6px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#e5e7eb);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
+.export-dd-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:200;min-width:230px;padding:6px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#e5e7eb);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
+.export-dd-pop.is-flip{top:auto;bottom:calc(100% + 8px)}
+/* Overflow escape hatch: only while a menu is open, so card rounded
+   corners + top accent bar stay pixel-perfect when closed. */
+.rp-form-card:has(.export-dd[open]),
+.rp-monitor-card:has(.export-dd[open]),
+.rp-monitor-footer:has(.export-dd[open]),
+.rp-monitor-actions:has(.export-dd[open]),
+.rp-form-actions:has(.export-dd[open]),
+.mon-card:has(.export-dd[open]),
+.children-toolbar:has(.export-dd[open]),
+.mon-export:has(.export-dd[open]),
+.rp-table-section:has(.export-dd[open]),
+.admin-section:has(.export-dd[open]),
+.audit-filter-wrap:has(.export-dd[open]),
+.nutritionist-panel:has(.export-dd[open]),
+.admin-pageheader:has(.export-dd[open]),
+.admin-pageheader-actions:has(.export-dd[open]){overflow:visible !important}
+.rp-form-card:has(.export-dd[open])::before{border-radius:14px 14px 0 0}
 .export-dd-item{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:8px;text-decoration:none;color:var(--admin-text,#111827)}
 .export-dd-item:hover{background:var(--admin-surface-alt,#f3f4f6)}
 .export-dd-item svg{width:20px;height:20px;flex:none}
@@ -45,19 +64,35 @@ function export_dropdown_assets(): string
 <script>
 (function(){
 if (window.__exportDdInit) return; window.__exportDdInit = true;
+function closeOthers(except){
+document.querySelectorAll('.export-dd[open]').forEach(function(o){ if (o !== except) { o.removeAttribute('open'); var p = o.querySelector('.export-dd-pop'); if (p) p.classList.remove('is-flip'); } });
+}
+function maybeFlip(dd){
+var pop = dd.querySelector('.export-dd-pop');
+if (!pop) return;
+pop.classList.remove('is-flip');
+try {
+var r = dd.getBoundingClientRect();
+var estH = pop.offsetHeight || 220;
+if (r.bottom + estH + 12 > window.innerHeight && r.top - estH - 12 > 0) pop.classList.add('is-flip');
+} catch (err) {}
+}
 document.addEventListener('click', function(e){
 var open = document.querySelectorAll('.export-dd[open]');
 if (!open.length) return;
 var inside = e.target && e.target.closest ? e.target.closest('.export-dd') : null;
-open.forEach(function(dd){ if (dd !== inside) dd.removeAttribute('open'); });
+open.forEach(function(dd){ if (dd !== inside) { dd.removeAttribute('open'); var p = dd.querySelector('.export-dd-pop'); if (p) p.classList.remove('is-flip'); } });
 });
 document.addEventListener('keydown', function(e){
-if (e.key === 'Escape') document.querySelectorAll('.export-dd[open]').forEach(function(dd){ dd.removeAttribute('open'); });
+if (e.key === 'Escape') document.querySelectorAll('.export-dd[open]').forEach(function(dd){ dd.removeAttribute('open'); var p = dd.querySelector('.export-dd-pop'); if (p) p.classList.remove('is-flip'); });
 });
 document.addEventListener('toggle', function(e){
 var dd = e.target && e.target.closest ? e.target.closest('.export-dd') : null;
-if (dd && dd.open) document.querySelectorAll('.export-dd[open]').forEach(function(o){ if (o !== dd) o.removeAttribute('open'); });
+if (!dd) return;
+if (dd.open) { closeOthers(dd); maybeFlip(dd); }
+else { var p = dd.querySelector('.export-dd-pop'); if (p) p.classList.remove('is-flip'); }
 }, true);
+window.addEventListener('resize', function(){ closeOthers(null); }, {passive:true});
 })();
 </script>
 HTML;
