@@ -67,9 +67,10 @@ while ($row = mysqli_fetch_assoc($res)) {
 		mysqli_stmt_close($stmt);
 
 		log_action(
+			null,
 			'UPDATE_CHILD',
-			"Auto-archived child #{$childId} ({$row['child_code']}) — reached 60 months of age.",
-			'warning'
+			'warning',
+			"Auto-archived child #{$childId} ({$row['child_code']}) — reached 60 months of age."
 		);
 	}
 

@@ -19,6 +19,7 @@ if (!in_array($kind, ['all', 'staff', 'parent', 'child'], true)) {
 }
 
 $conn = get_db_connection();
+$actor = current_user();
 
 // ── POST: Run auto-archive (auto tab) ──
 $archiveResult = null;
@@ -56,9 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && (string)($_POST['action'] ?? '') ==
 		if (mysqli_stmt_execute($stmt) && mysqli_stmt_affected_rows($stmt) > 0) {
 			$archived++;
 			log_action(
+				$actor['id'] ?? null,
 				'UPDATE_CHILD',
-				"Auto-archived child #{$childId} ({$row['child_code']}) — reached {$row['age_months']} months of age.",
-				'warning'
+				'warning',
+				"Auto-archived child #{$childId} ({$row['child_code']}) — reached {$row['age_months']} months of age."
 			);
 		} else {
 			$errors[] = "Failed to archive #{$childId} ({$name})";
