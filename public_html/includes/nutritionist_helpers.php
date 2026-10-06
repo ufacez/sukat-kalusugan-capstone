@@ -248,7 +248,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<head>';
     echo '<meta charset="utf-8">';
     echo '<meta name="color-scheme" content="light dark">';
-    echo '<style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}</style>';
+    echo '<style>html{background-color:#eef3f0;}html[data-theme="dark"]{background-color:#0f1a14;}html[data-font-size="large"]{font-size:112.5%;}html[data-font-size="extra-large"]{font-size:125%;}</style>';
     echo '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">';
     echo '<title>' . nutritionist_e($title) . ' | Sukat Kalusugan Nutritionist</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
@@ -270,6 +270,8 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo 'if(t==="dark"||(!t&&window.matchMedia("(prefers-color-scheme:dark)").matches)){';
     echo 'document.documentElement.setAttribute("data-theme","dark");';
     echo '}';
+    echo 'var fs=localStorage.getItem("font_size");';
+    echo 'if(fs==="large"||fs==="extra-large"){document.documentElement.setAttribute("data-font-size",fs);}';
     echo '})();';
     echo '</script>';
     echo '</head>';

@@ -66,14 +66,16 @@ if ($canViewParents) {
             p.phone,
             p.barangay_id,
             b.name AS barangay,
+            la.area_name AS local_area,
             p.status,
             p.created_at,
             COUNT(DISTINCT c.id) AS children_count
          FROM parents p
          LEFT JOIN barangays b ON b.id = p.barangay_id
+         LEFT JOIN local_areas la ON la.id = p.local_area_id
          LEFT JOIN children c ON c.parent_id = p.id AND c.status = 'active'
          WHERE p.status = 'active'
-         GROUP BY p.id, p.name, p.email, p.phone, p.barangay_id, b.name, p.status, p.created_at
+         GROUP BY p.id, p.name, p.email, p.phone, p.barangay_id, b.name, la.area_name, p.status, p.created_at
          ORDER BY p.id DESC"
     );
 
@@ -265,7 +267,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                     <tr<?php echo admin_paged_row_attr($parentIndex + count($staff), 10); ?> data-role="parent" data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' parent ' . (string)($parent['barangay'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
-                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($parent['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>
+                                <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>
                                 <div>
                                     <div style="font-weight:700;"><?php echo admin_e($parent['name']); ?></div>
                                     <div class="admin-mini"><?php echo admin_e($parent['email']); ?></div>
@@ -274,7 +276,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                         </td>
                         <td><span class="admin-pill is-info">Parent</span></td>
                         <td><span class="admin-mini">&mdash;</span></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['barangay'] ?? 'No barangay')); ?> &middot; <?php echo $kidCount; ?> child<?php echo $kidCount === 1 ? '' : 'ren'; ?></td>
+                        <td><?php echo admin_e((string)($parent['local_area'] ?? 'No purok')); ?> &middot; <?php echo $kidCount; ?> child<?php echo $kidCount === 1 ? '' : 'ren'; ?></td>
                         <td><span class="admin-pill is-success"><?php echo admin_e(ucfirst($parent['status'])); ?></span></td>
                         <td><?php
                             $d = (string)($parent['created_at'] ?? '');

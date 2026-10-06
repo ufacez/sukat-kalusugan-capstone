@@ -82,22 +82,12 @@ $parents = admin_fetch_all(
 		h.address AS household_address,
 		h.lat AS household_lat,
 		h.lng AS household_lng,
-		COUNT(DISTINCT c.id) AS children_count,
-		COUNT(DISTINCT a.id) AS appointment_count,
-		SUM(CASE WHEN lm.nutritional_status IS NOT NULL AND lm.nutritional_status NOT IN ('Normal') THEN 1 ELSE 0 END) AS follow_up_count
+		COUNT(DISTINCT c.id) AS children_count
 	 FROM parents p
 	 LEFT JOIN barangays bg ON bg.id = p.barangay_id
 	 LEFT JOIN local_areas la ON la.id = p.local_area_id
 	 LEFT JOIN households h ON h.id = p.household_id AND h.status = 'active'
      LEFT JOIN children c ON c.parent_id = p.id AND {$childScope}
-     LEFT JOIN appointments a ON a.parent_id = p.id
-	 LEFT JOIN measurements lm ON lm.id = (
-		SELECT m2.id
-		FROM measurements m2
-		WHERE m2.child_id = c.id
-		ORDER BY m2.measurement_date DESC, m2.id DESC
-		LIMIT 1
-	 )
 	 WHERE {$parentScope}" . ($localAreaFilter > 0 ? ' AND p.local_area_id = ?' : '') . "
 	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.local_area_id, la.area_name, la.area_type, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
 	 ORDER BY p.id DESC",
@@ -107,8 +97,6 @@ $parents = admin_fetch_all(
 
 $activeCount = count(array_filter($parents, static fn(array $parent): bool => (string)$parent['status'] === 'active'));
 $totalChildren = array_sum(array_map(static fn(array $parent): int => (int)$parent['children_count'], $parents));
-$totalAppointments = array_sum(array_map(static fn(array $parent): int => (int)$parent['appointment_count'], $parents));
-$atRiskCount = count(array_filter($parents, static fn(array $parent): bool => (int)$parent['follow_up_count'] > 0));
 
 // Tab slice: active vs archived, all within the user's barangay scope.
 $tabParents = array_values(array_filter($parents, static fn(array $parent): bool => $tab === 'archived' ? (string)$parent['status'] !== 'active' : (string)$parent['status'] === 'active'));
@@ -169,6 +157,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 .parents-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
 #parents-table th:last-child,
 #parents-table td:last-child{width:176px;min-width:176px;white-space:nowrap;text-align:center;padding-left:12px;padding-right:12px}
+#parents-table td{font-weight:600}
 #parents-table td:last-child .admin-actions{justify-content:center;gap:8px}
 @media (max-width:560px){
 .parents-toolbar{flex-direction:column;align-items:stretch}
@@ -205,16 +194,14 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 					<th>Type</th>
 					<th>Email</th>
 					<th>Phone</th>
-					<th>Barangay</th>
+					<th>Purok</th>
 					<th>Children</th>
-					<th>Appointments</th>
-					<th>Follow-up</th>
 					<th>Actions</th>
 				</tr>
 			</thead>
 			<tbody>
 				<?php if ($tabParents === []): ?>
-					<tr><td colspan="9" style="color:var(--admin-muted);text-align:center;padding:24px;"><?php echo $tab === 'archived' ? 'No archived parents in your scope.' : 'No active parents in your scope yet.'; ?></td></tr>
+					<tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;"><?php echo $tab === 'archived' ? 'No archived parents in your scope.' : 'No active parents in your scope yet.'; ?></td></tr>
 				<?php endif; ?>
 				<?php foreach ($tabParents as $parentIndex => $parent): ?>
 					<tr<?php echo admin_paged_row_attr($parentIndex, 5); ?>
@@ -235,16 +222,19 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 						data-household-lng="<?php echo $parent['household_lng'] !== null ? nutritionist_e((string)$parent['household_lng']) : ''; ?>"
 					>
 						<td>
-							<div style="font-weight:600;color:var(--admin-text);"><?php echo nutritionist_e($parent['name']); ?></div>
-							<div class="admin-mini"><?php echo nutritionist_e((string)($parent['address'] ?? '')); ?></div>
+							<div class="parent-name-cell">
+								<span class="parent-avatar"><?php echo nutritionist_e(admin_initials((string)$parent['name'])); ?></span>
+								<div class="parent-name-text">
+									<div class="parent-name"><?php echo nutritionist_e($parent['name']); ?></div>
+									<div class="admin-mini"><?php echo nutritionist_e((string)($parent['address'] ?? '')); ?></div>
+								</div>
+							</div>
 						</td>
-						<td style="color:var(--admin-muted);"><span class="admin-pill is-muted"><?php echo nutritionist_e($parent['parent_type']); ?></span></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e($parent['email']); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?></td>
-						<td style="color:var(--admin-muted);"><?php echo nutritionist_e((string)($parent['barangay'] ?? '')); ?></td>
-<td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
-						<td style="color:var(--admin-muted);"><?php echo (int)$parent['appointment_count']; ?></td>
-						<td style="color:var(--admin-muted);"><?php echo (int)$parent['follow_up_count'] ?? 0; ?></td>
+						<td><span class="admin-pill is-muted"><?php echo nutritionist_e($parent['parent_type']); ?></span></td>
+						<td><?php echo nutritionist_e($parent['email']); ?></td>
+						<td><?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?></td>
+						<td><?php echo !empty($parent['local_area']) ? nutritionist_e((string)$parent['local_area']) : '—'; ?></td>
+						<td><?php echo (int)$parent['children_count']; ?></td>
 						<td>
 							<div class="admin-actions">
 								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
@@ -286,21 +276,27 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 			<button type="button" class="close" id="pc-close" aria-label="Close">×</button>
 		</div>
 		<div class="pc-body">
-			<div class="pc-section">Contact information</div>
-			<div class="pc-row"><span class="label">Email</span><span class="value" id="pc-email">—</span></div>
-			<div class="pc-row"><span class="label">Phone</span><span class="value" id="pc-phone">—</span></div>
-			<div class="pc-row"><span class="label">Type</span><span class="value" id="pc-type">—</span></div>
-			<div class="pc-row"><span class="label">Status</span><span class="value" id="pc-status">—</span></div>
-			<div class="pc-row"><span class="label">Linked children</span><span class="value" id="pc-children">—</span></div>
-
-			<div class="pc-section">Address</div>
-			<div class="pc-row"><span class="label">Barangay</span><span class="value" id="pc-barangay">—</span></div>
-			<div class="pc-row"><span class="label">Street address</span><span class="value" id="pc-address">—</span></div>
-
-			<div class="pc-section">Household / Spot</div>
-			<div class="pc-row"><span class="label">Household code</span><span class="value" id="pc-household-code">—</span></div>
-			<div class="pc-row"><span class="label">Address</span><span class="value" id="pc-household-address">—</span></div>
-			<div class="pc-row"><span class="label">Coordinates</span><span class="value" id="pc-household-coords" style="font-family:monospace;font-size:11px;">—</span></div>
+			<div class="pc-cols">
+				<div class="pc-card">
+					<h3 class="pc-section">Contact information</h3>
+					<div class="pc-row"><span class="label">Email</span><span class="value" id="pc-email">—</span></div>
+					<div class="pc-row"><span class="label">Phone</span><span class="value" id="pc-phone">—</span></div>
+					<div class="pc-row"><span class="label">Type</span><span class="value" id="pc-type">—</span></div>
+					<div class="pc-row"><span class="label">Status</span><span class="value" id="pc-status">—</span></div>
+					<div class="pc-row"><span class="label">Linked children</span><span class="value" id="pc-children">—</span></div>
+				</div>
+				<div class="pc-card">
+					<h3 class="pc-section">Address</h3>
+					<div class="pc-row"><span class="label">Barangay</span><span class="value" id="pc-barangay">—</span></div>
+					<div class="pc-row"><span class="label">Street address</span><span class="value" id="pc-address">—</span></div>
+				</div>
+				<div class="pc-card">
+					<h3 class="pc-section">Household / Spot</h3>
+					<div class="pc-row"><span class="label">Household code</span><span class="value" id="pc-household-code">—</span></div>
+					<div class="pc-row"><span class="label">Address</span><span class="value" id="pc-household-address">—</span></div>
+					<div class="pc-row"><span class="label">Coordinates</span><span class="value" id="pc-household-coords">—</span></div>
+				</div>
+			</div>
 		</div>
 		<div class="pc-foot">
 			<a class="admin-btn-secondary" id="pc-edit" href="#">Edit parent</a>
@@ -325,7 +321,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 		var name = get('name');
 		var initials = (name.split(' ').filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0).toUpperCase(); }).join('')) || '--';
 		val('pc-avatar').textContent = initials;
-		val('pc-avatar').style.background = '#6366f1';
+		val('pc-avatar').style.background = '';
 
 		text('pc-name', name);
 		text('pc-sub', get('type') + ' · ' + get('email'));

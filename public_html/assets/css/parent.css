@@ -299,19 +299,18 @@
   height: 48px;
   place-items: center;
   border-radius: 50%;
-  background: var(--admin-primary-soft);
-  color: var(--admin-primary);
+  background: #0b6e4f !important;
+  color: #ffffff !important;
   font-size: 1.2rem;
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
 }
 
-/* Gender-coded avatar (inline background + color): fixed hexes so the
- * initial stays readable in both light and dark mode. The inline
- * `color` wins here; this is only a fallback + edge definition. */
+/* Keep child avatars on the same light-theme green palette in both themes. */
 .parent-page .parent-child-avatar[style*="background"] {
-  color: #fff;
+  background: #0b6e4f !important;
+  color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 
@@ -2005,8 +2004,8 @@
   height: 42px;
   place-items: center;
   border-radius: 50%;
-  background: var(--admin-primary-soft);
-  color: var(--admin-primary);
+  background: #0b6e4f !important;
+  color: #ffffff !important;
   font-weight: 800;
   line-height: 1;
   text-transform: uppercase;
@@ -2014,7 +2013,8 @@
 
 /* Same fixed-contrast treatment as the main avatar above. */
 .parent-page .parent-child-option-avatar[style*="background"] {
-  color: #fff;
+  background: #0b6e4f !important;
+  color: #fff !important;
   border: 1px solid rgba(255, 255, 255, 0.4);
 }
 

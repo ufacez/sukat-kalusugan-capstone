@@ -118,6 +118,7 @@ if ($editId > 0) {
 }
 
 $filterBarangay = (int)($_GET['barangay_id'] ?? 0);
+$filterSex = in_array(($_GET['sex'] ?? ''), ['Male', 'Female'], true) ? (string)$_GET['sex'] : '';
 
 $where = "WHERE c.status = 'active'";
 $params = [];
@@ -127,6 +128,11 @@ if ($filterBarangay > 0) {
     $where .= " AND c.barangay_id = ?";
     $params[] = $filterBarangay;
     $types = 'i';
+}
+if ($filterSex !== '') {
+    $where .= " AND c.sex = ?";
+    $params[] = $filterSex;
+    $types .= 's';
 }
 
 $children = admin_fetch_all(
@@ -234,6 +240,11 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                     <option value="<?php echo (int)$b['id']; ?>" <?php echo $filterBarangay === (int)$b['id'] ? 'selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
                 <?php endforeach; ?>
             </select>
+            <select class="admin-select" id="sex-filter" aria-label="Filter by sex" onchange="window.location.href='<?php echo admin_e(app_url('/admin/children.php')); ?>?barangay_id=<?php echo (int)$filterBarangay; ?>&sex='+this.value">
+                <option value="" <?php echo $filterSex === '' ? 'selected' : ''; ?>>All sexes</option>
+                <option value="Male" <?php echo $filterSex === 'Male' ? 'selected' : ''; ?>>Male</option>
+                <option value="Female" <?php echo $filterSex === 'Female' ? 'selected' : ''; ?>>Female</option>
+            </select>
             <input class="admin-search" type="search" placeholder="Search children" data-admin-filter="#children-table" style="flex:1;min-width:0;">
         </div>
     </div>
@@ -244,6 +255,7 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                 <tr>
                     <th>Code</th>
                     <th>Name</th>
+                    <th>Sex</th>
                     <th>Parent</th>
                     <th>Barangay</th>
                     <th>Last Measurement</th>
@@ -253,10 +265,10 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
             <tbody>
                 <?php foreach ($children as $childIndex => $child): ?>
                     <tr<?php echo admin_paged_row_attr($childIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'] . ' ' . $child['parent_name'] . ' ' . (string)($child['barangay'] ?? ''))); ?>">
-                        <td style="font-family:monospace;color:var(--admin-muted);"><?php echo admin_e($child['child_code']); ?></td>
+                        <td style="font-family:monospace;"><?php echo admin_e($child['child_code']); ?></td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
-                                <span class="admin-avatar" style="background:<?php echo admin_avatar_color($child['first_name'] . ' ' . $child['last_name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
+                                <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
                                 <div>
                                     <div style="font-weight:700;"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
                                     <div class="admin-mini">
@@ -269,8 +281,9 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                                 </div>
                             </div>
                         </td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['parent_name']); ?></td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
+                        <td><?php echo admin_e((string)$child['sex']); ?></td>
+                        <td><?php echo admin_e((string)$child['parent_name']); ?></td>
+                        <td><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
                         <td>
                             <?php if (!empty($child['measurement_date'])): ?>
                                 <?php $md = (string)$child['measurement_date']; ?>

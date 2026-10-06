@@ -1171,6 +1171,10 @@
   font-size: 0.85rem;
 }
 
+.admin-table td {
+  font-weight: 600;
+}
+
 .admin-table th {
   color: var(--admin-muted);
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;

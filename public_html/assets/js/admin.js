@@ -32,6 +32,36 @@
 
   applyTheme(getPreferredTheme());
 
+  const applyFontSize = (size) => {
+    const value = ["standard", "large", "extra-large"].includes(size) ? size : "standard";
+    if (value === "standard") {
+      document.documentElement.removeAttribute("data-font-size");
+    } else {
+      document.documentElement.setAttribute("data-font-size", value);
+    }
+    try {
+      localStorage.setItem("font_size", value);
+    } catch (error) {
+      // Preference persistence is optional.
+    }
+    document.querySelectorAll("[data-font-size-option]").forEach(function (option) {
+      option.checked = option.value === value;
+    });
+  };
+
+  let storedFontSize = "standard";
+  try {
+    storedFontSize = localStorage.getItem("font_size") || "standard";
+  } catch (error) {
+    storedFontSize = "standard";
+  }
+  applyFontSize(storedFontSize);
+  document.querySelectorAll("[data-font-size-option]").forEach(function (option) {
+    option.addEventListener("change", function () {
+      if (option.checked) applyFontSize(option.value);
+    });
+  });
+
   document.querySelectorAll("[data-theme-toggle], [data-theme-toggle-topbar]").forEach(function (btn) {
     btn.addEventListener("click", function () {
       const current = document.documentElement.getAttribute("data-theme");

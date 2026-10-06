@@ -11,7 +11,7 @@ $user = nutritionist_require_access();
 $localAreaFilter = (int)($_GET['local_area_id'] ?? 0);
 $validTabs = ['active', 'graduated', 'archived'];
 $tab = in_array(($_GET['tab'] ?? ''), $validTabs, true) ? ($_GET['tab'] ?? '') : 'active';
-$measuredOnly = (($_GET['measured'] ?? '') === 'with');
+$sexFilter = in_array(($_GET['sex'] ?? ''), ['Male', 'Female'], true) ? (string)$_GET['sex'] : '';
 
 // Archive / restore a single child (same behavior as the admin endpoints,
 // but scoped to the nutritionist's barangay).
@@ -68,8 +68,10 @@ if ($localAreaFilter > 0) {
     $types .= 'i';
     $filterParams[] = $localAreaFilter;
 }
-if ($measuredOnly) {
-    $where[] = 'EXISTS (SELECT 1 FROM measurements m WHERE m.child_id = c.id)';
+if ($sexFilter !== '') {
+    $where[] = 'c.sex = ?';
+    $types .= 's';
+    $filterParams[] = $sexFilter;
 }
 $where[] = 'c.status = ?';
 $types .= 's';
@@ -194,14 +196,14 @@ $localAreaList = admin_fetch_all(
 
 function nutritionist_children_url(array $params): string
 {
-    global $tab, $localAreaFilter, $measuredOnly;
+    global $tab, $localAreaFilter, $sexFilter;
     $base = app_url('/nutritionist/children.php');
     $defaults = ['tab' => $tab];
     if ($localAreaFilter > 0) {
         $defaults['local_area_id'] = $localAreaFilter;
     }
-    if ($measuredOnly) {
-        $defaults['measured'] = 'with';
+    if ($sexFilter !== '') {
+        $defaults['sex'] = $sexFilter;
     }
     $merged = array_filter(array_merge($defaults, $params), static fn($v) => $v !== '' && $v !== null);
     return $merged === [] ? $base : $base . '?' . http_build_query($merged);
@@ -264,8 +266,8 @@ nutritionist_layout_start(
 .children-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
 .children-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
 
-.children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
-.children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:#94a3b8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.children-table .child-name-cell{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-width:0}
+.children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .children-table .child-name-cell .text{min-width:0}
 .children-table .child-name-cell .text .name{font-weight:600;color:var(--admin-text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .children-table .child-name-cell .text .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
@@ -295,7 +297,7 @@ nutritionist_layout_start(
 .cc-overlay.is-open{display:flex}
 .cc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:1000px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
 .cc-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
-.cc-head .avatar{width:60px;height:60px;border-radius:50%;background:#94a3b8;color:#fff;font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cc-head .avatar{width:60px;height:60px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .cc-head .meta{min-width:0;flex:1}
 .cc-head .name{font-size:19px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cc-head .sub{font-size:13px;color:var(--admin-muted);margin-top:2px}
@@ -370,12 +372,13 @@ nutritionist_layout_start(
         </select>
         <select
             class="admin-select"
-            id="measurement-filter"
-            aria-label="Filter by measurement"
+            id="sex-filter"
+            aria-label="Filter by sex"
             onchange="window.location.href=this.value"
         >
-            <option value="<?php echo nutritionist_e(nutritionist_children_url(['measured' => null])); ?>" <?php echo !$measuredOnly ? 'selected' : ''; ?>>All children</option>
-            <option value="<?php echo nutritionist_e(nutritionist_children_url(['measured' => 'with'])); ?>" <?php echo $measuredOnly ? 'selected' : ''; ?>>With Measurement</option>
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['sex' => null])); ?>" <?php echo $sexFilter === '' ? 'selected' : ''; ?>>All sexes</option>
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['sex' => 'Male'])); ?>" <?php echo $sexFilter === 'Male' ? 'selected' : ''; ?>>Male</option>
+            <option value="<?php echo nutritionist_e(nutritionist_children_url(['sex' => 'Female'])); ?>" <?php echo $sexFilter === 'Female' ? 'selected' : ''; ?>>Female</option>
         </select>
     </div>
 
@@ -390,6 +393,7 @@ nutritionist_layout_start(
             <thead>
                 <tr>
                     <th>Full name of child</th>
+                    <th>Sex</th>
                     <th>Purok</th>
                     <th>Birthdate</th>
                     <th>Age (months)</th>
@@ -399,7 +403,7 @@ nutritionist_layout_start(
             </thead>
             <tbody>
                 <?php if ($pageChildren === []): ?>
-                    <tr><td colspan="6">
+                    <tr><td colspan="7">
                         <div class="children-empty">
                             <?php if ($totalAll === 0 && $tab === 'active'): ?>
                                 <div class="empty-title">No children registered yet</div>
@@ -416,7 +420,7 @@ nutritionist_layout_start(
                             <?php else: ?>
                                 <div class="empty-title">No children in this view</div>
                                 <div class="empty-sub">Your current filters don't match any children in your scope. Clear the filters to see all of them.</div>
-                                <a class="admin-btn-secondary" href="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => null, 'measured' => null])); ?>">Clear filters</a>
+                                <a class="admin-btn-secondary" href="<?php echo nutritionist_e(nutritionist_children_url(['local_area_id' => null, 'sex' => null])); ?>">Clear filters</a>
                             <?php endif; ?>
                         </div>
                     </td></tr>
@@ -464,12 +468,15 @@ nutritionist_layout_start(
                     >
                         <td>
                             <div class="child-name-cell">
-                                <span class="avatar" style="background:<?php echo nutritionist_e(child_avatar_color((string)($child['sex'] ?? ''))); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+                                <span class="avatar"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
                                 <div class="text">
                                     <div class="name"><?php echo nutritionist_e($fullName); ?></div>
-                                    <div class="sub"><?php echo nutritionist_e((string)$child['child_code']); ?> · <?php echo nutritionist_e((string)$child['sex']); ?></div>
+                                    <div class="sub"><?php echo nutritionist_e((string)$child['child_code']); ?></div>
                                 </div>
                             </div>
+                        </td>
+                        <td style="white-space:nowrap;">
+                            <?php echo nutritionist_e((string)$child['sex']); ?>
                         </td>
                         <td style="white-space:nowrap;">
                             <?php echo $localAreaName !== '' ? nutritionist_e($localAreaName) : '—'; ?>
@@ -660,12 +667,6 @@ nutritionist_layout_start(
         var initials = (name.split(' ').filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0).toUpperCase(); }).join('')) || '--';
 
         val('cc-avatar').textContent = initials;
-        val('cc-avatar').style.background = (function () {
-            // Match the in-row avatar color the page assigns.
-            var rowAvatar = row.querySelector('.child-name-cell .avatar');
-            return rowAvatar ? rowAvatar.style.background : '#94a3b8';
-        })();
-
         text('cc-name', name);
         text('cc-sub', code + ' · ' + (get('sex') || '—'));
 

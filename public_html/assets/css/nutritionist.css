@@ -179,6 +179,10 @@
   font-size: 0.92rem;
 }
 
+.nutritionist-page .nutritionist-table td {
+  font-weight: 600;
+}
+
 .nutritionist-page .nutritionist-table th {
   color: var(--admin-muted);
   font-size: 0.76rem;
@@ -3555,23 +3559,41 @@
  */
 .pc-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
 .pc-overlay.is-open{display:flex}
-.pc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:640px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.pc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:1000px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
 .pc-head{display:flex;align-items:center;gap:14px;padding:18px 20px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
-.pc-head .avatar{width:56px;height:56px;border-radius:50%;background:#6366f1;color:#fff;font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.pc-head .avatar{width:56px;height:56px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-weight:700;font-size:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .pc-head .meta{min-width:0;flex:1}
 .pc-head .name{font-size:16px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pc-head .sub{font-size:11px;color:var(--admin-muted);margin-top:2px}
 .pc-head .close{background:none;border:none;color:var(--admin-muted);font-size:20px;line-height:1;cursor:pointer;padding:6px 10px;border-radius:6px}
 .pc-head .close:hover{background:var(--admin-surface-alt);color:var(--admin-text)}
 
-.pc-body{padding:18px 20px}
-.pc-section{font-weight:700;font-size:11px;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.06em;margin:14px 0 8px}
-.pc-section:first-child{margin-top:0}
-.pc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:8px 0;border-bottom:1px solid var(--admin-border);font-size:12px}
+.pc-body{padding:20px 22px}
+.pc-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.pc-card{background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:14px 16px;min-width:0}
+.pc-section{font-weight:700;font-size:13px;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px}
+.pc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--admin-border);font-size:14px}
 .pc-row:last-child{border-bottom:none}
-.pc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0;width:140px}
+.pc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0}
 .pc-row .value{font-weight:600;color:var(--admin-text);text-align:right;flex:1;min-width:0;word-break:break-word}
-.pc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 20px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.pc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+
+.parent-name-cell{display:flex;align-items:center;justify-content:flex-start;gap:10px;min-width:0}
+.parent-avatar{width:34px;height:34px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.parent-name-text{min-width:0;text-align:left}
+.parent-name-text .parent-name{font-weight:600;color:var(--admin-text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+@media (max-width: 860px) {
+  .pc-cols{grid-template-columns:1fr}
+}
+@media (max-width: 560px) {
+  .pc-modal{max-width:calc(100vw - 16px);max-height:85vh}
+  .pc-body{padding:14px 16px}
+  .pc-row{flex-direction:column;gap:4px}
+  .pc-row .value{text-align:left}
+  .pc-head{padding:14px 16px}
+  .pc-foot{padding:12px 16px}
+}
 
 .admin-spotmap-add-person {
   display: block;

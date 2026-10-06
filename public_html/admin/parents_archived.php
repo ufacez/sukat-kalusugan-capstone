@@ -16,13 +16,15 @@ $parents = admin_fetch_all(
         p.phone,
         p.barangay_id,
         b.name AS barangay,
+        la.area_name AS local_area,
         p.status,
         COUNT(DISTINCT c.id) AS children_count
      FROM parents p
      LEFT JOIN barangays b ON b.id = p.barangay_id
+     LEFT JOIN local_areas la ON la.id = p.local_area_id
      LEFT JOIN children c ON c.parent_id = p.id
      WHERE p.status = 'inactive'
-     GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.barangay_id, b.name, p.status
+     GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.barangay_id, b.name, la.area_name, p.status
      ORDER BY p.id DESC"
 );
 
@@ -50,7 +52,7 @@ admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'use
                     <th>Type</th>
                     <th>Email</th>
                     <th>Phone</th>
-                    <th>Barangay</th>
+                    <th>Purok</th>
                     <th>Children</th>
                     <th>Actions</th>
                 </tr>
@@ -62,13 +64,16 @@ admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'use
                     <?php foreach ($parents as $parentIndex => $parent): ?>
                         <tr<?php echo admin_paged_row_attr($parentIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'])); ?>">
                             <td>
-                                <div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e($parent['name']); ?></div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>
+                                    <div style="font-weight:700;color:var(--admin-text);"><?php echo admin_e($parent['name']); ?></div>
+                                </div>
                             </td>
                             <td><span class="admin-pill is-muted"><?php echo admin_e($parent['parent_type']); ?></span></td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e($parent['email']); ?></td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['phone'] ?? '')); ?></td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e((string)($parent['barangay'] ?? '')); ?></td>
-                            <td style="color:var(--admin-muted);"><?php echo (int)$parent['children_count']; ?></td>
+                            <td><?php echo admin_e($parent['email']); ?></td>
+                            <td><?php echo admin_e((string)($parent['phone'] ?? '')); ?></td>
+                            <td><?php echo admin_e((string)($parent['local_area'] ?? '—')); ?></td>
+                            <td><?php echo (int)$parent['children_count']; ?></td>
                             <td>
                                 <div class="admin-actions">
                                     <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_restore.php')); ?>" style="display:inline;">

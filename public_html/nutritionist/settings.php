@@ -219,11 +219,32 @@ nutritionist_layout_start('Settings', 'Manage your account details.', 'settings'
                     <span class="admin-field-message"></span>
                 </label>
             </div>
-        </aside>
-    </div>
 
-    <div class="admin-settings-footer">
-        <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save All Changes</button>
+            <header class="admin-section-head" style="margin-top:24px;">
+                <h2 class="admin-section-title">Accessibility</h2>
+            </header>
+            <div class="admin-form-grid admin-form-grid--single">
+                <fieldset class="admin-field" style="border:0;padding:0;margin:0;">
+                    <legend style="font-weight:600;margin-bottom:8px;">Text size</legend>
+                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
+                        <input type="radio" name="font_size_preference" value="standard" data-font-size-option>
+                        <span>Standard</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
+                        <input type="radio" name="font_size_preference" value="large" data-font-size-option>
+                        <span style="font-size:1.08em;">Large</span>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
+                        <input type="radio" name="font_size_preference" value="extra-large" data-font-size-option>
+                        <span style="font-size:1.16em;">Extra large</span>
+                    </label>
+                </fieldset>
+            </div>
+
+            <div class="admin-settings-footer">
+                <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save All Changes</button>
+            </div>
+        </aside>
     </div>
 </form>
 <?php

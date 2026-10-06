@@ -117,7 +117,6 @@ if ($pageChildIds !== []) {
             'sex' => (string)($entry['sex'] ?? ''),
             'barangay' => (string)($entry['barangay_name'] ?? ''),
             'parent' => (string)($entry['parent_name'] ?? ''),
-            'avatar_bg' => child_avatar_color((string)($entry['sex'] ?? '')),
             'initials' => admin_initials($fullName),
             'record_url' => app_url('/nutritionist/measurement_record.php?child=' . $cid),
             'history' => array_map(static function (array $m): array {
@@ -242,7 +241,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 .children-toolbar .admin-field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--admin-muted);font-weight:600}
 .nutritionist-table-wrap{overflow-x:auto}
 .children-table .child-name-cell{display:flex;align-items:center;gap:10px;min-width:0}
-.children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:#94a3b8;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.children-table .child-name-cell .avatar{width:34px;height:34px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 .children-table .child-name-cell .text{min-width:0}
 .children-table .child-name-cell .text .name{font-weight:600;color:var(--admin-text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .children-table .child-name-cell .text .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
@@ -402,7 +401,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
                 <tr>
                     <td>
                         <div class="child-name-cell">
-                            <span class="avatar" style="background:<?php echo nutritionist_e(child_avatar_color((string)($entry['sex'] ?? ''))); ?>;"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
+                            <span class="avatar"><?php echo nutritionist_e(admin_initials($fullName)); ?></span>
                             <div class="text">
                                 <div class="name"><?php echo nutritionist_e($fullName); ?></div>
                                 <div class="sub"><?php echo nutritionist_e((string)$entry['child_code']); ?> · <?php echo nutritionist_e((string)$entry['sex']); ?></div>
@@ -494,7 +493,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
     <div class="admin-modal" style="max-width:640px;" role="dialog" aria-modal="true" aria-label="Measurement history">
         <div class="admin-modal-head">
             <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-                <span class="avatar" id="monHistAvatar" style="width:44px;height:44px;border-radius:50%;background:#94a3b8;color:#fff;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">--</span>
+                <span class="avatar" id="monHistAvatar" style="width:44px;height:44px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">--</span>
                 <div style="min-width:0;">
                     <h3 id="monHistName" style="margin:0;font-size:16px;">Child name</h3>
                     <div class="mon-hist-sub" id="monHistSub">—</div>
@@ -554,7 +553,6 @@ var monHistory = <?php echo json_encode($monHistoryJson, JSON_HEX_TAG | JSON_HEX
         if (!c) return;
         var avatar = document.getElementById('monHistAvatar');
         avatar.textContent = c.initials || '--';
-        avatar.style.background = c.avatar_bg || '#94a3b8';
         document.getElementById('monHistName').textContent = c.name || 'Child';
         document.getElementById('monHistSub').textContent =
             (c.code || '') + (c.sex ? ' · ' + c.sex : '') +

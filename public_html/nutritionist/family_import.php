@@ -524,7 +524,6 @@ if (($_GET['action'] ?? '') === 'template') {
             'headers' => $template['header'],
             'preview_rows' => $template['examples'],
             'preview_count' => count($template['examples']),
-            'note' => 'Recommended format, not required. Only mother/child name, sex and birthdate are read -- column order does not matter.',
         ], JSON_UNESCAPED_UNICODE);
         exit;
     }
@@ -962,13 +961,7 @@ nutritionist_layout_start(
 .ml-table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}
 .ml-table th,.ml-table td{padding:8px 10px;border-bottom:1px solid var(--admin-border);text-align:left;vertical-align:top}
 .ml-table thead th{background:var(--admin-surface-alt);font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--admin-muted)}
-.ml-template-bar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;border:1px dashed var(--admin-border);background:var(--admin-surface-alt);border-radius:12px;padding:14px 16px;margin-bottom:18px}
-.ml-template-text{min-width:0;flex:1}
-.ml-template-text strong{display:block;font-size:13px;font-weight:800;color:var(--admin-text);margin-bottom:2px}
-.ml-template-text .admin-field-hint{display:block;max-width:62ch}
-.ml-template-actions{display:flex;gap:8px;flex-wrap:wrap;margin:0}
 .ml-template-btn{margin:0;white-space:nowrap}
-@media(max-width:640px){.ml-template-bar{flex-direction:column;align-items:stretch}.ml-template-actions .ml-template-btn{width:100%}}
 .ml-guide{width:100%;border-collapse:collapse;font-size:12px;margin:10px 0 0}
 .ml-guide td{border:1px solid var(--admin-border);padding:6px 10px}
 .ml-guide td:first-child{font-weight:700;white-space:nowrap;background:var(--admin-surface-alt)}
@@ -1200,25 +1193,6 @@ nutritionist_layout_start(
         $mlTemplateUrl = app_url('/nutritionist/family_import.php') . '?action=template';
         $mlTemplatePreviewUrl = $mlTemplateUrl . '&preview=json';
         ?>
-        <div class="ml-template-bar">
-            <div class="ml-template-text">
-                <strong>Walang master list file?</strong>
-                <span class="admin-field-hint">Recommended, pero hindi required — kahit anong .xlsx na may mother/child name, sex at birthdate ang tinatanggap. I-preview muna, tapos i-download ang template.</span>
-            </div>
-            <div class="ml-template-actions">
-                <a
-                    class="admin-btn-secondary ml-template-btn"
-                    data-exp-preview="<?php echo nutritionist_e($mlTemplatePreviewUrl); ?>"
-                    data-exp-download="<?php echo nutritionist_e($mlTemplateUrl); ?>"
-                    data-exp-format="xlsx"
-                    href="<?php echo nutritionist_e($mlTemplateUrl); ?>"
-                    title="Preview the template, then download it from the preview window"
-                >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
-                    View &amp; download template
-                </a>
-            </div>
-        </div>
 
         <form method="post" enctype="multipart/form-data" action="<?php echo nutritionist_e(app_url('/nutritionist/family_import.php')); ?>" class="nutritionist-form-grid">
             <input type="hidden" name="action" value="preview">
@@ -1238,6 +1212,17 @@ nutritionist_layout_start(
             <div class="admin-field admin-field-wide">
                 <span>Master list file (.xlsx, max 5 MB) <span class="admin-required">*</span></span>
                 <div class="who-ref-import-actions">
+                    <a
+                        class="admin-btn-secondary ml-template-btn"
+                        data-exp-preview="<?php echo nutritionist_e($mlTemplatePreviewUrl); ?>"
+                        data-exp-download="<?php echo nutritionist_e($mlTemplateUrl); ?>"
+                        data-exp-format="xlsx"
+                        href="<?php echo nutritionist_e($mlTemplateUrl); ?>"
+                        title="Preview the template, then download it from the preview window"
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207 0 .431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.964-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                        View &amp; download template
+                    </a>
                     <label class="admin-btn-secondary" style="cursor:pointer;margin:0;white-space:nowrap;">
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3"/></svg>
                         Choose .xlsx

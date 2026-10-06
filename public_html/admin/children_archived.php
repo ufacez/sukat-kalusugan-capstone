@@ -90,15 +90,18 @@ $deleteTarget = admin_fetch_one('SELECT id, child_code, first_name FROM children
                     <?php foreach ($children as $childIndex => $child): ?>
                         <?php $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0]; ?>
                         <tr<?php echo admin_paged_row_attr($childIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($child['child_code'] . ' ' . $child['first_name'] . ' ' . $child['last_name'])); ?>">
-                            <td style="font-family:monospace;color:var(--admin-muted);"><?php echo admin_e($child['child_code']); ?></td>
+                            <td style="font-family:monospace;"><?php echo admin_e($child['child_code']); ?></td>
                             <td>
-                                <div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
+                                <div style="display:flex;align-items:center;gap:10px;">
+                                    <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
+                                    <div style="font-weight:700;color:var(--admin-text);"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
+                                </div>
                                 <div class="admin-mini"><?php echo admin_e((string)$child['birthdate']); ?></div>
                             </td>
-                            <td style="color:var(--admin-muted);"><?php echo (int)$age['days']; ?> d · <?php echo (int)$age['months']; ?> mo</td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['sex']); ?></td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
-                            <td style="color:var(--admin-muted);"><?php echo admin_e((string)$child['parent_name']); ?></td>
+                            <td><?php echo (int)$age['days']; ?> d · <?php echo (int)$age['months']; ?> mo</td>
+                            <td><?php echo admin_e((string)$child['sex']); ?></td>
+                            <td><?php echo admin_e((string)($child['barangay'] ?? '')); ?></td>
+                            <td><?php echo admin_e((string)$child['parent_name']); ?></td>
                             <td>
                                 <div class="admin-actions">
                                     <form method="post" action="<?php echo admin_e(app_url('/api/admin/children_restore.php')); ?>" style="display:inline;">
