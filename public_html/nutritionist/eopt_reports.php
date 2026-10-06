@@ -83,47 +83,16 @@ $listCodes = [
 	'SW' => ['title' => 'List_SW — Severely Wasted (SW/SAM)', 'desc' => 'WFH status SW/SAM (WHZ <-3).', 'axis' => 'Weight-for-Height', 'cond' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt' => ['title' => 'List_MSt&SSt — Stunted', 'desc' => 'HFA below -2SD.', 'axis' => 'Height-for-Age', 'cond' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 	'OW_Ob' => ['title' => 'List_OW&Ob — Overweight/Obese', 'desc' => 'WFA OW or WFH OW/Ob.', 'axis' => 'WFA/WFH', 'cond' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
-	'MUW' => ['title' => 'List_MUW — Moderately Underweight', 'desc' => 'WFA status MUW.', 'axis' => 'Weight-for-Age', 'cond' => "lm.wfa_status = 'MUW'", 'age_min' => 0, 'age_max' => 59],
 	'MUW_SUW_MSt_SSt' => ['title' => 'List_MUW,SUW,MSt&SSt — Underweight+Stunted', 'desc' => 'MUW or SUW with MSt/SSt.', 'axis' => 'WFA + HFA', 'cond' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt_MW_SW' => ['title' => 'List_MSt,SSt,MW&SW — Stunted+Wasted', 'desc' => 'MSt/SSt with MW/MAM or SW/SAM.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 	'MSt_SSt_OW_Ob' => ['title' => 'List_MSt,SSt,OW&Ob — Stunted+OW/Ob', 'desc' => 'MSt/SSt with OW/Ob.', 'axis' => 'HFA + WFH', 'cond' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 ];
 
-$listRows = [];
-$listParamRaw = trim((string)($_GET['list'] ?? ''));
-$listParamKey = strtolower($listParamRaw);
-$listCodeLowerMap = [];
-foreach ($listCodes as $code => $spec) {
-	$listCodeLowerMap[strtolower($code)] = $code;
-}
-$isSingleList = $listParamKey !== '' && isset($listCodeLowerMap[$listParamKey]);
-$listParam = $isSingleList ? $listCodeLowerMap[$listParamKey] : $listParamRaw;
-
-if ($isSingleList) {
-	$spec = $listCodes[$listParam];
-	$listRows = [];
-	$listAnchorMonth = $view === 'yearly' ? 12 : $month;
-	$listAnchor = (new DateTimeImmutable(sprintf('%04d-%02d-01', $year, $listAnchorMonth)))->modify('last day of this month');
-	$listParams = array_merge($scopeParams, [$listAnchor->format('Y-m-d')]);
-	$listRows = admin_fetch_all(
-		"SELECT c.id, c.child_code, c.first_name, c.middle_name, c.last_name,
-			c.sex, c.birthdate, la.area_name AS address, p.name AS parent_name,
-			lm.measurement_date, lm.age_months, lm.height_cm, lm.weight_kg,
-			lm.wfa_status, lm.hfa_status, lm.wfh_status
-		 FROM children c
-		 INNER JOIN parents p ON p.id = c.parent_id
-		 LEFT JOIN local_areas la ON la.id = c.local_area_id
-		 LEFT JOIN measurements lm ON lm.id = (
-			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id
-			ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
-		 )
-		 WHERE {$scope}
-		   AND TIMESTAMPDIFF(MONTH, c.birthdate, ?) BETWEEN {$spec['age_min']} AND {$spec['age_max']}
-		   AND {$spec['cond']}
-		 ORDER BY c.last_name, c.first_name",
-		str_repeat('i', count($scopeParams)) . 's',
-		$listParams
-	);
+// The per-list roster page (eye icon + HTML table) was removed — monitoring
+// lists are export-only now (Save as: Excel/CSV/PDF on each card). Bounce
+// direct ?list= links to the Monitoring tab, preserving the filters.
+if (trim((string)($_GET['list'] ?? '')) !== '') {
+	admin_redirect(app_url('/nutritionist/eopt_reports.php'), array_merge($filterParams, ['tab' => 'monitoring']));
 }
 
 $latestJoin = " INNER JOIN measurements lm ON lm.id = (
@@ -174,7 +143,6 @@ foreach ($listCountRows as $cr) {
 	if ($wfh === 'SW') $listCounts['SW']++;
 	if (in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['MSt_SSt']++;
 	if ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true)) $listCounts['OW_Ob']++;
-	if ($wfa === 'MUW') $listCounts['MUW']++;
 	if (in_array($wfa, ['MUW', 'SUW'], true) && in_array($hfa, ['MSt', 'SSt'], true)) $listCounts['MUW_SUW_MSt_SSt']++;
 	if (in_array($hfa, ['MSt', 'SSt'], true) && in_array($wfh, ['MW', 'SW'], true)) $listCounts['MSt_SSt_MW_SW']++;
 	if (in_array($hfa, ['MSt', 'SSt'], true) && ($wfa === 'OW' || in_array($wfh, ['OW', 'Ob'], true))) $listCounts['MSt_SSt_OW_Ob']++;
@@ -244,76 +212,7 @@ nutritionist_layout_start('Reports', 'Generate and manage eOPT Plus monitoring, 
 @media print{.nutritionist-sidebar,.nutritionist-topbar,.rp-filter-bar,.rp-tabs,.rp-form-actions,.rp-monitor-actions{display:none!important}.rp-panel{display:block!important}}
 </style>
 
-<?php if ($isSingleList): ?>
-<?php
-	$spec = $listCodes[$listParam];
-	$listExportUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $listParam]));
-	$listCsvUrl = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $listParam, 'format' => 'csv']));
-	$listPdfUrl = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query(array_merge($filterParams, ['report_type' => 'list', 'list_code' => $listParam]));
-?>
-<div class="rp-breadcrumb">
-	<a href="<?php echo nutritionist_e(app_url('/nutritionist/eopt_reports.php?' . http_build_query($filterParams))); ?>">&larr; Back to Reports</a>
-	<span>/</span>
-	<span><?php echo nutritionist_e($spec['title']); ?></span>
-</div>
-<div class="rp-table-section allow-overflow">
-	<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-		<div>
-			<div class="rp-table-title"><?php echo nutritionist_e($spec['title']); ?></div>
-			<div style="font-size:12px;color:var(--admin-muted);"><?php echo nutritionist_e($spec['axis']); ?> &middot; Age <?php echo $spec['age_min']; ?>-<?php echo $spec['age_max']; ?> mo &middot; Year <?php echo $year; ?> &middot; <?php echo count($listRows); ?> children</div>
-		</div>
-		<div style="display:flex;gap:8px;">
-			<?php echo export_dropdown($listExportUrl, $listCsvUrl, $listPdfUrl, 'Save as'); ?>
-		</div>
-	</div>
-	<?php
-	$isInfantList = ($listParam === '0-23');
-	$followupSeqMap = ($isInfantList && !empty($listRows))
-		? eopt_fetch_followup_sequence_map(array_column($listRows, 'id'))
-		: [];
-	?>
-	<?php if (empty($listRows)): ?>
-		<div style="padding:24px;text-align:center;color:var(--admin-muted);font-size:13px;">No children match this monitoring list for the selected filters.</div>
-	<?php else: ?>
-		<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-			<table class="nutritionist-table" data-page-size="5" style="min-width:<?php echo $isInfantList ? '1300px' : '850px'; ?>;">
-				<?php if ($isInfantList): ?>
-				<thead><tr><th rowspan="2">No.</th><th rowspan="2">Address</th><th rowspan="2">Mother/Caregiver</th><th rowspan="2">Child Name</th><th rowspan="2">Sex</th><th rowspan="2">Birthdate</th><th rowspan="2">Height</th><th rowspan="2">Weight</th><th rowspan="2">WFA</th><th rowspan="2">HFA</th><th rowspan="2">WFH</th><th colspan="6" style="text-align:center;">Follow-up Visits</th></tr><tr><?php for ($mh = 1; $mh <= 6; $mh++): ?><th>Month#<?php echo $mh; ?></th><?php endfor; ?></tr></thead>
-				<?php else: ?>
-				<thead><tr><th>No.</th><th>Address</th><th>Mother/Caregiver</th><th>Child Name</th><th>Sex</th><th>Birthdate</th><th>Height</th><th>Weight</th><th>WFA</th><th>HFA</th><th>WFH</th></tr></thead>
-				<?php endif; ?>
-				<tbody>
-					<?php foreach ($listRows as $i => $row): ?>
-						<tr<?php echo admin_paged_row_attr($i, 5); ?>>
-							<td><?php echo $i + 1; ?></td>
-							<td><?php echo nutritionist_e((string)($row['address'] ?? '')); ?></td>
-							<td><?php echo nutritionist_e((string)$row['parent_name']); ?></td>
-							<td><div style="font-weight:600;"><?php echo nutritionist_e(trim(($row['last_name']??'').', '.($row['first_name']??'').' '.($row['middle_name']??''))); ?></div><div style="font-size:11px;color:var(--admin-muted);"><?php echo nutritionist_e((string)$row['child_code']); ?></div></td>
-							<td><?php echo nutritionist_e((string)$row['sex']); ?></td>
-							<td><?php echo nutritionist_e((string)$row['birthdate']); ?></td>
-							<td><?php echo $row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '—'; ?></td>
-							<td><?php echo $row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '—'; ?></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['wfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['wfa_status'] ?? '—')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class($row['hfa_status'] ?? ''); ?>"><?php echo nutritionist_e((string)($row['hfa_status'] ?? '—')); ?></span></td>
-							<td><span class="admin-pill <?php echo nutritionist_status_class(!empty($row['wfh_status']) ? wfh_display_short($row['wfh_status']) : ''); ?>"><?php echo nutritionist_e(!empty($row['wfh_status']) ? wfh_display_short($row['wfh_status']) : '—'); ?></span></td>
-							<?php if ($isInfantList): ?>
-								<?php
-								$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
-								for ($mn = 1; $mn <= 6; $mn++):
-									[$fuLabel, $fuTitle] = eopt_followup_cell($seqVisits[$mn - 1] ?? null);
-								?>
-								<td title="<?php echo nutritionist_e($fuTitle); ?>" style="white-space:nowrap;font-size:11px;"><?php if ($fuLabel === '—'): ?><span style="color:var(--admin-muted);">—</span><?php else: ?><?php echo nutritionist_e($fuLabel); ?><?php endif; ?></td>
-								<?php endfor; ?>
-							<?php endif; ?>
-						</tr>
-					<?php endforeach; ?>
-				</tbody>
-			</table>
-		</div>
-	<?php endif; ?>
-</div>
 
-<?php else: ?>
 
 <div class="rp-filter-bar">
 	<form method="get" style="display:flex;gap:10px;flex-wrap:wrap;align-items:end;width:100%;">
@@ -398,11 +297,10 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 <?php elseif ($activeTab === 'monitoring'): ?>
 <div class="rp-panel is-active" data-panel="monitoring">
 	<div class="rp-section">
-		<div class="rp-section-head"><div><div class="rp-section-title">Monitoring Reports</div><div class="rp-section-sub">Official eOPT Plus monitoring lists. Click View to see the full roster.</div></div></div>
+		<div class="rp-section-head"><div><div class="rp-section-title">Monitoring Reports</div><div class="rp-section-sub">Official eOPT Plus monitoring lists. Use Save as to export Excel, CSV, or PDF.</div></div></div>
 		<div class="rp-monitor-grid">
 			<?php foreach ($listCodes as $code => $spec):
 				$count = $listCounts[$code] ?? 0;
-				$vLink = app_url('/nutritionist/eopt_reports.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code]));
 				$pLink = app_url('/nutritionist/eopt_pdf_generate.php') . '?' . http_build_query(array_merge($filterParams, ['report_type' => 'list', 'list_code' => $code]));
 				$eLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code]));
 				$cLink = app_url('/nutritionist/eopt_reports_export.php') . '?' . http_build_query(array_merge($filterParams, ['list' => $code, 'format' => 'csv']));
@@ -415,7 +313,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 						<div style="display:flex;gap:4px;align-items:center;">
 							<span class="admin-pill <?php echo $count > 0 ? 'is-success' : 'is-muted'; ?>" style="font-size:10px;"><?php echo $count > 0 ? 'Ready' : 'Empty'; ?></span>
 							<div class="rp-monitor-actions">
-								<a class="admin-icon-btn" title="View" href="<?php echo nutritionist_e($vLink); ?>"><?php echo admin_action_icon('view'); ?></a>
 								<?php echo export_dropdown($eLink, $cLink, $pLink, 'Save as', 'icon'); ?>
 							</div>
 						</div>
@@ -432,80 +329,6 @@ $tabUrl = function(string $tab) use ($filterParams): string {
 		<div class="rp-form-card"><div class="rp-form-name">NutStatusTool</div><div class="rp-form-desc">Detailed nutrition-status dataset with child, measurement, and WFA/HFA/WFL-H indicators.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count"><?php echo (int)$totalAssessed; ?> children</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatus', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatus']))), 'Save as'); ?></div></div>
 		<div class="rp-form-card"><div class="rp-form-name">NutStatusBrgy</div><div class="rp-form-desc">Barangay-level sex-disaggregated summary for 0–23 and 0–59 months.</div><div class="rp-form-meta"><span class="admin-pill is-success">Ready</span><span class="rp-form-count">0–23 &amp; 0–59 months</span></div><div class="rp-form-actions"><?php echo export_dropdown(app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy']))), app_url('/nutritionist/eopt_reports_export.php?' . http_build_query(array_merge($filterParams, ['report' => 'nutstatusbrgy', 'format' => 'csv']))), app_url('/nutritionist/eopt_pdf_generate.php?' . http_build_query(array_merge($filterParams, ['report_type' => 'nutstatusbrgy']))), 'Save as'); ?></div></div>
 	</div></div>
-	<?php
-	$summaryRows = admin_fetch_all(
-		"SELECT c.sex,
-			CASE WHEN TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) < 24 THEN '0-23' ELSE '24-59' END AS age_band,
-			m.wfa_status, m.hfa_status, m.wfh_status
-		 FROM children c INNER JOIN measurements m ON m.id = (
-			SELECT m2.id FROM measurements m2 WHERE m2.child_id = c.id ORDER BY m2.measurement_date DESC, m2.id DESC LIMIT 1
-		 )
-		 WHERE {$scope} AND TIMESTAMPDIFF(MONTH, c.birthdate, LAST_DAY(?)) BETWEEN 0 AND 59",
-		's' . str_repeat('i', count($scopeParams) + count($barangayFilterParams)) . 's',
-		array_merge([$anchorDate->format('Y-m-d')], $scopeParams, $barangayFilterParams, [$anchorDate->format('Y-m-d')])
-	);
-	$bucket = static fn(): array => ['Male' => ['0-23' => 0, '24-59' => 0, 'total' => 0], 'Female' => ['0-23' => 0, '24-59' => 0, 'total' => 0], 'Total' => ['0-23' => 0, '24-59' => 0, 'total' => 0]];
-	$wfaS = ['SUW' => $bucket(), 'MUW' => $bucket(), 'Normal' => $bucket()];
-	$hfaS = ['SSt' => $bucket(), 'MSt' => $bucket(), 'Normal' => $bucket(), 'Tall' => $bucket()];
-	$wfhS = ['SW' => $bucket(), 'MW' => $bucket(), 'Normal' => $bucket(), 'OW' => $bucket(), 'Ob' => $bucket()];
-	foreach ($summaryRows as $row) {
-		$sl = (string)$row['sex'] === 'Male' ? 'Male' : 'Female';
-		$ab = (string)$row['age_band'];
-		foreach ([['wfa_status', &$wfaS], ['hfa_status', &$hfaS], ['wfh_status', &$wfhS]] as [$f, &$r]) {
-			$v = $row[$f] ?? null;
-			if ($v === null || !isset($r[$v])) continue;
-			$r[$v][$sl][$ab]++; $r[$v][$sl]['total']++; $r[$v]['Total'][$ab]++; $r[$v]['Total']['total']++;
-		}
-	}
-	$renderTable = function(string $title, array $data): void {
-		$totalAll = 0; foreach ($data as $d) $totalAll += (int)$d['Total']['total'];
-		$colTotals = [
-			'Male' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
-			'Female' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
-			'Total' => ['0-23' => 0, '24-59' => 0, 'total' => 0],
-		];
-		foreach ($data as $c) {
-			foreach (['Male', 'Female', 'Total'] as $sex) {
-				foreach (['0-23', '24-59', 'total'] as $band) {
-					$colTotals[$sex][$band] += (int)$c[$sex][$band];
-				}
-			}
-		}
-	?>
-		<div class="rp-table-section">
-			<div class="rp-table-title"><?php echo nutritionist_e($title); ?></div>
-			<div class="nutritionist-table-wrap" style="overflow-x:auto;">
-				<table class="nutritionist-table" data-no-paginate style="min-width:700px;">
-					<thead><tr><th>Status</th><th>Male 0-23</th><th>Male 24-59</th><th>Male Total</th><th>Female 0-23</th><th>Female 24-59</th><th>Female Total</th><th>Grand Total</th><th>%</th></tr></thead>
-					<tbody>
-						<?php foreach ($data as $status => $c): $gt = (int)$c['Total']['total']; ?>
-							<tr><td><strong><?php echo nutritionist_e($status); ?></strong></td>
-							<td><?php echo (int)$c['Male']['0-23']; ?></td><td><?php echo (int)$c['Male']['24-59']; ?></td><td><?php echo (int)$c['Male']['total']; ?></td>
-							<td><?php echo (int)$c['Female']['0-23']; ?></td><td><?php echo (int)$c['Female']['24-59']; ?></td><td><?php echo (int)$c['Female']['total']; ?></td>
-							<td><strong><?php echo $gt; ?></strong></td>
-							<td><?php echo $totalAll > 0 ? number_format(($gt / $totalAll) * 100, 1) . '%' : '0.0%'; ?></td>
-							</tr>
-						<?php endforeach; ?>
-						<tr style="font-weight:700;border-top:2px solid var(--admin-border,#333);">
-							<td>Total</td>
-							<td><?php echo $colTotals['Male']['0-23']; ?></td>
-							<td><?php echo $colTotals['Male']['24-59']; ?></td>
-							<td><?php echo $colTotals['Male']['total']; ?></td>
-							<td><?php echo $colTotals['Female']['0-23']; ?></td>
-							<td><?php echo $colTotals['Female']['24-59']; ?></td>
-							<td><?php echo $colTotals['Female']['total']; ?></td>
-							<td><?php echo $colTotals['Total']['total']; ?></td>
-							<td>100%</td>
-						</tr>
-					</tbody>
-				</table>
-			</div>
-		</div>
-	<?php };
-	$renderTable('WEIGHT-FOR-AGE (WFA)', $wfaS);
-	$renderTable('HEIGHT-FOR-AGE (HFA)', $hfaS);
-	$renderTable('WEIGHT-FOR-LENGTH/HEIGHT (WFH)', $wfhS);
-	?>
 </div>
 
 <?php elseif ($activeTab === 'prevalence'): ?>
@@ -565,7 +388,5 @@ document.querySelectorAll('#rpTabs').forEach(function(row){
 	});
 });
 </script>
-
-<?php endif; ?>
 
 <?php nutritionist_layout_end(); ?>

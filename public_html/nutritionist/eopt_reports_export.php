@@ -181,21 +181,21 @@ function eopt_fetch_list(
  */
 $listsSpec = [
 	['code' => '0-23', 'sheet' => 'List_0_23', 'title' => 'CHILDREN 0-23 MONTHS OLD', 'axis' => 'All children (monthly weighing)',
-	 'condition' => '1=1', 'age_min' => 0, 'age_max' => 23, 'is_infant' => true],
+	 'condition' => '1=1', 'age_min' => 0, 'age_max' => 23],
 	['code' => 'MW', 'sheet' => 'List_MW', 'title' => 'MODERATELY WASTED', 'axis' => 'Weight-for-Height',
-	 'condition' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "lm.wfh_status = 'MW'", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'SW', 'sheet' => 'List_SW', 'title' => 'SEVERELY WASTED', 'axis' => 'Weight-for-Height',
-	 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'MSt_SSt', 'sheet' => 'List_MSt_SSt', 'title' => 'MODERATELY OR SEVERELY STUNTED', 'axis' => 'Height-for-Age',
-	 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'OW_Ob', 'sheet' => 'List_OW_Ob', 'title' => 'OVERWEIGHT OR OBESE', 'axis' => 'Weight-for-Age / Weight-for-Height',
-	 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'MUW_SUW_MSt_SSt', 'sheet' => 'List_MUW_SUW_MSt_SSt', 'title' => 'MODERATELY/SEVERELY UNDERWEIGHT + MODERATELY/SEVERELY STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age',
-	 'condition' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'MSt_SSt_MW_SW', 'sheet' => 'List_MSt_SSt_MW_SW', 'title' => 'MODERATELY/SEVERELY STUNTED + MODERATELY/SEVERELY WASTED', 'axis' => 'Height-for-Age + Weight-for-Height',
-	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 	['code' => 'MSt_SSt_OW_Ob', 'sheet' => 'List_MSt_SSt_OW_Ob', 'title' => 'MODERATELY/SEVERELY STUNTED + OVERWEIGHT OR OBESE', 'axis' => 'Height-for-Age + Weight-for-Height',
-	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59, 'is_infant' => false],
+	 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
 ];
 
 /*
@@ -232,12 +232,11 @@ if ($isForm1A) {
 		'condition' => '1=1',
 		'age_min' => 0,
 		'age_max' => 59,
-		'is_infant' => false,
 	]];
 }
 
 $listColumns = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
-$listWidths = [6, 18, 26, 38, 9, 14, 11, 11, 9, 9, 9];
+$listWidths = [6, 18, 26, 38, 10, 15, 13, 13, 10, 10, 10];
 
 $nutStatusColumns = [
 	'Child ID',
@@ -247,7 +246,7 @@ $nutStatusColumns = [
 	'Belongs to IP Group?',
 	'Sex',
 	'Date of Birth',
-	'Date of Measurement',
+	'Date Measured',
 	'Weight (kg)',
 	'Height (cm)',
 	'Age in Months',
@@ -260,8 +259,8 @@ $nutStatusColumns = [
 $nutStatusWidths = [14, 28, 26, 32, 14, 9, 14, 16, 12, 12, 12, 12, 18, 22, 24, 12];
 
 if ($isForm1A) {
-	$listColumns = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date of Measurement', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nutritional Status (WFL/H)', 'Disability'];
-	$listWidths = [14, 25, 29, 42, 10, 10, 17, 20, 16, 16, 15, 15, 32, 15];
+	$listColumns = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date Measured', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nut. Status (WFL/H)', 'Disability'];
+	$listWidths = [14, 25, 29, 42, 10, 10, 18, 21, 16, 16, 15, 15, 32, 15];
 }
 
 $sheets = [];
@@ -326,9 +325,14 @@ if ($isNutStatusBrgy) {
 	foreach ($summary as $axis => $statuses) {
 		$addRow($rowsOut, [$axis === 'HFA' ? 'HEIGHT / LENGTH FOR AGE' : ($axis === 'WFL/H' ? 'WEIGHT FOR LENGTH / HEIGHT' : 'WEIGHT FOR AGE'), '', '', '', '', '', '', '', ''], 'label');
 		$addRow($rowsOut, ['Classification', '0-23 Boys', '0-23 Girls', '0-23 Total', '0-23 Prev', '0-59 Boys', '0-59 Girls', '0-59 Total', '0-59 Prev'], 'header');
-		foreach ($statuses as $code => $label) {
-			$early = $summary[$axis][$code]['0-23'];
-			$all = $summary[$axis][$code]['0-59'];
+		foreach ($statuses as $code => $counts) {
+			// NOTE: $statuses comes from $summary (counts), so its values are
+			// count arrays — the human-readable labels live in $definitions.
+			// Using the count array as a cell made CSV print "Array" and XLSX
+			// blank cells in the Classification column.
+			$label = $definitions[$axis][$code] ?? $code;
+			$early = $counts['0-23'];
+			$all = $counts['0-59'];
 			$earlyTotal = $early['Boys'] + $early['Girls'];
 			$allTotal = $all['Boys'] + $all['Girls'];
 			$addRow($rowsOut, [$label, $early['Boys'], $early['Girls'], $earlyTotal, $denominators[$axis]['0-23'] > 0 ? number_format($earlyTotal / $denominators[$axis]['0-23'] * 100, 2) . '%' : '0.00%', $all['Boys'], $all['Girls'], $allTotal, $denominators[$axis]['0-59'] > 0 ? number_format($allTotal / $denominators[$axis]['0-59'] * 100, 2) . '%' : '0.00%']);
@@ -517,7 +521,6 @@ if ($isForm1B) {
 		$output[] = array_map(static fn($value) => ['v' => $value, 's' => $style], $values);
 	};
 	$addForm1bRow($form1bOutput, ['OPT PLUS FORM 1B: SUMMARY SHEET OF NUTRITIONAL STATUS', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''], 'title');
-	$addForm1bRow($form1bOutput, ['Barangay:', $barangayName, '', 'Municipality:', 'City of San Fernando', '', 'Province:', 'Pampanga', '', 'Total assessed:', $totalAssessed, '', 'IP children:', $ipCount, '', 'Disability:', $disabilityCount, '', 'Coverage:', '0-59 months', '', '', '', '', '', ''], 'label');
 	$addForm1bRow($form1bOutput, array_fill(0, 26, ''));
 
 	$ageGroupLabels = ['0-5', '6-11', '12-23', '24-35', '36-47', '48-59'];
@@ -672,12 +675,12 @@ if ($isForm1B) {
 		$ci = intdiv($ci, 26);
 	}
 
-	// Actual sheet layout: row 1 title, row 2 meta, row 3 blank,
-	// row 4 header group labels, row 5 sub-headers, row 6+ data.
+	// Actual sheet layout: row 1 title, row 2 blank,
+	// row 3 header group labels, row 4 sub-headers, row 5+ data.
 	$form1bTitleRow = 1;
-	$form1bHeaderRow1 = 4;
-	$form1bHeaderRow2 = 5;
-	$form1bFirstDataRow = 6;
+	$form1bHeaderRow1 = 3;
+	$form1bHeaderRow2 = 4;
+	$form1bFirstDataRow = 5;
 
 	$merges = [
 		"A{$form1bTitleRow}:{$form1bLastCol}{$form1bTitleRow}",
@@ -801,8 +804,8 @@ if ($isNutStatus) {
 			['v' => $fullName, 's' => 'cell'],
 			['v' => !empty($row['is_ip']) ? 'YES' : 'NO', 's' => 'cell_center'],
 			['v' => (string)($row['sex'] ?? ''), 's' => 'cell_center'],
-			['v' => (string)($row['birthdate'] ?? ''), 's' => 'cell_center'],
-			['v' => (string)($row['measurement_date'] ?? ''), 's' => 'cell_center'],
+			['v' => eopt_format_mdy($row['birthdate'] ?? null), 's' => 'cell_center'],
+			['v' => eopt_format_mdy($row['measurement_date'] ?? null), 's' => 'cell_center'],
 			['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
 			['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 			['v' => (int)$row['age_months'], 's' => 'cell_num'],
@@ -952,18 +955,19 @@ foreach ($activeSpecs as $listIndex => $spec) {
 		$spec['age_max'] ?? 59
 	);
 
-	// List_0-23 carries 6 sequence-based follow-up columns:
-	// Month#N = the child's Nth follow-up appointment (scheduled_at ASC).
-	$isInfantSheet = (($spec['code'] ?? '') === '0-23') || !empty($spec['is_infant']);
+	// Every monitoring list carries 6 sequence-based follow-up columns
+	// (Month#N = the child's Nth follow-up appointment, scheduled_at ASC),
+	// same as List_0-23. Form 1A keeps its fixed 14-column template.
+	$withFollowups = !$isForm1A;
 	$activeListColumns = $listColumns;
 	$activeListWidths = $listWidths;
-	if ($isInfantSheet && !$isForm1A) {
+	if ($withFollowups) {
 		for ($mh = 1; $mh <= 6; $mh++) {
 			$activeListColumns[] = 'Month#' . $mh;
-			$activeListWidths[] = 16;
+			$activeListWidths[] = 17;
 		}
 	}
-	$followupSeqMap = ($isInfantSheet && !$isForm1A && !empty($rows))
+	$followupSeqMap = ($withFollowups && !empty($rows))
 		? eopt_fetch_followup_sequence_map(array_column($rows, 'id'))
 		: [];
 
@@ -1013,8 +1017,8 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => $fullName, 's' => 'cell'],
 				['v' => !empty($row['is_ip']) ? 'YES' : 'NO', 's' => 'cell_center'],
 				['v' => (string)($row['sex'] ?? ''), 's' => 'cell_center'],
-				['v' => (string)($row['birthdate'] ?? ''), 's' => 'cell_center'],
-				['v' => (string)($row['measurement_date'] ?? ''), 's' => 'cell_center'],
+				['v' => eopt_format_mdy($row['birthdate'] ?? null), 's' => 'cell_center'],
+				['v' => eopt_format_mdy($row['measurement_date'] ?? null), 's' => 'cell_center'],
 				['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
 				['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 				['v' => (int)$row['age_months'], 's' => 'cell_num'],
@@ -1028,7 +1032,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => (string)$row['parent_name'], 's' => 'cell'],
 				['v' => $fullName, 's' => 'cell'],
 				['v' => (string)$row['sex'], 's' => 'cell_center'],
-				['v' => (string)$row['birthdate'], 's' => 'cell_center'],
+				['v' => eopt_format_mdy($row['birthdate'] ?? null), 's' => 'cell_center'],
 				['v' => $row['height_cm'] !== null ? (float)$row['height_cm'] : '', 's' => 'cell_num'],
 				['v' => $row['weight_kg'] !== null ? (float)$row['weight_kg'] : '', 's' => 'cell_num'],
 				['v' => (string)($row['wfa_status'] ?? ''), 's' => xlsx_status_style((string)($row['wfa_status'] ?? ''))],
@@ -1036,7 +1040,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 				['v' => wfh_display_short($row['wfh_status'] ?? ''), 's' => xlsx_status_style(wfh_display_short($row['wfh_status'] ?? ''))],
 			];
 
-		if ($isInfantSheet && !$isForm1A) {
+		if ($withFollowups) {
 			$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
 			for ($mn = 1; $mn <= 6; $mn++) {
 				$visit = $seqVisits[$mn - 1] ?? null;
@@ -1044,7 +1048,7 @@ foreach ($activeSpecs as $listIndex => $spec) {
 					$dataRow[] = ['v' => '', 's' => 'cell_center'];
 				} else {
 					try {
-						$cellText = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M j, Y');
+						$cellText = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M-d-Y');
 					} catch (Exception) {
 						$cellText = '';
 					}

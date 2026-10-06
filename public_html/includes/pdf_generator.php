@@ -57,12 +57,35 @@ function pdf_table_header(TCPDF $pdf, array $columns, array $widths, string $fil
 
 	$height = 8;
 	for ($i = 0; $i < count($columns); $i++) {
+		pdf_fit_font_to_width($pdf, 'helvetica', 'B', (string)$columns[$i], (float)$widths[$i], (float)$fontSize, 6.0);
 		$pdf->Cell($widths[$i], $height, $columns[$i], 1, 0, 'C', true);
 	}
 	$pdf->Ln();
 
 	$pdf->SetTextColor(0, 0, 0);
 	$pdf->SetFont('helvetica', '', $fontSize);
+}
+
+/**
+ * Shrink the current font just enough so $text fits inside $cellWidth.
+ * Used for Form 1A date columns (mm/dd/yyyy) whose 17-23mm cells would
+ * otherwise overflow with TCPDF's fixed-width Cell(). Only shrinks when
+ * the text is actually wider than the cell; never enlarges. Restores
+ * nothing — callers set their desired font right after via SetFont().
+ */
+function pdf_fit_font_to_width(TCPDF $pdf, string $family, string $style, string $text, float $cellWidth, float $baseSize, float $minSize = 6.0): void {
+	$label = trim($text);
+	if ($label === '' || $cellWidth <= 0) {
+		$pdf->SetFont($family, $style, $baseSize);
+		return;
+	}
+	$size = $baseSize;
+	$pdf->SetFont($family, $style, $size);
+	// 2mm total side padding so text never kisses the border.
+	while ($size > $minSize && $pdf->GetStringWidth($label) > ($cellWidth - 2.0)) {
+		$size -= 0.5;
+		$pdf->SetFont($family, $style, $size);
+	}
 }
 
 function pdf_status_fill(string $code): ?array {
@@ -83,11 +106,12 @@ function pdf_status_fill(string $code): ?array {
 	return $map[$code] ?? null;
 }
 
-function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = false, array $aligns = [], array $cellFills = []): void {
+function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = false, array $aligns = [], array $cellFills = [], ?array $shrinkCols = null, float $baseFontSize = 7.0, float $minFontSize = 6.0, array $boldCols = [], float $rowHeight = 5.0): void {
 	$altR = $isAlt ? 240 : 255;
 	$altG = $isAlt ? 248 : 255;
 	$altB = $isAlt ? 244 : 255;
-	$maxH = 5;
+	$maxH = $rowHeight;
+	$pdf->SetFont('helvetica', '', $baseFontSize);
 	for ($i = 0; $i < count($values); $i++) {
 		if (isset($cellFills[$i])) {
 			$f = $cellFills[$i];
@@ -96,9 +120,17 @@ function pdf_data_row(TCPDF $pdf, array $values, array $widths, bool $isAlt = fa
 			$pdf->SetFillColor($altR, $altG, $altB);
 		}
 		$align = $aligns[$i] ?? 'L';
+		$style = in_array($i, $boldCols, true) ? 'B' : '';
+		$shouldShrink = $shrinkCols === null || in_array($i, $shrinkCols, true);
+		if ($shouldShrink) {
+			pdf_fit_font_to_width($pdf, 'helvetica', $style, (string)$values[$i], (float)$widths[$i], $baseFontSize, $minFontSize);
+		} else {
+			$pdf->SetFont('helvetica', $style, $baseFontSize);
+		}
 		$pdf->Cell($widths[$i], $maxH, (string)$values[$i], 1, 0, $align, true);
 	}
 	$pdf->Ln();
+	$pdf->SetFont('helvetica', '', $baseFontSize);
 }
 
 function pdf_two_level_header(TCPDF $pdf, array $widths): void {
@@ -107,9 +139,9 @@ function pdf_two_level_header(TCPDF $pdf, array $widths): void {
 	$b = hexdec('4F');
 	$pdf->SetFillColor($r, $g, $b);
 	$pdf->SetTextColor(255, 255, 255);
-	$pdf->SetFont('helvetica', 'B', 7);
+	$pdf->SetFont('helvetica', 'B', 6.5);
 
-	$rowH = 5;
+	$rowH = 4.5;
 	$totalH = $rowH * 2;
 
 	$pdf->Cell($widths[0], $totalH, 'Classification', 1, 0, 'C', true);
@@ -130,7 +162,7 @@ function pdf_two_level_header(TCPDF $pdf, array $widths): void {
 	$pdf->Ln();
 
 	$pdf->SetTextColor(0, 0, 0);
-	$pdf->SetFont('helvetica', '', 7);
+	$pdf->SetFont('helvetica', '', 6);
 }
 
 function pdf_totals_row(TCPDF $pdf, string $label, int $count, array $widths): void {
@@ -268,22 +300,19 @@ function pdf_fetch_list(array $f, string $conditionSql, int $ageMin = 0, int $ag
 	);
 }
 
-function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = false, array $followupSeqMap = [], bool $showFollowups = false): void {
+function pdf_render_list_table(TCPDF $pdf, array $rows, array $followupSeqMap = [], bool $showFollowups = false): void {
 	$cols = ['No.', 'Address', 'Mother/Caregiver', 'Full Name of Child', 'Sex', 'Birthdate', 'Height (cm)', 'Weight (kg)', 'WFA', 'HFA', 'WFH'];
 	$widths = [12, 28, 32, 50, 14, 20, 18, 18, 14, 14, 14];
 
-	if ($showCategory) {
-		$cols[] = 'Category';
-		$widths[] = 30;
-	}
-
 	if ($showFollowups) {
-		// Condensed base widths so 11 base + 6 Month# cols fit landscape A4
-		// (printable ~273mm). Smaller 6pt font keeps "Month#6" headers inside.
-		$widths = [7, 18, 22, 28, 9, 14, 11, 11, 9, 9, 9];
+		// Roomy widths so 11 base + 6 Month# cols fill landscape A4
+		// (printable 273mm): Sex/Birthdate/Height/Weight/WFA/HFA/WFH and the
+		// Month# date cells all fit at base size — "Height (cm)" needs 13.6mm
+		// at 6pt, "Sep-19-2026" needs 14.2mm at 7pt.
+		$widths = [7, 20, 24, 30, 12, 16, 16, 16, 12, 12, 12];
 		for ($mh = 1; $mh <= 6; $mh++) {
 			$cols[] = 'Month#' . $mh;
-			$widths[] = 14;
+			$widths[] = 16;
 		}
 	}
 
@@ -308,7 +337,7 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 			(string)$row['parent_name'],
 			$fullName,
 			(string)$row['sex'],
-			(string)$row['birthdate'],
+			function_exists('eopt_format_mdy') ? eopt_format_mdy($row['birthdate'] ?? null) : (string)$row['birthdate'],
 			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
 			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
 			(string)($row['wfa_status'] ?? ''),
@@ -333,11 +362,6 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 			$cellFills[10] = $wfhFill;
 		}
 
-		if ($showCategory) {
-			$catCodes = monitoring_abnormal_codes($row['wfa_status'] ?? null, $row['hfa_status'] ?? null, $row['wfh_status'] ?? null);
-			$values[] = monitoring_category_label(implode('+', $catCodes)) ?: '';
-		}
-
 		if ($showFollowups) {
 			$seqVisits = $followupSeqMap[(int)($row['id'] ?? 0)] ?? [];
 			for ($mn = 1; $mn <= 6; $mn++) {
@@ -346,7 +370,7 @@ function pdf_render_list_table(TCPDF $pdf, array $rows, bool $showCategory = fal
 					$values[] = '';
 				} else {
 					try {
-						$values[] = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M j, Y');
+						$values[] = (new DateTimeImmutable((string)$visit['scheduled_at']))->format('M-d-Y');
 					} catch (Exception) {
 						$values[] = '';
 					}
@@ -369,8 +393,6 @@ function pdf_generate_form1a(array $f): TCPDF {
 
 	$pdf->SetFont('helvetica', 'B', 10);
 	$pdf->Cell(0, 6, 'OPT PLUS FORM 1A: PRE-PRINTED LIST OF PRESCHOOL CHILDREN IN THE BARANGAY', 0, 1, 'C');
-	$pdf->SetFont('helvetica', '', 7);
-	$pdf->Cell(0, 5, 'Names are alphabetically arranged. Add new or previously unlisted children at the end of this list.', 0, 1, 'C');
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
 	$allRows = admin_fetch_all(
@@ -397,8 +419,13 @@ function pdf_generate_form1a(array $f): TCPDF {
 		array_merge([$f['anchor_param'], $f['anchor_param'], $f['anchor_param']], $f['scope_params'], $f['barangay_filter_params'], [$f['anchor_param']])
 	);
 
-	$cols = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date of Measurement', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nutritional Status (WFL/H)', 'Disability'];
-	$widths = [14, 24, 29, 41, 10, 10, 17, 20, 16, 16, 15, 15, 31, 15];
+	$cols = ['Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name of Child', 'IP?', 'Sex', 'Date of Birth', 'Date Measured', 'Weight (kg)', 'Height (cm)', 'Age in Months', 'Age in Days', 'Nut. Status (WFL/H)', 'Disability'];
+	// Printable width on Landscape A4 with 12mm margins is 273mm — keep the
+	// sum exact. Short labels ("Date Measured", "Nut. Status") replace ones
+	// that overflowed even at minimum font; Age in Months widened (15->17)
+	// using 2mm from Disability (15->13). Auto-shrink remains as safety net
+	// for long names/addresses.
+	$widths = [14, 24, 29, 38, 10, 10, 20, 23, 16, 16, 17, 15, 28, 13];
 
 	pdf_table_header($pdf, $cols, $widths);
 
@@ -422,8 +449,8 @@ function pdf_generate_form1a(array $f): TCPDF {
 			$fullName,
 			!empty($row['is_ip']) ? 'YES' : 'NO',
 			(string)($row['sex'] ?? ''),
-			(string)($row['birthdate'] ?? ''),
-			(string)($row['measurement_date'] ?? ''),
+			function_exists('eopt_format_mdy') ? eopt_format_mdy($row['birthdate'] ?? null) : (string)($row['birthdate'] ?? ''),
+			function_exists('eopt_format_mdy') ? eopt_format_mdy($row['measurement_date'] ?? null) : (string)($row['measurement_date'] ?? ''),
 			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
 			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
 			(int)$row['age_months'],
@@ -481,10 +508,16 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 
 	$columns = [
 		'Child ID', 'Address / Location', 'Mother / Guardian', 'Full Name', 'IP?', 'Sex',
-		'Date of Birth', 'Date Measured', 'Weight kg', 'Height cm', 'Age mo.', 'Age days',
+		'Date of Birth', 'Date Measured', 'Weight kg', 'Height cm', 'Age in Months', 'Age in Days',
 		'WFA Status', 'HFA Status', 'WFL/H Status', 'Disability',
 	];
-	$widths = [13, 22, 25, 31, 10, 10, 16, 18, 14, 14, 12, 13, 22, 20, 24, 14];
+	// Printable width on Landscape A4 with 12mm margins is 273mm — keep the
+	// sum at/below it. Age columns widened (12->17, 13->17) for the full
+	// "Age in Months/Days" labels and WFA widened (19->21) for the long
+	// "Use WFL/H column" value; reclaimed from Address (22->21),
+	// Mother/Guardian (23->22), Full Name (31->28), HFA (20->18), WFL/H
+	// (24->21), and Disability (14->13). Auto-shrink covers residuals.
+	$widths = [13, 21, 22, 28, 10, 10, 16, 18, 14, 14, 17, 17, 21, 18, 21, 13];
 	pdf_table_header($pdf, $columns, $widths);
 
 	foreach ($rows as $index => $row) {
@@ -524,8 +557,8 @@ function pdf_generate_nutstatus(array $f): TCPDF {
 			$fullName,
 			!empty($row['is_ip']) ? 'YES' : 'NO',
 			(string)($row['sex'] ?? ''),
-			(string)($row['birthdate'] ?? ''),
-			(string)($row['measurement_date'] ?? ''),
+			function_exists('eopt_format_mdy') ? eopt_format_mdy($row['birthdate'] ?? null) : (string)($row['birthdate'] ?? ''),
+			function_exists('eopt_format_mdy') ? eopt_format_mdy($row['measurement_date'] ?? null) : (string)($row['measurement_date'] ?? ''),
 			$row['weight_kg'] !== null ? number_format((float)$row['weight_kg'], 2) : '',
 			$row['height_cm'] !== null ? number_format((float)$row['height_cm'], 1) : '',
 			(int)$row['age_months'],
@@ -661,17 +694,7 @@ function pdf_generate_form1b(array $f): TCPDF {
 		}
 	}
 
-	$pdf->SetFont('helvetica', 'B', 8);
-	$pdf->Cell(0, 6, 'Coverage and prevalence information', 0, 1);
-	$pdf->SetFont('helvetica', '', 8);
-	$pdf->Cell(65, 5, 'Barangay:', 0, 0); $pdf->Cell(70, 5, $f['barangay_name'], 0, 0);
-	$pdf->Cell(65, 5, 'Municipality / Province:', 0, 0); $pdf->Cell(70, 5, 'City of San Fernando, Pampanga', 0, 1);
-	$pdf->Cell(65, 5, 'Reporting year:', 0, 0); $pdf->Cell(70, 5, (string)$f['year'], 0, 0);
-	$pdf->Cell(65, 5, 'OPT Plus coverage:', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed . ' assessed', 0, 1);
-	$pdf->Cell(65, 5, 'Total children assessed:', 0, 0); $pdf->Cell(70, 5, (string)$totalAssessed, 0, 0);
-	$pdf->Cell(65, 5, 'Indigenous children:', 0, 0); $pdf->Cell(70, 5, (string)$ipCount, 0, 1);
-	$pdf->Cell(65, 5, 'Children with disability:', 0, 0); $pdf->Cell(70, 5, (string)$disabilityCount, 0, 1);
-	$pdf->Ln(3);
+	$pdf->Ln(2);
 
 	$wLabel = 24;
 	$wAgeSub = 10;
@@ -684,50 +707,56 @@ function pdf_generate_form1b(array $f): TCPDF {
 	$ageGroupLabels = ['0-5', '6-11', '12-23', '24-35', '36-47', '48-59'];
 	$subHeaders = ['Boys', 'Girls', 'Total'];
 
-	$pdf->SetFont('helvetica', 'B', 8);
-	$pdf->Cell(0, 6, 'NUTRITIONAL STATUS CONSOLIDATION TABLE', 0, 1);
-
 	$darkFill = [16, 110, 79];
 	$pdf->SetFillColor($darkFill[0], $darkFill[1], $darkFill[2]);
 	$pdf->SetTextColor(255, 255, 255);
-	$y1 = $pdf->GetY();
-	$x = $pdf->GetX();
 
-	$pdf->SetFont('helvetica', 'B', 6);
-	$hTop = 10;
-	$pdf->Cell($wLabel, $hTop, "ACRONYMS &\nABBREVIATIONS", 1, 0, 'C', true);
-	$pdf->SetFont('helvetica', '', 6);
-	foreach ($ageGroupLabels as $gl) {
-		$pdf->Cell($wAgeGroup, $hTop, $gl . " Months", 1, 0, 'C', true);
+	// Single-line short headers: TCPDF Cell() ignores "\n", which is why
+	// the old two-line titles ("ACRONYMS &\nABBREVIATIONS", etc.) rendered
+	// as one long overflowing line. Short labels always fit their cells.
+	$hTop = 7;
+	$topHeaders = array_merge(
+		['STATUS'],
+		array_map(static fn($gl) => $gl . ' MOS', $ageGroupLabels),
+		['0-59 TOTAL', 'F1K 0-23', 'IP']
+	);
+	$topWidths = array_merge(
+		[$wLabel],
+		array_fill(0, 6, $wAgeGroup),
+		[$wSummary, $wSummary, $wIP]
+	);
+	for ($i = 0; $i < count($topHeaders); $i++) {
+		pdf_fit_font_to_width($pdf, 'helvetica', 'B', $topHeaders[$i], (float)$topWidths[$i], 6.0, 5.0);
+		$pdf->Cell($topWidths[$i], $hTop, $topHeaders[$i], 1, 0, 'C', true);
 	}
-	$pdf->SetFont('helvetica', 'B', 5);
-	$pdf->Cell($wSummary, $hTop, "Birth to 5 Years\n(0-59 Months)", 1, 0, 'C', true);
-	$pdf->Cell($wSummary, $hTop, "F1K\n(0-23 Months)", 1, 0, 'C', true);
-	$pdf->Cell($wIP, $hTop, "# IP\nChildren", 1, 0, 'C', true);
 	$pdf->Ln();
 
-	$pdf->SetFont('helvetica', 'B', 6);
-	$hSub = 6;
-	$pdf->Cell($wLabel, $hSub, '', 1, 0, 'C', true);
+	$hSub = 5;
+	$subWidths = array_merge(
+		[$wLabel],
+		array_fill(0, 18, $wAgeSub),
+		array_fill(0, 2, $wSumSub),
+		array_fill(0, 2, $wSumSub),
+		array_fill(0, 3, $wIPSub)
+	);
+	$flatSubs = [''];
 	for ($g = 0; $g < 6; $g++) {
 		foreach ($subHeaders as $sh) {
-			$pdf->Cell($wAgeSub, $hSub, $sh, 1, 0, 'C', true);
+			$flatSubs[] = $sh;
 		}
 	}
-	foreach (['Total', 'Prev'] as $sh) {
-		$pdf->Cell($wSumSub, $hSub, $sh, 1, 0, 'C', true);
+	foreach (['Total', 'Prev', 'Total', 'Prev', 'B', 'G', 'T'] as $sh) {
+		$flatSubs[] = $sh;
 	}
-	foreach (['Total', 'Prev'] as $sh) {
-		$pdf->Cell($wSumSub, $hSub, $sh, 1, 0, 'C', true);
-	}
-	foreach (['Boys', 'Girls', 'Total'] as $sh) {
-		$pdf->Cell($wIPSub, $hSub, $sh, 1, 0, 'C', true);
+	for ($i = 0; $i < count($flatSubs); $i++) {
+		pdf_fit_font_to_width($pdf, 'helvetica', 'B', (string)$flatSubs[$i], (float)$subWidths[$i], 6.0, 5.0);
+		$pdf->Cell($subWidths[$i], $hSub, (string)$flatSubs[$i], 1, 0, 'C', true);
 	}
 	$pdf->Ln();
 
 	$pdf->SetTextColor(0, 0, 0);
 	$pdf->SetFont('helvetica', '', 5);
-	$rowH = 5;
+	$rowH = 4.5;
 	$rowIndex = 0;
 
 	$owMessage = 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.';
@@ -765,20 +794,13 @@ function pdf_generate_form1b(array $f): TCPDF {
 			$values[] = $counts['ip_girls'];
 			$values[] = $ipTotal;
 
-			$widths = array_merge([$wLabel], array_fill(0, 18, $wAgeSub), array_fill(0, 2, $wSumSub), array_fill(0, 2, $wSumSub), array_fill(0, 3, $wIPSub));
-			$aligns = array_merge(['L'], array_fill(0, 25, 'C'));
+		$widths = array_merge([$wLabel], array_fill(0, 18, $wAgeSub), array_fill(0, 2, $wSumSub), array_fill(0, 2, $wSumSub), array_fill(0, 3, $wIPSub));
+		$aligns = array_merge(['L'], array_fill(0, 25, 'C'));
+		// Column 0 is the status label; every other cell is a number.
+		$boldCols = range(1, count($values) - 1);
 
-			if ($rowIndex % 2 === 0) {
-				$pdf->SetFillColor(240, 248, 244);
-			} else {
-				$pdf->SetFillColor(255, 255, 255);
-			}
-			for ($i = 0; $i < count($values); $i++) {
-				$align = $aligns[$i] ?? 'L';
-				$pdf->Cell($widths[$i], $rowH, (string)$values[$i], 1, 0, $align, true);
-			}
-			$pdf->Ln();
-			$rowIndex++;
+		pdf_data_row($pdf, $values, $widths, $rowIndex % 2 === 0, $aligns, [], null, 5.0, 4.5, $boldCols, $rowH);
+		$rowIndex++;
 		}
 	}
 
@@ -831,9 +853,9 @@ function pdf_generate_form1b(array $f): TCPDF {
 	}
 	$repeatedChildren = count(array_filter($duplicateKeys, static fn($c) => $c > 1));
 
-	$pdf->Ln(3);
+	$pdf->Ln(2);
 	$pdf->SetFont('helvetica', 'B', 8);
-	$pdf->Cell(0, 6, 'SUMMARY', 0, 1);
+	$pdf->Cell(0, 5, 'SUMMARY', 0, 1);
 
 	$sFill = [16, 110, 79];
 	$pdf->SetFillColor($sFill[0], $sFill[1], $sFill[2]);
@@ -841,16 +863,16 @@ function pdf_generate_form1b(array $f): TCPDF {
 	$pdf->SetFont('helvetica', 'B', 6);
 
 	$scW = [80, 12, 80, 12, 72, 6];
-	$pdf->Cell($scW[0], 6, 'Summary of Children covered by e-OPT Plus', 1, 0, 'C', true);
-	$pdf->Cell($scW[1], 6, '', 1, 0, 'C', true);
-	$pdf->Cell($scW[2], 6, 'Mothers/Caregivers Summary', 1, 0, 'C', true);
-	$pdf->Cell($scW[3], 6, '', 1, 0, 'C', true);
-	$pdf->Cell($scW[4], 6, 'Data Inaccuracy', 1, 0, 'C', true);
-	$pdf->Cell($scW[5], 6, '', 1, 1, 'C', true);
+	$pdf->Cell($scW[0], 5, 'Summary of Children covered by e-OPT Plus', 1, 0, 'C', true);
+	$pdf->Cell($scW[1], 5, '', 1, 0, 'C', true);
+	$pdf->Cell($scW[2], 5, 'Mothers/Caregivers Summary', 1, 0, 'C', true);
+	$pdf->Cell($scW[3], 5, '', 1, 0, 'C', true);
+	$pdf->Cell($scW[4], 5, 'Data Inaccuracy', 1, 0, 'C', true);
+	$pdf->Cell($scW[5], 5, '', 1, 1, 'C', true);
 
 	$pdf->SetTextColor(0, 0, 0);
 	$pdf->SetFont('helvetica', '', 5.5);
-	$sRowH = 5;
+	$sRowH = 4.5;
 
 	$summaryData = [
 		['# Children 0-59 mos. Wasted/Stunted', $sumChildren['ws59'], 'Total Number of M/Cs 0-59 mos. old', $sumMC['total59'], '# Children with names and birthdate repeated', $repeatedChildren],
@@ -894,7 +916,7 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 	$pdf->AddPage();
 	pdf_header_block($pdf, $f['year'], $f['period_label'], $f['barangay_name']);
 	$pdf->SetFont('helvetica', 'B', 10);
-	$pdf->Cell(0, 7, 'NUTRITIONAL STATUS OF CHILDREN 0-23 AND 0-59 MONTHS OLD', 0, 1, 'C');
+	$pdf->Cell(0, 6, 'NUTRITIONAL STATUS OF CHILDREN 0-23 AND 0-59 MONTHS OLD', 0, 1, 'C');
 	$pdf->SetFont('helvetica', '', 7);
 	$pdf->Cell(0, 5, 'SEX-DISAGGREGATED SUMMARY TABLES FOR PRESENTATION | Region III - Central Luzon | Pampanga | City of San Fernando', 0, 1, 'C');
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
@@ -954,17 +976,17 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 
 	$axisConfig = [
 		'WFA' => [
-			'title' => '3. WEIGHT FOR AGE',
+			'title' => 'WEIGHT FOR AGE',
 			'order' => ['Normal', 'MUW', 'SUW'],
-			'message' => 'No Obese/Overweight classification in the WFA. Following international standards, we use WL/HZ to classify overweight and obesity in children.',
+			'message' => 'WFA has no Overweight/Obese classification — see the WFL/H section below.',
 		],
 		'HFA' => [
-			'title' => '4. HEIGHT FOR AGE',
+			'title' => 'HEIGHT FOR AGE',
 			'order' => ['Normal', 'Tall', 'MSt', 'SSt'],
 			'message' => null,
 		],
 		'WFL/H' => [
-			'title' => '5. WEIGHT FOR LENGTH/HEIGHT',
+			'title' => 'WEIGHT FOR LENGTH/HEIGHT',
 			'order' => ['Normal', 'OW', 'Ob', 'MW', 'SW'],
 			'message' => null,
 		],
@@ -972,12 +994,12 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 	$widths = [50, 18, 18, 18, 20, 18, 18, 18, 20];
 
 	foreach ($axisConfig as $axis => $cfg) {
-		$pdf->SetFont('helvetica', 'B', 9);
-		$pdf->Cell(0, 6, $cfg['title'], 0, 1);
+		$pdf->SetFont('helvetica', 'B', 8);
+		$pdf->Cell(0, 5, $cfg['title'], 0, 1);
 		$lineY = $pdf->GetY() + 1;
 		$xLeft = $pdf->GetX();
 		$pdf->Line($xLeft, $lineY, $pdf->GetPageWidth() - $xLeft, $lineY);
-		$pdf->Ln(3);
+		$pdf->Ln(2);
 
 		pdf_two_level_header($pdf, $widths);
 
@@ -989,33 +1011,37 @@ function pdf_generate_nutstatusbrgy(array $f): TCPDF {
 			$allTotal = $summary[$axis][$code]['0-59']['Boys'] + $summary[$axis][$code]['0-59']['Girls'];
 			$earlyPrev = $denominators[$axis]['0-23'] > 0 ? number_format(($earlyTotal / $denominators[$axis]['0-23']) * 100, 1) . '%' : '0.0%';
 			$allPrev = $denominators[$axis]['0-59'] > 0 ? number_format(($allTotal / $denominators[$axis]['0-59']) * 100, 1) . '%' : '0.0%';
+			// Column 0 is the classification label; every other cell is a number.
 			pdf_data_row($pdf, [
 				$label,
 				$summary[$axis][$code]['0-23']['Boys'], $summary[$axis][$code]['0-23']['Girls'], $earlyTotal, $earlyPrev,
 				$summary[$axis][$code]['0-59']['Boys'], $summary[$axis][$code]['0-59']['Girls'], $allTotal, $allPrev,
-			], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C']);
+			], $widths, $i % 2 === 0, ['L', 'C', 'C', 'C', 'C', 'C', 'C', 'C', 'C'], [], null, 6.0, 5.5, range(1, 8), 4.0);
 			$i++;
 
 			if ($code === 'Normal' && !empty($cfg['message'])) {
 				$totalW = 0;
 				for ($c = 0; $c < count($widths); $c++) { $totalW += $widths[$c]; }
 				$pdf->SetFillColor(240, 248, 244);
-				$pdf->SetFont('helvetica', 'I', 7);
-				$pdf->MultiCell($totalW, 5, $cfg['message'], 1, 'C', true);
-				$pdf->SetFont('helvetica', '', 7);
+				$pdf->SetFont('helvetica', 'I', 6);
+				$pdf->MultiCell($totalW, 4, $cfg['message'], 1, 'C', true);
+				$pdf->SetFont('helvetica', '', 6);
 				$i++;
 			}
 		}
-		$pdf->Ln(4);
+		$pdf->Ln(1);
 	}
 
+	// Single-row label + count boxes (previously two stacked rows each).
+	// Printable width is 273mm (Landscape A4 minus 12mm side margins).
 	$pdf->Ln(2);
 	$pdf->SetFont('helvetica', 'B', 7);
-	$pdf->Cell(0, 7, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-59 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 1, 'L');
-	$pdf->Cell(20, 7, (string)count($affectedParents['0-59']), 1, 1, 'C');
+	$boxLabelW = 273 - 25;
+	$pdf->Cell($boxLabelW, 6, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-59 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 0, 'L');
+	$pdf->Cell(25, 6, (string)count($affectedParents['0-59']), 1, 1, 'C');
 	$pdf->Ln(2);
-	$pdf->Cell(0, 7, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-23 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 1, 'L');
-	$pdf->Cell(20, 7, (string)count($affectedParents['0-23']), 1, 1, 'C');
+	$pdf->Cell($boxLabelW, 6, 'TOTAL NUMBER OF MOTHERS/CAREGIVERS OF CHILDREN (0-23 MOS OLD) AFFECTED BY UNDERNUTRITION', 1, 0, 'L');
+	$pdf->Cell(25, 6, (string)count($affectedParents['0-23']), 1, 1, 'C');
 	pdf_signature_block($pdf);
 
 	return $pdf;
@@ -1114,7 +1140,6 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 		'SW' => ['title' => 'MONITORING LIST FOR SEVERELY WASTED CHILDREN (SAM)', 'axis' => 'Weight-for-Height', 'condition' => "lm.wfh_status = 'SW'", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt' => ['title' => 'MONITORING LIST FOR MODERATELY OR SEVERELY STUNTED CHILDREN', 'axis' => 'Height-for-Age', 'condition' => "lm.hfa_status IN ('MSt','SSt')", 'age_min' => 0, 'age_max' => 59],
 		'OW_Ob' => ['title' => 'MONITORING LIST FOR OVERWEIGHT OR OBESE CHILDREN', 'axis' => 'Weight-for-Age / Weight-for-Height', 'condition' => "(lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob'))", 'age_min' => 0, 'age_max' => 59],
-		'MUW' => ['title' => 'MONITORING LIST FOR MODERATELY UNDERWEIGHT CHILDREN', 'axis' => 'Weight-for-Age', 'condition' => "lm.wfa_status = 'MUW'", 'age_min' => 0, 'age_max' => 59],
 		'MUW_SUW_MSt_SSt' => ['title' => 'MONITORING LIST FOR UNDERWEIGHT + STUNTED', 'axis' => 'Weight-for-Age + Height-for-Age', 'condition' => "(lm.wfa_status IN ('MUW','SUW') AND lm.hfa_status IN ('MSt','SSt'))", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt_MW_SW' => ['title' => 'MONITORING LIST FOR STUNTED + WASTED CHILDREN', 'axis' => 'Height-for-Age + Weight-for-Height', 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND lm.wfh_status IN ('MW','SW'))", 'age_min' => 0, 'age_max' => 59],
 		'MSt_SSt_OW_Ob' => ['title' => 'MONITORING LIST FOR STUNTED + OVERWEIGHT/OBESE', 'axis' => 'Height-for-Age + Weight-for-Height', 'condition' => "(lm.hfa_status IN ('MSt','SSt') AND (lm.wfa_status = 'OW' OR lm.wfh_status IN ('OW','Ob')))", 'age_min' => 0, 'age_max' => 59],
@@ -1137,13 +1162,13 @@ function pdf_generate_monitoring_list(string $listCode, array $f): TCPDF {
 	pdf_metadata_row($pdf, $f['barangay_name'], $f['period_label'], date('F j, Y'));
 
 	$rows = pdf_fetch_list($f, $spec['condition'], $spec['age_min'], $spec['age_max']);
-	// List_0-23 carries 6 sequence-based follow-up columns:
+	// Every monitoring list carries 6 sequence-based follow-up columns:
 	// Month#N = the child's Nth follow-up appointment (scheduled_at ASC).
-	$isInfantList = ($listCode === '0-23');
-	$followupSeqMap = ($isInfantList && !empty($rows))
+	// The old per-list Category column was removed.
+	$followupSeqMap = !empty($rows)
 		? eopt_fetch_followup_sequence_map(array_column($rows, 'id'))
 		: [];
-	pdf_render_list_table($pdf, $rows, $listCode !== '0-23', $followupSeqMap, $isInfantList);
+	pdf_render_list_table($pdf, $rows, $followupSeqMap, true);
 
 	return $pdf;
 }
@@ -1350,7 +1375,7 @@ function pdf_generate_referral(int $childId): TCPDF {
 		['Child Name:', trim(($child['last_name'] ?? '') . ', ' . ($child['first_name'] ?? '') . ' ' . ($child['middle_name'] ?? ''))],
 		['Child Code:', (string)($child['child_code'] ?? '')],
 		['Sex:', (string)$child['sex']],
-		['Birthdate:', (string)$child['birthdate']],
+		['Birthdate:', function_exists('eopt_format_mdy') ? eopt_format_mdy($child['birthdate'] ?? null) : (string)$child['birthdate']],
 		['Age:', doh_age_in_months((string)$child['birthdate']) . ' months'],
 		['Barangay:', (string)($child['barangay_name'] ?? '')],
 		['Municipality/City:', 'City of San Fernando, Pampanga'],
@@ -1372,7 +1397,7 @@ function pdf_generate_referral(int $childId): TCPDF {
 		$pdf->SetFont('helvetica', '', 8);
 
 		$mFields = [
-			['Measurement Date:', (string)$latestMeasurement['measurement_date']],
+			['Measurement Date:', function_exists('eopt_format_mdy') ? eopt_format_mdy($latestMeasurement['measurement_date'] ?? null) : (string)$latestMeasurement['measurement_date']],
 			['Weight (kg):', $latestMeasurement['weight_kg'] !== null ? number_format((float)$latestMeasurement['weight_kg'], 2) : 'N/A'],
 			['Height/Length (cm):', $latestMeasurement['height_cm'] !== null ? number_format((float)$latestMeasurement['height_cm'], 1) : 'N/A'],
 			['WFA:', (string)($latestMeasurement['wfa_status'] ?? 'N/A')],

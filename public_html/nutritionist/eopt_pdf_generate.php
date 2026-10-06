@@ -47,7 +47,7 @@ switch ($reportType) {
 		break;
 
 	case 'list':
-		$validCodes = ['0-23', 'MW', 'SW', 'MSt_SSt', 'OW_Ob', 'MUW', 'MUW_SUW_MSt_SSt', 'MSt_SSt_MW_SW', 'MSt_SSt_OW_Ob'];
+		$validCodes = ['0-23', 'MW', 'SW', 'MSt_SSt', 'OW_Ob', 'MUW_SUW_MSt_SSt', 'MSt_SSt_MW_SW', 'MSt_SSt_OW_Ob'];
 		if (!in_array($listCode, $validCodes, true)) {
 			admin_redirect(app_url('/nutritionist/eopt_reports.php'), ['notice' => 'Invalid monitoring list code.', 'type' => 'error']);
 			exit;

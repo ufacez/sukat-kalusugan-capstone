@@ -702,3 +702,22 @@ function nutritionist_chart_fill_rgba(string $hex, float $alpha): string
     $b = hexdec(substr($hex, 4, 2));
     return 'rgba(' . $r . ',' . $g . ',' . $b . ',' . $alpha . ')';
 }
+
+/**
+ * Format a DB DATE/DATETIME value as Mon-DD-YYYY (e.g. May-19-2024) for
+ * all EOPT PDF/Excel/CSV generations (birthdates + measurement dates).
+ * Returns '' for empty/invalid input so blank cells stay blank
+ * (never Jan-01-1970).
+ */
+function eopt_format_mdy(mixed $value): string
+{
+    $raw = trim((string)($value ?? ''));
+    if ($raw === '' || $raw === '0000-00-00' || $raw === '0000-00-00 00:00:00') {
+        return '';
+    }
+    $ts = strtotime($raw);
+    if ($ts === false) {
+        return '';
+    }
+    return date('M-d-Y', $ts);
+}
