@@ -47,16 +47,23 @@ if ($view === 'monthly') {
     $periodMonths = [$nowMonth];
 }
 
+// ── New children notification count ──
+$currentMonthRange = monitoring_month_range((int)date('Y'), $nowMonth);
+$currentQuarterRange = monitoring_quarter_range((int)date('Y'), $nowQuarter);
+$newChildrenTabRows = [];
+foreach ([
+    monitoring_fetch_list($user, 'new', $currentMonthRange['start'], $currentMonthRange['end']),
+    monitoring_fetch_list($user, 'new', $currentQuarterRange['start'], $currentQuarterRange['end']),
+] as $newChildrenRows) {
+    foreach ($newChildrenRows as $newChild) {
+        $newChildrenTabRows[(int)$newChild['id']] = $newChild;
+    }
+}
+$newChildrenCount = count($newChildrenTabRows);
+
 // ── Roster ──
 if ($view === 'new') {
-    $newMonthly = monitoring_fetch_list($user, 'new', $period['start'], $period['end']);
-    $currentQuarterRange = monitoring_quarter_range((int)date('Y'), $nowQuarter);
-    $newQuarterly = monitoring_fetch_list($user, 'new', $currentQuarterRange['start'], $currentQuarterRange['end']);
-    $roster = [];
-    foreach (array_merge($newMonthly, $newQuarterly) as $newChild) {
-        $roster[(int)$newChild['id']] = $newChild;
-    }
-    $roster = array_values($roster);
+    $roster = array_values($newChildrenTabRows);
 } else {
     $roster = monitoring_fetch_list($user, $view, $period['start'], $period['end']);
 }
@@ -226,6 +233,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 .rp-tab{display:inline-flex;align-items:center;gap:6px;padding:12px 20px;min-height:44px;font-size:14px;font-weight:600;color:var(--admin-muted);text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-2px;transition:color .15s,border-color .15s,background .15s;border-radius:8px 8px 0 0}
 .rp-tab:hover{color:var(--admin-text);background:var(--admin-surface-alt)}
 .rp-tab.is-active{color:var(--admin-primary);border-bottom-color:var(--admin-primary);background:transparent}
+.mon-new-badge{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:20px;padding:0 6px;border-radius:999px;background:#dc2626;color:#fff;font-size:11px;font-weight:800;line-height:1}
 .mon-subtabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
 .mon-subtab{font-size:14px;font-weight:700;padding:10px 18px;min-height:44px;display:inline-flex;align-items:center;border-radius:999px;border:2px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-text);text-decoration:none;transition:all .15s}
 .mon-subtab:hover{border-color:var(--admin-primary);color:var(--admin-primary)}
@@ -270,7 +278,7 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 <div class="rp-tabs">
     <a class="rp-tab <?php echo $view === 'monthly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('monthly')); ?>">Monthly</a>
     <a class="rp-tab <?php echo $view === 'quarterly' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('quarterly')); ?>">Quarterly</a>
-    <a class="rp-tab <?php echo $view === 'new' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('new')); ?>">New Children</a>
+    <a class="rp-tab <?php echo $view === 'new' ? 'is-active' : ''; ?>" href="<?php echo nutritionist_e($viewLink('new')); ?>">New Children<?php if ($newChildrenCount > 0): ?> <span class="mon-new-badge"><?php echo $newChildrenCount > 99 ? '99+' : (int)$newChildrenCount; ?></span><?php endif; ?></a>
 </div>
 
 <!-- ============ SUB TABS ============ -->
