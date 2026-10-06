@@ -200,7 +200,9 @@ $monChevronRight = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox=
 
 $monthNames = [1 => 'Jan', 2 => 'Feb', 3 => 'Mar', 4 => 'Apr', 5 => 'May', 6 => 'Jun', 7 => 'Jul', 8 => 'Aug', 9 => 'Sep', 10 => 'Oct', 11 => 'Nov', 12 => 'Dec'];
 
-$actions = '';
+$actions = nutritionist_can_write()
+    ? '<a class="admin-btn" href="' . nutritionist_e(app_url('/nutritionist/measurement_record.php')) . '">' . admin_action_icon('measure') . ' Add measurement</a>'
+    : '';
 
 nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monitoring of children.', 'monitoring', $actions);
 ?>
@@ -229,6 +231,9 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
 .children-table .child-name-cell .text{min-width:0}
 .children-table .child-name-cell .text .name{font-weight:600;color:var(--admin-text);font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .children-table .child-name-cell .text .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
+.children-table th:last-child,
+.children-table td:last-child{width:140px;min-width:140px;white-space:nowrap;text-align:center;padding-left:12px;padding-right:12px}
+.children-table td:last-child .admin-actions{justify-content:center;gap:8px}
 .children-empty{padding:32px 18px;color:var(--admin-muted);font-size:13px;background:var(--admin-surface-alt);border-radius:10px;border:1px dashed var(--admin-border);text-align:center;display:flex;flex-direction:column;align-items:center;gap:10px}
 .children-empty .empty-title{font-weight:700;color:var(--admin-text);font-size:14px}
 .children-empty .empty-sub{color:var(--admin-muted);max-width:420px;line-height:1.45}

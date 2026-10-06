@@ -20,7 +20,7 @@ $children = admin_fetch_all(
         bg.name AS barangay
      FROM children c
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
-     WHERE {$childrenScope}
+     WHERE {$childrenScope} AND c.status = 'active'
      ORDER BY c.last_name ASC, c.first_name ASC",
     str_repeat('i', count($childrenParams)),
     $childrenParams
@@ -107,12 +107,29 @@ nutritionist_layout_start(
 .child-picker-item .meta .name{font-weight:600;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .child-picker-item .meta .sub{font-size:10px;color:var(--admin-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 
-.child-summary{display:none;background:var(--admin-primary-soft);border:1px solid var(--admin-border);border-radius:10px;padding:12px 14px;margin-top:10px}
+.child-summary{display:none;background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:12px 14px;margin-top:10px}
 .child-summary.is-visible{display:block}
-.child-summary .row{display:flex;justify-content:space-between;align-items:center;font-size:12px;padding:3px 0}
-.child-summary .row .label{color:var(--admin-muted)}
-.child-summary .row .value{font-weight:600;color:var(--admin-text)}
-.child-summary .pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.cs-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;border-bottom:1px solid var(--admin-border)}
+.cs-head .avatar{width:36px;height:36px;border-radius:50%;background:var(--admin-primary);color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cs-headmeta{min-width:0;flex:1}
+.cs-name{font-weight:700;font-size:14px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-sub{font-size:11px;color:var(--admin-muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cs-head .pills{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.cs-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 16px;margin-top:2px}
+.cs-item{display:flex;justify-content:space-between;align-items:center;gap:10px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--admin-border)}
+.cs-item .k{color:var(--admin-muted);flex-shrink:0}
+.cs-item .v{font-weight:600;color:var(--admin-text);text-align:right}
+@media(max-width:560px){.cs-grid{grid-template-columns:1fr}.cs-head .pills{justify-content:flex-start}}
+
+/* Override panel — theme-aware colors so the title and hint stay
+readable in both light and dark mode (no hardcoded reds). */
+.ov-panel{display:none;padding:12px 14px;border-radius:10px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.28);margin:16px 0 14px}
+.ov-panel.is-open{display:block}
+.ov-panel .ov-title{font-weight:800;font-size:13px;color:var(--admin-danger);margin-bottom:6px}
+.ov-panel .ov-hint{margin:0 0 10px;font-size:12px;color:var(--admin-text)}
+.rc-panel{display:none;padding:12px 14px;border-radius:10px;background:rgba(11,110,79,.06);border:1px solid rgba(11,110,79,.30);margin:16px 0 14px}
+.rc-panel.is-open{display:block}
+
 
 .measurement-form{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px}
 .measurement-form .admin-field{margin:0;display:flex;flex-direction:column;gap:6px}
@@ -135,14 +152,16 @@ nutritionist_layout_start(
 .who-result .zgrid .zcard .label{font-size:10px;color:var(--admin-muted)}
 
 .who-flags{margin-top:10px;display:flex;flex-wrap:wrap;gap:6px}
-.who-flags .pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:rgba(224,49,49,0.10);color:#E03131}
+.who-flags .pill{font-size:10px;font-weight:600;padding:3px 8px;border-radius:6px;background:rgba(224,49,49,0.10);color:var(--admin-danger)}
 
 .who-summary{margin-top:10px;padding:10px 12px;border-radius:8px;background:var(--admin-primary-soft);color:var(--admin-text);font-size:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 
 .action-row{margin-top:18px;display:flex;gap:10px;flex-wrap:wrap}
 
-.flag-banner{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(224,49,49,0.08);color:#E03131;font-size:12px;font-weight:600}
+.flag-banner{display:none;margin-top:10px;padding:10px 12px;border-radius:8px;background:rgba(224,49,49,0.08);color:var(--admin-danger);font-size:12px;font-weight:600}
 .flag-banner.is-visible{display:block}
+
+
 
 .last-hint{margin-top:8px;padding:8px 10px;border-radius:8px;background:var(--admin-surface-alt);font-size:11px;color:var(--admin-muted);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
 .last-hint strong{color:var(--admin-text);font-weight:700}
@@ -172,15 +191,21 @@ nutritionist_layout_start(
             </div>
 
             <div class="child-summary<?php echo $preselectedChild !== null ? ' is-visible' : ''; ?>" id="child-summary">
-                <div class="row"><span class="label">Name</span><span class="value" id="cs-name"><?php echo $preselectedChild !== null ? nutritionist_e(trim($preselectedChild['first_name'] . ' ' . ($preselectedChild['middle_name'] ?? '') . ' ' . $preselectedChild['last_name'])) : ''; ?></span></div>
-                <div class="row"><span class="label">Code</span><span class="value" id="cs-code"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['child_code']) : ''; ?></span></div>
-                <div class="row"><span class="label">Sex</span><span class="value" id="cs-sex"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['sex']) : ''; ?></span></div>
-                <div class="row"><span class="label">Birthdate</span><span class="value" id="cs-birthdate"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['birthdate']) : ''; ?></span></div>
-                <div class="row"><span class="label">Age at measurement</span><span class="value" id="cs-age">—</span></div>
-                <div class="row"><span class="label">Age in days</span><span class="value" id="cs-age-days">—</span></div>
-                <div class="row"><span class="label">Barangay</span><span class="value" id="cs-barangay"><?php echo $preselectedChild !== null ? nutritionist_e((string)($preselectedChild['barangay'] ?? '—')) : ''; ?></span></div>
-                <div class="row"><span class="label">Measurement date</span><span class="value" id="cs-measurement-date">—</span></div>
-                <div class="pills" id="cs-pills"></div>
+                <div class="cs-head">
+                    <span class="avatar" id="cs-avatar"><?php echo $preselectedChild !== null ? nutritionist_e(admin_initials(trim($preselectedChild['first_name'] . ' ' . $preselectedChild['last_name']))) : '—'; ?></span>
+                    <div class="cs-headmeta">
+                        <div class="cs-name" id="cs-name"><?php echo $preselectedChild !== null ? nutritionist_e(trim($preselectedChild['first_name'] . ' ' . ($preselectedChild['middle_name'] ?? '') . ' ' . $preselectedChild['last_name'])) : ''; ?></div>
+                        <div class="cs-sub"><span id="cs-code"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['child_code']) : ''; ?></span> · <span id="cs-barangay"><?php echo $preselectedChild !== null ? nutritionist_e((string)($preselectedChild['barangay'] ?? '—')) : ''; ?></span></div>
+                    </div>
+                    <div class="pills" id="cs-pills"></div>
+                </div>
+                <div class="cs-grid">
+                    <div class="cs-item"><span class="k">Sex</span><span class="v" id="cs-sex"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['sex']) : ''; ?></span></div>
+                    <div class="cs-item"><span class="k">Birthdate</span><span class="v" id="cs-birthdate"><?php echo $preselectedChild !== null ? nutritionist_e((string)$preselectedChild['birthdate']) : ''; ?></span></div>
+                    <div class="cs-item"><span class="k">Age in months</span><span class="v" id="cs-age">—</span></div>
+                    <div class="cs-item"><span class="k">Age in days</span><span class="v" id="cs-age-days">—</span></div>
+                    <div class="cs-item"><span class="k">Measurement date</span><span class="v" id="cs-measurement-date">—</span></div>
+                </div>
 
                 <?php if ($lastMeasurement !== null): ?>
                     <div class="last-hint">
@@ -223,7 +248,7 @@ nutritionist_layout_start(
                     </label>
                     <label class="admin-field admin-field-wide">
                         <span>Measurement date</span>
-                        <input type="date" name="measurement_date" id="date-input" value="<?php echo nutritionist_e(date('Y-m-d')); ?>" max="<?php echo nutritionist_e(date('Y-m-d')); ?>" required>
+                        <input type="date" name="measurement_date" id="date-input" value="<?php echo nutritionist_e(date('Y-m-d')); ?>" min="<?php echo nutritionist_e(date('Y-m-01')); ?>" max="<?php echo nutritionist_e(date('Y-m-d')); ?>" required>
                     </label>
                 </div>
             </form>
@@ -258,9 +283,9 @@ nutritionist_layout_start(
 
             <div class="flag-banner" id="flag-banner"></div>
 
-            <div id="override-panel" style="display:none;padding:12px 14px;border-radius:8px;background:rgba(220,38,38,.06);border:1px solid rgba(220,38,38,.28);margin-bottom:14px;">
-                <div style="font-weight:800;font-size:13px;color:#991b1b;margin-bottom:6px;">Not scheduled — record as override?</div>
-                <p id="override-hint" style="margin:0 0 10px;font-size:12px;color:#7f1d1d;"></p>
+            <div class="ov-panel" id="override-panel">
+                <div class="ov-title">Not scheduled — record as override?</div>
+                <p class="ov-hint" id="override-hint"></p>
                 <label class="admin-field" style="margin-bottom:10px;">
                     <span>Reason for override *</span>
                     <textarea id="override-reason" maxlength="255" rows="2" placeholder="e.g. Doctor requested an urgent re-weigh after illness"></textarea>
@@ -273,11 +298,9 @@ nutritionist_layout_start(
                 <div class="form-message" id="override-message" aria-live="polite"></div>
             </div>
 
-            <div id="recheck-panel" style="display:none;padding:12px 14px;border-radius:8px;background:rgba(11,110,79,.06);border:1px solid rgba(11,110,79,.30);margin-bottom:14px;">
-                <div style="font-weight:800;font-size:13px;color:#0b6e4f;margin-bottom:6px;">Double-check — save as recheck?</div>
-                <p style="margin:0 0 10px;font-size:12px;color:#14532d;">Rechecks must be within the same month as the measurement you are verifying (before moving to the next month). They never move the due schedule. The previous reading stays in history; this one is marked as the verified value.</p>
+            <div class="rc-panel" id="recheck-panel">
                 <label class="admin-field" style="margin-bottom:10px;">
-                    <span>Reason for recheck *</span>
+                    <span>Reason for measuring again</span>
                     <textarea id="recheck-reason" maxlength="255" rows="2" placeholder="e.g. Child moved during scan, unstable reading — verifying"></textarea>
                     <span class="admin-field-message"></span>
                 </label>
@@ -292,8 +315,8 @@ nutritionist_layout_start(
                 <button class="admin-btn" type="button" id="save-btn" disabled>
                     <?php echo admin_action_icon('save'); ?> Save measurement
                 </button>
-                <button class="admin-btn-secondary" type="button" id="recheck-open-btn">Measure again (double-check)</button>
-                <button class="admin-btn-secondary" type="button" id="reset-btn">Clear values</button>
+                <button class="admin-btn-secondary" type="button" id="recheck-open-btn">Measure again</button>
+                <button class="admin-btn-secondary" type="button" id="reset-btn">Reset form</button>
                 <a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>" id="cancel-link">Cancel</a>
             </div>
         </article>
@@ -309,6 +332,8 @@ nutritionist_layout_start(
     var PREVIEW_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/who_preview.php")); ?>';
     var OVERRIDE_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/measurements_override.php")); ?>';
     var RECHECK_URL = '<?php echo nutritionist_e(app_url("/api/nutritionist/measurements_recheck.php")); ?>';
+    var MONITORING_URL = '<?php echo nutritionist_e(app_url("/nutritionist/monitoring.php")); ?>';
+    var goToMonitoringAfterDone = false;
 
     var $ = function (id) { return document.getElementById(id); };
 
@@ -346,19 +371,19 @@ nutritionist_layout_start(
     var recheckOpenBtn = $('recheck-open-btn');
 
     function hideOverridePanel() {
-        if (overridePanel) overridePanel.style.display = 'none';
+        if (overridePanel) overridePanel.classList.remove('is-open');
         if (overrideReason) overrideReason.value = '';
         if (overrideMessage) overrideMessage.textContent = '';
     }
 
-    function showOverridePanel(nextDue) {
+    function showOverridePanel(nextDue, customHint) {
         if (!overridePanel) return;
         if (overrideHint) {
-            overrideHint.textContent = nextDue
+            overrideHint.textContent = customHint || (nextDue
                 ? 'Next scheduled measurement: ' + nextDue + '. Saving now records an exceptional OVERRIDE measurement instead.'
-                : 'Saving now records an exceptional OVERRIDE measurement instead of waiting for the schedule.';
+                : 'Saving now records an exceptional OVERRIDE measurement instead of waiting for the schedule.');
         }
-        overridePanel.style.display = '';
+        overridePanel.classList.add('is-open');
         if (overrideReason) overrideReason.focus();
     }
 
@@ -369,11 +394,16 @@ nutritionist_layout_start(
      * ---- Child picker ----
      */
     function renderResults(query) {
-        var q = (query || '').trim().toLowerCase();
+        // Token-based matching so multi-word queries work in any order
+        // (e.g. "cruz juan" finds "Juan Dela Cruz"), across name + code
+        // + barangay. No result cap — the dropdown scrolls (max-height)
+        // so every matching child is reachable.
+        var tokens = String(query || '').trim().toLowerCase().split(/\s+/).filter(function (t) { return t !== ''; });
         var matches = CHILDREN.filter(function (c) {
-            if (!q) return true;
-            return (c.name + ' ' + c.code + ' ' + c.barangay).toLowerCase().indexOf(q) !== -1;
-        }).slice(0, 8);
+            if (tokens.length === 0) return true;
+            var hay = (c.name + ' ' + c.code + ' ' + (c.barangay || '')).toLowerCase();
+            return tokens.every(function (t) { return hay.indexOf(t) !== -1; });
+        });
         if (matches.length === 0) {
             childResults.innerHTML = '<div class="child-picker-item" style="cursor:default;color:var(--admin-muted);">No matching children.</div>';
             childResults.classList.add('is-open');
@@ -430,6 +460,11 @@ nutritionist_layout_start(
         $('cs-sex').textContent = match.sex;
         $('cs-birthdate').textContent = match.birthdate;
         $('cs-barangay').textContent = match.barangay || '—';
+        var csAvatar = $('cs-avatar');
+        if (csAvatar) {
+            var avInitials = ((match.first_name || '').charAt(0) + (match.last_name || '').charAt(0)).toUpperCase();
+            csAvatar.textContent = avInitials || '—';
+        }
 
         updateChildAgeDisplay();
 
@@ -623,19 +658,12 @@ nutritionist_layout_start(
         // Derive combined display status from the three DOH axes (abbreviations).
         // Exclude Normal; show all abnormal axes together. WFH uses the
         // SAM/MAM-annotated display labels (stored values stay SW/MW).
-        var wfa = String(data.wfa_status || 'Normal');
-        var hfa = String(data.hfa_status || 'Normal');
-        var wfh = wfhDisplayShort(data.wfh_status || 'Normal');
-        var abnParts = [];
-        if (wfa !== 'Normal') abnParts.push(wfa);
-        if (hfa !== 'Normal' && hfa !== 'Tall') abnParts.push(hfa);
-        if (hfa === 'Tall') abnParts.push('Tall');
-        if (wfh !== 'Normal') abnParts.push(wfh);
-        var status = abnParts.length > 0 ? abnParts.join(' + ') : 'Normal';
+        var combo = combinedStatusParts(data);
+        var status = combo.status;
 
         whoSummary.innerHTML = ''
-            + '<span><strong>Status:</strong> <span class="admin-pill ' + statusPillClass(status) + '">' + escapeHtml(status) + '</span></span>'
-            + '<span>WFA: ' + escapeHtml(wfa) + ' · HFA: ' + escapeHtml(hfa) + ' · WFH: ' + escapeHtml(wfh) + '</span>';
+            + '<span><strong>Status:</strong> <span class="admin-pill ' + combo.pill + '">' + escapeHtml(status) + '</span></span>'
+            + '<span>WFA: ' + escapeHtml(String(data.wfa_status || 'Normal')) + ' · HFA: ' + escapeHtml(String(data.hfa_status || 'Normal')) + ' · WFH: ' + escapeHtml(wfhDisplayShort(data.wfh_status || 'Normal')) + '</span>';
 
         whoFlags.innerHTML = '';
         if (data.is_flagged) {
@@ -648,6 +676,23 @@ nutritionist_layout_start(
 
     function toastError(message) {
         if (window.AdminToast) AdminToast.error(message);
+    }
+
+    /*
+     * Combined display status shared by the live preview and the done
+     * modal: abnormal DOH axes joined together, or Normal.
+     */
+    function combinedStatusParts(data) {
+        var wfa = String(data.wfa_status || 'Normal');
+        var hfa = String(data.hfa_status || 'Normal');
+        var wfh = wfhDisplayShort(data.wfh_status || 'Normal');
+        var abnParts = [];
+        if (wfa !== 'Normal') abnParts.push(wfa);
+        if (hfa !== 'Normal' && hfa !== 'Tall') abnParts.push(hfa);
+        if (hfa === 'Tall') abnParts.push('Tall');
+        if (wfh !== 'Normal') abnParts.push(wfh);
+        var status = abnParts.length > 0 ? abnParts.join(' + ') : 'Normal';
+        return { status: status, pill: statusPillClass(status) };
     }
 
     saveBtn.addEventListener('click', function () {
@@ -680,33 +725,34 @@ nutritionist_layout_start(
                 var saveErr = new Error(json.message || 'Could not save the measurement.');
                 saveErr.notDue = json.not_due === true;
                 saveErr.nextDue = json.next_due || null;
+                saveErr.needsOverride = json.needs_override === true;
+                saveErr.needsRecheck = json.needs_recheck === true;
                 throw saveErr;
             }
-            // The panel already shows these exact values from the live
-            // preview; re-render with the authoritative save response.
-            renderSavedResult(json.data);
-            if (window.AdminToast) AdminToast.success('Measurement saved for ' + json.data.child_name + ' (' + json.data.child_code + ').');
-            saveBtn.innerHTML = 'Saved!';
-            setTimeout(function () {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = originalLabel;
-            }, 2000);
+            // Done check + fresh form so the next child can be recorded
+            // right away.
+            resetRecordForm();
+            saveBtn.innerHTML = originalLabel;
+            showSavedDone('Measurement saved');
             return;
         })
         .catch(function (err) {
             toastError(err.message || 'Could not save the measurement.');
             if (err && err.notDue) showOverridePanel(err.nextDue);
+            if (err && err.needsOverride) showOverridePanel(null, 'This date is outside the current month. Saving records an exceptional OVERRIDE measurement instead.');
+            if (err && err.needsRecheck) showRecheckPanel();
         })
         .finally(function () {
-            if (saveBtn.innerHTML !== 'Saved!') {
+            saveBtn.innerHTML = originalLabel;
+            saveBtn.disabled = true;
+            if (selectedChild && weightInput.value !== '' && heightInput.value !== '') {
                 saveBtn.disabled = false;
-                saveBtn.innerHTML = originalLabel;
             }
         });
     });
 
     function hideRecheckPanel() {
-        if (recheckPanel) recheckPanel.style.display = 'none';
+        if (recheckPanel) recheckPanel.classList.remove('is-open');
         if (recheckReason) recheckReason.value = '';
         if (recheckMessage) recheckMessage.textContent = '';
     }
@@ -714,7 +760,7 @@ nutritionist_layout_start(
     function showRecheckPanel() {
         if (!recheckPanel) return;
         hideOverridePanel();
-        recheckPanel.style.display = '';
+        recheckPanel.classList.add('is-open');
         if (recheckReason) recheckReason.focus();
     }
 
@@ -765,14 +811,9 @@ nutritionist_layout_start(
         .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
         .then(function (json) {
             if (!json.success) throw new Error(json.message || 'Could not save the override measurement.');
-            renderSavedResult(json.data);
-            if (window.AdminToast) AdminToast.success('Override measurement saved for ' + json.data.child_name + ' (' + json.data.child_code + ').');
-            hideOverridePanel();
-            saveBtn.innerHTML = 'Saved!';
-            setTimeout(function () {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = saveOriginalLabel;
-            }, 2000);
+            resetRecordForm();
+            saveBtn.innerHTML = saveOriginalLabel;
+            showSavedDone('Override saved');
             return;
         })
         .catch(function (err) {
@@ -794,7 +835,7 @@ nutritionist_layout_start(
         }
         var reason = (recheckReason.value || '').trim();
         if (reason === '') {
-            recheckMessage.textContent = 'A reason for the recheck is required.';
+            recheckMessage.textContent = 'A reason for measuring again is required.';
             recheckReason.focus();
             return;
         }
@@ -818,14 +859,9 @@ nutritionist_layout_start(
         .then(function (r) { return r.json().catch(function () { throw new Error('Unexpected server response.'); }); })
         .then(function (json) {
             if (!json.success) throw new Error(json.message || 'Could not save the recheck measurement.');
-            renderSavedResult(json.data);
-            if (window.AdminToast) AdminToast.success('Recheck saved for ' + json.data.child_name + ' (' + json.data.child_code + '). Due schedule unchanged.');
-            hideRecheckPanel();
-            saveBtn.innerHTML = 'Saved!';
-            setTimeout(function () {
-                saveBtn.disabled = false;
-                saveBtn.innerHTML = saveOriginalLabel;
-            }, 2000);
+            resetRecordForm();
+            saveBtn.innerHTML = saveOriginalLabel;
+            showSavedDone('Recheck saved');
             return;
         })
         .catch(function (err) {
@@ -837,17 +873,64 @@ nutritionist_layout_start(
         });
     });
 
-    resetBtn.addEventListener('click', function () {
+    /*
+     * Full form reset after a save (or via Reset form): clears the values
+     * AND the selected child so the next record starts fresh.
+     */
+    function resetRecordForm() {
         weightInput.value = '';
         heightInput.value = '';
         dateInput.value = new Date().toISOString().slice(0, 10);
-        updateChildAgeDisplay();
+        childSearch.value = '';
+        childIdInput.value = '';
+        selectedChild = null;
+        childSummary.classList.remove('is-visible');
+        var csAvatar = $('cs-avatar');
+        if (csAvatar) csAvatar.textContent = '—';
+        $('cs-name').textContent = '';
+        $('cs-code').textContent = '';
+        $('cs-sex').textContent = '';
+        $('cs-birthdate').textContent = '';
+        $('cs-barangay').textContent = '';
+        $('cs-age').textContent = '—';
+        $('cs-age-days').textContent = '—';
+        var csDateEl = $('cs-measurement-date');
+        if (csDateEl) csDateEl.textContent = '—';
+        $('cs-pills').innerHTML = '';
         whoResult.style.display = 'none';
+        whoFlags.innerHTML = '';
         saveBtn.disabled = true;
         flagBanner.classList.remove('is-visible');
         hideOverridePanel();
         hideRecheckPanel();
-    });
+    }
+
+    /*
+     * Done check after a save: shows the shared check modal, then takes
+     * the user to the Monitoring List when it is dismissed (Okay, backdrop
+     * click, or Escape). The overlay only exists after the layout footer
+     * scripts run, so the watcher is attached lazily on first use.
+     */
+    function showSavedDone(title) {
+        goToMonitoringAfterDone = true;
+        var ov = document.getElementById('sk-done-overlay');
+        if (ov && !ov.hasAttribute('data-record-watch')) {
+            ov.setAttribute('data-record-watch', '1');
+            new MutationObserver(function () {
+                if (ov.hidden && goToMonitoringAfterDone) {
+                    goToMonitoringAfterDone = false;
+                    window.location.href = MONITORING_URL;
+                }
+            }).observe(ov, { attributes: true, attributeFilter: ['hidden'] });
+        }
+        if (window.SKDone) {
+            window.SKDone('', title);
+        } else {
+            window.location.href = MONITORING_URL;
+        }
+    }
+
+    resetBtn.addEventListener('click', resetRecordForm);
 
 })();
 </script>

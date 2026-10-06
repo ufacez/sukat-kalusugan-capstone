@@ -273,7 +273,9 @@ nutritionist_layout_start(
 .children-table .address-cell{max-width:240px}
 .children-table .address-cell .primary{font-size:12px;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .children-table .address-cell .sub{font-size:10px;color:var(--admin-muted);margin-top:1px}
-
+.children-table th:last-child,
+.children-table td:last-child{width:176px;min-width:176px;white-space:nowrap;text-align:center;padding-left:12px;padding-right:12px}
+.children-table td:last-child .admin-actions{justify-content:center;gap:8px}
 .children-table .row-link{cursor:pointer;transition:background-color .12s}
 .children-table .row-link:hover td{background:var(--admin-surface-alt)}
 
@@ -388,10 +390,8 @@ nutritionist_layout_start(
             <thead>
                 <tr>
                     <th>Full name of child</th>
-                    <th>Date</th>
-                    <th>Weight (kg)</th>
-                    <th>Height (cm)</th>
-                    <th>Nutritional status (WFA · HFA · WFH)</th>
+                    <th>Purok</th>
+                    <th>Birthdate</th>
                     <th>Age (months)</th>
                     <th>Age (days)</th>
                     <th>Actions</th>
@@ -399,7 +399,7 @@ nutritionist_layout_start(
             </thead>
             <tbody>
                 <?php if ($pageChildren === []): ?>
-                    <tr><td colspan="8">
+                    <tr><td colspan="6">
                         <div class="children-empty">
                             <?php if ($totalAll === 0 && $tab === 'active'): ?>
                                 <div class="empty-title">No children registered yet</div>
@@ -427,8 +427,8 @@ nutritionist_layout_start(
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
                     $profileUrl = nutritionist_e(app_url('/nutritionist/child_view.php?id=' . (int)$child['id']));
                     $editUrl = nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id']));
-                    $recordUrl = nutritionist_e(app_url('/nutritionist/measurement_record.php?child=' . (int)$child['id']));
                     $parentAddress = (string)($child['parent_address'] ?? '');
+                    $localAreaName = trim((string)($child['local_area'] ?? ''));
                     $lastDate = $child['last_measurement_date'] ?? null;
                     ?>
                     <tr<?php echo admin_paged_row_attr($childIndex, 5); ?>
@@ -472,39 +472,10 @@ nutritionist_layout_start(
                             </div>
                         </td>
                         <td style="white-space:nowrap;">
-                            <?php if ($lastDate !== null && $lastDate !== ''): ?>
-                                <?php echo nutritionist_e(date('M j, Y', strtotime((string)$lastDate))); ?>
-                            <?php else: ?>
-                                <span style="color:var(--admin-muted);font-style:italic;">Not yet</span>
-                            <?php endif; ?>
+                            <?php echo $localAreaName !== '' ? nutritionist_e($localAreaName) : '—'; ?>
                         </td>
-                        <td style="white-space:nowrap;font-weight:600;">
-                            <?php echo $child['last_weight'] !== null ? number_format((float)$child['last_weight'], 2) : '<span style="color:var(--admin-muted);font-weight:400;">—</span>'; ?>
-                        </td>
-                        <td style="white-space:nowrap;font-weight:600;">
-                            <?php echo $child['last_height'] !== null ? number_format((float)$child['last_height'], 1) : '<span style="color:var(--admin-muted);font-weight:400;">—</span>'; ?>
-                        </td>
-                        <td>
-                            <?php if ($lastDate !== null && $lastDate !== ''): ?>
-                                <?php
-                                $wfaCode = (string)($child['last_wfa'] ?? '—');
-                                $hfaCode = (string)($child['last_hfa'] ?? '—');
-                                $wfhRaw = (string)($child['last_wfh'] ?? '');
-                                $wfhCode = $wfhRaw !== '' ? wfh_display_short($wfhRaw) : '—';
-                                $short = static fn(string $code): string => match ($code) {
-                                    'Normal' => 'N',
-                                    'Tall' => 'T',
-                                    default => $code,
-                                };
-                                ?>
-                                <div style="display:flex;gap:4px;flex-wrap:wrap;">
-                                    <span class="admin-pill <?php echo nutritionist_status_class($wfaCode); ?>" title="Weight-for-Age: <?php echo nutritionist_e($wfaCode); ?>"><?php echo nutritionist_e($short($wfaCode)); ?></span>
-                                    <span class="admin-pill <?php echo nutritionist_status_class($hfaCode); ?>" title="Height-for-Age: <?php echo nutritionist_e($hfaCode); ?>"><?php echo nutritionist_e($short($hfaCode)); ?></span>
-                                    <span class="admin-pill <?php echo nutritionist_status_class($wfhCode); ?>" title="Weight-for-Length/Height: <?php echo nutritionist_e($wfhCode); ?>"><?php echo nutritionist_e($short($wfhCode)); ?></span>
-                                </div>
-                            <?php else: ?>
-                                <span class="admin-pill is-muted">Not yet</span>
-                            <?php endif; ?>
+                        <td style="white-space:nowrap;">
+                            <?php echo nutritionist_e(date('M j, Y', strtotime((string)$child['birthdate']))); ?>
                         </td>
                         <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
                             <?php echo (int)$age['months']; ?> m
@@ -515,9 +486,6 @@ nutritionist_layout_start(
                         <td>
                             <div class="admin-actions" onclick="event.stopPropagation();">
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
-                                <?php if (nutritionist_can_write()): ?>
-                                <a class="admin-icon-btn" title="Record measurement" href="<?php echo $recordUrl; ?>"><?php echo admin_action_icon('measure'); ?></a>
-                                <?php endif; ?>
                                 <?php if (nutritionist_can_write('children.update')): ?>
                                 <a class="admin-icon-btn" title="Edit profile" href="<?php echo $editUrl; ?>"><?php echo admin_action_icon('edit'); ?></a>
                                 <?php endif; ?>

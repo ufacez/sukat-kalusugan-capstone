@@ -134,6 +134,17 @@ if ($isOverride && $overrideReason === '') {
     api_error('Override measurements require a reason. Please use the Override Measurement form.', 422);
 }
 
+// Routine measurements must fall within the current calendar month.
+// Older readings can only be back-encoded as an audited OVERRIDE
+// (reason required) via measurements_override.php.
+if (!$isOverride && $parsedDate->format('Ym') !== $today->format('Ym')) {
+    api_error(
+        'Routine measurements can only be recorded for the current month (' . $today->format('M Y') . '). To back-encode an older reading, save it as an override with a reason.',
+        422,
+        ['needs_override' => true]
+    );
+}
+
 $childBirthdate = trim((string)$child['birthdate']);
 $childSex = (string)$child['sex'];
 
@@ -177,7 +188,23 @@ $dupResult = mysqli_stmt_get_result($dupStmt);
 $dupCount = $dupResult ? (int)mysqli_fetch_row($dupResult)[0] : 0;
 mysqli_stmt_close($dupStmt);
 if ($dupCount > 0) {
-    api_error('A measurement for this child already exists on ' . $measurementDate . '. Use "Measure again (double-check)" for a verification, or choose a different date.', 422);
+    api_error('A measurement for this child already exists on ' . $measurementDate . '. Use "Measure again" to save a recheck verification instead.', 422, ['needs_recheck' => true]);
+}
+
+// Only one routine per child per calendar month — a second weighing in
+// the same month must be recorded as a RECHECK verification, never as
+// another routine. Overrides (audited backlog entries) are exempt.
+if (!$isOverride) {
+    $monthDupStmt = mysqli_prepare($conn, "SELECT COUNT(*) FROM measurements WHERE child_id = ? AND DATE_FORMAT(measurement_date, '%Y-%m') = ? AND measurement_type IN ('ROUTINE','OVERRIDE')");
+    $monthKey = $parsedDate->format('Y-m');
+    mysqli_stmt_bind_param($monthDupStmt, 'is', $childId, $monthKey);
+    mysqli_stmt_execute($monthDupStmt);
+    $monthDupResult = mysqli_stmt_get_result($monthDupStmt);
+    $monthDupCount = $monthDupResult ? (int)mysqli_fetch_row($monthDupResult)[0] : 0;
+    mysqli_stmt_close($monthDupStmt);
+    if ($monthDupCount > 0) {
+        api_error('This child already has a routine measurement for ' . $parsedDate->format('M Y') . '. Use "Measure again" to save a recheck verification instead.', 422, ['needs_recheck' => true]);
+    }
 }
 
 $metrics = calculate_who_metrics($weightKg, $heightCm, $ageDays, $childSex);

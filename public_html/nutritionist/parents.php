@@ -167,6 +167,9 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 .parents-toolbar{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .parents-toolbar .admin-search{flex:0 1 280px;max-width:280px;min-width:200px;min-height:44px;font-size:14px}
 .parents-toolbar .admin-select{min-width:200px;max-width:260px;min-height:44px;font-size:14px}
+#parents-table th:last-child,
+#parents-table td:last-child{width:176px;min-width:176px;white-space:nowrap;text-align:center;padding-left:12px;padding-right:12px}
+#parents-table td:last-child .admin-actions{justify-content:center;gap:8px}
 @media (max-width:560px){
 .parents-toolbar{flex-direction:column;align-items:stretch}
 .parents-toolbar .admin-search,.parents-toolbar .admin-select{max-width:100%;width:100%;flex:1}
