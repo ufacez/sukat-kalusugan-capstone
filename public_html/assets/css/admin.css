@@ -128,13 +128,13 @@
 .admin-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 14px;
   padding: 4px 6px 16px;
 }
 
 .admin-brand-mark {
-  width: 48px;
-  height: 48px;
+  width: 56px;
+  height: 56px;
   border-radius: 8px;
   background: transparent;
   border: none;
@@ -176,11 +176,22 @@
 
 .admin-brand-name {
   font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 1.1rem;
+  font-size: 1.25rem;
   font-weight: 900;
-  color: var(--admin-text);
   line-height: 1.2;
   letter-spacing: -0.02em;
+}
+
+.admin-brand-name > span:first-child {
+  color: var(--admin-primary);
+}
+
+.admin-brand-name-accent {
+  color: #69c441;
+}
+
+[data-theme="dark"] .admin-brand-name > span:first-child {
+  color: #ffffff;
 }
 
 .admin-brand-sub {
@@ -196,6 +207,8 @@
 .admin-brand-text {
   overflow: hidden;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
 }
 
 /* Collapsed state: hide text labels */

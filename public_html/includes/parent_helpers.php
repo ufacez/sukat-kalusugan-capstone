@@ -263,7 +263,6 @@ function parent_layout_start(string $title, string $subtitle, string $activeSect
     echo '</div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name"><span>Sukat</span> <span class="admin-brand-name-accent">Kalusugan</span></div>';
-    echo '<div class="admin-brand-sub">Parent portal</div>';
     echo '</div>';
     echo '</div>';
 

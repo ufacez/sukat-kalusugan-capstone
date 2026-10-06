@@ -1136,7 +1136,6 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '</div>';
     echo '<div class="admin-brand-text">';
     echo '<div class="admin-brand-name"><span>Sukat</span> <span class="admin-brand-name-accent">Kalusugan</span></div>';
-    echo '<div class="admin-brand-sub">Admin console</div>';
     echo '</div>';
     echo '</div>';
 
