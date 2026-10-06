@@ -53,7 +53,7 @@ foreach (array_slice($rawHistory, -6) as $turn) {
         continue;
     }
 
-    $conversationHistory[] = ['role' => $role, 'content' => mb_substr($content, 0, 1000)];
+    $conversationHistory[] = ['role' => $role, 'content' => sk_substr($content, 0, 1000)];
 }
 
 if ($childId <= 0) {
@@ -64,7 +64,7 @@ if ($message === '') {
     api_error('Please type a question.');
 }
 
-if (mb_strlen($message) > 1000) {
+if (sk_strlen($message) > 1000) {
     api_error('That message is too long. Please shorten your question.');
 }
 

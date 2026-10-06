@@ -121,7 +121,7 @@ function dashboard_normalize_name(string $name): string
 {
     $name = preg_replace('/\s*\((?:pob\.?|poblacion)\)\s*/i', '', $name) ?? $name;
     $name = preg_replace('/\s+/', ' ', trim($name)) ?? trim($name);
-    return mb_strtolower($name);
+    return sk_strtolower($name);
 }
 
 $byNormalizedName = [];

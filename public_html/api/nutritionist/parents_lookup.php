@@ -9,6 +9,11 @@ declare(strict_types=1);
  * Same barangay scoping as child_form.php: non-admin nutritionists only see
  * parents in their assigned barangay.
  *
+ * List/search results are active parents only (status = 'active') so
+ * archived parents can never be picked for new children. The ?id= lookup
+ * stays scope-only (no status filter) so edit forms can still resolve the
+ * label of a previously assigned parent.
+ *
  * GET ?q=name&page=1&page_size=5 → {parents, page, pages, total}
  * GET ?id=123                  → {parent} (edit-mode preselect)
  */
@@ -53,14 +58,14 @@ $like = '%' . $query . '%';
 // decrypted names in PHP (scoped + capped; picker scale, not a dump).
 if (sk_pii_encryption_enabled() && $query !== '') {
     $candidates = admin_fetch_all(
-        'SELECT ' . $columns . ' ' . $from . ' ORDER BY p.id DESC LIMIT 500',
+        'SELECT ' . $columns . ' ' . $from . " AND p.status = 'active' ORDER BY p.id DESC LIMIT 500",
         $scopeTypes,
         $scopeParams
     );
-    $needle = mb_strtolower($query);
+    $needle = sk_strtolower($query);
     $matched = [];
     foreach ($candidates as $candidate) {
-        if (mb_strstrpos(mb_strtolower(trim((string)($candidate['name'] ?? ''))), $needle) !== false) {
+        if (sk_strpos_ci(trim((string)($candidate['name'] ?? '')), $needle) !== false) {
             $matched[] = $candidate;
         }
     }
@@ -79,7 +84,7 @@ if (sk_pii_encryption_enabled() && $query !== '') {
 }
 
 $total = admin_scalar(
-    'SELECT COUNT(*) ' . $from . ' AND p.name LIKE ?',
+    'SELECT COUNT(*) ' . $from . " AND p.status = 'active' AND p.name LIKE ?",
     $scopeTypes . 's',
     [...$scopeParams, $like]
 );
@@ -89,7 +94,7 @@ $page = min($page, $pages);
 $offset = ($page - 1) * $pageSize;
 
 $rows = admin_fetch_all(
-    'SELECT ' . $columns . ' ' . $from . ' AND p.name LIKE ? ORDER BY p.name ASC LIMIT ? OFFSET ?',
+    'SELECT ' . $columns . ' ' . $from . " AND p.status = 'active' AND p.name LIKE ? ORDER BY p.name ASC LIMIT ? OFFSET ?",
     $scopeTypes . 'sii',
     [...$scopeParams, $like, $pageSize, $offset]
 );

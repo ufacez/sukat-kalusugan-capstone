@@ -114,6 +114,9 @@ define('NUTRITIONIST_AI_PROVIDER', env('NUTRITIONIST_AI_PROVIDER', ''));
 define('NUTRITIONIST_AI_KEY', env('NUTRITIONIST_AI_KEY', ''));
 define('NUTRITIONIST_AI_MODEL', env('NUTRITIONIST_AI_MODEL', ''));
 
+// ── Multibyte-safe string fallbacks (works with/without php-mbstring) ──────
+require_once __DIR__ . '/mb_fallback.php';
+
 // ── Error display control (dev vs production) ────────────────────────────────
 // bootstrap_errors.php was previously orphaned (never required); wire it here
 // so APP_ENV=production hides raw errors on the live Azure VM.

@@ -94,7 +94,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 
     $parent = admin_fetch_one(
-        'SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1',
+        'SELECT id, barangay_id, status FROM parents WHERE id = ? LIMIT 1',
         'i',
         [$parentId]
     );
@@ -107,6 +107,26 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
                 'type' => 'error'
             ]
         );
+    }
+
+    if ((string)($parent['status'] ?? '') !== 'active') {
+        // Updates that keep the already-saved parent stay editable so a
+        // child is never locked out of corrections after its parent is
+        // archived; any new/different assignment must be an active parent.
+        $keepsExistingParent = $action === 'update' && $childId > 0 && (int)admin_scalar(
+            'SELECT COUNT(*) FROM children WHERE id = ? AND parent_id = ? LIMIT 1',
+            'ii',
+            [$childId, $parentId]
+        ) > 0;
+        if (!$keepsExistingParent) {
+            admin_redirect(
+                $errorBackUrl,
+                [
+                    'notice' => 'The selected parent/guardian is archived. Please choose an active parent.',
+                    'type' => 'error'
+                ]
+            );
+        }
     }
 
     $barangayId = !empty($parent['barangay_id'])

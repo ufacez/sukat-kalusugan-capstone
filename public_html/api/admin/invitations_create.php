@@ -53,7 +53,7 @@ if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
 }
 $phone = $phone !== '' ? $phone : null;
 
-if (mb_strlen($address) > 255) {
+if (sk_strlen($address) > 255) {
     admin_redirect('/admin/invitations.php', ['notice' => 'Address must be 255 characters or less.', 'type' => 'error']);
 }
 $address = $address !== '' ? htmlspecialchars($address, ENT_QUOTES, 'UTF-8') : null;

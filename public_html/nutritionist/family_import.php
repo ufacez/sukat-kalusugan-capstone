@@ -220,9 +220,9 @@ function ml_import_guard_barangay(string $address, string $targetName, array $na
             continue;
         }
         $pattern = '/(?<!\pL)' . preg_quote($name, '/') . '(?!\pL)/iu';
-        if (preg_match($pattern, $address) && mb_strlen($name) > $bestLen) {
+        if (preg_match($pattern, $address) && sk_strlen($name) > $bestLen) {
             $best = $name;
-            $bestLen = mb_strlen($name);
+            $bestLen = sk_strlen($name);
         }
     }
 
@@ -404,7 +404,7 @@ function ml_import_existing_parent_index(int $barangayId): array
             if ($id > $lastId) {
                 $lastId = $id;
             }
-            $name = mb_strtolower(trim((string)($row['name'] ?? '')));
+            $name = sk_strtolower(trim((string)($row['name'] ?? '')));
             if ($name !== '' && !isset($index[$name])) {
                 $index[$name] = $id;
             }
@@ -717,7 +717,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
          * the mother up in the paged PHP-computed name index. */
         $parentId = 0;
         if (sk_pii_encryption_enabled()) {
-            $parentId = $existingParentIndex[mb_strtolower(trim($mName))] ?? 0;
+            $parentId = $existingParentIndex[sk_strtolower(trim($mName))] ?? 0;
         } else {
             $existing = admin_fetch_one(
                 "SELECT id FROM parents WHERE barangay_id = ? AND LOWER(name) = LOWER(?) AND status = 'active' LIMIT 1",
@@ -760,7 +760,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
             // Keep the encrypted-mode index current so a later family with the
             // same mother reuses the account just minted in this batch.
             if (sk_pii_encryption_enabled()) {
-                $existingParentIndex[mb_strtolower(trim($mName))] = $parentId;
+                $existingParentIndex[sk_strtolower(trim($mName))] = $parentId;
             }
 
             foreach ($kids as $kid) {
@@ -842,7 +842,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
                 (string)sk_encrypt_value((string)($row['child']['last'] ?? '')),
                 $row['sex'] !== null ? (string)$row['sex'] : null,
                 $row['dob'] !== null ? (string)$row['dob'] : null,
-                mb_substr((string)($row['note'] ?? ''), 0, 250),
+                sk_substr((string)($row['note'] ?? ''), 0, 250),
                 'pending',
             ]
         );

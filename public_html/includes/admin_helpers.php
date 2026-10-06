@@ -108,9 +108,9 @@ function admin_initials(string $name): string
 {
     $parts = array_filter(explode(' ', trim($name)));
     if (count($parts) >= 2) {
-        return mb_strtoupper(mb_substr($parts[0], 0, 1) . mb_substr(end($parts), 0, 1));
+        return sk_strtoupper(sk_substr($parts[0], 0, 1) . sk_substr(end($parts), 0, 1));
     }
-    return mb_strtoupper(mb_substr($name, 0, 2));
+    return sk_strtoupper(sk_substr($name, 0, 2));
 }
 
 /**
@@ -154,8 +154,8 @@ function admin_avatar_color(string $name): string
 {
     $colors = ['#0b6e4f','#1a6b5a','#2e8b6e','#3a7d5c','#4e9a6f','#2d8f6f','#347a5c','#408c6a'];
     $hash = 0;
-    for ($i = 0; $i < mb_strlen($name); $i++) {
-        $hash = ($hash * 31 + mb_ord(mb_substr($name, $i, 1))) % count($colors);
+    for ($i = 0; $i < sk_strlen($name); $i++) {
+        $hash = ($hash * 31 + sk_ord(sk_substr($name, $i, 1))) % count($colors);
     }
     return $colors[$hash];
 }
@@ -515,8 +515,8 @@ function child_duplicate_identity(string $firstName, string $lastName, string $b
             foreach ($page as $candidate) {
                 $lastId = max($lastId, (int)($candidate['id'] ?? 0));
                 if (
-                    mb_strtolower(trim((string)($candidate['first_name'] ?? ''))) === mb_strtolower($firstName)
-                    && mb_strtolower(trim((string)($candidate['last_name'] ?? ''))) === mb_strtolower($lastName)
+                    sk_strtolower(trim((string)($candidate['first_name'] ?? ''))) === sk_strtolower($firstName)
+                    && sk_strtolower(trim((string)($candidate['last_name'] ?? ''))) === sk_strtolower($lastName)
                 ) {
                     return $candidate;
                 }
@@ -580,8 +580,8 @@ function dqc_duplicate_name_dob_groups(string $extraWhere, string $types = '', a
 
     $groups = [];
     foreach ($rows as $row) {
-        $first = mb_strtolower(trim((string)($row['first_name'] ?? '')));
-        $last = mb_strtolower(trim((string)($row['last_name'] ?? '')));
+        $first = sk_strtolower(trim((string)($row['first_name'] ?? '')));
+        $last = sk_strtolower(trim((string)($row['last_name'] ?? '')));
         $dob = trim((string)($row['birthdate'] ?? ''));
         if ($first === '' || $last === '' || $dob === '') {
             continue;

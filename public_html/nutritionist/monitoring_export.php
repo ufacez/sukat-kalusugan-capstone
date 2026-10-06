@@ -106,10 +106,10 @@ if ($search !== '') {
 $roster = monitoring_fetch_list($user, $view, $period['start'], $period['end']);
 
 if ($search !== '') {
-    $needle = mb_strtolower($search);
+    $needle = sk_strtolower($search);
     $roster = array_values(array_filter($roster, static function (array $row) use ($needle): bool {
-        $haystack = mb_strtolower($row['first_name'] . ' ' . $row['last_name'] . ' ' . $row['child_code']);
-        return mb_strpos($haystack, $needle) !== false;
+        $haystack = sk_strtolower($row['first_name'] . ' ' . $row['last_name'] . ' ' . $row['child_code']);
+        return sk_strpos_ci($haystack, $needle) !== false;
     }));
 }
 

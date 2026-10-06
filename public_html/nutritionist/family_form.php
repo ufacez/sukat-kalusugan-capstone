@@ -321,12 +321,15 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             throw new RuntimeException('Pumili muna ng parent/guardian.');
         }
         $prow = admin_fetch_one(
-            'SELECT id, name, email, barangay_id, local_area_id, household_id FROM parents WHERE id = ? LIMIT 1',
+            'SELECT id, name, email, barangay_id, local_area_id, household_id, status FROM parents WHERE id = ? LIMIT 1',
             'i',
             [$existingParentId]
         );
         if ($prow === null) {
             throw new RuntimeException('Ang napiling parent ay hindi makita.');
+        }
+        if ((string)($prow['status'] ?? '') !== 'active') {
+            throw new RuntimeException('Ang napiling parent ay archived. Pumili ng active na parent/guardian.');
         }
         if (!$isAdmin && (int)($prow['barangay_id'] ?? 0) !== (int)($user['barangay_id'] ?? 0)) {
             throw new RuntimeException('You can only add children to parents under your assigned barangay.');

@@ -105,7 +105,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phone = $phone !== '' ? (string)admin_normalize_ph_mobile($phone) : null;
 
         $address = trim((string)($_POST['address'] ?? ''));
-        if (mb_strlen($address) > 255) {
+        if (sk_strlen($address) > 255) {
             admin_flash_form_state($_POST, 'address');
             admin_redirect($inviteBack, ['notice' => 'Address must be 255 characters or less.', 'type' => 'error']);
         }

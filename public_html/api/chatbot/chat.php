@@ -308,8 +308,8 @@ mysqli_stmt_close($stmt);
  * ----------------------------------------------------------------------- */
 if (count($chatHistory) <= 1) {
     // Auto-generate title from first user message
-    $autoTitle = mb_substr($message, 0, 60);
-    if (mb_strlen($message) > 60) {
+    $autoTitle = sk_substr($message, 0, 60);
+    if (sk_strlen($message) > 60) {
         $autoTitle .= '...';
     }
 

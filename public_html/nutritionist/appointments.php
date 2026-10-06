@@ -294,7 +294,7 @@ $tabUrl = static function (string $tab, string $month) {
 					$rowLabel = $fullName . ' ' . (string)($req['child_code'] ?? '') . ' ' . (string)($req['parent_name'] ?? '') . ' ' . $reqStatus;
 				?>
 				<tr<?php echo admin_paged_row_attr($reqIndex, 10); ?>
-					data-filter-text="<?php echo nutritionist_e(mb_strtolower($rowLabel)); ?>"
+					data-filter-text="<?php echo nutritionist_e(sk_strtolower($rowLabel)); ?>"
 				>
 					<td>
 						<strong><?php echo nutritionist_e($fullName); ?></strong>
