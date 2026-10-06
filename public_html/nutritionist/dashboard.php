@@ -216,13 +216,30 @@ $parents = admin_fetch_all(
 	$parentsParams
 );
 
-// Current monitoring quarter (DOH calendar quarters) + coverage within it.
-// A child counts as measured for the quarter when its latest measurement
-// date falls inside the quarter window.
+// Current monitoring quarter (DOH calendar quarters).
 $currentQuarter = (int)ceil((int)$today->format('n') / 3);
 $quarterRange = monitoring_quarter_range((int)$today->format('Y'), $currentQuarter);
 $quarterEnd = new DateTimeImmutable($quarterRange['end']);
 $quarterDaysLeft = $today > $quarterEnd ? 0 : (int)$today->diff($quarterEnd)->days;
+
+// Registered-child measurement coverage for the current month.
+$registeredTotal = count($children);
+$registeredMeasured = 0;
+foreach ($children as $child) {
+	$latestMeasurementDate = (string)($child['measurement_date'] ?? '');
+	if ($latestMeasurementDate !== ''
+		&& $latestMeasurementDate >= $monthStart
+		&& $latestMeasurementDate <= $monthEnd) {
+		$registeredMeasured++;
+	}
+}
+$registeredPct = $registeredTotal > 0
+	? (int)round(($registeredMeasured / $registeredTotal) * 100)
+	: 0;
+$registeredProgressColor = $registeredPct >= 100 ? '#16a34a' : '#dc2626';
+$registeredProgressBackground = $registeredPct >= 100
+	? 'rgba(22, 163, 74, 0.14)'
+	: 'rgba(220, 38, 38, 0.14)';
 
 // Scope barangay name for the scope card. Admins see every barangay.
 $scopeBarangayName = 'All Barangays';
@@ -613,21 +630,21 @@ nutritionist_layout_start('Nutritionist Dashboard', 'WHO monitoring, growth anal
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Children Monitored</div>
-				<div class="dashboard-stat-value" data-count-up><?php echo count($children); ?></div>
-				<div class="dashboard-stat-meta"><span class="highlight">Registered in your scope</span></div>
+				<div class="dashboard-stat-value" data-count-up><?php echo (int)$registeredTotal; ?></div>
+				<div class="dashboard-stat-meta"><span class="highlight">Registered Children</span></div>
 			</div>
 		</div>
 	</article>
 
 	<article class="dashboard-stat-card">
 		<div class="dashboard-stat-row">
-			<div class="dashboard-stat-icon-wrap is-valid">
+			<div class="dashboard-stat-icon-wrap" style="background:<?php echo $registeredProgressBackground; ?>;color:<?php echo $registeredProgressColor; ?>;">
 				<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0 2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"/></svg>
 			</div>
 			<div>
 				<div class="dashboard-stat-label">Measurements</div>
 				<div class="dashboard-stat-value" data-count-up><?php echo count($measurements); ?></div>
-				<div class="dashboard-stat-meta">This month</div>
+				<div class="dashboard-stat-meta"><?php echo (int)$registeredMeasured; ?> out of <?php echo (int)$registeredTotal; ?> (<?php echo (int)$registeredPct; ?>%)</div>
 			</div>
 		</div>
 	</article>
