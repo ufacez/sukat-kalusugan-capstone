@@ -1135,7 +1135,8 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<img src="' . admin_e(app_url('/assets/img/logo/logo_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-img logo-dark">';
     echo '</div>';
     echo '<div class="admin-brand-text">';
-    echo '<div class="admin-brand-name"><span>Sukat</span> <span class="admin-brand-name-accent">Kalusugan</span></div>';
+    echo '<img src="' . admin_e(app_url('/assets/img/logo/logotext_forlight.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-wordmark logo-light">';
+    echo '<img src="' . admin_e(app_url('/assets/img/logo/logotext_fordark.svg')) . '" alt="Sukat Kalusugan" class="admin-brand-wordmark logo-dark">';
     echo '</div>';
     echo '</div>';
 

@@ -128,13 +128,13 @@
 .admin-brand {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
   padding: 4px 6px 16px;
 }
 
 .admin-brand-mark {
-  width: 56px;
-  height: 56px;
+  width: 58px;
+  height: 58px;
   border-radius: 8px;
   background: transparent;
   border: none;
@@ -209,6 +209,29 @@
   white-space: nowrap;
   display: flex;
   align-items: center;
+}
+
+.admin-brand-wordmark {
+  width: 184px;
+  max-width: 100%;
+  height: auto;
+  display: none;
+}
+
+.admin-brand-text .admin-brand-wordmark.logo-light {
+  display: block;
+}
+
+.admin-brand-text .admin-brand-wordmark.logo-dark {
+  display: none;
+}
+
+[data-theme="dark"] .admin-brand-text .admin-brand-wordmark.logo-light {
+  display: none;
+}
+
+[data-theme="dark"] .admin-brand-text .admin-brand-wordmark.logo-dark {
+  display: block;
 }
 
 /* Collapsed state: hide text labels */
