@@ -352,7 +352,9 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
                     <th>Date</th>
                     <th>Weight (kg)</th>
                     <th>Height (cm)</th>
-                    <th>Nutritional status (WFA · HFA · WFH)</th>
+                    <th>WFA</th>
+                    <th>HFA</th>
+                    <th>WFH</th>
                     <th>Age (months)</th>
                     <th>Age (days)</th>
                     <th>Actions</th>
@@ -402,13 +404,23 @@ nutritionist_layout_start('Monitoring List', 'Track quarterly and monthly monito
                     </td>
                     <td>
                         <?php if ($hasMeasurement): ?>
-                        <div style="display:flex;gap:4px;flex-wrap:wrap;">
                             <span class="admin-pill <?php echo nutritionist_status_class($wfaCode); ?>" title="Weight-for-Age: <?php echo nutritionist_e($wfaCode); ?>"><?php echo nutritionist_e($monShort($wfaCode)); ?></span>
-                            <span class="admin-pill <?php echo nutritionist_status_class($hfaCode); ?>" title="Height-for-Age: <?php echo nutritionist_e($hfaCode); ?>"><?php echo nutritionist_e($monShort($hfaCode)); ?></span>
-                            <span class="admin-pill <?php echo nutritionist_status_class($wfhCode); ?>" title="Weight-for-Length/Height: <?php echo nutritionist_e($wfhCode); ?>"><?php echo nutritionist_e($monShort($wfhCode)); ?></span>
-                        </div>
                         <?php else: ?>
-                            <span class="admin-pill is-muted">Not yet</span>
+                            <span class="admin-pill is-muted">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($hasMeasurement): ?>
+                            <span class="admin-pill <?php echo nutritionist_status_class($hfaCode); ?>" title="Height-for-Age: <?php echo nutritionist_e($hfaCode); ?>"><?php echo nutritionist_e($monShort($hfaCode)); ?></span>
+                        <?php else: ?>
+                            <span class="admin-pill is-muted">—</span>
+                        <?php endif; ?>
+                    </td>
+                    <td>
+                        <?php if ($hasMeasurement): ?>
+                            <span class="admin-pill <?php echo nutritionist_status_class($wfhCode); ?>" title="Weight-for-Length/Height: <?php echo nutritionist_e($wfhCode); ?>"><?php echo nutritionist_e($monShort($wfhCode)); ?></span>
+                        <?php else: ?>
+                            <span class="admin-pill is-muted">—</span>
                         <?php endif; ?>
                     </td>
                     <td style="color:var(--admin-muted);white-space:nowrap;font-weight:600;">
