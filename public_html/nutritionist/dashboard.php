@@ -830,15 +830,28 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 		});
 		return m;
 	}
+	function nskXSize(w, count){
+		var crowded = count >= 5;
+		if (w < 360) return crowded ? 8.5 : 9;
+		if (w < 480) return crowded ? 9 : 9.5;
+		if (w < 640) return crowded ? 10 : 11;
+		return 12;
+	}
 	function nskLayout(items){
 		var rect = canvas.parentElement.getBoundingClientRect();
 		var w = Math.max(rect.width, 220);
 		var h = Math.max(Math.round(rect.height) || 0, 280);
-		var padL = 46, padR = 14, padT = 24;
-		var padB = 26 + maxLabelLines(items) * 15;
+		var isSmall = w < 480;
+		/* Taller canvas on phones so wrapped 2-3 line x-labels don't collide. */
+		if (isSmall) h = Math.max(h, 330);
+		var xSize = nskXSize(w, items.length);
+		var xLineH = Math.round(xSize * 1.3);
+		var padL = isSmall ? 34 : 46, padR = isSmall ? 10 : 14, padT = isSmall ? 20 : 24;
+		var padB = 16 + maxLabelLines(items) * xLineH + 8;
 		var cW = w - padL - padR, cH = h - padT - padB;
 		var groupW = cW / Math.max(items.length, 1);
-		return { w: w, h: h, padL: padL, padR: padR, padT: padT, padB: padB, cW: cW, cH: cH, groupW: groupW, barW: Math.min(groupW * 0.5, 54) };
+		var barW = isSmall ? Math.min(groupW * 0.44, 40) : Math.min(groupW * 0.5, 54);
+		return { w: w, h: h, padL: padL, padR: padR, padT: padT, padB: padB, cW: cW, cH: cH, groupW: groupW, barW: barW, xSize: xSize, xLineH: xLineH, isSmall: isSmall };
 	}
 
 	function renderNsk(key, animPct){
@@ -856,7 +869,7 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 			ctx.beginPath(); ctx.setLineDash([4,4]); ctx.moveTo(L.padL, gy); ctx.lineTo(L.w-L.padR, gy); ctx.stroke();
 			ctx.setLineDash([]);
 			ctx.fillStyle = getCSS('--admin-muted') || '#94a3b8';
-			ctx.font = '10px Inter, sans-serif';
+			ctx.font = (L.isSmall ? '9px' : '10px') + ' Inter, sans-serif';
 			ctx.textAlign = 'right';
 			ctx.fillText(String(t), L.padL-6, gy+3);
 		});
@@ -884,18 +897,18 @@ window.NSK_DATA = <?php echo json_encode($nskChartJson, JSON_HEX_TAG | JSON_HEX_
 
 			/* whole-number count on top */
 			ctx.fillStyle = isHover ? it.color : (getCSS('--admin-text') || '#1e293b');
-			ctx.font = (isHover ? 'bold ' : '') + '12px Inter, sans-serif';
+			ctx.font = (isHover ? 'bold ' : '') + (L.isSmall ? '10px' : '12px') + ' Inter, sans-serif';
 			ctx.textAlign = 'center';
 			if (animPct >= 0.95) ctx.fillText(String(it.count), cx, by - 10);
 
-			/* x label — full name, wrapped */
+			/* x label — full name, wrapped; smaller on phones so bars keep a gap */
 			ctx.fillStyle = getCSS('--admin-text') || '#1e293b';
-			ctx.font = '600 12px Inter, sans-serif';
+			ctx.font = '600 ' + L.xSize + 'px Inter, sans-serif';
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'top';
 			var lines = String(it.label).split('\n');
-			var lineH = 14;
-			var startY = L.padT + L.cH + 16 - ((lines.length * lineH) - lineH) / 2;
+			var lineH = L.xLineH;
+			var startY = L.padT + L.cH + 14;
 			lines.forEach(function(line, li){
 				ctx.fillText(line, cx, startY + li * lineH);
 			});

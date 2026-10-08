@@ -29,8 +29,16 @@ function export_dropdown_assets(): string
 .export-dd summary::after{content:'';width:7px;height:7px;border-right:1.6px solid currentColor;border-bottom:1.6px solid currentColor;transform:rotate(45deg) translateY(-2px);opacity:.7;flex:none}
 .export-dd[open]{position:relative;z-index:80}
 .export-dd[open] summary::after{transform:rotate(-135deg) translateY(-1px)}
-.export-dd-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:200;min-width:230px;padding:6px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#e5e7eb);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
+.export-dd-pop{position:absolute;right:0;top:calc(100% + 8px);z-index:200;min-width:230px;max-width:calc(100vw - 24px);box-sizing:border-box;padding:6px;background:var(--admin-surface,#fff);border:1px solid var(--admin-border,#e5e7eb);border-radius:12px;box-shadow:0 12px 32px rgba(15,23,42,.14)}
 .export-dd-pop.is-flip{top:auto;bottom:calc(100% + 8px)}
+@media (max-width:560px){
+.export-dd-pop{min-width:0;width:max-content;max-width:calc(100vw - 24px)}
+.export-dd-item{white-space:normal}
+.export-dd-item>span{min-width:0;flex:1 1 auto}
+.export-dd-label{white-space:normal}
+.export-dd-sub{white-space:normal}
+.nsk-indicator-dd .export-dd-pop{left:0;right:auto;min-width:0;width:max-content;max-width:calc(100vw - 24px)}
+}
 /* Overflow escape hatch: only while a menu is open, so card rounded
    corners + top accent bar stay pixel-perfect when closed. */
 .rp-form-card:has(.export-dd[open]),
@@ -45,6 +53,11 @@ function export_dropdown_assets(): string
 .admin-section:has(.export-dd[open]),
 .audit-filter-wrap:has(.export-dd[open]),
 .nutritionist-panel:has(.export-dd[open]),
+.nsk-overview-panel:has(.export-dd[open]),
+.nsk-card:has(.export-dd[open]),
+.nsk-overview-head:has(.export-dd[open]),
+.nsk-overview-grid:has(.export-dd[open]),
+.nutritionist-dashboard-grid:has(.export-dd[open]),
 .admin-pageheader:has(.export-dd[open]),
 .admin-pageheader-actions:has(.export-dd[open]){overflow:visible !important}
 .rp-form-card:has(.export-dd[open])::before{border-radius:14px 14px 0 0}
@@ -71,10 +84,17 @@ function maybeFlip(dd){
 var pop = dd.querySelector('.export-dd-pop');
 if (!pop) return;
 pop.classList.remove('is-flip');
+pop.style.left = ''; pop.style.right = ''; pop.style.width = '';
 try {
 var r = dd.getBoundingClientRect();
 var estH = pop.offsetHeight || 220;
 if (r.bottom + estH + 12 > window.innerHeight && r.top - estH - 12 > 0) pop.classList.add('is-flip');
+/* Horizontal viewport clamp: keep the whole menu on-screen on phones. */
+var pr = pop.getBoundingClientRect();
+var vw = window.innerWidth || document.documentElement.clientWidth || 360;
+if (pr.left < 8 && pr.right <= vw - 8) { pop.style.left = '0'; pop.style.right = 'auto'; }
+else if (pr.right > vw - 8 && pr.left >= 8) { pop.style.left = 'auto'; pop.style.right = '0'; }
+else if (pr.left < 8 && pr.right > vw - 8) { pop.style.left = '0'; pop.style.right = 'auto'; pop.style.width = 'calc(100vw - 24px)'; }
 } catch (err) {}
 }
 document.addEventListener('click', function(e){

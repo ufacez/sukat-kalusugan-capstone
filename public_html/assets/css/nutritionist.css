@@ -5537,6 +5537,16 @@
   max-width: 100%;
 }
 
+/* Phones: give wrapped 2-3 line x-labels breathing room so bars don't touch. */
+@media (max-width: 560px) {
+  .nsk-chart-wrap {
+    min-height: 330px;
+  }
+  .nsk-card {
+    padding: 14px;
+  }
+}
+
 /* Status card stretches so rows fill to the bottom with no dead space. */
 .nsk-status-card {
   display: flex;
