@@ -278,6 +278,44 @@ function xlsx_lite_write(string $path, array $headerRow, array $dataRows, string
 	]);
 }
 
+/**
+ * Shared attestation footer for official XLSX sheets (EOPT / monitoring).
+ *
+ * Mirrors pdf_signature_block() in pdf_generator.php so every printable
+ * workbook ends the same way:
+ *   Prepared by: (Nutrition Officer / Nutritionist)
+ *   Certified correct: (City/Municipal Nutrition Action Officer)
+ *
+ * Returns a blank separator row + the two signature rows, padded to
+ * $totalCols. Callers append the result to their sheet rows. CSV streams
+ * reuse the same sheet rows, so the footer stays consistent there too.
+ *
+ * @return array<int, array<int, array{v:mixed,s:string}>>
+ */
+function xlsx_lite_signature_rows(int $totalCols): array
+{
+	$totalCols = max(1, $totalCols);
+	$rows = [];
+	$rows[] = array_map(static fn($v) => ['v' => $v, 's' => 'default'], array_fill(0, $totalCols, ''));
+	$pairs = [
+		['Prepared by:', '(Nutrition Officer / Nutritionist)'],
+		['Certified correct:', '(City/Municipal Nutrition Action Officer)'],
+	];
+	foreach ($pairs as [$signLabel, $signRole]) {
+		$signRow = [
+			['v' => $signLabel, 's' => 'label'],
+			['v' => '', 's' => 'default'],
+			['v' => '', 's' => 'default'],
+			['v' => $signRole, 's' => 'note'],
+		];
+		while (count($signRow) < $totalCols) {
+			$signRow[] = ['v' => '', 's' => 'default'];
+		}
+		$rows[] = $signRow;
+	}
+	return $rows;
+}
+
 /*
 |--------------------------------------------------------------------------
 | Named cell styles shared by every EOPT export sheet. Each entry maps a

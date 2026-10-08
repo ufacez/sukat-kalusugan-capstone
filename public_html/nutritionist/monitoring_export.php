@@ -252,6 +252,8 @@ if ($format === 'pdf') {
         $pdf->SetFont('helvetica', 'I', 7);
         $pdf->Cell(0, 5, 'Showing the first 1,000 of ' . count($dataRows) . ' rows — use XLSX/CSV for the full table.', 0, 1, 'C');
     }
+    pdf_totals_row($pdf, 'TOTAL NUMBER OF CHILDREN IN THIS LIST:', count($dataRows), $pdfWidths);
+    pdf_signature_block($pdf);
 	log_action((int)$user['id'], 'MONITORING_EXPORT', 'info', sprintf('Exported monitoring PDF (%d row(s)).', count($dataRows)));
 	while (ob_get_level() > 0) {
 		ob_end_clean();
@@ -264,6 +266,7 @@ if ($format === 'pdf') {
 		header('Content-Disposition: attachment; filename="' . $baseName . '.pdf"');
 	}
 	$pdf->Output($baseName . '.pdf', $previewInline ? 'I' : 'D');
+	exit;
 }
 
 // ── CSV preview / download ──
@@ -328,6 +331,17 @@ try {
             $cells[] = ['v' => $value, 's' => $style];
         }
         $sheetRows[] = $cells;
+    }
+    // Totals + attestation footer — same 2-line standard as EOPT sheets.
+    $monTotalCols = count($header);
+    $monTotalRow = [['v' => 'TOTAL NUMBER OF CHILDREN IN THIS LIST:', 's' => 'total_label']];
+    for ($c = 1; $c < $monTotalCols - 1; $c++) {
+        $monTotalRow[] = ['v' => '', 's' => 'total_label'];
+    }
+    $monTotalRow[] = ['v' => count($dataRows), 's' => 'total'];
+    $sheetRows[] = $monTotalRow;
+    foreach (xlsx_lite_signature_rows($monTotalCols) as $sigRow) {
+        $sheetRows[] = $sigRow;
     }
     $written = xlsx_lite_write_workbook($tmpPath, [[
         'name' => $sheetName,

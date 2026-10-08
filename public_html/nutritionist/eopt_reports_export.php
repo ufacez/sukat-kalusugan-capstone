@@ -341,6 +341,9 @@ if ($isNutStatusBrgy) {
 	}
 	$addRow($rowsOut, ['Total Number of Mothers/Caregivers of Children 0-59 Months Affected by Undernutrition', count($caregivers['0-59']), '', '', '', '', '', '', ''], 'label');
 	$addRow($rowsOut, ['Total Number of Mothers/Caregivers of Children 0-23 Months Affected by Undernutrition', count($caregivers['0-23']), '', '', '', '', '', '', ''], 'label');
+	foreach (xlsx_lite_signature_rows(9) as $sigRow) {
+		$rowsOut[] = $sigRow;
+	}
 	$sheets[] = ['name' => 'NutStatusBrgy', 'widths' => [38, 13, 13, 13, 14, 13, 13, 13, 14], 'merges' => ['A1:I1'], 'rows' => $rowsOut];
 }
 
@@ -401,6 +404,15 @@ if ($isForm1C) {
 			['v' => $hfa, 's' => xlsx_status_style($hfa)],
 			['v' => $wfh, 's' => xlsx_status_style($wfh)],
 		];
+	}
+	$form1cTotalRow = [['v' => 'TOTAL NUMBER OF CHILDREN IN THIS LIST:', 's' => 'total_label']];
+	for ($c = 1; $c < 7; $c++) {
+		$form1cTotalRow[] = ['v' => '', 's' => 'total_label'];
+	}
+	$form1cTotalRow[] = ['v' => count($form1cRows), 's' => 'total'];
+	$form1cRowsOut[] = $form1cTotalRow;
+	foreach (xlsx_lite_signature_rows(8) as $sigRow) {
+		$form1cRowsOut[] = $sigRow;
 	}
 	$sheets[] = [
 		'name' => 'Form_1C',
@@ -722,6 +734,9 @@ if ($isForm1B) {
 		$merges[] = "B{$owMsgRowNum}:{$form1bLastCol}{$owMsgRowNum}";
 	}
 
+	foreach (xlsx_lite_signature_rows(26) as $sigRow) {
+		$form1bOutput[] = $sigRow;
+	}
 	$sheets[] = [
 		'name' => 'Form_1B',
 		'widths' => array_merge([22], array_fill(0, 18, 7), array_fill(0, 4, 9), array_fill(0, 3, 7)),
@@ -817,6 +832,16 @@ if ($isNutStatus) {
 		];
 	}
 
+	$nutTotalCols = count($nutStatusColumns);
+	$nutTotalRow = [['v' => 'TOTAL NUMBER OF CHILDREN IN THIS LIST:', 's' => 'total_label']];
+	for ($c = 1; $c < $nutTotalCols - 1; $c++) {
+		$nutTotalRow[] = ['v' => '', 's' => 'total_label'];
+	}
+	$nutTotalRow[] = ['v' => count($nutStatusRows), 's' => 'total'];
+	$outRows[] = $nutTotalRow;
+	foreach (xlsx_lite_signature_rows($nutTotalCols) as $sigRow) {
+		$outRows[] = $sigRow;
+	}
 	$sheets[] = [
 		'name' => 'NutStatusTool',
 		'widths' => $nutStatusWidths,
@@ -932,12 +957,15 @@ foreach ([
 	$summaryRowsOut[] = array_map(static fn($v) => ['v' => $v], ['', '']);
 }
 
+foreach (xlsx_lite_signature_rows(8) as $sigRow) {
+	$summaryRowsOut[] = $sigRow;
+}
 $sheets[] = [
-	'name' => 'Summary',
-	'widths' => [16, 12, 12, 12, 12, 12, 12, 12],
-	'merges' => ['A1:H1', 'A2:H2', 'A3:H3', 'A4:H4', 'A5:H5'],
-	'rows' => $summaryRowsOut,
-];
+		'name' => 'Summary',
+		'widths' => [16, 12, 12, 12, 12, 12, 12, 12],
+		'merges' => ['A1:H1', 'A2:H2', 'A3:H3', 'A4:H4', 'A5:H5'],
+		'rows' => $summaryRowsOut,
+	];
 }
 
 /*
