@@ -358,6 +358,8 @@ function parent_layout_end(): void
     echo confirm_modal_shell();
     $adminJsVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin.js');
     echo '<script src="' . parent_e(app_url('/assets/js/admin.js?v=' . $adminJsVersion)) . '"></script>';
+    $formValidateVersion = (int) @filemtime(__DIR__ . '/../assets/js/admin-form-validate.js');
+    echo '<script src="' . parent_e(app_url('/assets/js/admin-form-validate.js?v=' . $formValidateVersion)) . '"></script>';
 
     // Floating Kali AI widget — same shared widget as the nutritionist
     // portal, except on the dedicated assistant page itself.
