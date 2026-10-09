@@ -35,7 +35,7 @@ if ($userType === 'parent') {
 
 $childId = api_int($_GET['child_id'] ?? null);
 
-if ($childId === null || $childId <= 0) {
+if ($childId <= 0) {
     api_error('Child ID is required.');
 }
 
@@ -43,16 +43,32 @@ $db = get_db_connection();
 
 
 /* -----------------------------------------------------------------------
- * Load child
+ * Load child — ownership/barangay scoping enforced in SQL so a tampered
+ * child_id can never load another family's row (returns "not found").
  * ----------------------------------------------------------------------- */
+$scopeSql = '';
+$scopeTypes = 'i';
+$scopeParams = [$childId];
+if ($userType === 'parent') {
+    // Parents may only open their OWN children.
+    $scopeSql = ' AND c.parent_id = ?';
+    $scopeTypes .= 'i';
+    $scopeParams[] = (int)($user['id'] ?? 0);
+} elseif (($user['role'] ?? '') === 'nutritionist' && ($user['barangay_id'] ?? '') !== '') {
+    // Nutritionists are scoped to their assigned barangay (same rule as
+    // interpret.php / children.php) so one barangay can't pull another's.
+    $scopeSql = ' AND c.barangay_id = ?';
+    $scopeTypes .= 'i';
+    $scopeParams[] = (int)$user['barangay_id'];
+}
 $sql = 'SELECT c.id, c.child_code, c.first_name, c.last_name, c.sex,
                c.birthdate, c.barangay_id, c.parent_id,
                b.name AS barangay_name
         FROM children c
         LEFT JOIN barangays b ON b.id = c.barangay_id
-        WHERE c.id = ?';
+        WHERE c.id = ?' . $scopeSql;
 $stmt = mysqli_prepare($db, $sql);
-mysqli_stmt_bind_param($stmt, 'i', $childId);
+mysqli_stmt_bind_param($stmt, $scopeTypes, ...$scopeParams);
 mysqli_stmt_execute($stmt);
 $child = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 mysqli_stmt_close($stmt);
@@ -62,18 +78,9 @@ if (is_array($child)) {
 }
 
 if ($child === null) {
+    // Deliberately generic: a parent probing another family's id learns
+    // nothing beyond "not found" (no 403 oracle confirming existence).
     api_error('Child not found.', 404);
-}
-
-
-/* -----------------------------------------------------------------------
- * Authorization: parents can only see their own children
- * ----------------------------------------------------------------------- */
-if ($userType === 'parent') {
-    $parentId = (int)($user['id'] ?? 0);
-    if ((int)$child['parent_id'] !== $parentId && !empty($child['parent_id'])) {
-        api_error('Access denied.', 403);
-    }
 }
 
 

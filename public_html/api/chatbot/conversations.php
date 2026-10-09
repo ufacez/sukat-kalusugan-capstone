@@ -150,6 +150,21 @@ if ($method === 'POST') {
         }
     }
 
+    // Nutritionists are scoped to their assigned barangay (same rule as
+    // interpret.php / children.php / chat.php) so one barangay can't open
+    // chats about another barangay's children.
+    if (($user['type'] ?? '') === 'staff' && ($user['role'] ?? '') === 'nutritionist'
+        && ($user['barangay_id'] ?? '') !== '' && $childId > 0) {
+        $inScope = admin_fetch_one(
+            'SELECT id FROM children WHERE id = ? AND barangay_id = ? AND status = \'active\' LIMIT 1',
+            'ii',
+            [$childId, (int)$user['barangay_id']]
+        );
+        if ($inScope === null) {
+            api_error('That child could not be found.', 404);
+        }
+    }
+
     if ($title === '') {
         $title = 'New Conversation';
     }

@@ -29,13 +29,17 @@ $payload = api_payload();
 
 $conversationId = api_int($payload['conversation_id'] ?? null);
 $message        = trim((string)($payload['message'] ?? ''));
-$childId        = api_int($payload['child_id'] ?? null);
+// NOTE: api_int() returns 0 (never null) when the key is missing, so keep
+// the raw value to distinguish "not sent" (fall back to the conversation's
+// child) from an explicit 0 (general question, e.g. floating widget).
+$rawChildId     = $payload['child_id'] ?? null;
+$childId        = api_int($rawChildId);
 
 if ($message === '') {
     api_error('Message cannot be empty.');
 }
 
-if ($conversationId === null || $conversationId <= 0) {
+if ($conversationId <= 0) {
     api_error('Conversation ID is required.');
 }
 
@@ -55,9 +59,18 @@ if ($conv === null) {
     api_error('Conversation not found.', 404);
 }
 
-// Use conversation's child_id if not overridden
-if ($childId === null) {
-    $childId = $conv['child_id'] !== null ? (int)$conv['child_id'] : null;
+$convChildId = $conv['child_id'] !== null ? (int)$conv['child_id'] : 0;
+
+// Use conversation's child_id when the client did not send one. An explicit
+// 0 means "general question" (floating widget); any other id must match the
+// conversation so messages can't be filed under child A while leaking child
+// B's data into the LLM context.
+if ($rawChildId === null || $rawChildId === '') {
+    $childId = $convChildId;
+}
+
+if ($childId !== $convChildId) {
+    api_error('Conversation does not match the selected child. Please start a new chat.', 400);
 }
 
 
@@ -127,16 +140,23 @@ if ($childId <= 0) {
     $contextBlock = chatbot_build_nutritionist_overview_context($summary, $trend);
 } 
 
-if ($childId !== null && $childId > 0) {
+if ($childId > 0) {
 
-    // Load child. Parents may only open their OWN children — any other
-    // id behaves as "not found" so one family can never read another's data.
+    // Load child. Parents may only open their OWN children, nutritionists
+    // only children in their assigned barangay — any other id behaves as
+    // "not found" so one family/barangay can never read another's data.
     $isParentUser = ($user['type'] ?? '') === 'parent';
     if ($isParentUser) {
         $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
                 FROM children WHERE id = ? AND parent_id = ?';
         $stmt = mysqli_prepare($db, $sql);
         mysqli_stmt_bind_param($stmt, 'ii', $childId, $userId);
+    } elseif (($user['role'] ?? '') === 'nutritionist' && ($user['barangay_id'] ?? '') !== '') {
+        $staffBarangayId = (int)$user['barangay_id'];
+        $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
+                FROM children WHERE id = ? AND barangay_id = ?';
+        $stmt = mysqli_prepare($db, $sql);
+        mysqli_stmt_bind_param($stmt, 'ii', $childId, $staffBarangayId);
     } else {
         $sql = 'SELECT id, first_name, last_name, sex, birthdate, barangay_id
                 FROM children WHERE id = ?';
@@ -151,7 +171,7 @@ if ($childId !== null && $childId > 0) {
         sk_decrypt_pii_row($child);
     }
 
-    if ($child === null && $isParentUser) {
+    if ($child === null) {
         api_error('That child could not be found.', 404);
     }
 
