@@ -1467,8 +1467,442 @@
   gap: 14px;
 }
 
+/* Shared compact layout for the full-page edit forms. */
+.record-edit-form {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+  align-items: start;
+  gap: 10px 12px;
+  padding: 18px;
+  border: 1px solid var(--admin-border);
+  border-radius: 16px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.record-edit-frame-modal {
+  width: min(1180px, calc(100vw - 40px));
+  max-width: min(1180px, calc(100vw - 40px)) !important;
+  height: min(900px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+}
+
+.child-record-edit-frame-modal {
+  width: min(720px, calc(100vw - 40px));
+  max-width: min(720px, calc(100vw - 40px)) !important;
+}
+
+.record-edit-frame-modal iframe {
+  display: block;
+  width: 100%;
+  height: calc(100% - 66px);
+  border: 0;
+  background: var(--admin-surface);
+  overflow: hidden;
+}
+
+@media (max-width: 620px) {
+  .record-edit-frame-modal {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px) !important;
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+.record-edit-form .admin-field {
+  gap: 0.25rem;
+}
+
+.record-edit-form .admin-field-row {
+  gap: 8px;
+}
+
+.record-edit-form .admin-field input,
+.record-edit-form .admin-field select,
+.record-edit-form .admin-field textarea {
+  min-height: 46px;
+  padding: 0.65rem 0.8rem;
+  border-radius: 10px;
+}
+
+.record-edit-form .admin-field textarea {
+  min-height: 82px;
+}
+
+.record-edit-form .admin-field-message {
+  font-size: 0.68rem;
+  line-height: 1.15;
+  min-height: 0.75em;
+}
+
+.record-edit-form .admin-address-picker {
+  gap: 8px;
+}
+
+.record-edit-form .admin-pw-checklist {
+  gap: 2px 8px;
+}
+
+.child-edit-card {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 14px 16px;
+  border: 1px solid var(--admin-border);
+  border-radius: 14px;
+  background: var(--admin-surface);
+}
+
+.child-edit-card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 0.92rem;
+  line-height: 1.2;
+}
+
+.child-edit-card-title svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 17px;
+  color: var(--admin-primary);
+}
+
+.child-edit-card-description {
+  margin: -2px 0 2px;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+  line-height: 1.25;
+}
+
+.child-edit-name-row,
+.child-edit-demographics,
+.child-edit-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.child-edit-name-row {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.child-edit-guardian-card {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.child-edit-guardian-card .child-edit-card-title,
+.child-edit-guardian-card .child-edit-card-description {
+  grid-column: 1 / -1;
+}
+
+.child-edit-guardian-card .admin-field {
+  min-width: 0;
+}
+
+.child-edit-demographics .admin-field:first-child {
+  min-width: 0;
+}
+
+.child-edit-options .admin-field-checkbox {
+  min-height: 58px;
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+}
+
+.child-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.child-edit-actions .admin-btn-secondary {
+  margin-left: 0 !important;
+}
+
+@media (max-width: 620px) {
+  .child-edit-demographics,
+  .child-edit-name-row,
+  .child-edit-guardian-card,
+  .child-edit-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.record-edit-form > .admin-field[style*="align-content:end"] {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+@media (max-width: 880px) {
+  .record-edit-form {
+    padding: 14px;
+  }
+}
+
 .admin-field-wide {
   grid-column: 1 / -1;
+}
+
+.admin-edit-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(230px, 0.9fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.admin-edit-sidebar {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.admin-edit-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.admin-edit-modal-overlay[hidden] {
+  display: none;
+}
+
+.admin-modal-open {
+  overflow: hidden;
+}
+
+.admin-edit-modal {
+  max-width: 760px;
+}
+
+.admin-edit-modal-subtitle {
+  margin: 3px 0 0;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+}
+
+.admin-edit-modal-body {
+  display: grid;
+  gap: 12px;
+  padding: 14px 18px 18px;
+  max-height: calc(90vh - 76px);
+  overflow-y: auto;
+}
+
+.admin-edit-card {
+  padding: 13px 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  box-shadow: var(--admin-shadow);
+}
+
+.admin-edit-card h3 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 0.9rem;
+}
+
+.admin-edit-card > p {
+  margin: 3px 0 10px;
+  color: var(--admin-muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.admin-edit-card .admin-field-row {
+  gap: 10px;
+}
+
+.admin-edit-short-field {
+  max-width: calc(50% - 5px);
+  margin-top: 10px;
+}
+
+.admin-edit-hint {
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+}
+
+.admin-edit-access {
+  margin-top: 10px;
+}
+
+.admin-edit-access-label {
+  display: block;
+  margin-bottom: 7px;
+  color: var(--admin-text);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.admin-edit-access-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.admin-edit-access-option {
+  display: grid;
+  gap: 4px;
+  min-height: 68px;
+  padding: 10px;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: var(--admin-surface);
+  cursor: pointer;
+}
+
+.admin-edit-access-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.admin-edit-access-option strong {
+  font-size: 0.76rem;
+}
+
+.admin-edit-access-option small {
+  color: var(--admin-muted);
+  font-size: 0.65rem;
+  line-height: 1.25;
+}
+
+.admin-edit-access-option.is-selected {
+  border-color: var(--admin-primary);
+  box-shadow: 0 0 0 1px var(--admin-primary);
+  background: var(--admin-primary-soft);
+}
+
+.admin-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 2px 0 0;
+}
+
+.admin-user-summary-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-user-summary-head .admin-avatar {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  font-size: 0.82rem;
+  line-height: 1;
+}
+
+.admin-user-summary-head strong,
+.admin-user-summary-head span {
+  display: block;
+}
+
+.admin-user-summary-head strong {
+  font-size: 0.82rem;
+}
+
+.admin-user-summary-head div span {
+  margin-top: 2px;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+}
+
+.admin-user-summary-status {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 12px 0;
+}
+
+.admin-user-summary dl {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 10px;
+  margin: 0;
+  font-size: 0.7rem;
+}
+
+.admin-user-summary dt {
+  color: var(--admin-muted);
+}
+
+.admin-user-summary dd {
+  margin: 0;
+  color: var(--admin-text);
+  font-weight: 600;
+  text-align: right;
+}
+
+.admin-edit-archive {
+  border-color: rgba(201, 59, 59, 0.3);
+}
+
+.admin-edit-archive h3 {
+  color: var(--admin-danger);
+}
+
+.admin-btn-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.58rem 0.75rem;
+  border: 1px solid rgba(201, 59, 59, 0.35);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--admin-danger);
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-btn-danger svg {
+  width: 14px;
+  height: 14px;
+}
+
+@media (max-width: 880px) {
+  .admin-edit-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-edit-sidebar {
+    order: -1;
+  }
+}
+
+@media (max-width: 600px) {
+  .admin-edit-card .admin-field-row,
+  .admin-edit-short-field {
+    max-width: none;
+  }
+
+  .admin-edit-card .admin-field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-edit-access-options {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .admin-field {

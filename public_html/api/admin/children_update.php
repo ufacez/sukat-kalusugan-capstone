@@ -22,6 +22,11 @@ $hasDisability = isset($_POST['has_disability']) ? 1 : 0;
 $parentId = (int)($_POST['parent_id'] ?? 0);
 $localAreaId = (int)($_POST['local_area_id'] ?? 0);
 
+// Every failure flashes the submitted values (via admin_flash_form_state)
+// and bounces to the standalone edit page, mirroring users_update.php, so
+// the form is never wiped and the offending field is highlighted.
+$errorBackUrl = '/admin/child_form.php?id=' . $id;
+
 if ($id <= 0) {
     admin_redirect('/admin/children.php', ['notice' => 'Invalid child id.', 'type' => 'error']);
 }
@@ -30,30 +35,38 @@ if (
     !admin_is_valid_name_part($firstName, true)
     || !admin_is_valid_name_part($middleName, false)
     || !admin_is_valid_name_part($lastName, true)
-    || $birthdate === ''
-    || $parentId <= 0
 ) {
-    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'First name, last name, birthdate, and parent are required.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'first_name');
+    admin_redirect($errorBackUrl, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
+}
+
+if ($birthdate === '') {
+    admin_flash_form_state($_POST, 'birthdate');
+    admin_redirect($errorBackUrl, ['notice' => 'Birthdate is required.', 'type' => 'error']);
+}
+
+if ($parentId <= 0) {
+    admin_flash_form_state($_POST, 'parent_id');
+    admin_redirect($errorBackUrl, ['notice' => 'Select the parent/guardian for this child.', 'type' => 'error']);
 }
 
 $parent = admin_fetch_one('SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId]);
 
 if (!$parent) {
-    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Selected parent/guardian could not be found.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'parent_id');
+    admin_redirect($errorBackUrl, ['notice' => 'Selected parent/guardian could not be found.', 'type' => 'error']);
 }
 
 $barangayId = !empty($parent['barangay_id']) ? (int)$parent['barangay_id'] : null;
 
 if ($barangayId === null) {
-    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'The selected parent/guardian does not have a Barangay assigned.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'parent_id');
+    admin_redirect($errorBackUrl, ['notice' => 'The selected parent/guardian does not have a Barangay assigned.', 'type' => 'error']);
 }
 
-$currentChild = null;
-if ($id > 0) {
-    $currentChild = admin_fetch_one('SELECT id, parent_id, local_area_id FROM children WHERE id = ? LIMIT 1', 'i', [$id]);
-    if (!$currentChild) {
-        admin_redirect('/admin/children.php', ['notice' => 'Invalid child id.', 'type' => 'error']);
-    }
+$currentChild = admin_fetch_one('SELECT id, child_code, parent_id, local_area_id FROM children WHERE id = ? LIMIT 1', 'i', [$id]);
+if (!$currentChild) {
+    admin_redirect('/admin/children.php', ['notice' => 'Invalid child id.', 'type' => 'error']);
 }
 
 $validatedLocalAreaId = null;
@@ -69,32 +82,36 @@ if ($localAreaId > 0) {
     if ($localArea) {
         $validatedLocalAreaId = (int)$localArea['id'];
     } elseif (!$keepsExistingInactiveArea) {
-        admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
+        admin_flash_form_state($_POST, 'local_area_id');
+        admin_redirect($errorBackUrl, ['notice' => 'Selected Local Area is inactive or does not belong to the selected Barangay.', 'type' => 'error']);
     }
 }
 
 $registrationAgeDays = doh_age_in_days($birthdate);
 
 if ($registrationAgeDays === null || $registrationAgeDays > 1825) {
-    admin_redirect('/admin/child_form.php?id=' . $id, ['notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger.', 'type' => 'error']);
+    admin_flash_form_state($_POST, 'birthdate');
+    admin_redirect($errorBackUrl, ['notice' => 'Birthdate must be valid and the child must be 5 years (~1825 days) old or younger.', 'type' => 'error']);
 }
 
 if (!in_array($sex, ['Male', 'Female'], true)) {
     $sex = 'Male';
 }
 
-$current = admin_fetch_one('SELECT child_code FROM children WHERE id = ? LIMIT 1', 'i', [$id]);
-$childCode = (string)($current['child_code'] ?? 'CHD-0000');
+$childCode = (string)($currentChild['child_code'] ?? '');
 
 $ok = admin_execute(
-    'UPDATE children SET child_code = ?, first_name = ?, middle_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, local_area_id = ?, is_ip = ?, has_disability = ?, parent_id = ? WHERE id = ?',
-    'ssssssssiiii',
-    [$childCode, $firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId, $id]
+    'UPDATE children SET first_name = ?, middle_name = ?, last_name = ?, birthdate = ?, sex = ?, barangay_id = ?, local_area_id = ?, is_ip = ?, has_disability = ?, parent_id = ? WHERE id = ?',
+    'ssssssiiiii',
+    [$firstName, $middleName, $lastName, $birthdate, $sex, $barangayId, $validatedLocalAreaId ?? null, $isIp, $hasDisability, $parentId, $id]
 );
 
 if ($ok) {
     $actor = current_user();
-    log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'info', 'Updated child ' . $childCode . ' (' . $id . ')');
+    log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'info', 'Updated child ' . ($childCode !== '' ? $childCode : '#' . $id) . ' (' . $id . ')');
 }
 
-admin_redirect('/admin/children.php', $ok ? ['notice' => 'Child updated successfully.'] : ['notice' => 'Child could not be updated.', 'type' => 'error']);
+admin_clear_form_state();
+admin_redirect('/admin/children.php', $ok
+    ? ['notice' => 'Child updated successfully.', 'type' => 'success']
+    : ['notice' => 'Child could not be updated. Please try again.', 'type' => 'error']);

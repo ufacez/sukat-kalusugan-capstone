@@ -14,9 +14,14 @@ admin_require_access('users.update');
 
 $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
 $barangays = admin_barangay_options();
+$accessLevels = [
+    'full' => ['label' => 'Full', 'description' => 'View, add, edit and archive records.'],
+    'standard' => ['label' => 'Standard', 'description' => 'View, add and edit records. Cannot archive.'],
+    'readonly' => ['label' => 'Read only', 'description' => 'View records only. No changes.'],
+];
 
 $editingUser = admin_fetch_one(
-    'SELECT u.id, u.name, u.email, u.username, u.user_code, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
+    'SELECT u.id, u.name, u.email, u.username, u.user_code, u.phone, u.barangay_id, b.name AS barangay, u.status, u.access_level, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
      LEFT JOIN barangays b ON b.id = u.barangay_id
@@ -60,6 +65,8 @@ $formPhone = admin_old_value($old, 'phone', $editingUser['phone'] ?? '');
 $formRole = admin_old_value($old, 'role', $editingUser['role_name'] ?? 'nutritionist');
 $formBarangayId = (int)admin_old_value($old, 'barangay_id', (string)($editingUser['barangay_id'] ?? 0));
 $formStatus = admin_old_value($old, 'status', $editingUser['status'] ?? 'active');
+$formAccessLevel = admin_old_value($old, 'access_level', $editingUser['access_level'] ?? 'full');
+$canChangeAccess = has_permission('roles_permissions.update');
 
 $actions = '<a class="admin-btn-secondary" href="'
     . admin_e(app_url('/admin/users.php'))
@@ -77,106 +84,156 @@ admin_layout_start(
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">Edit User</h2>
-            <p class="admin-section-subtitle"><?php echo admin_e((string)$editingUser['name']); ?> · <?php echo admin_e(ucfirst((string)$editingUser['role_name'])); ?> <?php echo sk_code_badge((string)($editingUser['user_code'] ?? '')); ?></p>
+            <p class="admin-section-subtitle">Update account details and role assignment.</p>
         </div>
+        <button class="admin-btn" type="button" data-edit-user-open><?php echo admin_action_icon('edit'); ?> Edit user</button>
     </div>
 
-    <form class="admin-form-grid" method="post" data-validate-form data-role-barangay-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>">
-        <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
-
-        <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
-
-        <div class="admin-field-wide">
-            <div class="admin-field-row">
-                <label class="admin-field" id="user-first-name-field">
-                    <span>First name<span class="admin-required">*</span></span>
-                    <input id="user_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo admin_e($editingNameParts['first']); ?>" placeholder="Jane">
-                    <span class="admin-field-message"></span>
-                </label>
-                <label class="admin-field" id="user-middle-name-field">
-                    <span>Middle name</span>
-                    <input id="user_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo admin_e($editingNameParts['middle']); ?>" placeholder="Santos">
-                    <span class="admin-field-message"></span>
-                </label>
-                <label class="admin-field" id="user-last-name-field">
-                    <span>Surname<span class="admin-required">*</span></span>
-                    <input id="user_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo admin_e($editingNameParts['last']); ?>" placeholder="Doe">
-                    <span class="admin-field-message"></span>
-                </label>
+    <div class="admin-edit-layout">
+        <div class="admin-edit-modal-overlay" data-edit-user-overlay data-open-on-load="<?php echo $formErrorNotice !== '' ? 'true' : 'false'; ?>" hidden>
+        <form class="admin-modal admin-modal--form admin-edit-modal" method="post" data-validate-form data-role-barangay-form data-edit-user-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>" role="dialog" aria-modal="true" aria-labelledby="edit-user-modal-title">
+            <div class="admin-modal-head">
+                <div>
+                    <h3 id="edit-user-modal-title">Edit user</h3>
+                    <p class="admin-edit-modal-subtitle">Update account details and role assignment.</p>
+                </div>
+                <button class="admin-modal-close" type="button" data-edit-user-close aria-label="Close">&times;</button>
             </div>
-        </div>
+            <div class="admin-edit-modal-body">
+            <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
+            <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
 
-        <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
-            <span>Email<span class="admin-required">*</span></span>
-            <input id="user_email" type="email" name="email" required data-validate="email" data-label="Email" value="<?php echo admin_e($formEmail); ?>" placeholder="jane@example.com">
-            <span class="admin-field-message"><?php echo $formErrorField === 'email' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
-        </label>
-        <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
-            <span>Username<span class="admin-required">*</span></span>
-            <input id="user_username" name="username" required data-validate="username" data-label="Username" value="<?php echo admin_e($formUsername); ?>" placeholder="janedoe">
-            <span class="admin-field-message"><?php echo $formErrorField === 'username' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
-        </label>
-        <div class="admin-field-wide">
-            <div class="admin-field-row">
-                <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
+            <section class="admin-edit-card">
+                <h3>Personal information</h3>
+                <p>The name shown on records, reports and audit logs.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field">
+                        <span>First name<span class="admin-required">*</span></span>
+                        <input id="user_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo admin_e($editingNameParts['first']); ?>" placeholder="Jane">
+                        <span class="admin-field-message"></span>
+                    </label>
+                    <label class="admin-field">
+                        <span>Middle name</span>
+                        <input id="user_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo admin_e($editingNameParts['middle']); ?>" placeholder="Santos">
+                        <span class="admin-field-message"></span>
+                    </label>
+                    <label class="admin-field">
+                        <span>Surname<span class="admin-required">*</span></span>
+                        <input id="user_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo admin_e($editingNameParts['last']); ?>" placeholder="Doe">
+                        <span class="admin-field-message"></span>
+                    </label>
+                </div>
+            </section>
+
+            <section class="admin-edit-card">
+                <h3>Account</h3>
+                <p>How this person signs in and how they can be reached.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
+                        <span>Email<span class="admin-required">*</span></span>
+                        <input id="user_email" type="email" name="email" required data-validate="email" data-label="Email" value="<?php echo admin_e($formEmail); ?>" placeholder="jane@example.com">
+                        <span class="admin-field-message"><?php echo $formErrorField === 'email' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
+                    </label>
+                    <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
+                        <span>Username<span class="admin-required">*</span></span>
+                        <input id="user_username" name="username" required data-validate="username" data-label="Username" value="<?php echo admin_e($formUsername); ?>" placeholder="janedoe">
+                        <span class="admin-field-message"><?php echo $formErrorField === 'username' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
+                    </label>
+                </div>
+                <label class="admin-field admin-edit-short-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                     <span>Mobile number<span class="admin-required">*</span></span>
                     <input id="user_phone" name="phone" required data-validate="phone-ph" data-label="Mobile number" value="<?php echo admin_e($formPhone); ?>" placeholder="09171234567">
                     <span class="admin-field-message"><?php echo $formErrorField === 'phone' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
-                <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
-                    <span>Role<span class="admin-required">*</span></span>
-                    <select name="role" required>
-                        <?php foreach ($roles as $role): ?>
-                            <option value="<?php echo admin_e($role['name']); ?>" <?php echo ($formRole === $role['name']) ? 'selected' : ''; ?>><?php echo admin_e(ucfirst($role['name'])); ?></option>
+            </section>
+
+            <section class="admin-edit-card">
+                <h3>Role &amp; access</h3>
+                <p>What this person can do and where.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
+                        <span>Role<span class="admin-required">*</span></span>
+                        <select name="role" required>
+                            <?php foreach ($roles as $role): ?>
+                                <option value="<?php echo admin_e($role['name']); ?>" <?php echo ($formRole === $role['name']) ? 'selected' : ''; ?>><?php echo admin_e(ucfirst($role['name'])); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <span class="admin-field-message"><?php echo $formErrorField === 'role' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
+                    </label>
+                    <label class="admin-field">
+                        <span>Barangay scope</span>
+                        <select name="barangay_id">
+                            <option value="">-- All barangays (admin scope) --</option>
+                            <?php foreach ($barangays as $barangay): ?>
+                                <option value="<?php echo (int)$barangay['id']; ?>" <?php echo $formBarangayId === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
+                            <?php endforeach; ?>
+                        </select>
+                        <small class="admin-edit-hint">Records they are assigned to this barangay.</small>
+                    </label>
+                </div>
+                <?php if ($canChangeAccess): ?>
+                <div class="admin-edit-access">
+                    <span class="admin-edit-access-label">Access level<span class="admin-required">*</span></span>
+                    <div class="admin-edit-access-options">
+                        <?php foreach ($accessLevels as $accessKey => $accessOption): ?>
+                        <label class="admin-edit-access-option<?php echo $formAccessLevel === $accessKey ? ' is-selected' : ''; ?>">
+                            <input type="radio" name="access_level" value="<?php echo admin_e($accessKey); ?>" <?php echo $formAccessLevel === $accessKey ? 'checked' : ''; ?>>
+                            <strong><?php echo admin_e($accessOption['label']); ?></strong>
+                            <small><?php echo admin_e($accessOption['description']); ?></small>
+                        </label>
                         <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <label class="admin-field admin-edit-short-field">
+                    <span>Status<span class="admin-required">*</span></span>
+                    <select name="status" required>
+                        <option value="active" <?php echo ($formStatus === 'active') ? 'selected' : ''; ?>>Active</option>
+                        <option value="inactive" <?php echo ($formStatus === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
                     </select>
-                    <span class="admin-field-message"><?php echo $formErrorField === 'role' && $formErrorNotice !== '' ? admin_e($formErrorNotice) : ''; ?></span>
                 </label>
-            </div>
-        </div>
-        <label class="admin-field">
-            <span>Barangay scope</span>
-            <select name="barangay_id">
-                <option value="">-- All barangays (admin scope) --</option>
-                <?php foreach ($barangays as $barangay): ?>
-                    <option value="<?php echo (int)$barangay['id']; ?>" <?php echo $formBarangayId === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo admin_e($barangay['name']); ?></option>
-                <?php endforeach; ?>
-            </select>
-        </label>
-        <label class="admin-field">
-            <span>Status<span class="admin-required">*</span></span>
-            <select name="status" required>
-                <option value="active" <?php echo ($formStatus === 'active') ? 'selected' : ''; ?>>Active</option>
-                <option value="inactive" <?php echo ($formStatus === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-            </select>
-        </label>
+            </section>
 
-        <label class="admin-field admin-field-wide">
-            <span>New password (optional)</span>
-            <input id="user_password" type="password" name="password" data-validate="password" autocomplete="new-password" placeholder="Leave blank to keep current password">
-            <span class="admin-field-message"></span>
-            <ul class="admin-pw-checklist" data-pw-checklist-for="user_password">
-                <li data-pw-rule="length">At least 8 characters</li>
-                <li data-pw-rule="upper">One uppercase letter</li>
-                <li data-pw-rule="lower">One lowercase letter</li>
-                <li data-pw-rule="number">One number</li>
-                <li data-pw-rule="special">One special character</li>
-            </ul>
-            <div class="admin-pw-strength" data-pw-strength-for="user_password">
-                <div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
-                <div class="admin-pw-strength-label"></div>
+            <div class="admin-edit-actions">
+                <button class="admin-btn-secondary" type="button" data-edit-user-close>Cancel</button>
+                <button class="admin-btn" type="submit" data-edit-user-save hidden><?php echo admin_action_icon('save'); ?> Save changes</button>
             </div>
-        </label>
-        <label class="admin-field admin-field-wide">
-            <span>Confirm new password</span>
-            <input id="user_password_confirm" type="password" name="password_confirm" data-validate="confirm-password" data-match="user_password" autocomplete="new-password" placeholder="Re-type the password">
-            <span class="admin-field-message"></span>
-        </label>
-
-        <div class="admin-field admin-field-wide" style="align-content:end;">
-            <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save changes</button>
+            </div>
+        </form>
         </div>
-    </form>
+
+        <aside class="admin-edit-sidebar">
+            <section class="admin-edit-card admin-user-summary">
+                <div class="admin-user-summary-head">
+                    <span class="admin-avatar" style="background:<?php echo admin_avatar_color((string)$editingUser['name']); ?>;"><?php echo admin_initials((string)$editingUser['name']); ?></span>
+                    <div>
+                        <strong><?php echo admin_e((string)$editingUser['name']); ?></strong>
+                        <span><?php echo admin_e(ucfirst((string)$editingUser['role_name'])); ?></span>
+                    </div>
+                </div>
+                <div class="admin-user-summary-status">
+                    <span class="admin-pill <?php echo $formStatus === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst($formStatus)); ?></span>
+                    <?php echo sk_code_badge((string)($editingUser['user_code'] ?? '')); ?>
+                </div>
+                <dl>
+                    <dt>User ID</dt><dd><?php echo admin_e((string)($editingUser['user_code'] ?? '')); ?></dd>
+                    <dt>Username</dt><dd><?php echo admin_e($formUsername); ?></dd>
+                    <dt>Barangay</dt><dd><?php echo admin_e((string)($editingUser['barangay'] ?? 'All barangays')); ?></dd>
+                </dl>
+            </section>
+
+            <?php if (has_permission('users.delete')): ?>
+            <section class="admin-edit-card admin-edit-archive">
+                <h3>Archive user</h3>
+                <p>Archived users can no longer sign in. Everything they recorded is kept.</p>
+                <form method="post" action="<?php echo admin_e(app_url('/api/admin/users_archive.php')); ?>" data-admin-confirm="Archive <?php echo admin_e($editingUser['name']); ?>?">
+                    <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
+                    <button class="admin-btn-danger" type="submit"><?php echo admin_action_icon('archive'); ?> Archive user</button>
+                </form>
+            </section>
+            <?php endif; ?>
+        </aside>
+    </div>
 </section>
 <?php
 admin_layout_end();

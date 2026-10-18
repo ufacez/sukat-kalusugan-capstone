@@ -241,7 +241,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 							<div class="admin-actions">
 								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
 								<?php if (nutritionist_can_write('parents.update')): ?>
-								<a class="admin-icon-btn" title="Edit" href="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+								<button class="admin-icon-btn" title="Edit" type="button" data-record-edit-url="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></button>
 								<?php endif; ?>
 								<?php if (nutritionist_can_write('parents.delete')): ?>
 									<?php if ($tab === 'archived'): ?>
@@ -393,6 +393,11 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 		if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeParentCard();
 	});
 })();
+</script>
+
+<div class="admin-modal-overlay record-edit-frame-overlay" id="record-edit-frame-overlay" hidden><div class="admin-modal record-edit-frame-modal" role="dialog" aria-modal="true" aria-label="Edit parent"><div class="admin-modal-head"><div><h3>Edit parent</h3><p class="users-edit-subtitle">Update the selected parent record.</p></div><button class="admin-modal-close" type="button" data-record-edit-close aria-label="Close">&times;</button></div><iframe title="Edit parent" data-record-edit-frame></iframe></div></div>
+<script>
+(function(){var o=document.getElementById('record-edit-frame-overlay'),f=o&&o.querySelector('[data-record-edit-frame]');if(!o||!f)return;function close(){o.hidden=true;f.src='about:blank';document.body.classList.remove('admin-modal-open')}document.querySelectorAll('[data-record-edit-url]').forEach(function(b){b.addEventListener('click',function(){f.src=b.getAttribute('data-record-edit-url')+'&modal=1';o.hidden=false;document.body.classList.add('admin-modal-open')})});o.querySelector('[data-record-edit-close]').addEventListener('click',close);o.addEventListener('click',function(e){if(e.target===o)close()})})();
 </script>
 
 <?php

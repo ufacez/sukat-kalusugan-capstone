@@ -605,6 +605,11 @@
       loadAreas(areaName);
     }
 
+    root.addEventListener("psgc:hydrate-address", () => {
+      hydrateFromStoredAddress();
+      rebuildAddress();
+    });
+
     // CSFP is the only locale — lock province and city to fixed options.
     setFixedOption(provinceSelect, "pampanga", CSFP_PROVINCE);
     provinceSelect.disabled = true;
@@ -1051,6 +1056,66 @@
     captureBaseline();
   }
 
+  function initEditUserSaveState(form) {
+    const saveButton = form.querySelector("[data-edit-user-save]");
+    if (!saveButton) return;
+
+    const fields = Array.from(form.querySelectorAll("input, select, textarea"))
+      .filter((field) => field.type !== "hidden" && field.type !== "submit" && field.type !== "button");
+    const baseline = fields.map((field) => field.name + "=" + field.value).join("&");
+
+    function evaluate() {
+      const current = fields.map((field) => field.name + "=" + field.value).join("&");
+      const dirty = current !== baseline;
+      saveButton.hidden = !dirty;
+      saveButton.disabled = !dirty;
+    }
+
+    fields.forEach((field) => {
+      field.addEventListener("input", evaluate);
+      field.addEventListener("change", () => {
+        if (field.type === "radio") {
+          form.querySelectorAll(".admin-edit-access-option").forEach((option) => {
+            const radio = option.querySelector("input[type='radio']");
+            option.classList.toggle("is-selected", !!radio && radio.checked);
+          });
+        }
+        evaluate();
+      });
+    });
+
+    evaluate();
+  }
+
+  function initEditUserModal(root) {
+    const overlay = root.querySelector("[data-edit-user-overlay]");
+    const openButton = root.querySelector("[data-edit-user-open]");
+    const closeButtons = root.querySelectorAll("[data-edit-user-close]");
+    if (!overlay || !openButton) return;
+
+    function setOpen(open) {
+      overlay.hidden = !open;
+      document.body.classList.toggle("admin-modal-open", open);
+      if (open) {
+        const firstField = overlay.querySelector("input:not([type='hidden']), select");
+        if (firstField) firstField.focus();
+      } else {
+        openButton.focus();
+      }
+    }
+
+    openButton.addEventListener("click", () => setOpen(true));
+    closeButtons.forEach((button) => button.addEventListener("click", () => setOpen(false)));
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) setOpen(false);
+    });
+    document.addEventListener("keydown", (event) => {
+      if (event.key === "Escape" && !overlay.hidden) setOpen(false);
+    });
+
+    if (overlay.dataset.openOnLoad === "true") setOpen(true);
+  }
+
   function initLegacySettingsSaveBar(form) {
     const bar = form.querySelector("[data-settings-savebar]");
     const saveBtn = form.querySelector("[data-settings-save]");
@@ -1195,10 +1260,30 @@
     });
   }
 
+  // The access-style option cards hide their native radio/checkbox and show
+  // selection through the "is-selected" card highlight. Radios already sync
+  // via initEditUserSaveState, but checkboxes (e.g. IP / disability flags)
+  // had no sync at all, so clicks produced no visible feedback.
+  function initAccessOptionToggles(root) {
+    root.addEventListener("change", (event) => {
+      const control = event.target;
+      if (!control || typeof control.matches !== "function") return;
+      if (!control.matches(".admin-edit-access-option input[type='radio'], .admin-edit-access-option input[type='checkbox']")) return;
+      const container = control.closest(".admin-edit-access-options") || control.closest("form") || root;
+      container.querySelectorAll(".admin-edit-access-option").forEach((option) => {
+        const input = option.querySelector("input[type='radio'], input[type='checkbox']");
+        option.classList.toggle("is-selected", !!input && input.checked);
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     initValidation(document);
+    initAccessOptionToggles(document);
     document.querySelectorAll("[data-psgc-picker]").forEach((root) => initPsgcPicker(root));
     document.querySelectorAll("[data-account-settings]").forEach((root) => initAccountSettings(root));
+    document.querySelectorAll("[data-edit-user-form]").forEach((form) => initEditUserSaveState(form));
+    document.querySelectorAll(".admin-edit-layout").forEach((root) => initEditUserModal(root));
     document.querySelectorAll("form.admin-settings-form").forEach((form) => initLegacySettingsSaveBar(form));
     document.querySelectorAll("[data-role-barangay-form]").forEach((form) => initRoleBarangayScope(form));
     document.querySelectorAll("[data-csfp-barangay-picker]").forEach((root) => initCsfpBarangayForm(root));

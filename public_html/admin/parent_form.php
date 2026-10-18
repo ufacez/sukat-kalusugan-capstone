@@ -50,6 +50,7 @@ admin_layout_start(
     $editingParent ? 'Edit Parent' : 'Add Parent'
 );
 ?>
+<?php if (isset($_GET['modal'])): ?><style>.admin-sidebar,.admin-topbar,.admin-pageheader{display:none!important}.admin-shell{display:block!important}.admin-main{margin:0!important}.admin-content{padding:12px!important}.admin-section-head{display:none!important}.admin-section{margin:0!important}</style><?php endif; ?>
 <section class="admin-section">
     <div class="admin-section-head">
         <div>
@@ -58,7 +59,7 @@ admin_layout_start(
         </div>
     </div>
 
-    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/parents_update.php')); ?>">
+    <form class="admin-form-grid<?php echo $editingParent ? ' record-edit-form' : ''; ?>" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/parents_update.php')); ?>">
         <input type="hidden" name="action" value="update">
         <input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">
 

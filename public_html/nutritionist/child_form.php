@@ -456,8 +456,15 @@ nutritionist_layout_start(
     $actions,
     $editChild !== null ? 'Edit Child' : 'Add Child'
 );
-
 ?>
+<?php if (isset($_GET['modal'])): ?><style>
+html,body{overflow:hidden!important;background:transparent!important}
+.admin-sidebar,.admin-topbar,.admin-pageheader,.nutritionist-form-head{display:none!important}
+.admin-console-footer{display:none!important}
+.admin-shell,.admin-main,.admin-content{display:block!important;margin:0!important;padding:0!important;min-height:0!important}
+.nutritionist-panel{margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important}
+.record-edit-form{display:grid!important;max-width:none!important;margin:0!important;padding:12px!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:transparent!important;max-height:100dvh;overflow-y:auto}
+</style><?php endif; ?>
 
 <section class="nutritionist-panel">
 
@@ -506,7 +513,7 @@ nutritionist_layout_start(
 
     <form
         method="post"
-        class="nutritionist-form-grid"
+        class="nutritionist-form-grid<?php echo $editChild !== null ? ' record-edit-form' : ''; ?>"
         data-validate-form
     >
 
@@ -926,6 +933,68 @@ nutritionist_layout_start(
         </div>
     </div>
 </div>
+
+<?php if ($editChild !== null): ?>
+<script>
+(function () {
+    var form = document.querySelector('form.record-edit-form');
+    if (!form || form.querySelector('.child-edit-card')) return;
+
+    function fieldFor(name) {
+        var input = form.querySelector('[name="' + name + '"]');
+        return input ? input.closest('.admin-field') : null;
+    }
+
+    function makeCard(title, description, fields) {
+        var card = document.createElement('section');
+        card.className = 'child-edit-card admin-field-wide';
+        var heading = document.createElement('h3');
+        heading.className = 'child-edit-card-title';
+        heading.textContent = title;
+        var copy = document.createElement('p');
+        copy.className = 'child-edit-card-description';
+        copy.textContent = description;
+        card.appendChild(heading);
+        card.appendChild(copy);
+        fields.forEach(function (field) {
+            if (field) card.appendChild(field);
+        });
+        return card;
+    }
+
+    var personal = makeCard('Personal information', 'The name and details shown on records and reports.', []);
+    var nameRow = document.createElement('div');
+    nameRow.className = 'child-edit-name-row';
+    [fieldFor('first_name'), fieldFor('middle_name'), fieldFor('last_name')].forEach(function (field) {
+        if (field) nameRow.appendChild(field);
+    });
+    var demographics = document.createElement('div');
+    demographics.className = 'child-edit-demographics';
+    [fieldFor('birthdate'), fieldFor('sex')].forEach(function (field) {
+        if (field) demographics.appendChild(field);
+    });
+    personal.appendChild(nameRow);
+    personal.appendChild(demographics);
+
+    ['parent_id', 'local_area_id', 'household_id'].forEach(function (name) {
+        var field = fieldFor(name);
+        if (field) field.style.display = 'none';
+    });
+    var parentDisplay = form.querySelector('input[readonly]');
+    if (parentDisplay) {
+        var parentDisplayField = parentDisplay.closest('.admin-field');
+        if (parentDisplayField) parentDisplayField.style.display = 'none';
+    }
+    var additional = makeCard('Additional details', 'Used for program eligibility and reports.', [
+        fieldFor('is_ip'), fieldFor('has_disability')
+    ]);
+    var footer = form.querySelector('.admin-field[style*="grid-column:1 / -1"]');
+    if (footer) footer.classList.add('child-edit-actions');
+    form.insertBefore(personal, footer || null);
+    form.insertBefore(additional, footer || null);
+})();
+</script>
+<?php endif; ?>
 
 
 <script>

@@ -10,12 +10,10 @@ $canAddParent = has_permission('parents.create');
 $canEditParent = has_permission('parents.update');
 $canArchiveParent = has_permission('parents.delete');
 $canChangeAccess = has_permission('roles_permissions.update');
+$roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
+$barangays = admin_barangay_options();
 
 $editId = (int)($_GET['edit'] ?? 0);
-
-if ($editId > 0) {
-    admin_redirect('/admin/user_form.php?id=' . $editId);
-}
 
 /*
 |--------------------------------------------------------------------------
@@ -24,7 +22,7 @@ if ($editId > 0) {
 */
 
 $staff = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay,
+    'SELECT u.id, u.name, u.email, u.username, u.phone, u.address, u.barangay_id, b.name AS barangay,
             u.user_code,
             u.status, u.access_level, u.last_login, u.created_at, r.name AS role_name
      FROM users u
@@ -166,7 +164,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">User Directory</h2>
-            <p class="admin-section-subtitle">Staff and parent accounts. Access levels change inline per staff row.</p>
+            <p class="admin-section-subtitle">Staff and parent accounts.</p>
         </div>
         <div class="admin-toolbar" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <div class="rp-role-pills" role="tablist" aria-label="Filter by account type">
@@ -189,9 +187,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                     <th>Name</th>
                     <th>Role</th>
                     <th>Access</th>
-                    <th>Detail</th>
                     <th>Status</th>
-                    <th>Registered</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -215,33 +211,25 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                         </td>
                         <td><span class="admin-pill <?php echo $roleName === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e($roleLabel); ?></span></td>
                         <td>
-                            <div style="position:relative;display:inline-block;">
-                                <span class="admin-pill <?php echo admin_e($accessLevels[$al]['pill'] ?? 'is-muted'); ?>"><?php echo admin_e(ucfirst($al)); ?></span>
-                                <?php if ($canChangeAccess): ?>
-                                <button class="admin-icon-btn rp-dropdown-trigger" title="Change access" type="button" data-user-id="<?php echo (int)$user['id']; ?>" style="width:26px;height:26px;margin-left:4px;vertical-align:middle;"><?php echo admin_action_icon('edit'); ?></button>
-                                <div class="rp-dropdown-menu">
-                                    <div class="rp-dropdown-label">Access Level</div>
-                                    <?php foreach ($accessLevels as $lvlKey => $lvl): ?>
-                                        <button class="rp-dropdown-item<?php echo $al === $lvlKey ? ' is-active' : ''; ?>" type="button" data-user-id="<?php echo (int)$user['id']; ?>" data-level="<?php echo admin_e($lvlKey); ?>">
-                                            <span class="rp-dropdown-dot" style="background:<?php echo admin_e($lvl['dot']); ?>"></span>
-                                            <?php echo admin_e($lvl['label']); ?>
-                                        </button>
-                                    <?php endforeach; ?>
-                                </div>
-                                <?php endif; ?>
-                            </div>
+                            <span class="admin-pill <?php echo admin_e($accessLevels[$al]['pill'] ?? 'is-muted'); ?>"><?php echo admin_e(ucfirst($al)); ?></span>
                         </td>
-                        <td style="color:var(--admin-muted);"><?php echo admin_e((string)($user['barangay'] ?? 'All barangays')); ?></td>
                         <td><span class="admin-pill <?php echo $user['status'] === 'active' ? 'is-success' : 'is-muted'; ?>"><?php echo admin_e(ucfirst($user['status'])); ?></span></td>
-                        <td><?php
-                            $d = (string)($user['created_at'] ?? '');
-                            echo $d !== '' ? admin_e(date('M j Y', strtotime($d))) : 'n/a';
-                        ?></td>
                         <td>
                             <?php if (has_permission('users.update') || has_permission('users.delete')): ?>
                             <div class="admin-actions">
                                 <?php if (has_permission('users.update')): ?>
-                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/user_form.php?id=' . (int)$user['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <button class="admin-icon-btn" title="Edit" type="button"
+                                    data-users-edit
+                                    data-user-id="<?php echo (int)$user['id']; ?>"
+                                    data-name="<?php echo admin_e($user['name']); ?>"
+                                    data-email="<?php echo admin_e($user['email']); ?>"
+                                    data-username="<?php echo admin_e($user['username']); ?>"
+                                    data-phone="<?php echo admin_e($user['phone']); ?>"
+                                    data-address="<?php echo admin_e($user['address'] ?? ''); ?>"
+                                    data-role="<?php echo admin_e($roleName); ?>"
+                                    data-barangay-id="<?php echo (int)($user['barangay_id'] ?? 0); ?>"
+                                    data-status="<?php echo admin_e($user['status']); ?>"
+                                    data-access-level="<?php echo admin_e($al); ?>"><?php echo admin_action_icon('edit'); ?></button>
                                 <?php endif; ?>
                                 <?php if (has_permission('users.delete')): ?>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/users_archive.php')); ?>" data-admin-confirm="Archive <?php echo admin_e($user['name']); ?>?" style="display:inline;">
@@ -269,18 +257,14 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                         </td>
                         <td><span class="admin-pill is-info">Parent</span></td>
                         <td><span class="admin-mini">&mdash;</span></td>
-                        <td><?php echo admin_e((string)($parent['local_area'] ?? 'No purok')); ?> &middot; <?php echo $kidCount; ?> child<?php echo $kidCount === 1 ? '' : 'ren'; ?></td>
                         <td><span class="admin-pill is-success"><?php echo admin_e(ucfirst($parent['status'])); ?></span></td>
-                        <td><?php
-                            $d = (string)($parent['created_at'] ?? '');
-                            echo $d !== '' ? admin_e(date('M j Y', strtotime($d))) : 'n/a';
-                        ?></td>
                         <td>
                             <?php if ($canEditParent || $canArchiveParent): ?>
                             <div class="admin-actions">
                                 <?php if ($canEditParent): ?>
-                                <a class="admin-icon-btn" title="Edit" href="<?php echo admin_e(app_url('/admin/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <button class="admin-icon-btn" title="Edit" type="button" data-record-edit-url="<?php echo admin_e(app_url('/admin/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></button>
                                 <?php endif; ?>
+
                                 <?php if ($canArchiveParent): ?>
                                 <form method="post" action="<?php echo admin_e(app_url('/api/admin/parents_archive.php')); ?>" data-admin-confirm="Archive <?php echo admin_e($parent['name']); ?>? Linked children are archived too." style="display:inline;">
                                     <input type="hidden" name="id" value="<?php echo (int)$parent['id']; ?>">
@@ -297,24 +281,132 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
     </div>
 </section>
 
+<div class="admin-modal-overlay record-edit-frame-overlay" id="record-edit-frame-overlay" hidden>
+    <div class="admin-modal record-edit-frame-modal" role="dialog" aria-modal="true" aria-label="Edit record">
+        <div class="admin-modal-head">
+            <div><h3>Edit record</h3><p class="users-edit-subtitle">Update the selected record.</p></div>
+            <button class="admin-modal-close" type="button" data-record-edit-close aria-label="Close">&times;</button>
+        </div>
+        <iframe title="Edit record" data-record-edit-frame></iframe>
+    </div>
+</div>
+
+<?php if (has_permission('users.update')): ?>
+<div class="admin-modal-overlay" id="users-edit-overlay" hidden>
+    <form class="admin-modal admin-modal--form users-edit-modal" method="post" data-validate-form data-role-barangay-form data-edit-user-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>">
+        <div class="admin-modal-head">
+            <div>
+                <h3>Edit user</h3>
+                <p class="users-edit-subtitle">Update account details and role assignment.</p>
+            </div>
+            <button class="admin-modal-close" type="button" data-users-edit-close aria-label="Close">&times;</button>
+        </div>
+        <div class="users-edit-body">
+            <input type="hidden" name="id">
+            <div class="admin-flash is-error" data-validate-banner style="display:none;"></div>
+            <section class="invite-form-card admin-field-wide">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('users'); ?> Personal information</h4>
+                <p>The name shown on records, reports and audit logs.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field"><span>First name<span class="admin-required">*</span></span><input name="first_name" required data-validate="name" maxlength="60"><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Middle name</span><input name="middle_name" data-validate="name" maxlength="60"><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Surname<span class="admin-required">*</span></span><input name="last_name" required data-validate="name" maxlength="60"><span class="admin-field-message"></span></label>
+                </div>
+            </section>
+            <section class="invite-form-card admin-field-wide">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('clipboard'); ?> Account</h4>
+                <p>How this person signs in and how they can be reached.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field"><span>Email<span class="admin-required">*</span></span><input type="email" name="email" required data-validate="email"><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Username<span class="admin-required">*</span></span><input name="username" required data-validate="username"><span class="admin-field-message"></span></label>
+                </div>
+                <label class="admin-field users-edit-phone-field"><span>Mobile number<span class="admin-required">*</span></span><input name="phone" required data-validate="phone-ph"><span class="admin-field-message"></span></label>
+            </section>
+            <section class="invite-form-card admin-field-wide">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('key'); ?> Role &amp; access</h4>
+                <p>What this person can do and where.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field"><span>Role<span class="admin-required">*</span></span><select name="role" required><?php foreach ($roles as $role): ?><option value="<?php echo admin_e($role['name']); ?>"><?php echo admin_e(ucfirst($role['name'])); ?></option><?php endforeach; ?></select></label>
+                    <label class="admin-field"><span>Barangay scope</span><select name="barangay_id"><option value="">-- All barangays (admin scope) --</option><?php foreach ($barangays as $barangay): ?><option value="<?php echo (int)$barangay['id']; ?>"><?php echo admin_e($barangay['name']); ?></option><?php endforeach; ?></select></label>
+                </div>
+                <?php if ($canChangeAccess): ?>
+                <div class="admin-edit-access">
+                    <span class="admin-edit-access-label">Access level<span class="admin-required">*</span></span>
+                    <div class="admin-edit-access-options">
+                        <?php foreach ($accessLevels as $accessKey => $accessOption): ?>
+                        <label class="admin-edit-access-option"><input type="radio" name="access_level" value="<?php echo admin_e($accessKey); ?>" required><strong><?php echo admin_e($accessOption['label'] === 'Read Only' ? 'Read only' : $accessOption['label']); ?></strong><small><?php echo $accessKey === 'full' ? 'View, add, edit and archive records.' : ($accessKey === 'standard' ? 'View, add and edit records.' : 'View records only. No changes.'); ?></small></label>
+                        <?php endforeach; ?>
+                    </div>
+                </div>
+                <?php endif; ?>
+                <label class="admin-field admin-edit-short-field"><span>Status<span class="admin-required">*</span></span><select name="status" required><option value="active">Active</option><option value="inactive">Inactive</option></select></label>
+            </section>
+            <section class="invite-form-card invite-address-card admin-field-wide">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('barangays'); ?> Home address</h4>
+                <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="users_edit_address" data-psgc-street-target="users_edit_house" data-psgc-area-target="users_edit_area">
+                    <label class="admin-field"><span>Province</span><select data-psgc="province"><option value="">Loading provinces…</option></select></label>
+                    <label class="admin-field"><span>City / Municipality</span><select data-psgc="city" disabled><option value="">-- Select province first --</option></select></label>
+                    <label class="admin-field"><span>Barangay</span><select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select></label>
+                    <label class="admin-field"><span>Local area / Purok<span class="admin-required">*</span></span><select id="users_edit_area" data-psgc="area" disabled><option value="">-- Select barangay first --</option></select></label>
+                </div>
+                <label class="admin-field invite-house-field" style="margin-top:10px;"><span>House no. / street<span class="admin-required">*</span></span><input id="users_edit_house" data-psgc="street" name="house_no" required placeholder="143 Mabini St."><span class="admin-field-message"></span></label>
+                <div class="admin-address-status" data-psgc-status></div>
+                <div class="admin-address-preview" role="status" aria-live="polite"><?php echo admin_sidebar_icon('barangays'); ?><div><span class="admin-address-preview-label">Full address</span><input id="users_edit_address" name="address" type="text" maxlength="255" readonly placeholder="Your complete address will appear here."></div></div>
+            </section>
+            <div class="admin-edit-actions"><button class="admin-btn-secondary" type="button" data-users-edit-close>Cancel</button><button class="admin-btn" type="submit" data-edit-user-save hidden><?php echo admin_action_icon('save'); ?> Save changes</button></div>
+        </div>
+    </form>
+</div>
+<?php endif; ?>
+
 <style>
-.rp-dropdown-menu{position:absolute;top:calc(100% + 4px);right:0;min-width:190px;background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.12);z-index:9999;padding:4px;opacity:0;visibility:hidden;transform:translateY(-4px);transition:all .15s}
-.rp-dropdown-menu.is-open{opacity:1;visibility:visible;transform:translateY(0)}
-.rp-dropdown-label{font-size:9px;font-weight:600;color:var(--admin-muted);text-transform:uppercase;letter-spacing:.4px;padding:6px 10px 2px;user-select:none}
-#users-table{min-width:760px}
+#users-table{min-width:680px}
 #users-table th,#users-table td{vertical-align:middle}
-#users-table td:nth-child(2),#users-table td:nth-child(3),#users-table td:nth-child(5){white-space:nowrap}
+#users-table td:nth-child(2),#users-table td:nth-child(3){white-space:nowrap}
 #users-table th:last-child,#users-table td:last-child{text-align:center}
 #users-table .admin-actions{justify-content:center}
-#users-table .rp-dropdown-menu.is-floating{position:fixed;top:auto;right:auto;transform:translateY(-4px)}
-#users-table .rp-dropdown-menu.is-floating.is-open{transform:translateY(0)}
+body.admin-page .users-edit-modal{width:min(1120px,calc(100vw - 40px)) !important;max-width:min(1120px,calc(100vw - 40px)) !important;max-height:calc(100dvh - 32px);border-radius:18px;overflow:hidden}
+.users-edit-modal .admin-modal-head{padding:20px 24px 14px;align-items:flex-start}
+.users-edit-modal .admin-modal-head h3{font-size:1.35rem;letter-spacing:-.02em}
+.users-edit-subtitle{margin:3px 0 0;color:var(--admin-muted);font-size:.82rem}
+.users-edit-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;padding:12px 24px 16px;background:var(--admin-page-gradient-start);max-height:calc(94vh - 66px);overflow-y:auto}
+.users-edit-body > section:nth-of-type(1),
+.users-edit-body > section:nth-of-type(2){grid-column:auto}
+.users-edit-body > section:nth-of-type(3),
+.users-edit-body > section:nth-of-type(4),
+.users-edit-body > .admin-edit-actions{grid-column:1 / -1}
+.users-edit-body .invite-form-card{align-self:start;padding:12px 14px;border:1px solid var(--admin-border);border-radius:14px;background:var(--admin-surface)}
+.users-edit-body .invite-form-card-title{margin:0 0 7px;line-height:1.15}
+.users-edit-body .invite-form-card > p{margin:0 0 7px;color:var(--admin-muted);font-size:.66rem;line-height:1.2}
+.users-edit-body .invite-form-card .admin-field-row{gap:8px}
+.users-edit-body .invite-form-card .admin-field{gap:.25rem}
+.users-edit-phone-field{max-width:none;margin-top:4px}
+.users-edit-body .invite-form-card input,
+.users-edit-body .invite-form-card select{height:46px;padding:.65rem .8rem}
+.users-edit-body .invite-form-card input,
+.users-edit-body .invite-form-card select{border-radius:10px}
+.users-edit-body .invite-form-card-title svg{width:17px;height:17px;flex:0 0 17px}
+.users-edit-body .admin-field-message{font-size:.66rem;line-height:1.15;min-height:.75em}
+.users-edit-body .admin-edit-access{margin-top:6px}
+.users-edit-body .admin-edit-access-options{gap:6px}
+.users-edit-body .admin-edit-access-option{min-height:58px;padding:8px}
+.users-edit-body .admin-edit-actions{margin:2px -24px -16px;padding:10px 24px 12px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
+@media(max-width:620px){
+ body.admin-page .users-edit-modal{width:calc(100vw - 24px);max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}
+ .users-edit-modal .admin-modal-head{padding:22px 18px 16px}
+ .users-edit-body{grid-template-columns:minmax(0,1fr);padding:12px 18px 16px}
+ .users-edit-body > section:nth-of-type(1),
+ .users-edit-body > section:nth-of-type(2),
+ .users-edit-body > section:nth-of-type(3),
+ .users-edit-body > section:nth-of-type(4),
+ .users-edit-body > .admin-edit-actions{grid-column:1}
+ .users-edit-body .invite-form-card{padding:14px}
+ .users-edit-phone-field{max-width:none}
+ .users-edit-body .admin-edit-actions{margin-left:-18px;margin-right:-18px;margin-bottom:-16px;padding-left:18px;padding-right:18px}
+}
 .admin-section-head{flex-wrap:wrap}
 .admin-section-head .admin-toolbar{flex:1 1 auto;justify-content:flex-end}
 .admin-toolbar .admin-search{flex:1 1 200px;min-width:0}
-.rp-dropdown-item{display:flex;align-items:center;gap:8px;width:100%;padding:7px 10px;border:none;background:transparent;border-radius:8px;cursor:pointer;font-size:12px;font-weight:500;color:var(--admin-text);font-family:Inter,sans-serif;text-align:left;transition:background .1s}
-.rp-dropdown-item:hover{background:var(--admin-surface-alt)}
-.rp-dropdown-item.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);font-weight:600}
-.rp-dropdown-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .rp-role-pills{display:flex;gap:6px;flex-wrap:wrap}
 .rp-role-pill{font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .rp-role-pill:hover{border-color:rgba(11,110,79,.35);color:var(--admin-primary)}
@@ -322,22 +414,6 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
 </style>
 
 <script>
-function rpCloseMenus() {
-    document.querySelectorAll('.rp-dropdown-menu.is-open').forEach(function(m) {
-        m.classList.remove('is-open', 'is-floating');
-        m.style.top = '';
-        m.style.left = '';
-    });
-}
-document.addEventListener('click', function(e) {
-    if (e.target && e.target.closest && e.target.closest('.rp-dropdown-menu')) return;
-    document.querySelectorAll('.rp-dropdown-menu.is-open').forEach(function(m) {
-        if (!m.parentElement.contains(e.target)) rpCloseMenus();
-    });
-});
-document.addEventListener('scroll', function() { rpCloseMenus(); }, true);
-window.addEventListener('resize', function() { rpCloseMenus(); });
-
 // Type pills: gate the shared admin.js table filter (data-role-filter on
 // the table + data-role on rows), then re-run it via the search box.
 document.querySelectorAll('[data-role-pill]').forEach(function(pill) {
@@ -358,63 +434,80 @@ document.querySelectorAll('[data-role-pill]').forEach(function(pill) {
     });
 });
 
-document.querySelectorAll('.rp-dropdown-trigger').forEach(function(btn) {
-    btn.addEventListener('click', function(e) {
-        e.stopPropagation();
-        var wrap = this.parentElement;
-        var menu = wrap ? wrap.querySelector('.rp-dropdown-menu') : null;
-        if (!menu) return;
-        var wasOpen = menu.classList.contains('is-open');
-        rpCloseMenus();
-        if (wasOpen) return;
-        menu.classList.add('is-floating', 'is-open');
-        var rect = btn.getBoundingClientRect();
-        var mw = menu.offsetWidth || 190;
-        var mh = menu.offsetHeight || 150;
-        var left = Math.round(rect.left + rect.width / 2 - mw / 2);
-        left = Math.max(8, Math.min(left, window.innerWidth - mw - 8));
-        var below = Math.round(rect.bottom + 4);
-        var top = (below + mh + 8 > window.innerHeight)
-            ? Math.max(8, Math.round(rect.top - mh - 4))
-            : below;
-        menu.style.left = left + 'px';
-        menu.style.top = top + 'px';
-    });
-});
-
-document.querySelectorAll('.rp-dropdown-item').forEach(function(item) {
-    item.addEventListener('click', function(e) {
-        e.stopPropagation();
-        rpCloseMenus();
-        var userId = parseInt(this.dataset.userId);
-        var level = this.dataset.level;
-        if (!userId || !level) return;
-
-        var levelLabel = level.charAt(0).toUpperCase() + level.slice(1);
-        var proceed = window.SKConfirm
-            ? window.SKConfirm('Change this user\'s access to ' + levelLabel + '?', { title: 'Change access', confirmLabel: 'Change access' })
-            : Promise.resolve(confirm('Change this user\'s access to ' + levelLabel + '?'));
-        proceed.then(function (ok) {
-        if (!ok) return;
-
-        var apiUrl = '<?php echo admin_e(app_url("/api/admin/user_access_level.php")); ?>';
-        fetch(apiUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            body: JSON.stringify({ user_id: userId, access_level: level })
-        })
-        .then(function(r) { return r.json(); })
-        .then(function(data) {
-            if (data.success) {
-                window.location.reload();
-            } else {
-                AdminToast.error(data.message || 'Failed to update access level.');
-            }
-        })
-        .catch(function() { AdminToast.error('Network error. Please try again.'); });
+var usersEditOverlay = document.getElementById('users-edit-overlay');
+var usersEditForm = usersEditOverlay ? usersEditOverlay.querySelector('form') : null;
+function closeUsersEditModal() {
+    if (!usersEditOverlay) return;
+    usersEditOverlay.hidden = true;
+    document.body.classList.remove('admin-modal-open');
+}
+function setUsersField(name, value) {
+    var field = usersEditForm ? usersEditForm.querySelector('[name="' + name + '"]') : null;
+    if (field) field.value = value || '';
+}
+document.querySelectorAll('[data-users-edit]').forEach(function(button) {
+    button.addEventListener('click', function() {
+        if (!usersEditForm) return;
+        var fullName = (this.dataset.name || '').trim().split(/\s+/);
+        setUsersField('id', this.dataset.userId);
+        setUsersField('first_name', fullName.shift() || '');
+        setUsersField('last_name', fullName.length ? fullName.pop() : '');
+        setUsersField('middle_name', fullName.join(' '));
+        setUsersField('email', this.dataset.email);
+        setUsersField('username', this.dataset.username);
+        setUsersField('phone', this.dataset.phone);
+        setUsersField('address', this.dataset.address);
+        setUsersField('role', this.dataset.role);
+        setUsersField('barangay_id', this.dataset.barangayId === '0' ? '' : this.dataset.barangayId);
+        setUsersField('status', this.dataset.status);
+        usersEditForm.querySelectorAll('[name="access_level"]').forEach(function(radio) {
+            radio.checked = radio.value === (button.dataset.accessLevel || 'full');
+            var card = radio.closest('.admin-edit-access-option');
+            if (card) card.classList.toggle('is-selected', radio.checked);
         });
+        var picker = usersEditForm.querySelector('[data-psgc-picker]');
+        if (picker) picker.dispatchEvent(new CustomEvent('psgc:hydrate-address', { bubbles: true }));
+        usersEditOverlay.hidden = false;
+        document.body.classList.add('admin-modal-open');
+        var firstField = usersEditForm.querySelector('[name="first_name"]');
+        if (firstField) firstField.focus();
     });
 });
+if (usersEditOverlay) {
+    usersEditOverlay.querySelectorAll('[data-users-edit-close]').forEach(function(button) {
+        button.addEventListener('click', closeUsersEditModal);
+    });
+    usersEditOverlay.addEventListener('click', function(event) {
+        if (event.target === usersEditOverlay) closeUsersEditModal();
+    });
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape' && !usersEditOverlay.hidden) closeUsersEditModal();
+    });
+}
+var recordEditOverlay = document.getElementById('record-edit-frame-overlay');
+var recordEditFrame = recordEditOverlay ? recordEditOverlay.querySelector('[data-record-edit-frame]') : null;
+function closeRecordEditModal() {
+    if (!recordEditOverlay) return;
+    recordEditOverlay.hidden = true;
+    if (recordEditFrame) recordEditFrame.src = 'about:blank';
+    document.body.classList.remove('admin-modal-open');
+}
+document.querySelectorAll('[data-record-edit-url]').forEach(function(button) {
+    button.addEventListener('click', function() {
+        if (!recordEditOverlay || !recordEditFrame) return;
+        recordEditFrame.src = this.getAttribute('data-record-edit-url') + '&modal=1';
+        recordEditOverlay.hidden = false;
+        document.body.classList.add('admin-modal-open');
+    });
+});
+if (recordEditOverlay) {
+    recordEditOverlay.querySelectorAll('[data-record-edit-close]').forEach(function(button) {
+        button.addEventListener('click', closeRecordEditModal);
+    });
+    recordEditOverlay.addEventListener('click', function(event) {
+        if (event.target === recordEditOverlay) closeRecordEditModal();
+    });
+}
 </script>
 
 

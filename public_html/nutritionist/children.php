@@ -19,6 +19,94 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = (string)($_POST['action'] ?? '');
     $childId = (int)($_POST['id'] ?? 0);
 
+    if ($action === 'update' && $childId > 0) {
+        nutritionist_require_write('children.update');
+
+        $firstName = trim((string)($_POST['first_name'] ?? ''));
+        $middleName = trim((string)($_POST['middle_name'] ?? ''));
+        $lastName = trim((string)($_POST['last_name'] ?? ''));
+        $birthdate = trim((string)($_POST['birthdate'] ?? ''));
+        $sex = (string)($_POST['sex'] ?? 'Male');
+        $parentId = (int)($_POST['parent_id'] ?? 0);
+        $localAreaId = (int)($_POST['local_area_id'] ?? 0);
+        $isIp = isset($_POST['is_ip']) ? 1 : 0;
+        $hasDisability = isset($_POST['has_disability']) ? 1 : 0;
+
+        $target = admin_fetch_one(
+            'SELECT id, child_code, barangay_id, parent_id, local_area_id
+             FROM children WHERE id = ? LIMIT 1',
+            'i',
+            [$childId]
+        );
+        $parent = $parentId > 0
+            ? admin_fetch_one('SELECT id, barangay_id FROM parents WHERE id = ? LIMIT 1', 'i', [$parentId])
+            : null;
+        $userBarangayId = (int)($user['barangay_id'] ?? 0);
+        $validName = admin_is_valid_name_part($firstName, true)
+            && admin_is_valid_name_part($middleName, false)
+            && admin_is_valid_name_part($lastName, true);
+        $validSex = in_array($sex, ['Male', 'Female'], true);
+        $parentBarangayId = (int)($parent['barangay_id'] ?? 0);
+        $localArea = $localAreaId > 0
+            ? admin_fetch_one(
+                'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+                'ii',
+                [$localAreaId, $parentBarangayId]
+            )
+            : null;
+        $keepsExistingArea = $target !== null
+            && $localAreaId === (int)($target['local_area_id'] ?? 0)
+            && $parentId === (int)($target['parent_id'] ?? 0);
+
+        if (
+            $target === null
+            || !$validName
+            || $birthdate === ''
+            || !$validSex
+            || $parent === null
+            || ($userBarangayId > 0 && $parentBarangayId !== $userBarangayId)
+            || ($localAreaId > 0 && $localArea === null && !$keepsExistingArea)
+            || doh_age_in_days($birthdate) === null
+            || (doh_age_in_days($birthdate) ?? 0) > 1825
+        ) {
+            admin_redirect('/nutritionist/children.php', ['notice' => 'Please check the child details and assigned location.', 'type' => 'error']);
+        }
+
+        $ok = admin_execute(
+            'UPDATE children
+             SET first_name = ?, middle_name = ?, last_name = ?, birthdate = ?,
+                 sex = ?, barangay_id = ?, local_area_id = ?, is_ip = ?,
+                 has_disability = ?, parent_id = ?
+             WHERE id = ?',
+            'sssssiiiiii',
+            [
+                $firstName,
+                $middleName,
+                $lastName,
+                $birthdate,
+                $sex,
+                $parentBarangayId,
+                $localArea !== null ? (int)$localArea['id'] : ($keepsExistingArea ? $localAreaId : null),
+                $isIp,
+                $hasDisability,
+                $parentId,
+                $childId
+            ]
+        );
+
+        if ($ok) {
+            $actor = current_user();
+            log_action($actor['id'] ?? null, 'UPDATE_CHILD', 'info', 'Updated child ' . ($target['child_code'] ?? '#' . $childId) . ' (' . $childId . ')');
+        }
+
+        admin_redirect(
+            '/nutritionist/children.php',
+            $ok
+                ? ['notice' => 'Child updated successfully.']
+                : ['notice' => 'Child could not be updated.', 'type' => 'error']
+        );
+    }
+
     if (($action === 'archive' || $action === 'restore') && $childId > 0) {
         nutritionist_require_write('children.delete');
 
@@ -430,7 +518,6 @@ nutritionist_layout_start(
                     $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                     $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
                     $profileUrl = nutritionist_e(app_url('/nutritionist/child_view.php?id=' . (int)$child['id']));
-                    $editUrl = nutritionist_e(app_url('/nutritionist/child_form.php?id=' . (int)$child['id']));
                     $parentAddress = (string)($child['parent_address'] ?? '');
                     $localAreaName = trim((string)($child['local_area'] ?? ''));
                     $lastDate = $child['last_measurement_date'] ?? null;
@@ -494,7 +581,18 @@ nutritionist_layout_start(
                             <div class="admin-actions" onclick="event.stopPropagation();">
                                 <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
                                 <?php if (nutritionist_can_write('children.update')): ?>
-                                <a class="admin-icon-btn" title="Edit profile" href="<?php echo $editUrl; ?>"><?php echo admin_action_icon('edit'); ?></a>
+                                <button class="admin-icon-btn" title="Edit profile" type="button"
+                                    data-child-edit
+                                    data-child-id="<?php echo (int)$child['id']; ?>"
+                                    data-first-name="<?php echo nutritionist_e($child['first_name']); ?>"
+                                    data-middle-name="<?php echo nutritionist_e($child['middle_name'] ?? ''); ?>"
+                                    data-last-name="<?php echo nutritionist_e($child['last_name']); ?>"
+                                    data-birthdate="<?php echo nutritionist_e((string)$child['birthdate']); ?>"
+                                    data-sex="<?php echo nutritionist_e((string)$child['sex']); ?>"
+                                    data-is-ip="<?php echo !empty($child['is_ip']) ? '1' : '0'; ?>"
+                                    data-has-disability="<?php echo !empty($child['has_disability']) ? '1' : '0'; ?>"
+                                    data-parent-id="<?php echo (int)$child['parent_id']; ?>"
+                                    data-local-area-id="<?php echo (int)($child['local_area_id'] ?? 0); ?>"><?php echo admin_action_icon('edit'); ?></button>
                                 <?php endif; ?>
                                 <?php if (nutritionist_can_write('children.delete')): ?>
                                     <?php if ($tab === 'archived'): ?>
@@ -732,6 +830,95 @@ nutritionist_layout_start(
     });
 })();
 </script>
+
+<?php if (nutritionist_can_write('children.update')): ?>
+<div class="admin-modal-overlay" id="child-edit-overlay" hidden>
+    <form class="admin-modal admin-modal--form child-edit-modal" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/children.php')); ?>">
+        <div class="admin-modal-head">
+            <div>
+                <h3>Edit child</h3>
+                <p class="child-edit-subtitle">Update the selected child record.</p>
+            </div>
+            <button class="admin-modal-close" type="button" data-child-edit-close aria-label="Close">&times;</button>
+        </div>
+        <div class="child-edit-body">
+            <input type="hidden" name="action" value="update">
+            <input type="hidden" name="id" value="">
+            <input type="hidden" name="parent_id" value="">
+            <input type="hidden" name="local_area_id" value="">
+            <section class="invite-form-card child-edit-card">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('children'); ?> Personal information</h4>
+                <p>The child's name and birth details.</p>
+                <div class="admin-field-row">
+                    <label class="admin-field"><span>First name<span class="admin-required">*</span></span><input name="first_name" required data-validate="name"><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Middle name</span><input name="middle_name" data-validate="name"><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Surname<span class="admin-required">*</span></span><input name="last_name" required data-validate="name"><span class="admin-field-message"></span></label>
+                </div>
+                <div class="admin-field-row" style="margin-top:10px;">
+                    <label class="admin-field"><span>Birthdate<span class="admin-required">*</span></span><input type="date" name="birthdate" required><span class="admin-field-message"></span></label>
+                    <label class="admin-field"><span>Sex<span class="admin-required">*</span></span><select name="sex" required><option value="Male">Male</option><option value="Female">Female</option></select></label>
+                </div>
+            </section>
+            <section class="invite-form-card child-edit-full child-edit-card">
+                <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('children'); ?> Additional details</h4>
+                <div class="admin-edit-access-options child-edit-checks" style="grid-template-columns:repeat(2,minmax(0,1fr));">
+                    <label class="admin-edit-access-option"><input type="checkbox" name="is_ip" value="1"><strong>Indigenous People (IP)</strong><small>Child belongs to an indigenous group.</small></label>
+                    <label class="admin-edit-access-option"><input type="checkbox" name="has_disability" value="1"><strong>With disability</strong><small>Child has a documented disability.</small></label>
+                </div>
+            </section>
+            <div class="admin-edit-actions"><button class="admin-btn-secondary" type="button" data-child-edit-close>Cancel</button><button class="admin-btn" type="submit" data-child-edit-save hidden><?php echo admin_action_icon('save'); ?> Save changes</button></div>
+        </div>
+    </form>
+</div>
+<style>
+body.nutritionist-page .child-edit-modal{width:min(720px,calc(100vw - 40px)) !important;max-width:min(720px,calc(100vw - 40px)) !important;max-height:calc(100dvh - 32px);border-radius:18px;overflow:hidden}
+.child-edit-modal .admin-modal-head{padding:20px 24px 14px;align-items:flex-start}
+.child-edit-modal .admin-modal-head h3{font-size:1.35rem;letter-spacing:-.02em}
+.child-edit-subtitle{margin:3px 0 0;color:var(--admin-muted);font-size:.82rem}
+.child-edit-body{display:grid;grid-template-columns:minmax(0,1fr);align-items:start;gap:10px;padding:14px 24px 16px;background:var(--admin-page-gradient-start);max-height:calc(94vh - 66px);overflow-y:auto}
+.child-edit-body .invite-form-card{align-self:start;padding:12px 14px;border:1px solid var(--admin-border);border-radius:14px;background:var(--admin-surface)}
+.child-edit-body .invite-form-card-title{margin:0 0 7px;line-height:1.15}
+.child-edit-body .invite-form-card > p{margin:0 0 7px;color:var(--admin-muted);font-size:.66rem;line-height:1.2}
+.child-edit-body .invite-form-card .admin-field-row{gap:8px}
+.child-edit-body .invite-form-card .admin-field{gap:.25rem}
+.child-edit-body .invite-form-card input,.child-edit-body .invite-form-card select{height:46px;padding:.65rem .8rem;border-radius:10px}
+.child-edit-body .invite-form-card-title svg{width:17px;height:17px;flex:0 0 17px}
+.child-edit-body .admin-edit-access-options{gap:6px}
+.child-edit-body .admin-edit-access-option{min-height:58px;padding:8px}
+.child-edit-body .admin-edit-actions{margin:2px -24px -16px;padding:12px 24px 14px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
+@media(max-width:620px){body.nutritionist-page .child-edit-modal{width:calc(100vw - 24px) !important;max-width:calc(100vw - 24px) !important}.child-edit-body{padding:12px 16px 16px}.child-edit-body .admin-edit-actions{margin:2px -16px -16px;padding:10px 16px 12px}}
+</style>
+<script>
+(function(){
+    var overlay=document.getElementById('child-edit-overlay');
+    if(!overlay)return;
+    var form=overlay.querySelector('form');
+    var save=form.querySelector('[data-child-edit-save]');
+    var options=overlay.querySelectorAll('.admin-edit-access-option');
+    var baseline='';
+    function field(name){return form.querySelector('[name="'+name+'"]');}
+    function snapshot(){return Array.prototype.slice.call(form.querySelectorAll('input,select')).filter(function(f){return f.type!=='hidden'&&f.name;}).map(function(f){return f.name+'='+(f.type==='checkbox'?(f.checked?'1':'0'):f.value);}).join('&');}
+    function refresh(){var dirty=snapshot()!==baseline;save.hidden=!dirty;save.disabled=!dirty;}
+    function close(){overlay.hidden=true;document.body.classList.remove('admin-modal-open');}
+    document.querySelectorAll('[data-child-edit]').forEach(function(button){
+        button.addEventListener('click',function(){
+            ['id','first_name','middle_name','last_name','birthdate','sex','parent_id','local_area_id'].forEach(function(name){
+                var input=field(name); if(input) input.value=button.dataset[name.replace(/_([a-z])/g,function(_,c){return c.toUpperCase();})]||'';
+            });
+            field('is_ip').checked=button.dataset.isIp==='1';
+            field('has_disability').checked=button.dataset.hasDisability==='1';
+            options.forEach(function(option){var cb=option.querySelector('input');option.classList.toggle('is-selected',cb.checked);});
+            baseline=snapshot(); refresh(); overlay.hidden=false; document.body.classList.add('admin-modal-open'); field('first_name').focus();
+        });
+    });
+    form.addEventListener('input',refresh); form.addEventListener('change',refresh);
+    options.forEach(function(option){var cb=option.querySelector('input');if(cb)cb.addEventListener('change',function(){option.classList.toggle('is-selected',cb.checked);refresh();});});
+    overlay.querySelectorAll('[data-child-edit-close]').forEach(function(button){button.addEventListener('click',close);});
+    overlay.addEventListener('click',function(e){if(e.target===overlay)close();});
+    document.addEventListener('keydown',function(e){if(e.key==='Escape'&&!overlay.hidden)close();});
+})();
+</script>
+<?php endif; ?>
 
 <?php
 nutritionist_layout_end();

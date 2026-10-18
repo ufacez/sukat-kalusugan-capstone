@@ -335,6 +335,7 @@ nutritionist_layout_start(
 	$editingParent ? 'Edit Parent' : 'Add Parent'
 );
 ?>
+<?php if (isset($_GET['modal'])): ?><style>.admin-sidebar,.admin-topbar,.admin-pageheader{display:none!important}.admin-shell{display:block!important}.admin-main{margin:0!important}.admin-content{padding:12px!important}.nutritionist-form-head{display:none!important}.nutritionist-panel{margin:0!important;box-shadow:none!important}</style><?php endif; ?>
 <section class="nutritionist-panel">
 	<div class="nutritionist-form-head" style="margin-bottom:16px;">
 		<div>
@@ -343,7 +344,7 @@ nutritionist_layout_start(
 		</div>
 	</div>
 
-	<form class="nutritionist-form-grid" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php' . ($editingParent ? '?id=' . (int)$editingParent['id'] : ''))); ?>">
+	<form class="nutritionist-form-grid<?php echo $editingParent ? ' record-edit-form' : ''; ?>" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php' . ($editingParent ? '?id=' . (int)$editingParent['id'] : ''))); ?>">
 		<input type="hidden" name="action" value="<?php echo $editingParent ? 'update' : 'create'; ?>">
 		<?php if ($editingParent): ?>
 			<input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">

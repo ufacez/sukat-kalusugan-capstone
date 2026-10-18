@@ -17,10 +17,12 @@ $lastName = trim((string)($_POST['last_name'] ?? ''));
 $email = trim((string)($_POST['email'] ?? ''));
 $username = trim((string)($_POST['username'] ?? ''));
 $phone = trim((string)($_POST['phone'] ?? ''));
+$address = trim((string)($_POST['address'] ?? ''));
 $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
 $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 $roleName = trim((string)($_POST['role'] ?? 'nutritionist'));
 $status = trim((string)($_POST['status'] ?? 'active'));
+$accessLevel = trim((string)($_POST['access_level'] ?? ''));
 $password = (string)($_POST['password'] ?? '');
 $passwordConfirm = (string)($_POST['password_confirm'] ?? '');
 
@@ -85,6 +87,13 @@ if ($roleName !== 'admin' && $barangayId === null) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Select a barangay — only admins can have "All barangays" scope.', 'type' => 'error']);
 }
 
+if ($accessLevel !== '' && !in_array($accessLevel, ['full', 'standard', 'readonly'], true)) {
+    admin_flash_form_state($_POST, 'access_level');
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Select a valid access level.', 'type' => 'error']);
+}
+
+$canChangeAccess = has_permission('roles_permissions.update');
+
 // Duplicate enforcement lives on the ADD paths only — edits must always
 // save (same-table conflicts still fail on the UNIQUE keys below with a
 // generic message). Format is still validated here.
@@ -97,21 +106,35 @@ $conn = get_db_connection();
 
 if ($password !== '') {
     $hash = password_hash($password, PASSWORD_DEFAULT);
-    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?');
+    $sql = $canChangeAccess && $accessLevel !== ''
+        ? 'UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, address = ?, role_id = ?, barangay_id = ?, status = ?, access_level = ? WHERE id = ?'
+        : 'UPDATE users SET name = ?, email = ?, username = ?, password_hash = ?, phone = ?, address = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?';
+    $stmt = mysqli_prepare($conn, $sql);
 
     if ($stmt === false) {
         admin_redirect('/admin/users.php', ['notice' => 'Unable to update user right now.', 'type' => 'error']);
     }
 
-    mysqli_stmt_bind_param($stmt, 'sssssiisi', $name, $email, $username, $hash, $phone, $roleId, $barangayId, $status, $id);
+    if ($canChangeAccess && $accessLevel !== '') {
+        mysqli_stmt_bind_param($stmt, 'ssssssiissi', $name, $email, $username, $hash, $phone, $address, $roleId, $barangayId, $status, $accessLevel, $id);
+    } else {
+        mysqli_stmt_bind_param($stmt, 'ssssssiisi', $name, $email, $username, $hash, $phone, $address, $roleId, $barangayId, $status, $id);
+    }
 } else {
-    $stmt = mysqli_prepare($conn, 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?');
+    $sql = $canChangeAccess && $accessLevel !== ''
+        ? 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, address = ?, role_id = ?, barangay_id = ?, status = ?, access_level = ? WHERE id = ?'
+        : 'UPDATE users SET name = ?, email = ?, username = ?, phone = ?, address = ?, role_id = ?, barangay_id = ?, status = ? WHERE id = ?';
+    $stmt = mysqli_prepare($conn, $sql);
 
     if ($stmt === false) {
         admin_redirect('/admin/users.php', ['notice' => 'Unable to update user right now.', 'type' => 'error']);
     }
 
-    mysqli_stmt_bind_param($stmt, 'ssssiisi', $name, $email, $username, $phone, $roleId, $barangayId, $status, $id);
+    if ($canChangeAccess && $accessLevel !== '') {
+        mysqli_stmt_bind_param($stmt, 'sssssiissi', $name, $email, $username, $phone, $address, $roleId, $barangayId, $status, $accessLevel, $id);
+    } else {
+        mysqli_stmt_bind_param($stmt, 'sssssiisi', $name, $email, $username, $phone, $address, $roleId, $barangayId, $status, $id);
+    }
 }
 
 if (!mysqli_stmt_execute($stmt)) {
@@ -127,4 +150,3 @@ log_action($actor['id'] ?? null, 'UPDATE_USER', 'info', 'Updated staff #' . $id)
 
 admin_clear_form_state();
 admin_redirect('/admin/users.php', ['notice' => 'User updated successfully.', 'type' => 'success']);
-
