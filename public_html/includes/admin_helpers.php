@@ -1223,7 +1223,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<title>' . admin_e($title) . ' | Sukat Kalusugan Admin</title>';
     echo '<link rel="preconnect" href="https://fonts.googleapis.com">';
     echo '<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>';
-    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">';
+    echo '<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">';
     $appCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/app.css');
     echo '<link rel="stylesheet" href="' . admin_e(app_url('/assets/css/app.css?v=' . $appCssVersion)) . '">';
     $adminCssVersion = (int) @filemtime(__DIR__ . '/../assets/css/admin.css');

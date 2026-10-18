@@ -621,6 +621,9 @@
         barangaySelect.disabled = false;
         hydrateFromStoredAddress();
         setStatus("");
+        // Lets host pages (e.g. the account settings save-bar baseline)
+        // react once the picker has finished populating + hydrating.
+        root.dispatchEvent(new CustomEvent("psgc:hydrated", { bubbles: true }));
       })
       .catch(() => {
         setStatus("Couldn't load the CSFP barangay list. Please reload the page and try again.", true);
@@ -773,9 +776,350 @@
     });
   }
 
+  // ---- Account settings page (admin/settings.php) ----
+  //
+  // Three progressive enhancements layered over the shared picker + the
+  // standard validation wiring:
+  //   1. a searchable barangay combobox that drives the hidden native
+  //      <select data-psgc="barangay"> (so initPsgcPicker above is unaware
+  //      it is being surfaced differently);
+  //   2. a dirty-aware sticky save bar for the profile/address form;
+  //   3. a password gate (segments + match indicator + disabled submit).
+  // Everything is guarded by the presence of its own data attribute, so this
+  // block is inert on every other page that loads this file.
+
+  function initAccountCombobox(box) {
+    const select = box.querySelector("[data-combobox-select]");
+    const input = box.querySelector("[data-combobox-input]");
+    const list = box.querySelector("[data-combobox-list]");
+    const toggle = box.querySelector("[data-combobox-toggle]");
+
+    if (!select || !input || !list) return;
+
+    let options = [];
+    let activeIndex = -1;
+
+    function readOptions() {
+      options = Array.from(select.options)
+        .filter((opt) => opt.value !== "")
+        .map((opt) => ({ value: opt.value, name: opt.dataset.name || opt.textContent || "" }));
+    }
+
+    function selectedName() {
+      const opt = select.selectedOptions && select.selectedOptions[0];
+      return opt && opt.value !== "" ? opt.dataset.name || opt.textContent || "" : "";
+    }
+
+    function close() {
+      list.hidden = true;
+      input.setAttribute("aria-expanded", "false");
+      activeIndex = -1;
+    }
+
+    function render(filter) {
+      const query = String(filter || "").trim().toLowerCase();
+      const matches = options.filter((opt) => query === "" || opt.name.toLowerCase().indexOf(query) !== -1);
+      list.innerHTML = "";
+
+      if (matches.length === 0) {
+        const empty = document.createElement("li");
+        empty.className = "acct-combobox-empty";
+        empty.textContent = options.length === 0 ? "No barangays loaded yet." : "No matches.";
+        list.appendChild(empty);
+        activeIndex = -1;
+        return;
+      }
+
+      matches.forEach((opt) => {
+        const li = document.createElement("li");
+        li.className = "acct-combobox-option";
+        li.setAttribute("role", "option");
+        li.setAttribute("aria-selected", opt.value === select.value ? "true" : "false");
+        li.dataset.value = opt.value;
+        li.textContent = opt.name;
+        li.addEventListener("mousedown", (event) => {
+          event.preventDefault();
+          choose(opt);
+        });
+        list.appendChild(li);
+      });
+
+      activeIndex = -1;
+    }
+
+    function open() {
+      render(input.value === selectedName() ? "" : input.value);
+      list.hidden = false;
+      input.setAttribute("aria-expanded", "true");
+    }
+
+    function choose(opt) {
+      select.value = opt.value;
+      input.value = opt.name;
+      close();
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    function highlight(delta) {
+      const items = Array.from(list.querySelectorAll(".acct-combobox-option"));
+      if (items.length === 0) return;
+      activeIndex = (activeIndex + delta + items.length) % items.length;
+      items.forEach((item, index) => item.classList.toggle("is-active", index === activeIndex));
+      items[activeIndex].scrollIntoView({ block: "nearest" });
+    }
+
+    input.addEventListener("focus", () => {
+      if (list.hidden) {
+        input.select();
+        open();
+      }
+    });
+
+    input.addEventListener("input", () => {
+      if (list.hidden) {
+        list.hidden = false;
+        input.setAttribute("aria-expanded", "true");
+      }
+      render(input.value);
+    });
+
+    input.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        if (list.hidden) open();
+        highlight(1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        if (list.hidden) open();
+        highlight(-1);
+      } else if (event.key === "Enter") {
+        const items = Array.from(list.querySelectorAll(".acct-combobox-option"));
+        if (!list.hidden && activeIndex >= 0 && items[activeIndex]) {
+          event.preventDefault();
+          const opt = options.find((candidate) => candidate.value === items[activeIndex].dataset.value);
+          if (opt) choose(opt);
+        }
+      } else if (event.key === "Escape") {
+        if (!list.hidden) {
+          event.preventDefault();
+          input.value = selectedName();
+          close();
+        }
+      } else if (event.key === "Tab") {
+        close();
+      }
+    });
+
+    input.addEventListener("blur", () => {
+      window.setTimeout(() => {
+        input.value = selectedName();
+        close();
+      }, 150);
+    });
+
+    if (toggle) {
+      toggle.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        if (list.hidden) {
+          open();
+          input.focus();
+        } else {
+          close();
+        }
+      });
+    }
+
+    document.addEventListener("click", (event) => {
+      if (!box.contains(event.target)) close();
+    });
+
+    function refresh() {
+      readOptions();
+      input.value = selectedName();
+      if (!list.hidden) render(input.value);
+    }
+
+    const observer = new MutationObserver(refresh);
+    observer.observe(select, { childList: true });
+
+    select.addEventListener("change", () => {
+      input.value = selectedName();
+    });
+
+    box._skRefreshCombobox = refresh;
+    refresh();
+  }
+
+  function initAccountSaveBar(root) {
+    const form = root.querySelector("[data-account-profile-form]");
+    const bar = root.querySelector("[data-account-savebar]");
+
+    if (!form || !bar) return;
+
+    const saveBtn = root.querySelector("[data-account-save]");
+    const cancelBtn = root.querySelector("[data-account-cancel]");
+    const streetInput = form.querySelector('[data-psgc="street"]');
+    const barangaySelect = form.querySelector('[data-psgc="barangay"]');
+    const addressInput = form.querySelector("#account_address");
+
+    let baseline = "";
+    let baselineFields = new Map();
+    let baselineStreet = "";
+    let baselineBarangay = "";
+    let baselineAddress = "";
+
+    function namedFields() {
+      return Array.from(form.querySelectorAll("input[name], select[name], textarea[name]"));
+    }
+
+    function snapshot() {
+      const parts = namedFields().map((el) => el.name + "=" + String(el.value));
+      if (streetInput) parts.push("street=" + streetInput.value);
+      if (barangaySelect) parts.push("barangay=" + barangaySelect.value);
+      // The full address is rebuilt programmatically (no input event), so it
+      // is captured explicitly rather than relying on form serialization.
+      if (addressInput) parts.push("address=" + addressInput.value);
+      return parts.join("&");
+    }
+
+    function apply(dirty) {
+      bar.classList.toggle("is-visible", dirty);
+      if (saveBtn) saveBtn.disabled = !dirty;
+    }
+
+    function evaluate() {
+      apply(snapshot() !== baseline);
+    }
+
+    function captureBaseline() {
+      baseline = snapshot();
+      baselineFields = new Map(namedFields().map((el) => [el, el.value]));
+      baselineStreet = streetInput ? streetInput.value : "";
+      baselineBarangay = barangaySelect ? barangaySelect.value : "";
+      baselineAddress = addressInput ? addressInput.value : "";
+      apply(false);
+    }
+
+    function reset() {
+      if (barangaySelect && barangaySelect.value !== baselineBarangay) {
+        barangaySelect.value = baselineBarangay;
+        barangaySelect.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+      if (streetInput) streetInput.value = baselineStreet;
+      baselineFields.forEach((value, el) => {
+        el.value = value;
+      });
+      if (addressInput) addressInput.value = baselineAddress;
+      apply(false);
+    }
+
+    form.addEventListener("input", evaluate);
+    form.addEventListener("change", evaluate);
+    root.addEventListener("psgc:hydrated", captureBaseline);
+
+    if (cancelBtn) {
+      cancelBtn.addEventListener("click", reset);
+    }
+
+    captureBaseline();
+  }
+
+  function initAccountPasswordGate(root) {
+    const form = root.querySelector("[data-account-password-form]");
+    if (!form) return;
+
+    const oldInput = form.querySelector('input[name="old_password"]');
+    const newInput = form.querySelector('input[name="password"]');
+    const repeatInput = form.querySelector('input[name="password_repeat"]');
+    const submit = form.querySelector("[data-account-password-submit]");
+    const bar = form.querySelector("[data-acct-strength-bar]");
+    const label = form.querySelector("[data-acct-strength-label]");
+    const matchBox = form.querySelector("[data-account-match]");
+    const segments = bar ? Array.from(bar.querySelectorAll("[data-acct-segment]")) : [];
+
+    function rules(value) {
+      return {
+        length: value.length >= 8,
+        lower: /[a-z]/.test(value),
+        upper: /[A-Z]/.test(value),
+        number: /[0-9]/.test(value),
+        special: /[^A-Za-z0-9]/.test(value),
+      };
+    }
+
+    function level(metCount, value) {
+      if (value === "" || metCount === 0) return { segments: 0, tone: "", label: "" };
+      if (metCount <= 2) return { segments: 1, tone: "danger", label: "Weak" };
+      if (metCount === 3) return { segments: 2, tone: "warn", label: "Fair" };
+      if (metCount === 4) return { segments: 3, tone: "warn", label: "Good" };
+      return { segments: 4, tone: "ok", label: "Strong" };
+    }
+
+    function update() {
+      const value = newInput ? newInput.value : "";
+      const checks = rules(value);
+      const metCount = Object.values(checks).filter(Boolean).length;
+      const lv = level(metCount, value);
+
+      segments.forEach((seg, index) => seg.classList.toggle("is-on", index < lv.segments));
+      if (bar) bar.setAttribute("data-tone", lv.tone);
+      if (label) {
+        label.textContent = lv.label;
+        if (lv.tone) {
+          label.setAttribute("data-tone", lv.tone);
+        } else {
+          label.removeAttribute("data-tone");
+        }
+      }
+
+      const repeatValue = repeatInput ? repeatInput.value : "";
+      if (matchBox) {
+        if (repeatValue === "") {
+          matchBox.hidden = true;
+          matchBox.textContent = "";
+          matchBox.classList.remove("is-ok", "is-bad");
+        } else {
+          const matches = repeatValue === value;
+          matchBox.hidden = false;
+          matchBox.textContent = matches ? "Passwords match" : "Passwords do not match";
+          matchBox.classList.toggle("is-ok", matches);
+          matchBox.classList.toggle("is-bad", !matches);
+        }
+      }
+
+      const complete = Object.values(checks).every(Boolean);
+      const canSubmit = !!oldInput
+        && oldInput.value !== ""
+        && value !== ""
+        && complete
+        && repeatValue === value;
+
+      if (submit) submit.disabled = !canSubmit;
+    }
+
+    [oldInput, newInput, repeatInput].forEach((el) => {
+      if (el) el.addEventListener("input", update);
+    });
+    form.addEventListener("change", update);
+    update();
+  }
+
+  function initAccountSettings(root) {
+    root.querySelectorAll("[data-account-combobox]").forEach((box) => initAccountCombobox(box));
+    initAccountSaveBar(root);
+    initAccountPasswordGate(root);
+
+    root.addEventListener("psgc:hydrated", () => {
+      root.querySelectorAll("[data-account-combobox]").forEach((box) => {
+        if (typeof box._skRefreshCombobox === "function") box._skRefreshCombobox();
+      });
+    });
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     initValidation(document);
     document.querySelectorAll("[data-psgc-picker]").forEach((root) => initPsgcPicker(root));
+    document.querySelectorAll("[data-account-settings]").forEach((root) => initAccountSettings(root));
     document.querySelectorAll("[data-role-barangay-form]").forEach((form) => initRoleBarangayScope(form));
     document.querySelectorAll("[data-csfp-barangay-picker]").forEach((root) => initCsfpBarangayForm(root));
     document.querySelectorAll("[data-csfp-child-picker]").forEach((root) => initCsfpChildForm(root));
