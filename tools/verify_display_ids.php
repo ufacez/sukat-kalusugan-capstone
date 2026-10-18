@@ -134,7 +134,7 @@ foreach ([1 => 'ADM', 2 => 'NUT'] as $roleId => $prefix) {
 }
 
 // Counter sanity: last_value must be >= the highest issued number for the prefix.
-$counterRows = mysqli_query($conn, 'SELECT prefix, last_value FROM code_counters');
+$counterRows = mysqli_query($conn, 'SELECT prefix, `last_value` FROM code_counters');
 $counters = [];
 if ($counterRows !== false) {
     while ($row = mysqli_fetch_assoc($counterRows)) {

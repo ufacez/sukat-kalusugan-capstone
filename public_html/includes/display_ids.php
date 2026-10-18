@@ -51,8 +51,8 @@ function sk_next_display_code(string $prefix): string
 
     $stmt = mysqli_prepare(
         $conn,
-        "INSERT INTO code_counters (prefix, last_value) VALUES (?, LAST_INSERT_ID(1))
-         ON DUPLICATE KEY UPDATE last_value = LAST_INSERT_ID(last_value + 1)"
+        "INSERT INTO code_counters (prefix, `last_value`) VALUES (?, LAST_INSERT_ID(1))
+         ON DUPLICATE KEY UPDATE `last_value` = LAST_INSERT_ID(`last_value` + 1)"
     );
     if ($stmt === false) {
         // Defensive: fall back to a time-based value so a create never hard-fails.
@@ -69,7 +69,7 @@ function sk_next_display_code(string $prefix): string
     if ($n <= 0) {
         $row = mysqli_fetch_assoc(mysqli_query(
             $conn,
-            "SELECT last_value FROM code_counters WHERE prefix = '" . mysqli_real_escape_string($conn, $prefix) . "'"
+            "SELECT `last_value` FROM code_counters WHERE prefix = '" . mysqli_real_escape_string($conn, $prefix) . "'"
         ));
         $n = (int)($row['last_value'] ?? 1);
     }

@@ -75,8 +75,8 @@ DEALLOCATE PREPARE stmt;
 -- 3. Counter table: one row per prefix, advanced atomically at runtime
 -- ---------------------------------------------------------------------------
 CREATE TABLE IF NOT EXISTS code_counters (
-    prefix     VARCHAR(4)      NOT NULL,
-    last_value INT UNSIGNED    NOT NULL DEFAULT 0,
+    prefix       VARCHAR(4)    NOT NULL,
+    `last_value` INT UNSIGNED  NOT NULL DEFAULT 0,
     PRIMARY KEY (prefix)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
@@ -125,14 +125,14 @@ DROP TEMPORARY TABLE IF EXISTS tmp_display_codes;
 -- ---------------------------------------------------------------------------
 -- 5. Seed the counters past the highest backfilled value (never decreases).
 -- ---------------------------------------------------------------------------
-INSERT INTO code_counters (prefix, last_value)
+INSERT INTO code_counters (prefix, `last_value`)
 SELECT 'ADM', COUNT(*) FROM users WHERE role_id = 1
-ON DUPLICATE KEY UPDATE last_value = GREATEST(last_value, VALUES(last_value));
+ON DUPLICATE KEY UPDATE `last_value` = GREATEST(`last_value`, VALUES(`last_value`));
 
-INSERT INTO code_counters (prefix, last_value)
+INSERT INTO code_counters (prefix, `last_value`)
 SELECT 'NUT', COUNT(*) FROM users WHERE role_id = 2
-ON DUPLICATE KEY UPDATE last_value = GREATEST(last_value, VALUES(last_value));
+ON DUPLICATE KEY UPDATE `last_value` = GREATEST(`last_value`, VALUES(`last_value`));
 
-INSERT INTO code_counters (prefix, last_value)
+INSERT INTO code_counters (prefix, `last_value`)
 SELECT 'PAR', COUNT(*) FROM parents
-ON DUPLICATE KEY UPDATE last_value = GREATEST(last_value, VALUES(last_value));
+ON DUPLICATE KEY UPDATE `last_value` = GREATEST(`last_value`, VALUES(`last_value`));
