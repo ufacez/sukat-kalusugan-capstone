@@ -128,12 +128,12 @@ if (is_array($staff) && password_verify($password, (string)($staff['password_has
     login_respond_success($_SESSION['auth']);
 }
 
-// Fall back to parent authentication (email only).
+// Fall back to parent authentication by username or email.
 $parentStmt = mysqli_prepare(
     $conn,
-    'SELECT id, name, email, password_hash, parent_type, status, barangay_id, must_change_password
+    'SELECT id, name, email, username, password_hash, parent_type, status, barangay_id, must_change_password
      FROM parents
-     WHERE LOWER(email) = LOWER(?)
+     WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
      LIMIT 1'
 );
 
@@ -142,9 +142,9 @@ if ($parentStmt === false) {
     // log in without the flag rather than breaking every parent login.
     $parentStmt = mysqli_prepare(
         $conn,
-        'SELECT id, name, email, password_hash, parent_type, status, barangay_id
+        'SELECT id, name, email, username, password_hash, parent_type, status, barangay_id
          FROM parents
-         WHERE LOWER(email) = LOWER(?)
+         WHERE LOWER(email) = LOWER(?) OR LOWER(username) = LOWER(?)
          LIMIT 1'
     );
 }
@@ -153,7 +153,7 @@ if ($parentStmt === false) {
     login_respond_error('Unable to process sign in right now.', 500);
 }
 
-mysqli_stmt_bind_param($parentStmt, 's', $identifier);
+mysqli_stmt_bind_param($parentStmt, 'ss', $identifier, $identifier);
 mysqli_stmt_execute($parentStmt);
 $parentResult = mysqli_stmt_get_result($parentStmt);
 $parent = $parentResult instanceof mysqli_result ? mysqli_fetch_assoc($parentResult) : null;
@@ -175,6 +175,7 @@ if (is_array($parent) && password_verify($password, (string)($parent['password_h
         // bypasses the admin_fetch_all decrypt layer).
         'name' => (string)sk_decrypt_value((string)($parent['name'] ?? '')),
         'email' => (string)$parent['email'],
+        'username' => (string)($parent['username'] ?? ''),
         'role' => 'parent',
         'parent_type' => (string)($parent['parent_type'] ?? ''),
         'barangay_id' => $barangayId === null ? null : (int)$barangayId,

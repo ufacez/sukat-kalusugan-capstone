@@ -250,11 +250,11 @@
     if (!rules.number) missing.push("a number");
     if (!rules.special) missing.push("a special character");
 
-    setStateLenient(
-      input,
-      optional || isStrongPassword(value),
-      missing.length > 0 ? "Password must have " + missing.join(", ") : ""
-    );
+    const message = input.closest("[data-account-settings]")
+      ? ""
+      : missing.length > 0 ? "Password must have " + missing.join(", ") : "";
+
+    setStateLenient(input, optional || isStrongPassword(value), message);
 
       // Re-check confirm password whenever the password changes, but keep
       // it neutral too when the confirm field itself is still untouched.
@@ -315,7 +315,10 @@
       // dynamically added rows): enforce required/strength strictly.
       const val = input.value;
       const optional = !input.required && val === "";
-      setState(input, optional || isStrongPassword(val), "Password must have 8+ characters, one lowercase letter, one uppercase letter, a number, a special character.");
+      const message = input.closest("[data-account-settings]")
+        ? ""
+        : "Password must have 8+ characters, one lowercase letter, one uppercase letter, a number, a special character.";
+      setState(input, optional || isStrongPassword(val), message);
     }
   }
 
@@ -497,7 +500,7 @@
         areaSelect.innerHTML = "";
         const placeholder = document.createElement("option");
         placeholder.value = "";
-        placeholder.textContent = "-- Select purok / area (optional) --";
+        placeholder.textContent = "-- Select Local Area --";
         areaSelect.appendChild(placeholder);
 
         items.forEach((item) => {
@@ -776,7 +779,7 @@
     });
   }
 
-  // ---- Account settings page (admin/settings.php) ----
+  // ---- Shared account settings page ----
   //
   // Three progressive enhancements layered over the shared picker + the
   // standard validation wiring:
@@ -1024,6 +1027,43 @@
     captureBaseline();
   }
 
+  function initLegacySettingsSaveBar(form) {
+    const bar = form.querySelector("[data-settings-savebar]");
+    const saveBtn = form.querySelector("[data-settings-save]");
+    if (!bar || !saveBtn) return;
+
+    const streetInput = form.querySelector('[data-psgc="street"]');
+    let baseline = "";
+
+    function snapshot() {
+      const fields = Array.from(form.querySelectorAll("input[name], select[name], textarea[name]"))
+        .filter((el) => !["password", "hidden", "submit"].includes(el.type)
+          && !["old_password", "password", "password_repeat"].includes(el.name));
+      const values = fields.map((el) => el.name + "=" + String(el.value));
+      if (streetInput) values.push("street=" + streetInput.value);
+      return values.join("&");
+    }
+
+    function apply(dirty) {
+      bar.classList.toggle("is-visible", dirty);
+      saveBtn.disabled = !dirty;
+    }
+
+    function captureBaseline() {
+      baseline = snapshot();
+      apply(false);
+    }
+
+    function evaluate() {
+      apply(snapshot() !== baseline);
+    }
+
+    form.addEventListener("input", evaluate);
+    form.addEventListener("change", evaluate);
+    form.addEventListener("psgc:hydrated", captureBaseline);
+    captureBaseline();
+  }
+
   function initAccountPasswordGate(root) {
     const form = root.querySelector("[data-account-password-form]");
     if (!form) return;
@@ -1104,10 +1144,25 @@
     update();
   }
 
+  function initPasswordToggles(scope) {
+    scope.querySelectorAll("[data-password-toggle]").forEach((toggle) => {
+      const target = document.getElementById(toggle.getAttribute("data-password-target"));
+      if (!target) return;
+
+      toggle.addEventListener("click", () => {
+        const showing = target.type === "text";
+        target.type = showing ? "password" : "text";
+        toggle.setAttribute("aria-label", (showing ? "Show" : "Hide") + " password");
+        toggle.classList.toggle("is-visible", !showing);
+      });
+    });
+  }
+
   function initAccountSettings(root) {
     root.querySelectorAll("[data-account-combobox]").forEach((box) => initAccountCombobox(box));
     initAccountSaveBar(root);
     initAccountPasswordGate(root);
+    initPasswordToggles(root);
 
     root.addEventListener("psgc:hydrated", () => {
       root.querySelectorAll("[data-account-combobox]").forEach((box) => {
@@ -1120,6 +1175,7 @@
     initValidation(document);
     document.querySelectorAll("[data-psgc-picker]").forEach((root) => initPsgcPicker(root));
     document.querySelectorAll("[data-account-settings]").forEach((root) => initAccountSettings(root));
+    document.querySelectorAll("form.admin-settings-form").forEach((form) => initLegacySettingsSaveBar(form));
     document.querySelectorAll("[data-role-barangay-form]").forEach((form) => initRoleBarangayScope(form));
     document.querySelectorAll("[data-csfp-barangay-picker]").forEach((root) => initCsfpBarangayForm(root));
     document.querySelectorAll("[data-csfp-child-picker]").forEach((root) => initCsfpChildForm(root));

@@ -5,7 +5,28 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 start_secure_session();
 $actor = nutritionist_require_access();
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_password'])) {
+    nutritionist_require_write('settings.update');
+    $oldPassword = (string)($_POST['old_password'] ?? '');
+    $password = (string)($_POST['password'] ?? '');
+    $passwordRepeat = (string)($_POST['password_repeat'] ?? '');
+    $current = admin_fetch_one('SELECT password_hash FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+    if ($current === null || $oldPassword === '' || !password_verify($oldPassword, (string)$current['password_hash'])) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'Old password is incorrect.', 'type' => 'error']);
+    }
+    if ($password === '' || $password !== $passwordRepeat) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'New password and repeat do not match.', 'type' => 'error']);
+    }
+    if (!admin_is_strong_password($password)) {
+        admin_redirect('/nutritionist/settings.php', ['notice' => 'New password must be at least 8 characters and include upper, lower, number, and special characters.', 'type' => 'error']);
+    }
+    $ok = admin_execute('UPDATE users SET password_hash = ? WHERE id = ?', 'si', [password_hash($password, PASSWORD_DEFAULT), (int)$actor['id']]);
+    admin_redirect('/nutritionist/settings.php', $ok
+        ? ['notice' => 'Password updated successfully.', 'type' => 'success']
+        : ['notice' => 'Password could not be updated. Please try again.', 'type' => 'error']);
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account']) && !isset($_POST['update_password'])) {
     nutritionist_require_write('settings.update');
     $firstName = trim((string)($_POST['first_name'] ?? ''));
     $lastName  = trim((string)($_POST['last_name'] ?? ''));
@@ -58,7 +79,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
             admin_redirect('/nutritionist/settings.php', ['notice' => 'New password and repeat do not match.', 'type' => 'error']);
         }
 
-        if (strlen($password) < 8 || !preg_match('/[a-z]/', $password) || !preg_match('/[A-Z]/', $password) || !preg_match('/[0-9]/', $password) || !preg_match('/[^A-Za-z0-9]/', $password)) {
+        if (!admin_is_strong_password($password)) {
             admin_redirect('/nutritionist/settings.php', ['notice' => 'New password must be at least 8 characters and include upper, lower, number, and special characters.', 'type' => 'error']);
         }
     }
@@ -92,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
         : ['notice' => 'Account could not be updated. This email or username may already be in use.', 'type' => 'error']);
 }
 
-$myAccount = admin_fetch_one('SELECT name, email, username, user_code, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+$myAccount = admin_fetch_one('SELECT name, email, username, user_code, phone, address, last_login FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
 $fullName = trim((string)($myAccount['name'] ?? ''));
 $nameParts = $fullName === '' ? ['', ''] : preg_split('/\s+/', $fullName);
 if (count($nameParts) === 1) {
@@ -106,151 +127,17 @@ if (count($nameParts) === 1) {
 $avatarColor    = admin_avatar_color($fullName !== '' ? $fullName : ($actor['email'] ?? 'User'));
 $avatarInitials = $fullName !== '' ? admin_initials($fullName) : strtoupper(substr((string)($actor['email'] ?? 'U'), 0, 1));
 $storedAddress  = (string)($myAccount['address'] ?? '');
+$lastLoginRaw = (string)($myAccount['last_login'] ?? '');
+$lastLoginText = $lastLoginRaw !== '' ? date('D, g:i A', strtotime($lastLoginRaw)) : 'Today';
+
+$settingsProfile = $myAccount;
+$settingsRoleLabel = 'Nutritionist';
+$settingsUserCode = (string)($myAccount['user_code'] ?? '');
+$settingsLastLoginText = $lastLoginText;
+$settingsEscaper = 'nutritionist_e';
+$settingsShowUsername = true;
 
 $actions = '<a class="admin-btn-secondary" href="' . nutritionist_e(app_url('/nutritionist/dashboard.php')) . '">' . admin_action_icon('back') . ' Dashboard</a>';
 nutritionist_layout_start('Settings', 'Manage your account details.', 'settings', $actions);
-?>
-<form method="post" data-validate-form class="admin-settings-form">
-    <input type="hidden" name="update_account" value="1">
-    <div class="admin-flash is-error" data-validate-banner style="display:none;"></div>
-
-    <div class="admin-settings-grid">
-        <section class="admin-section admin-settings-card">
-            <header class="admin-section-head">
-                <h2 class="admin-section-title">General Information</h2>
-            </header>
-
-            <div class="admin-settings-avatar">
-                <span class="admin-avatar admin-avatar--lg" style="background:<?php echo admin_e($avatarColor); ?>;">
-                    <?php echo admin_e($avatarInitials); ?>
-                </span>
-            </div>
-            <div style="text-align:center;margin-bottom:6px;"><?php echo sk_code_badge((string)($myAccount['user_code'] ?? '')); ?></div>
-
-            <h3 class="admin-settings-subhead">Basic Info</h3>
-
-            <div class="admin-form-grid">
-                <label class="admin-field">
-                    <span>First Name</span>
-                    <input id="account_first_name" name="first_name" required data-validate="name" data-label="First name" autocomplete="given-name" value="<?php echo admin_e($firstNameValue); ?>">
-                    <span class="admin-field-message"></span>
-                </label>
-                <label class="admin-field">
-                    <span>Last Name</span>
-                    <input id="account_last_name" name="last_name" required data-validate="name" data-label="Last name" autocomplete="family-name" value="<?php echo admin_e($lastNameValue); ?>">
-                    <span class="admin-field-message"></span>
-                </label>
-
-                <label class="admin-field admin-field-wide">
-                    <span>Email</span>
-                    <input id="account_email" type="email" name="email" required data-validate="email" data-label="Email" autocomplete="email" value="<?php echo admin_e($myAccount['email'] ?? ''); ?>">
-                    <span class="admin-field-message"></span>
-                </label>
-
-                <label class="admin-field admin-field-wide">
-                    <span>Username</span>
-                    <input id="account_username" name="username" required data-validate="username" data-label="Username" autocomplete="username" maxlength="30" placeholder="janedoe" value="<?php echo admin_e($myAccount['username'] ?? ''); ?>">
-                    <span class="admin-field-message"></span>
-                </label>
-
-                <label class="admin-field">
-                    <span>Phone</span>
-                    <input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo admin_e($myAccount['phone'] ?? ''); ?>" placeholder="09171234567">
-                    <span class="admin-field-message"></span>
-                </label>
-                <div class="admin-field admin-field-wide">
-                    <span>Address</span>
-                    <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="account_address">
-                        <label class="admin-field">
-                            <span>Province</span>
-                            <select data-psgc="province"><option value="">Loading provinces...</option></select>
-                        </label>
-                        <label class="admin-field">
-                            <span>City / Municipality</span>
-                            <select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
-                        </label>
-                        <label class="admin-field">
-                            <span>Barangay</span>
-                            <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
-                        </label>
-                        <label class="admin-field">
-                            <span>Purok / Local Area</span>
-                            <select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
-                        </label>
-                    </div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>House no. / street</span>
-                        <input data-psgc="street" placeholder="143 Purok 6" value="">
-                    </label>
-                    <div class="admin-address-status" data-psgc-status></div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>Full address</span>
-                        <textarea id="account_address" name="address" maxlength="255" rows="2" readonly placeholder="Auto-built from province / city / barangay / street"><?php echo admin_e($storedAddress); ?></textarea>
-                    </label>
-                </div>
-            </div>
-        </section>
-
-        <aside class="admin-section admin-settings-card admin-settings-card--narrow">
-            <header class="admin-section-head">
-                <h2 class="admin-section-title">Change password</h2>
-            </header>
-
-            <div class="admin-form-grid admin-form-grid--single">
-                <label class="admin-field">
-                    <span>Old password</span>
-                    <input id="account_old_password" type="password" name="old_password" autocomplete="current-password" placeholder="••••••••••">
-                    <span class="admin-field-message"></span>
-                </label>
-                <label class="admin-field">
-                    <span>New password</span>
-                    <input id="account_password" type="password" name="password" data-validate="password" data-label="New password" autocomplete="new-password" placeholder="Leave blank to keep current">
-                    <span class="admin-field-message"></span>
-                    <ul class="admin-pw-checklist" data-pw-checklist-for="account_password">
-                        <li data-pw-rule="length">At least 8 characters</li>
-                        <li data-pw-rule="upper">One uppercase letter</li>
-                        <li data-pw-rule="lower">One lowercase letter</li>
-                        <li data-pw-rule="number">One number</li>
-                        <li data-pw-rule="special">One special character</li>
-                    </ul>
-                    <div class="admin-pw-strength" data-pw-strength-for="account_password">
-                        <div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
-                        <div class="admin-pw-strength-label"></div>
-                    </div>
-                </label>
-                <label class="admin-field">
-                    <span>Repeat New password</span>
-                    <input id="account_password_repeat" type="password" name="password_repeat" data-validate="confirm-password" data-label="Repeat new password" data-match="account_password" autocomplete="new-password" placeholder="Confirm new password">
-                    <span class="admin-field-message"></span>
-                </label>
-            </div>
-
-            <header class="admin-section-head" style="margin-top:24px;">
-                <h2 class="admin-section-title">Accessibility</h2>
-            </header>
-            <div class="admin-form-grid admin-form-grid--single">
-                <fieldset class="admin-field" style="border:0;padding:0;margin:0;">
-                    <legend style="font-weight:600;margin-bottom:8px;">Text size</legend>
-                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
-                        <input type="radio" name="font_size_preference" value="standard" data-font-size-option>
-                        <span>Standard</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
-                        <input type="radio" name="font_size_preference" value="large" data-font-size-option>
-                        <span style="font-size:1.08em;">Large</span>
-                    </label>
-                    <label style="display:flex;align-items:center;gap:8px;margin:7px 0;">
-                        <input type="radio" name="font_size_preference" value="extra-large" data-font-size-option>
-                        <span style="font-size:1.16em;">Extra large</span>
-                    </label>
-                </fieldset>
-            </div>
-
-            <div class="admin-settings-footer">
-                <button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save All Changes</button>
-            </div>
-        </aside>
-    </div>
-</form>
-<?php
+require __DIR__ . '/../includes/account_settings_view.php';
 nutritionist_layout_end();

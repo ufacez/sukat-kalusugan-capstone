@@ -85,7 +85,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             <div class="auth-card-header">
                 <p class="eyebrow">Welcome back</p>
                 <h2 id="sign-in-title">Sign in to continue</h2>
-                <p class="muted">Use your staff username/email or parent email and password.</p>
+                <p class="muted">Use your staff or parent username/email and password.</p>
             </div>
 
             <div class="flash flash-notice" role="status">Sukat Kalusugan is a student capstone by <strong>Group A4Tech</strong> (OLFU). Authorized accounts only — no public sign-up. Accounts are issued by the project team. We ask for your username/email and password only to verify the account we issued to you. This page is not affiliated with OLFU, Google, or any bank or government login, and we never ask for payment details. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>

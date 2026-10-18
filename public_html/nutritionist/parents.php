@@ -228,7 +228,6 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 								<span class="parent-avatar"><?php echo nutritionist_e(admin_initials((string)$parent['name'])); ?></span>
 								<div class="parent-name-text">
 									<div class="parent-name"><?php echo nutritionist_e($parent['name']); ?></div>
-									<div class="admin-mini"><?php echo nutritionist_e((string)($parent['address'] ?? '')); ?></div>
 									<div class="admin-mini" style="font-family:monospace;"><?php echo nutritionist_e((string)($parent['parent_code'] ?? '')); ?></div>
 								</div>
 							</div>
