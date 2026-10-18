@@ -32,7 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
         admin_redirect('/admin/settings.php', ['notice' => 'Enter a valid username (3-30 characters: letters, numbers, dot, or underscore).', 'type' => 'error']);
     }
     if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
-        admin_redirect('/admin/settings.php', ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+        admin_redirect('/admin/settings.php', ['notice' => 'Enter a valid PH mobile number (e.g. 09171234567).', 'type' => 'error']);
     }
     $phone = $phone !== '' ? (string)admin_normalize_ph_mobile($phone) : '';
     if ($address !== '' && strlen($address) > 255) {
@@ -170,7 +170,7 @@ admin_layout_start('Settings', 'Manage your account details.', 'settings');
 
                 <label class="admin-field">
                     <span>Phone</span>
-                    <input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo admin_e($myAccount['phone'] ?? ''); ?>" placeholder="+1 (000) 000-0000">
+                    <input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" value="<?php echo admin_e($myAccount['phone'] ?? ''); ?>" placeholder="09171234567">
                     <span class="admin-field-message"></span>
                 </label>
                 <div class="admin-field admin-field-wide">

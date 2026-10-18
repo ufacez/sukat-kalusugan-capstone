@@ -185,7 +185,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $phoneRaw = trim((string)($_POST['phone'] ?? ''));
         if ($phoneRaw === '' || !admin_is_valid_ph_mobile($phoneRaw)) {
             admin_flash_form_state($_POST, 'phone');
-            admin_redirect($inviteBack, ['notice' => 'A valid Philippine mobile number is required (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+            admin_redirect($inviteBack, ['notice' => 'A valid Philippine mobile number is required (e.g. 09171234567).', 'type' => 'error']);
         }
         $normalizedPhone = (string)admin_normalize_ph_mobile($phoneRaw);
 
@@ -618,7 +618,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                             <span>Mobile number<span class="admin-required">*</span></span>
-                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09171234567" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>

@@ -40,7 +40,7 @@ if ($role !== 'admin' && $barangayId === null) {
 
 // Mobile number is REQUIRED — the code is always delivered by SMS.
 if ($phoneRaw === '' || !admin_is_valid_ph_mobile($phoneRaw)) {
-    admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'A valid Philippine mobile number is required (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+    admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'A valid Philippine mobile number is required (e.g. 09171234567).', 'type' => 'error']);
 }
 $normalizedPhone = (string)admin_normalize_ph_mobile($phoneRaw);
 

@@ -52,7 +52,7 @@ if (!$existingParent) {
 }
 
 if (!admin_is_valid_ph_mobile($phone)) {
-    admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+    admin_redirect('/admin/parent_form.php?id=' . $id, ['notice' => 'Enter a valid PH mobile number (e.g. 09171234567).', 'type' => 'error']);
 }
 
 $phone = (string)admin_normalize_ph_mobile($phone);

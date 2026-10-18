@@ -211,7 +211,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     }
 
     if (!admin_is_valid_ph_mobile($pPhone)) {
-        admin_redirect($backUrl, ['notice' => 'Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+        admin_redirect($backUrl, ['notice' => 'Enter a valid PH mobile number (e.g. 09171234567).', 'type' => 'error']);
     }
     $pPhone = (string)admin_normalize_ph_mobile($pPhone);
 

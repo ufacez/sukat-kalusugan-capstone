@@ -176,7 +176,7 @@
     return setStateLenient(
       input,
       normalizePhMobile(raw) !== null,
-      "Enter a valid PH mobile number (09XXXXXXXXX or +639XXXXXXXXX)."
+      "Enter a valid PH mobile number (e.g. 09171234567)."
     );
   }
 

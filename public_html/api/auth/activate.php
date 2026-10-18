@@ -37,7 +37,7 @@ if ($code === '' || strlen($code) !== 6) {
 $normalizedPhone = admin_normalize_ph_mobile($phoneRaw);
 if ($normalizedPhone === null) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Please enter the mobile number on your invitation (09XXXXXXXXX or +639XXXXXXXXX).']);
+    echo json_encode(['success' => false, 'message' => 'Please enter the mobile number on your invitation (e.g. 09171234567).']);
     exit;
 }
 

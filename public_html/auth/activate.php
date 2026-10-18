@@ -89,7 +89,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
 
                 <label class="field" for="activation_phone">
                     <span>Mobile number on your invitation</span>
-                    <input id="activation_phone" name="phone" type="tel" maxlength="14" inputmode="tel" autocomplete="off" placeholder="09XXXXXXXXX" required>
+                    <input id="activation_phone" name="phone" type="tel" maxlength="14" inputmode="tel" autocomplete="off" placeholder="09171234567" required>
                     <span class="admin-field-message"></span>
                 </label>
 
