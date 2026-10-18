@@ -32,9 +32,14 @@ if (!in_array($mode, ['--status', '--dry-run', '--apply', '--verify'], true)) {
 }
 
 // table => id column => [pii columns]
+// invitations + users joined in 20261009 (private invitation codes):
+// invitee_name/phone/address and users.phone/address are AES-256-GCM
+// encrypted; emails, code_hash, and phone_hash stay plaintext (lookups).
 $targets = [
     'parents' => ['id' => 'id', 'cols' => ['name', 'phone', 'address']],
     'children' => ['id' => 'id', 'cols' => ['first_name', 'middle_name', 'last_name']],
+    'invitations' => ['id' => 'id', 'cols' => ['invitee_name', 'invitee_phone', 'invitee_address']],
+    'users' => ['id' => 'id', 'cols' => ['phone', 'address']],
 ];
 
 function pii_table_exists(mysqli $conn, string $table): bool
@@ -137,8 +142,11 @@ if ($mode === '--verify') {
     }
     $fail = 0;
     $checked = 0;
-    foreach (['parents', 'children'] as $table) {
+    foreach (['parents', 'children', 'invitations', 'users'] as $table) {
         if (!pii_table_exists($conn, $table)) {
+            continue;
+        }
+        if (!isset($targets[$table])) {
             continue;
         }
         $cols = $targets[$table]['cols'];

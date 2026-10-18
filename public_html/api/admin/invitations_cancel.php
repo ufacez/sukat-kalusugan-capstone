@@ -16,7 +16,8 @@ if ($id <= 0) {
 }
 
 $invitation = admin_fetch_one(
-    "SELECT id, invitee_name, code, role, status FROM invitations WHERE id = ? LIMIT 1",
+    // Privacy: never select the legacy plaintext code column.
+    "SELECT id, invitee_name, role, status FROM invitations WHERE id = ? LIMIT 1",
     'i',
     [$id]
 );

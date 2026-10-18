@@ -36,6 +36,99 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
     }
 
+    // Resend = rotate: the old code hash is replaced by a brand-new one
+    // (the old code stops working) and the new code goes out via the
+    // invitation's email + SMS channels. The plaintext is never shown.
+    if ($formAction === 'resend') {
+        $resendId = (int)($_POST['id'] ?? 0);
+        if ($resendId <= 0) {
+            admin_redirect('/admin/invitations.php', ['notice' => 'Invalid invitation.', 'type' => 'error']);
+        }
+        $inv = admin_fetch_one(
+            'SELECT id, invitee_name, invitee_email, invitee_phone, invitee_address, role, method, status FROM invitations WHERE id = ? LIMIT 1',
+            'i',
+            [$resendId]
+        );
+        if ($inv === null || ($inv['status'] ?? '') !== 'pending') {
+            admin_redirect('/admin/invitations.php', ['notice' => 'Invitation not found or already processed.', 'type' => 'error']);
+        }
+        $resendEmail = trim((string)($inv['invitee_email'] ?? ''));
+        $resendPhone = trim((string)($inv['invitee_phone'] ?? ''));
+        // invitee_phone is stored encrypted — admin_fetch_one decrypts it
+        // via sk_decrypt_pii_row, so this is the normalized plaintext here.
+        $resendNorm = admin_normalize_ph_mobile($resendPhone);
+        // Mobile is the only required channel; email is optional.
+        if ($resendNorm === null) {
+            admin_redirect('/admin/invitations.php', ['notice' => 'This invitation has no usable mobile number — cancel it and create a new one.', 'type' => 'error']);
+        }
+        $resendHasEmail = $resendEmail !== '' && filter_var($resendEmail, FILTER_VALIDATE_EMAIL) !== false;
+        $resendMethod = $resendHasEmail ? 'both' : 'sms';
+        $newPlain = strtoupper(bin2hex(random_bytes(3)));
+        $newHash = sk_invitation_code_hash($newPlain);
+        $newExpiry = date('Y-m-d H:i:s', time() + (48 * 60 * 60));
+        $rotated = admin_execute(
+            "UPDATE invitations SET code_hash = ?, code = NULL, expires_at = ?, method = ? WHERE id = ? AND status = 'pending'",
+            'sssi',
+            [$newHash, $newExpiry, $resendMethod, $resendId]
+        );
+        if (!$rotated) {
+            admin_redirect('/admin/invitations.php', ['notice' => 'Could not resend invitation.', 'type' => 'error']);
+        }
+        $actor = current_user();
+        log_action($actor['id'] ?? null, 'RESEND_INVITATION', 'info', sprintf(
+            'Resent invitation #%d with a new code — role: %s',
+            $resendId,
+            (string)($inv['role'] ?? 'staff')
+        ));
+        $resendName = (string)($inv['invitee_name'] ?? '');
+        $resendRole = (string)($inv['role'] ?? 'nutritionist');
+        $emailOk = false;
+        $smsOk = false;
+        if ($resendHasEmail) {
+            try {
+                require_once __DIR__ . '/../includes/mailer.php';
+                require_once __DIR__ . '/../includes/email_template.php';
+                $activateUrl = app_absolute_url('/auth/activate.php');
+                $emailOk = send_mail(
+                    $resendEmail,
+                    'Sukat Kalusugan — Your New Activation Code',
+                    sprintf(
+                        "Hello %s,\n\nYour activation code was re-issued. Your NEW code: %s\n\nActivate at:\n%s\n\nEnter the code WITH your mobile number (%s). The old code no longer works. Expires in 48 hours. Do not share.\n\n— Sukat Kalusugan System",
+                        $resendName,
+                        $newPlain,
+                        $activateUrl,
+                        $resendNorm
+                    ),
+                    email_template_action(
+                        'Your Sukat Kalusugan activation code was re-issued.',
+                        'Hello ' . $resendName . ',',
+                        'Your new activation code',
+                        ['An administrator re-sent your invitation. Your old code no longer works — use the new one below with your mobile number.'],
+                        'Activate account',
+                        $activateUrl,
+                        'Your new activation code',
+                        $newPlain,
+                        'Expires in 48 hours. Do not share your code.'
+                    )
+                );
+            } catch (Throwable $e) {
+                error_log('[SukatKalusugan] Invitation resend email failed: ' . $e->getMessage());
+            }
+        }
+        try {
+            require_once __DIR__ . '/../includes/sms.php';
+            $smsOk = send_invite_sms($resendNorm, $newPlain, $resendRole);
+        } catch (Throwable $e) {
+            error_log('[SukatKalusugan] Invitation resend SMS failed: ' . $e->getMessage());
+        }
+        unset($newPlain);
+        $masked = substr($resendNorm, 0, 4) . '***' . substr($resendNorm, -2);
+        $resendTargets = $masked . ($resendHasEmail ? ' / ' . $resendEmail : '');
+        admin_redirect('/admin/invitations.php', ['notice' => ($smsOk && (!$resendHasEmail || $emailOk))
+            ? 'New code sent to ' . $resendTargets . '. The old code no longer works.'
+            : 'New code issued for ' . $resendTargets . ', but delivery failed — check SMTP/Semaphore settings. The code was NOT shown here.']);
+    }
+
     if ($formAction === 'create') {
         $firstName = trim((string)($_POST['first_name'] ?? ''));
         $middleName = trim((string)($_POST['middle_name'] ?? ''));
@@ -44,7 +137,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $emailRaw = trim((string)($_POST['email'] ?? ''));
         $usernameRaw = trim((string)($_POST['username'] ?? ''));
         $role = trim((string)($_POST['role'] ?? ''));
-        $method = trim((string)($_POST['method'] ?? 'manual'));
         $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
         $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 
@@ -65,6 +157,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             admin_redirect($inviteBack, ['notice' => 'Invalid role.', 'type' => 'error']);
         }
 
+        // "All barangays" is an admin-only scope. Nutritionist invitations
+        // must be tied to a single barangay (mirrors the JS toggle).
+        if ($role !== 'admin' && $barangayId === null) {
+            admin_flash_form_state($_POST, 'barangay_id');
+            admin_redirect($inviteBack, ['notice' => 'Select a barangay — nutritionists cannot have "All barangays" scope.', 'type' => 'error']);
+        }
+
         // Optional staff username (3-30 chars). Blank = auto-generated at
         // activation. Must be unique across existing staff accounts.
         $username = $usernameRaw !== '' ? $usernameRaw : null;
@@ -79,30 +178,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        if (!in_array($method, ['email', 'manual'], true)) {
-            $method = 'manual';
+        // Mobile number is REQUIRED — not every nutritionist has an email,
+        // so the code is always delivered by SMS. Email is optional: when
+        // supplied, the code is also emailed (delivery method is derived
+        // automatically, there is no manual/method choice in the UI).
+        $phoneRaw = trim((string)($_POST['phone'] ?? ''));
+        if ($phoneRaw === '' || !admin_is_valid_ph_mobile($phoneRaw)) {
+            admin_flash_form_state($_POST, 'phone');
+            admin_redirect($inviteBack, ['notice' => 'A valid Philippine mobile number is required (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
         }
+        $normalizedPhone = (string)admin_normalize_ph_mobile($phoneRaw);
 
-        if ($method === 'email') {
-            $email = $emailRaw !== '' ? $emailRaw : null;
-            if ($email === null || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        // Email is optional. Validate/unique-check only when provided.
+        $email = $emailRaw !== '' ? $emailRaw : null;
+        if ($email !== null) {
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 admin_flash_form_state($_POST, 'email');
-                admin_redirect($inviteBack, ['notice' => 'A valid email address is required for email invitations.', 'type' => 'error']);
+                admin_redirect($inviteBack, ['notice' => 'Enter a valid email address (or leave it blank to send by SMS only).', 'type' => 'error']);
             }
             if (admin_email_in_use($email)) {
                 admin_flash_form_state($_POST, 'email');
                 admin_redirect($inviteBack, ['notice' => 'This email is already registered. Use a different email address.', 'type' => 'error']);
             }
-        } else {
-            $email = $emailRaw !== '' ? $emailRaw . '@sukat.kalusugan' : null;
         }
 
-        $phone = trim((string)($_POST['phone'] ?? ''));
-        if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
-            admin_flash_form_state($_POST, 'phone');
-            admin_redirect($inviteBack, ['notice' => 'Please enter a valid Philippine mobile number (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
-        }
-        $phone = $phone !== '' ? (string)admin_normalize_ph_mobile($phone) : null;
+        // Derived delivery method: SMS always, email only when we have one.
+        $method = $email !== null ? 'both' : 'sms';
 
         $address = trim((string)($_POST['address'] ?? ''));
         if (sk_strlen($address) > 255) {
@@ -118,23 +219,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         $actor = current_user();
-        $code = strtoupper(bin2hex(random_bytes(3)));
+
+        // Private codes: the plaintext lives only in this request (to send
+        // by email + SMS). Only its SHA-256 hash is stored — the code can
+        // never be recovered from the DB or the web UI.
+        $plainCode = strtoupper(bin2hex(random_bytes(3)));
+        $codeHash = sk_invitation_code_hash($plainCode);
+        $phoneHash = sk_phone_hash($normalizedPhone);
         $expiresAt = date('Y-m-d H:i:s', time() + (48 * 60 * 60));
 
-        // The invitee_username column arrives via db/20260915_invitation_username.sql.
-        // Build the INSERT to match the live schema so invitations keep working
-        // even if the migration has not been applied yet (username is then
-        // auto-generated at activation as before).
+        // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is
+        // unset). Email stays plaintext (login + UNIQUE lookup key).
+        $encName = (string)sk_encrypt_value($name);
+        $encPhone = (string)sk_encrypt_value($normalizedPhone);
+        $encAddress = $address !== null ? (string)sk_encrypt_value($address) : null;
+
+        // The username + hash columns arrive via dated migrations. Fail
+        // closed when the private-code columns are missing so we never
+        // fall back to storing a plaintext code.
         $hasUsernameCol = (int)admin_scalar(
             "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_username'",
             '',
             [],
             0
         );
+        $hasCodeHashCol = (int)admin_scalar(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'code_hash'",
+            '',
+            [],
+            0
+        );
+        $hasPhoneHashCol = (int)admin_scalar(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_phone_hash'",
+            '',
+            [],
+            0
+        );
+        if ($hasCodeHashCol <= 0 || $hasPhoneHashCol <= 0) {
+            admin_flash_form_state($_POST);
+            admin_redirect($inviteBack, ['notice' => 'Database migration required (db/20261009_invitation_private_sms.sql). Ask your administrator to import it first.', 'type' => 'error']);
+        }
+        // Extremely unlikely, but never store a duplicate code hash.
+        $tries = 0;
+        while ($tries < 5 && (int)admin_scalar('SELECT COUNT(*) FROM invitations WHERE code_hash = ?', 's', [$codeHash], 0) > 0) {
+            $plainCode = strtoupper(bin2hex(random_bytes(3)));
+            $codeHash = sk_invitation_code_hash($plainCode);
+            $tries++;
+        }
         if ($hasUsernameCol > 0) {
-            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_username, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_username, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)');
         } else {
-            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)');
+            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)');
         }
         if ($stmt === false) {
             admin_flash_form_state($_POST);
@@ -142,12 +277,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         $inviterId = (int)($actor['id'] ?? 0);
         if ($hasUsernameCol > 0) {
-            mysqli_stmt_bind_param($stmt, 'isssssissss', $inviterId, $name, $email, $username, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
+            mysqli_stmt_bind_param($stmt, 'issssssissss', $inviterId, $encName, $email, $username, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
         } else {
             if ($username !== null) {
                 error_log('[SukatKalusugan] Invitation username dropped (migration not applied): ' . $username);
             }
-            mysqli_stmt_bind_param($stmt, 'issssissss', $inviterId, $name, $email, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
+            mysqli_stmt_bind_param($stmt, 'isssssissss', $inviterId, $encName, $email, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
         }
         try {
             $ok = mysqli_stmt_execute($stmt);
@@ -171,29 +306,33 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $role
         ));
 
+        // Deliver the code over the invitee's own channels only. The code
+        // is NEVER echoed back to the admin UI. SMS is always sent (the
+        // mobile number is required); email is sent only when supplied.
         $emailSent = false;
-        if ($method === 'email' && $email !== null) {
+        $smsSent = false;
+        if ($email !== null) {
             try {
                 require_once __DIR__ . '/../includes/mailer.php';
                 require_once __DIR__ . '/../includes/email_template.php';
-                // Absolute live URL (APP_URL) so the emailed button/link works
-                // from any host. The ?code= prefills the 6-char code box on the
-                // activation page — the code flow itself is unchanged.
-                $activateUrl = app_absolute_url('/auth/activate.php?code=' . $code);
+                // Absolute live URL (APP_URL) so the emailed button works
+                // from any host. No ?code= prefill — the invitee types the
+                // code from their email/SMS plus their mobile number.
+                $activateUrl = app_absolute_url('/auth/activate.php');
                 $subject = 'Sukat Kalusugan — Activate Your Staff Account';
                 $body = sprintf(
                     "Hello %s,\n\n" .
                     "An administrator has invited you to join Sukat Kalusugan as a %s.\n\n" .
                     "Your activation code: %s\n\n" .
                     "To activate your account, visit:\n%s\n\n" .
-                    "Or go to the login page and click \"Have an activation code?\"\n" .
-                    "Enter the code above and set your password.\n\n" .
-                    "This code expires in 48 hours.\n\n" .
+                    "Enter the code above WITH your mobile number (%s) and set your password.\n\n" .
+                    "This code expires in 48 hours. Do not share it.\n\n" .
                     "— Sukat Kalusugan System",
                     $name,
                     ucfirst($role),
-                    $code,
-                    $activateUrl
+                    $plainCode,
+                    $activateUrl,
+                    $normalizedPhone
                 );
                 $htmlBody = email_template_action(
                     'You have been invited to join Sukat Kalusugan as ' . ucfirst($role) . '.',
@@ -201,23 +340,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'Activate your staff account',
                     [
                         'An administrator has invited you to join Sukat Kalusugan as a ' . ucfirst($role) . '.',
-                        'Click the button below to open the activation page — your code is already filled in. Just set your password.',
+                        'Click the button below to open the activation page, then enter your code WITH your mobile number.',
                     ],
                     'Activate account',
                     $activateUrl,
                     'Your activation code',
-                    $code,
-                    'This code expires in 48 hours. You can also open the sign-in page and click "Have an activation code?" to enter it manually.'
+                    $plainCode,
+                    'This code expires in 48 hours. You will also need the mobile number on this invitation. Do not share your code.'
                 );
                 $emailSent = send_mail($email, $subject, $body, $htmlBody);
             } catch (Throwable $e) {
                 error_log('[SukatKalusugan] Invitation email failed: ' . $e->getMessage());
             }
         }
+        try {
+            require_once __DIR__ . '/../includes/sms.php';
+            $smsSent = send_invite_sms($normalizedPhone, $plainCode, $role);
+        } catch (Throwable $e) {
+            error_log('[SukatKalusugan] Invitation SMS failed: ' . $e->getMessage());
+        }
+        // Forget the plaintext immediately — only the hash is stored.
+        $plainCode = '';
+        unset($plainCode);
 
-        $noticeParam = 'Invitation created. ' . ($method === 'manual'
-            ? 'Share this code with ' . $name . ': ' . $code
-            : ($emailSent ? 'Activation email sent to ' . $email . '.' : 'Invitation created. Share this code with ' . $name . ': ' . $code . ' (email could not be sent — share manually).'));
+        $maskedPhone = substr($normalizedPhone, 0, 4) . '***' . substr($normalizedPhone, -2);
+        $channels = $email !== null ? 'SMS + email' : 'SMS';
+        if ($smsSent && ($email === null || $emailSent)) {
+            $noticeParam = 'Invitation sent via ' . $channels . ' to ' . $maskedPhone
+                . ($email !== null ? ' / ' . $email : '') . '. The code is hidden for privacy.';
+        } else {
+            $noticeParam = 'Invitation created for ' . $maskedPhone . ($email !== null ? ' / ' . $email : '') . '.'
+                . ($smsSent ? '' : ' SMS could not be sent — check Semaphore settings and the number.')
+                . ($email !== null && !$emailSent ? ' Email could not be sent — check SMTP settings.' : '')
+                . ' The code was NOT shown here; use Resend to issue a new one.';
+        }
         admin_clear_form_state();
         admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);
     }
@@ -231,13 +387,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // the 3-pending cap already enforced on creation, so even heavy usage stays
 // well under a few hundred rows. This keeps the visual pagination controls
 // consistent with every other admin-table in the system.
+// Codes are hashed (code_hash) and never selected or displayed. The
+// legacy `code` column is history-only and stays out of every query.
 $invitations = admin_fetch_all(
-    "SELECT i.id, i.invitee_name, i.invitee_email, i.barangay_id, i.role, i.code, i.method, i.status, i.expires_at, i.used_at, i.created_at,
-            u.name AS inviter_name,
-            b.name AS barangay_name
+    "SELECT i.id, i.invitee_name, i.invitee_email, i.invitee_phone, i.role, i.status, i.created_at,
+            u.name AS inviter_name
      FROM invitations i
      INNER JOIN users u ON u.id = i.inviter_user_id
-     LEFT JOIN barangays b ON b.id = i.barangay_id
      ORDER BY i.created_at DESC",
     '', []
 );
@@ -256,42 +412,6 @@ $actions = '<a class="admin-btn-secondary" href="' . admin_e(app_url('/admin/use
 
 admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire after 48 hours.', 'invitations', $actions);
 ?>
-<section class="admin-grid-cards">
-    <article class="admin-card">
-        <div class="admin-card-row">
-            <div class="admin-card-icon">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7.5v3m0 0v3m0-3h3m-3 0h-3m-2.25-4.125a3.375 3.375 0 1 1-6.75 0 3.375 3.375 0 0 1 6.75 0ZM4 19.235v-.11a6.375 6.375 0 0 1 12.75 0v.109A12.318 12.318 0 0 1 10.374 21c-2.331 0-4.512-.645-6.374-1.766Z"/></svg>
-            </div>
-            <div class="admin-card-content">
-                <div class="admin-card-label">Pending Invitations</div>
-                <div class="admin-card-value"><?php echo $pendingCount; ?></div>
-                <div class="admin-card-meta">
-                    <span class="admin-card-trend"><?php echo 3 - $pendingCount; ?> slots remaining</span>
-                </div>
-            </div>
-        </div>
-    </article>
-    <article class="admin-card">
-        <div class="admin-card-row">
-            <div class="admin-card-icon is-success">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z"/></svg>
-            </div>
-            <div class="admin-card-content">
-                <div class="admin-card-label">Activated</div>
-                <?php
-                $activatedCount = 0;
-                foreach ($invitations as $inv) {
-                    if ($inv['status'] === 'used') $activatedCount++;
-                }
-                ?>
-                <div class="admin-card-value"><?php echo $activatedCount; ?></div>
-                <div class="admin-card-meta">
-                    <span class="admin-card-trend"><?php echo 3 - $activatedCount; ?> used code</span>
-            </div>
-        </div>
-    </article>
-</section>
-
 <section class="admin-section">
     <div class="admin-section-head">
         <div>
@@ -306,13 +426,10 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                 <tr>
                     <th>Name</th>
                     <th>Email</th>
+                    <th>Mobile</th>
                     <th>Role</th>
-                    <th>Barangay</th>
-                    <th>Method</th>
-                    <th>Code</th>
                     <th>Status</th>
                     <th>Invited By</th>
-                    <th>Expires</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -331,10 +448,11 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             </div>
                         </td>
                         <td><span class="admin-mini"><?php echo admin_e($inv['invitee_email'] ?? '—'); ?></span></td>
+                        <td><span class="admin-mini"><?php
+                            $ph = (string)($inv['invitee_phone'] ?? '');
+                            echo $ph !== '' ? admin_e(substr($ph, 0, 4) . '***' . substr($ph, -2)) : '—';
+                        ?></span></td>
                         <td><span class="admin-pill <?php echo $inv['role'] === 'admin' ? 'is-update' : 'is-create'; ?>"><?php echo admin_e(ucfirst($inv['role'])); ?></span></td>
-                        <td><?php echo admin_e((string)($inv['barangay_name'] ?? 'All barangays')); ?></td>
-                        <td><span class="admin-pill is-read"><?php echo admin_e(ucfirst($inv['method'])); ?></span></td>
-                        <td><code style="font-weight:700;letter-spacing:0.1em;font-size:0.85rem;"><?php echo admin_e($inv['code']); ?></code></td>
                         <td>
                             <?php
                             // CRUD action-pill mapping for invitation status:
@@ -354,27 +472,15 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                         </td>
                         <td><?php echo admin_e($inv['inviter_name']); ?></td>
                         <td>
-                            <?php
-                            $exp = (string)($inv['expires_at'] ?? '');
-                            if ($exp !== '' && $inv['status'] === 'pending') {
-                                $expTime = strtotime($exp);
-                                $now = time();
-                                if ($expTime > $now) {
-                                    $hoursLeft = (int)ceil(($expTime - $now) / 3600);
-                                    echo '<span style="font-weight:600;">' . $hoursLeft . 'h left</span>';
-                                } else {
-                                    echo '<span class="admin-pill is-muted">Expired</span>';
-                                }
-                            } elseif ($exp !== '') {
-                                echo admin_e(date('M j Y', strtotime($exp)));
-                            } else {
-                                echo 'n/a';
-                            }
-                            ?>
-                        </td>
-                        <td>
                             <?php if ($inv['status'] === 'pending'): ?>
                             <div class="admin-actions">
+                                <form method="post" action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>" data-admin-confirm="Send a NEW code for <?php echo admin_e($inv['invitee_name']); ?>? The old code stops working." style="display:inline;">
+                                    <input type="hidden" name="action" value="resend">
+                                    <input type="hidden" name="id" value="<?php echo (int)$inv['id']; ?>">
+                                    <button class="admin-icon-btn is-update" title="Resend (new code via email + SMS)" type="submit" aria-label="Resend invitation with a new code">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99"/></svg>
+                                    </button>
+                                </form>
                                 <form method="post" action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>" data-admin-confirm="Cancel invitation for <?php echo admin_e($inv['invitee_name']); ?>?" style="display:inline;">
                                     <input type="hidden" name="action" value="cancel">
                                     <input type="hidden" name="id" value="<?php echo (int)$inv['id']; ?>">
@@ -411,11 +517,10 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
             <button class="admin-modal-close" data-invite-close type="button" aria-label="Close">&times;</button>
         </div>
         <div class="admin-modal-body">
-            <p class="admin-section-subtitle" style="margin:0 0 14px;">Generate an activation code for a new staff member. Codes expire after 48 hours. <span class="admin-required">*</span> Required field.</p>
             <?php if ($pendingCount >= 3): ?>
             <div class="admin-flash is-error">Maximum 3 pending invitations reached. Cancel or wait for expiry before creating a new one.</div>
             <?php endif; ?>
-            <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>">
+            <form class="admin-form-grid" method="post" data-validate-form data-role-barangay-form action="<?php echo admin_e(app_url('/admin/invitations.php')); ?>">
                 <input type="hidden" name="action" value="create">
 
                 <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
@@ -442,12 +547,9 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
 
                 <div class="admin-field-wide">
                     <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
-                        <span>Email address<span id="invite-email-required" class="admin-required" style="display:none;">*</span></span>
-                        <div id="invite-email-wrap" style="display:flex;align-items:stretch;border:1px solid <?php echo $formErrorField === 'email' ? 'var(--admin-danger)' : 'var(--admin-border)'; ?>;border-radius:8px;overflow:hidden;background:var(--admin-surface);transition:border-color .15s,box-shadow .15s;<?php echo $formErrorField === 'email' ? 'box-shadow:0 0 0 3px var(--admin-danger-glow);' : ''; ?>">
-                            <input name="email" id="invite-email-input" type="text" placeholder="auto-generated from name" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="flex:1;border:none;padding:10px 14px;background:transparent;font-size:0.85rem;min-width:0;outline:none;">
-                            <span id="invite-email-domain" style="display:flex;align-items:center;padding:0 14px;color:var(--admin-muted);font-size:0.85rem;white-space:nowrap;background:var(--admin-search-bg);border-left:1px solid var(--admin-border);font-weight:600;letter-spacing:0.02em;">@sukat.kalusugan</span>
-                        </div>
-                        <span class="admin-field-message"><?php echo $formErrorField === 'email' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'This email is already in use. Use a different email address.') : ''; ?></span>
+                        <span>Email address</span>
+                        <input name="email" id="invite-email-input" type="email" maxlength="150" placeholder="e.g. juan@gmail.com" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="width:100%;">
+                        <span class="admin-field-message"><?php echo $formErrorField === 'email' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'Enter a valid email address.') : ''; ?></span>
                     </label>
                 </div>
 
@@ -455,7 +557,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
                             <span>Username</span>
-                            <input name="username" id="invite-username" type="text" maxlength="30" autocomplete="off" placeholder="e.g. juandelacruz (blank = auto-generated)" data-validate="username" data-label="Username" value="<?php echo admin_e(admin_old_value($old, 'username')); ?>">
+                            <input name="username" id="invite-username" type="text" maxlength="30" autocomplete="off" placeholder="e.g. juandelacruz" data-validate="username" data-label="Username" value="<?php echo admin_e(admin_old_value($old, 'username')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'username' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'This username is already taken. Use a different username.') : ''; ?></span>
                         </label>
                         <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">
@@ -472,8 +574,8 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                 <div class="admin-field-wide">
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
-                            <span>Mobile number</span>
-                            <input name="phone" id="invite-phone" type="tel" maxlength="14" inputmode="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                            <span>Mobile number<span class="admin-required">*</span></span>
+                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09XXXXXXXXX or +639XXXXXXXXX" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>
@@ -517,13 +619,6 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                                 <?php endforeach; ?>
                             </select>
                         </label>
-                        <label class="admin-field">
-                            <span>Delivery method<span class="admin-required">*</span></span>
-                            <select name="method" id="invite-method" required>
-                                <option value="manual"<?php echo admin_old_value($old, 'method', 'manual') === 'manual' ? ' selected' : ''; ?>>Manual (share code in person)</option>
-                                <option value="email"<?php echo admin_old_value($old, 'method', '') === 'email' ? ' selected' : ''; ?>>Email</option>
-                            </select>
-                        </label>
                     </div>
                 </div>
 
@@ -564,61 +659,10 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
     });
 })();
 (function(){
-    var firstNameInput = document.getElementById('invite_first_name');
-    var lastNameInput = document.getElementById('invite_last_name');
+    // Email is now a plain required email field (no manual-mode prefix
+    // hack). Clear a server-rendered duplicate-email error once the user
+    // edits the address so the submit guard does not keep blocking.
     var emailInput = document.getElementById('invite-email-input');
-    var emailDomain = document.getElementById('invite-email-domain');
-    var methodSelect = document.getElementById('invite-method');
-
-    function generateEmail(first, last) {
-        var f = first.toLowerCase().replace(/[^a-z]/g, '');
-        var l = last.toLowerCase().replace(/[^a-z]/g, '');
-        if (f.length < 2 && l.length < 2) return '';
-        return f + l;
-    }
-
-    if (firstNameInput && lastNameInput && emailInput) {
-        var lastAutoValue = emailInput.value;
-
-        function autoFillEmail() {
-            var generated = generateEmail(firstNameInput.value, lastNameInput.value);
-            if (emailInput.value === '' || emailInput.value === lastAutoValue) {
-                emailInput.value = generated;
-                lastAutoValue = generated;
-            }
-        }
-
-        firstNameInput.addEventListener('input', autoFillEmail);
-        lastNameInput.addEventListener('input', autoFillEmail);
-    }
-
-    if (methodSelect && emailDomain && emailInput) {
-        var emailMarker = document.getElementById('invite-email-required');
-        methodSelect.addEventListener('change', function(){
-            if (methodSelect.value === 'email') {
-                emailDomain.style.display = 'none';
-                emailInput.placeholder = 'e.g. juan@gmail.com';
-                emailInput.type = 'email';
-                emailInput.required = true;
-                if (emailMarker) emailMarker.style.display = '';
-            } else {
-                emailDomain.style.display = '';
-                emailInput.placeholder = 'auto-generated from name';
-                emailInput.type = 'text';
-                emailInput.required = false;
-                if (emailMarker) emailMarker.style.display = 'none';
-            }
-        });
-        // Sync the email UI with the restored method after a validation
-        // error (e.g. duplicate email sent with method=email).
-        methodSelect.dispatchEvent(new Event('change'));
-    }
-
-    // A server-rendered duplicate-email error stays red until the user
-    // edits the address (this input has no data-validate rule because it
-    // doubles as the manual-mode prefix field). Without this, the submit
-    // guard in admin-form-validate.js would keep blocking the form even
-    // after the address was fixed.
     if (emailInput) {
         emailInput.addEventListener('input', function(){
             var label = emailInput.closest('.admin-field');
@@ -626,11 +670,6 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                 label.classList.remove('is-invalid');
                 var msg = label.querySelector('.admin-field-message');
                 if (msg) msg.textContent = '';
-                var wrap = document.getElementById('invite-email-wrap');
-                if (wrap) {
-                    wrap.style.borderColor = 'var(--admin-border)';
-                    wrap.style.boxShadow = '';
-                }
             }
         });
     }

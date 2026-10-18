@@ -102,6 +102,12 @@ define('SMTP_PASS', env('SMTP_PASS', ''));
 define('MAIL_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', ''));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'Sukat Kalusugan'));
 
+// ── SMS / Semaphore (staff invitation codes) ───────────────────────────────
+// SMTP is email-only. Codes go out via BOTH email and Semaphore SMS.
+// Empty key = SMS disabled (invite still created, admin sees a warning).
+define('SEMAPHORE_API_KEY', env('SEMAPHORE_API_KEY', ''));
+define('SEMAPHORE_SENDER_NAME', env('SEMAPHORE_SENDER_NAME', 'SukatKalusugan'));
+
 // ── AI Chatbot (Kali AI) ─────────────────────────────────────────────────
 define('CHATBOT_PROVIDER', env('CHATBOT_PROVIDER', 'gemini'));
 define('CHATBOT_API_KEY', env('CHATBOT_API_KEY', ''));

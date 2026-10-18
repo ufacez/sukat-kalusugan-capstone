@@ -57,6 +57,13 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php', ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
+// "All barangays" (null) is an admin-only scope; every other role must be
+// tied to a single barangay (mirrors the JS toggle on the form).
+if ($roleName !== 'admin' && $barangayId === null) {
+    admin_flash_form_state($_POST, 'barangay_id');
+    admin_redirect('/admin/user_form.php', ['notice' => 'Select a barangay — only admins can have "All barangays" scope.', 'type' => 'error']);
+}
+
 // Duplicate checks — email must be globally unique across staff + parents,
 // username unique across staff.
 if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {

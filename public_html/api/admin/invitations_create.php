@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 require_once __DIR__ . '/../../includes/admin_helpers.php';
 
 start_secure_session();
@@ -14,10 +16,9 @@ $middleName = trim((string)($_POST['middle_name'] ?? ''));
 $lastName = trim((string)($_POST['last_name'] ?? ''));
 $name = admin_combine_name($firstName, $middleName, $lastName);
 $emailRaw = trim((string)($_POST['email'] ?? ''));
-$phone = trim((string)($_POST['phone'] ?? ''));
+$phoneRaw = trim((string)($_POST['phone'] ?? ''));
 $address = trim((string)($_POST['address'] ?? ''));
 $role = trim((string)($_POST['role'] ?? ''));
-$method = trim((string)($_POST['method'] ?? 'manual'));
 $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
 $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
 
@@ -32,26 +33,30 @@ if (!in_array($role, ['admin', 'nutritionist'], true)) {
     admin_redirect('/admin/invitations.php', ['notice' => 'Invalid role selected.', 'type' => 'error']);
 }
 
-if (!in_array($method, ['email', 'manual'], true)) {
-    $method = 'manual';
+// "All barangays" is admin-only; nutritionist invitations need a barangay.
+if ($role !== 'admin' && $barangayId === null) {
+    admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'Select a barangay — nutritionists cannot have "All barangays" scope.', 'type' => 'error']);
 }
 
-if ($method === 'email') {
-    $email = $emailRaw !== '' ? $emailRaw : null;
-    if ($email === null || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
-        admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'A valid email address is required for email invitations.', 'type' => 'error']);
+// Mobile number is REQUIRED — the code is always delivered by SMS.
+if ($phoneRaw === '' || !admin_is_valid_ph_mobile($phoneRaw)) {
+    admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'A valid Philippine mobile number is required (09XXXXXXXXX or +639XXXXXXXXX).', 'type' => 'error']);
+}
+$normalizedPhone = (string)admin_normalize_ph_mobile($phoneRaw);
+
+// Email is OPTIONAL. Validate/unique-check only when provided.
+$email = $emailRaw !== '' ? $emailRaw : null;
+if ($email !== null) {
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'Enter a valid email address (or leave it blank to send by SMS only).', 'type' => 'error']);
     }
     if (admin_email_in_use($email)) {
         admin_redirect('/admin/invitations.php?invite=open', ['notice' => 'This email is already registered. Use a different email address.', 'type' => 'error']);
     }
-} else {
-    $email = $emailRaw !== '' ? $emailRaw . '@sukat.kalusugan' : null;
 }
 
-if ($phone !== '' && !admin_is_valid_ph_mobile($phone)) {
-    admin_redirect('/admin/invitations.php', ['notice' => 'Please enter a valid Philippine mobile number (09XXXXXXXXX).', 'type' => 'error']);
-}
-$phone = $phone !== '' ? $phone : null;
+// Derived delivery method: SMS always, email too only when we have one.
+$method = $email !== null ? 'both' : 'sms';
 
 if (sk_strlen($address) > 255) {
     admin_redirect('/admin/invitations.php', ['notice' => 'Address must be 255 characters or less.', 'type' => 'error']);
@@ -70,13 +75,43 @@ if ($pendingCount >= 3) {
     admin_redirect('/admin/invitations.php', ['notice' => 'Maximum 3 pending invitations allowed. Cancel or wait for existing ones to expire.', 'type' => 'error']);
 }
 
+$hasCodeHashCol = (int)admin_scalar(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'code_hash'",
+    '',
+    [],
+    0
+);
+$hasPhoneHashCol = (int)admin_scalar(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_phone_hash'",
+    '',
+    [],
+    0
+);
+if ($hasCodeHashCol <= 0 || $hasPhoneHashCol <= 0) {
+    admin_redirect('/admin/invitations.php', ['notice' => 'Database migration required (db/20261009_invitation_private_sms.sql).', 'type' => 'error']);
+}
+
 $actor = current_user();
-$code = strtoupper(bin2hex(random_bytes(3)));
+// Private codes: plaintext lives only in this request; only the hash is stored.
+$plainCode = strtoupper(bin2hex(random_bytes(3)));
+$codeHash = sk_invitation_code_hash($plainCode);
+$phoneHash = sk_phone_hash($normalizedPhone);
 $expiresAt = date('Y-m-d H:i:s', time() + (48 * 60 * 60));
+
+$encName = (string)sk_encrypt_value($name);
+$encPhone = (string)sk_encrypt_value($normalizedPhone);
+$encAddress = $address !== null ? (string)sk_encrypt_value($address) : null;
+
+$tries = 0;
+while ($tries < 5 && (int)admin_scalar('SELECT COUNT(*) FROM invitations WHERE code_hash = ?', 's', [$codeHash], 0) > 0) {
+    $plainCode = strtoupper(bin2hex(random_bytes(3)));
+    $codeHash = sk_invitation_code_hash($plainCode);
+    $tries++;
+}
 
 $stmt = mysqli_prepare(
     $conn,
-    'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_address, barangay_id, role, code, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)'
 );
 
 if ($stmt === false) {
@@ -84,7 +119,7 @@ if ($stmt === false) {
 }
 
 $inviterId = (int)($actor['id'] ?? 0);
-mysqli_stmt_bind_param($stmt, 'issssissss', $inviterId, $name, $email, $phone, $address, $barangayId, $role, $code, $method, $expiresAt);
+mysqli_stmt_bind_param($stmt, 'isssssissss', $inviterId, $encName, $email, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
 $ok = mysqli_stmt_execute($stmt);
 mysqli_stmt_close($stmt);
 
@@ -101,8 +136,55 @@ log_action($actor['id'] ?? null, 'CREATE_INVITATION', 'info', sprintf(
     $role
 ));
 
-$noticeParam = 'Invitation created. ' . ($method === 'manual'
-    ? 'Share this code with ' . $name . ': ' . $code
-    : 'Activation email sent to ' . $email . '.');
+// Deliver via the invitee's own channels only. SMS is always sent; email
+// is sent only when the optional address was supplied.
+$emailSent = false;
+$smsSent = false;
+if ($email !== null) {
+    try {
+        require_once __DIR__ . '/../../includes/mailer.php';
+        require_once __DIR__ . '/../../includes/email_template.php';
+        $activateUrl = app_absolute_url('/auth/activate.php');
+        $emailSent = send_mail(
+            $email,
+            'Sukat Kalusugan — Activate Your Staff Account',
+            sprintf(
+                "Hello %s,\n\nAn administrator has invited you to join Sukat Kalusugan as a %s.\n\nYour activation code: %s\n\nActivate at:\n%s\n\nEnter the code WITH your mobile number (%s). Expires in 48 hours. Do not share.\n\n— Sukat Kalusugan System",
+                $name,
+                ucfirst($role),
+                $plainCode,
+                $activateUrl,
+                $normalizedPhone
+            ),
+            email_template_action(
+                'You have been invited to join Sukat Kalusugan as ' . ucfirst($role) . '.',
+                'Hello ' . $name . ',',
+                'Activate your staff account',
+                ['An administrator has invited you to join Sukat Kalusugan as a ' . ucfirst($role) . '.', 'Open the activation page, then enter your code WITH your mobile number.'],
+                'Activate account',
+                $activateUrl,
+                'Your activation code',
+                $plainCode,
+                'This code expires in 48 hours. Do not share your code.'
+            )
+        );
+    } catch (Throwable $e) {
+        error_log('[SukatKalusugan] Invitation email failed: ' . $e->getMessage());
+    }
+}
+try {
+    require_once __DIR__ . '/../../includes/sms.php';
+    $smsSent = send_invite_sms($normalizedPhone, $plainCode, $role);
+} catch (Throwable $e) {
+    error_log('[SukatKalusugan] Invitation SMS failed: ' . $e->getMessage());
+}
+unset($plainCode);
+
+$maskedPhone = substr($normalizedPhone, 0, 4) . '***' . substr($normalizedPhone, -2);
+$target = $maskedPhone . ($email !== null ? ' / ' . $email : '');
+// The code is NEVER included in the notice (private).
+$noticeParam = ($smsSent && ($email === null || $emailSent))
+    ? 'Invitation sent to ' . $target . '. The code is hidden for privacy.'
+    : 'Invitation created for ' . $target . ', but delivery failed — check SMTP/Semaphore settings. The code was NOT shown here; use Resend to issue a new one.';
 
 admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);

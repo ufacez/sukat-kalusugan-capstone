@@ -67,7 +67,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
             <div class="auth-card-header">
                 <p class="eyebrow">Staff Activation</p>
                 <h2 id="activate-title">Activate your account</h2>
-                <p class="muted">Enter the 6-character code from your administrator and set your password.</p>
+                <p class="muted">Enter the 6-character code from your email/SMS <strong>plus</strong> the mobile number on your invitation, then set your password.</p>
             </div>
 
             <div class="flash flash-notice" role="status">Group A4Tech capstone. Codes are issued by your administrator only. Never share codes or passwords. <a class="link" href="../contact.php">Contact us</a>.</div>
@@ -84,6 +84,12 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     <input id="activation_code" name="code" type="text" maxlength="8" autocomplete="off" placeholder="e.g. AX7K2M" required
                         value="<?php echo htmlspecialchars($prefillCode, ENT_QUOTES, 'UTF-8'); ?>"
                         style="text-transform:uppercase;letter-spacing:0.15em;font-weight:700;font-size:1.1rem;">
+                    <span class="admin-field-message"></span>
+                </label>
+
+                <label class="field" for="activation_phone">
+                    <span>Mobile number on your invitation</span>
+                    <input id="activation_phone" name="phone" type="tel" maxlength="14" inputmode="tel" autocomplete="off" placeholder="09XXXXXXXXX" required>
                     <span class="admin-field-message"></span>
                 </label>
 
@@ -189,11 +195,17 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 if (notice) notice.style.display = 'none';
 
                 var code = (document.getElementById('activation_code')?.value || '').trim().toUpperCase();
+                var phone = (document.getElementById('activation_phone')?.value || '').trim();
                 var password = document.getElementById('activate_password')?.value || '';
                 var pwConfirm = document.getElementById('activate_password_confirm')?.value || '';
 
                 if (code.length < 6) {
                     msg.textContent = 'Please enter a valid 6-character code.';
+                    msg.className = 'form-message';
+                    return;
+                }
+                if (phone === '') {
+                    msg.textContent = 'Please enter the mobile number on your invitation.';
                     msg.className = 'form-message';
                     return;
                 }
@@ -224,7 +236,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 fetch('../api/auth/activate.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({code: code, password: password, password_confirm: pwConfirm})
+                    body: JSON.stringify({code: code, phone: phone, password: password, password_confirm: pwConfirm})
                 })
                 .then(function(r){ return r.json(); })
                 .then(function(data){

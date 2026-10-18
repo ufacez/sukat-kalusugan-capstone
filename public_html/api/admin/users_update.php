@@ -78,6 +78,13 @@ if ($roleId <= 0) {
     admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Selected role does not exist.', 'type' => 'error']);
 }
 
+// "All barangays" (null) is an admin-only scope; every other role must be
+// tied to a single barangay (mirrors the JS toggle on the form).
+if ($roleName !== 'admin' && $barangayId === null) {
+    admin_flash_form_state($_POST, 'barangay_id');
+    admin_redirect('/admin/user_form.php?id=' . $id, ['notice' => 'Select a barangay — only admins can have "All barangays" scope.', 'type' => 'error']);
+}
+
 // Duplicate enforcement lives on the ADD paths only — edits must always
 // save (same-table conflicts still fail on the UNIQUE keys below with a
 // generic message). Format is still validated here.

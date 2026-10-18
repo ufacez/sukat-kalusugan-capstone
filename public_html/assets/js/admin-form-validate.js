@@ -1,8 +1,8 @@
 /**
- * Shared live-validation + PSGC (Philippine Standard Geographic Code)
- * address picker for the admin "Add/Edit User" and "Add/Edit Parent"
- * forms. Everything here is progressive enhancement: forms still work
- * (and are still validated) server-side if JS is unavailable.
+ * Shared live-validation + CSFP address picker for the admin and
+ * nutritionist forms. Everything here is progressive enhancement: forms
+ * still work (and are still validated) server-side if JS is unavailable.
+ * The address picker is locked to the City of San Fernando, Pampanga.
  */
 (function () {
   "use strict";
@@ -396,27 +396,17 @@
     });
   }
 
-  // ---- PSGC cascading address picker ----
+  // ---- CSFP address picker ----
+  //
+  // The system only serves the City of San Fernando, Pampanga. The address
+  // picker used to cascade through the external PSGC API (province -> city
+  // -> barangay). It is now locked to the local CSFP list so every personal
+  // address resolves to CSFP: Province and City are fixed single options and
+  // the Barangay list comes from the local /api/admin/csfp_barangays.php
+  // endpoint. No network dependency on the public PSGC service.
 
-  const PSGC_BASE = "https://psgc.gitlab.io/api";
-  const psgcCache = {};
-
-  async function psgcFetch(path) {
-    if (psgcCache[path]) {
-      return psgcCache[path];
-    }
-
-    const response = await fetch(PSGC_BASE + path);
-
-    if (!response.ok) {
-      throw new Error("PSGC request failed: " + path);
-    }
-
-    const data = await response.json();
-    psgcCache[path] = data;
-
-    return data;
-  }
+  const CSFP_PROVINCE = "Pampanga";
+  const CSFP_CITY = "City of San Fernando";
 
   function fillSelect(select, items, placeholder) {
     select.innerHTML = "";
@@ -435,6 +425,16 @@
         option.dataset.name = item.name;
         select.appendChild(option);
       });
+  }
+
+  function setFixedOption(select, value, label) {
+    select.innerHTML = "";
+    const option = document.createElement("option");
+    option.value = value;
+    option.textContent = label;
+    option.dataset.name = label;
+    option.selected = true;
+    select.appendChild(option);
   }
 
   function initPsgcPicker(root) {
@@ -471,57 +471,11 @@
       target.value = parts.join(", ");
     }
 
-    provinceSelect.addEventListener("change", async () => {
-      citySelect.innerHTML = "";
-      barangaySelect.innerHTML = "";
-      citySelect.disabled = true;
-      barangaySelect.disabled = true;
-
-      if (!provinceSelect.value) {
-        fillSelect(citySelect, [], "-- Select province first --");
-        fillSelect(barangaySelect, [], "-- Select city/municipality first --");
-        rebuildAddress();
-        return;
-      }
-
-      setStatus("Loading cities/municipalities…");
-
-      try {
-        const cities = await psgcFetch("/provinces/" + provinceSelect.value + "/cities-municipalities/");
-        fillSelect(citySelect, cities, "-- Select city/municipality --");
-        fillSelect(barangaySelect, [], "-- Select city/municipality first --");
-        citySelect.disabled = false;
-        setStatus("");
-      } catch (err) {
-        setStatus("Couldn't load cities right now. You can still type the address manually below.", true);
-      }
-
-      rebuildAddress();
-    });
-
-    citySelect.addEventListener("change", async () => {
-      barangaySelect.innerHTML = "";
-      barangaySelect.disabled = true;
-
-      if (!citySelect.value) {
-        fillSelect(barangaySelect, [], "-- Select city/municipality first --");
-        rebuildAddress();
-        return;
-      }
-
-      setStatus("Loading barangays…");
-
-      try {
-        const barangays = await psgcFetch("/cities-municipalities/" + citySelect.value + "/barangays/");
-        fillSelect(barangaySelect, barangays, "-- Select barangay --");
-        barangaySelect.disabled = false;
-        setStatus("");
-      } catch (err) {
-        setStatus("Couldn't load barangays right now. You can still type the address manually below.", true);
-      }
-
-      rebuildAddress();
-    });
+    // CSFP is the only locale — lock province and city to fixed options.
+    setFixedOption(provinceSelect, "pampanga", CSFP_PROVINCE);
+    provinceSelect.disabled = true;
+    setFixedOption(citySelect, "csfp", CSFP_CITY);
+    citySelect.disabled = true;
 
     barangaySelect.addEventListener("change", rebuildAddress);
 
@@ -529,16 +483,64 @@
       streetInput.addEventListener("input", rebuildAddress);
     }
 
-    setStatus("Loading provinces…");
+    setStatus("Loading barangays…");
 
-    psgcFetch("/provinces/")
-      .then((provinces) => {
-        fillSelect(provinceSelect, provinces, "-- Select province --");
+    fetch("../api/admin/csfp_barangays.php")
+      .then((response) => {
+        if (!response.ok) throw new Error("CSFP barangay request failed");
+        return response.json();
+      })
+      .then((data) => {
+        const barangays = (data.barangays || []).map((name) => ({ code: name, name }));
+        fillSelect(barangaySelect, barangays, "-- Select barangay --");
+        barangaySelect.disabled = false;
         setStatus("");
       })
       .catch(() => {
-        setStatus("Couldn't reach the PH address service. You can still type the address manually below.", true);
+        setStatus("Couldn't load the CSFP barangay list. You can still type the address manually below.", true);
       });
+  }
+
+  // ---- Role-driven barangay scope ----
+  //
+  // "All barangays" (empty value) is an admin-only scope. Nutritionist
+  // accounts must be tied to a single barangay, so the empty option is
+  // hidden and the select is required whenever the role is not admin.
+  function initRoleBarangayScope(form) {
+    const roleSelect = form.querySelector('select[name="role"]');
+    const barangaySelect = form.querySelector('select[name="barangay_id"]');
+
+    if (!roleSelect || !barangaySelect) {
+      return;
+    }
+
+    const allOption = barangaySelect.querySelector('option[value=""]');
+
+    function sync() {
+      const isAdmin = roleSelect.value === "admin";
+
+      if (allOption) {
+        allOption.hidden = !isAdmin;
+        allOption.disabled = !isAdmin;
+      }
+
+      if (isAdmin) {
+        barangaySelect.required = false;
+        return;
+      }
+
+      barangaySelect.required = true;
+
+      if (!barangaySelect.value) {
+        const first = Array.from(barangaySelect.options).find((option) => option.value !== "");
+        if (first) {
+          barangaySelect.value = first.value;
+        }
+      }
+    }
+
+    roleSelect.addEventListener("change", sync);
+    sync();
   }
 
   function initCsfpBarangayForm(root) {
@@ -648,6 +650,7 @@
   document.addEventListener("DOMContentLoaded", () => {
     initValidation(document);
     document.querySelectorAll("[data-psgc-picker]").forEach((root) => initPsgcPicker(root));
+    document.querySelectorAll("[data-role-barangay-form]").forEach((form) => initRoleBarangayScope(form));
     document.querySelectorAll("[data-csfp-barangay-picker]").forEach((root) => initCsfpBarangayForm(root));
     document.querySelectorAll("[data-csfp-child-picker]").forEach((root) => initCsfpChildForm(root));
   });

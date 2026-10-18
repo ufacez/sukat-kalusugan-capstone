@@ -3535,6 +3535,20 @@ body.nutritionist-page .admin-modal {
   overflow-y: auto;
 }
 
+/* Keep the invitation header visible while the long form scrolls only when
+ * the viewport is too short to show the whole form. */
+body.admin-page #invite-overlay .admin-modal {
+  max-width: min(760px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+
+body.admin-page #invite-overlay .admin-modal-body {
+  max-height: calc(100dvh - 82px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 body.admin-page .admin-modal-head,
 body.nutritionist-page .admin-modal-head {
   padding: 14px 16px;

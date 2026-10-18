@@ -12,6 +12,13 @@ if ($editId > 0) {
     admin_require_access('parents.create');
 }
 
+// Create mode now lives in the unified Add Family form — this page is
+// edit-only. Only GET requests without an id are bounced; the edit form
+// POSTs to api/admin/parents_update.php.
+if ($editId <= 0 && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+    admin_redirect('/admin/family_form.php');
+}
+
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 $barangays = admin_barangay_options();
 
@@ -51,11 +58,9 @@ admin_layout_start(
         </div>
     </div>
 
-    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url($editingParent ? '/api/admin/parents_update.php' : '/api/admin/parents_create.php')); ?>">
-        <input type="hidden" name="action" value="<?php echo $editingParent ? 'update' : 'create'; ?>">
-        <?php if ($editingParent): ?>
-            <input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">
-        <?php endif; ?>
+    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/parents_update.php')); ?>">
+        <input type="hidden" name="action" value="update">
+        <input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">
 
         <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
 

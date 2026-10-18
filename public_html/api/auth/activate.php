@@ -1,7 +1,10 @@
 <?php
 
+declare(strict_types=1);
+
 // scan-ok: no-auth-gate — public invitation-code endpoint by design; the
-// 6-character code is the credential, validated below before any write.
+// 6-character code + the invitee's own mobile number are the credential,
+// validated below (hashed comparison) before any write.
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
@@ -18,12 +21,22 @@ if (strtoupper((string)($_SERVER['REQUEST_METHOD'] ?? 'GET')) !== 'POST') {
 
 $payload = json_decode((string)file_get_contents('php://input'), true) ?? $_POST;
 $code = strtoupper(trim((string)($payload['code'] ?? '')));
+$phoneRaw = trim((string)($payload['phone'] ?? ($payload['mobile'] ?? '')));
 $password = (string)($payload['password'] ?? '');
 $passwordConfirm = (string)($payload['password_confirm'] ?? '');
 
 if ($code === '' || strlen($code) !== 6) {
     http_response_code(422);
     echo json_encode(['success' => false, 'message' => 'Please enter a valid 6-character activation code.']);
+    exit;
+}
+
+// The code alone is not enough: the invitee must also prove ownership of
+// the mobile number the invitation was sent to (panel requirement).
+$normalizedPhone = admin_normalize_ph_mobile($phoneRaw);
+if ($normalizedPhone === null) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Please enter the mobile number on your invitation (09XXXXXXXXX or +639XXXXXXXXX).']);
     exit;
 }
 
@@ -51,6 +64,30 @@ if ($password !== $passwordConfirm) {
     exit;
 }
 
+// Private-code schema (db/20261009_invitation_private_sms.sql). Fail closed
+// with a generic message so pre-migration deploys never leak state.
+$hasCodeHashCol = (int)admin_scalar(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'code_hash'",
+    '',
+    [],
+    0
+);
+$hasPhoneHashCol = (int)admin_scalar(
+    "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_phone_hash'",
+    '',
+    [],
+    0
+);
+if ($hasCodeHashCol <= 0 || $hasPhoneHashCol <= 0) {
+    error_log('[SukatKalusugan] Activation blocked: invitation migration not applied.');
+    http_response_code(503);
+    echo json_encode(['success' => false, 'message' => 'Activation is temporarily unavailable. Please try again later.']);
+    exit;
+}
+
+$codeHash = sk_invitation_code_hash($code);
+$phoneHash = sk_phone_hash($normalizedPhone);
+
 $hasUsernameCol = (int)admin_scalar(
     "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_username'",
     '',
@@ -59,12 +96,12 @@ $hasUsernameCol = (int)admin_scalar(
 );
 $stmt = mysqli_prepare(
     $conn,
-    "SELECT id, inviter_user_id, invitee_name, invitee_email, "
-    . ($hasUsernameCol > 0 ? "invitee_username, " : "")
-    . "invitee_phone, invitee_address, barangay_id, role, method, status, expires_at
+    'SELECT id, inviter_user_id, invitee_name, invitee_email, '
+    . ($hasUsernameCol > 0 ? 'invitee_username, ' : '')
+    . 'invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, method, status, expires_at, code_hash
      FROM invitations
-     WHERE code = ?
-     LIMIT 1"
+     WHERE code_hash = ?
+     LIMIT 1'
 );
 
 if ($stmt === false) {
@@ -73,15 +110,32 @@ if ($stmt === false) {
     exit;
 }
 
-mysqli_stmt_bind_param($stmt, 's', $code);
+mysqli_stmt_bind_param($stmt, 's', $codeHash);
 mysqli_stmt_execute($stmt);
 $result = mysqli_stmt_get_result($stmt);
 $invitation = $result instanceof mysqli_result ? mysqli_fetch_assoc($result) : null;
 mysqli_stmt_close($stmt);
 
+// Generic message on purpose: never reveal whether the code or the number
+// was the wrong half (anti-enumeration).
 if ($invitation === null) {
     http_response_code(422);
-    echo json_encode(['success' => false, 'message' => 'Invalid activation code.']);
+    echo json_encode(['success' => false, 'message' => 'Invalid activation code or mobile number.']);
+    exit;
+}
+
+$storedPhoneHash = trim((string)($invitation['invitee_phone_hash'] ?? ''));
+$phoneOk = $storedPhoneHash !== '' && hash_equals($storedPhoneHash, $phoneHash);
+if (!$phoneOk) {
+    // Back-compat: rows written before invitee_phone_hash existed carry the
+    // number only as AES ciphertext — decrypt and compare normalized form.
+    $storedPhonePlain = sk_decrypt_value((string)($invitation['invitee_phone'] ?? ''));
+    $storedNorm = $storedPhonePlain !== '' ? admin_normalize_ph_mobile($storedPhonePlain) : null;
+    $phoneOk = $storedNorm !== null && hash_equals($storedNorm, $normalizedPhone);
+}
+if (!$phoneOk) {
+    http_response_code(422);
+    echo json_encode(['success' => false, 'message' => 'Invalid activation code or mobile number.']);
     exit;
 }
 
@@ -111,7 +165,8 @@ $storedUsername = trim((string)($invitation['invitee_username'] ?? ''));
 if ($storedUsername !== '' && preg_match('/^[A-Za-z0-9._]{3,30}$/', $storedUsername) === 1) {
     $username = $storedUsername;
 } else {
-    $username = strtolower(preg_replace('/[^a-z0-9]/', '', preg_replace('/\s+/', '', $invitation['invitee_name'])));
+    $displayForName = sk_decrypt_value(trim((string)($invitation['invitee_name'] ?? '')));
+    $username = strtolower((string)preg_replace('/[^a-z0-9]/', '', (string)preg_replace('/\s+/', '', $displayForName)));
     if ($username === '') {
         $username = 'staff';
     }
@@ -130,7 +185,9 @@ if ($roleId <= 0) {
     exit;
 }
 
-$displayName = trim($invitation['invitee_name']);
+// Invitation PII is AES-encrypted at rest — decrypt for the new account,
+// then re-encrypt on the users row (same key, new envelope).
+$displayName = sk_decrypt_value(trim((string)($invitation['invitee_name'] ?? '')));
 $invitationEmail = trim((string)($invitation['invitee_email'] ?? ''));
 $email = $invitationEmail !== '' ? $invitationEmail : $username . '@sukat.kalusugan';
 if (admin_email_in_use($email)) {
@@ -140,8 +197,10 @@ if (admin_email_in_use($email)) {
 }
 $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 $barangayId = !empty($invitation['barangay_id']) ? (int)$invitation['barangay_id'] : null;
-$phone = !empty($invitation['invitee_phone']) ? $invitation['invitee_phone'] : null;
-$address = !empty($invitation['invitee_address']) ? $invitation['invitee_address'] : null;
+$decryptedAddress = sk_decrypt_value((string)($invitation['invitee_address'] ?? ''));
+// Carry the verified number forward (normalized), encrypted at rest.
+$phone = (string)sk_encrypt_value($normalizedPhone);
+$address = $decryptedAddress !== '' ? (string)sk_encrypt_value($decryptedAddress) : null;
 
 $inviteStmt = mysqli_prepare(
     $conn,

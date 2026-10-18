@@ -6,10 +6,13 @@ declare(strict_types=1);
  * crypto.php — AES-256-GCM application-layer encryption for PII at rest.
  *
  * Scope (deliberate, do not widen without a search redesign):
- *   ENCRYPTED: parents.name/phone/address, children.first_name/middle_name/last_name
+ *   ENCRYPTED: parents.name/phone/address, children.first_name/middle_name/last_name,
+ *     invitations.invitee_name/phone/address, users.phone/address
  *   PLAINTEXT (must stay): emails (login + UNIQUE lookups), child_code/device_code
  *     (kiosk lookup keys), birthdate (DATE used by SQL TIMESTAMPDIFF age math),
- *     password_hash (bcrypt one-way hash — NEVER reversible encryption).
+ *     password_hash (bcrypt one-way hash — NEVER reversible encryption),
+ *     invitations.code_hash / invitee_phone_hash (SHA-256 lookup keys — like
+ *     passwords, one-way by design so even a DB dump reveals no code).
  *
  * Why GCM with a random IV per value: same plaintext encrypts differently
  * every time, so a DB dump leaks nothing via frequency analysis, and
@@ -158,7 +161,7 @@ function sk_decrypt_value(?string $value): ?string
  */
 function sk_pii_columns(): array
 {
-    return ['name', 'parent_name', 'phone', 'parent_phone', 'address', 'parent_address', 'actor_name', 'first_name', 'middle_name', 'last_name', 'child_first_name', 'child_last_name'];
+    return ['name', 'parent_name', 'phone', 'parent_phone', 'address', 'parent_address', 'actor_name', 'first_name', 'middle_name', 'last_name', 'child_first_name', 'child_last_name', 'invitee_name', 'invitee_phone', 'invitee_address'];
 }
 
 /** Decrypt every PII column present in a fetched DB row (in place). */
@@ -169,4 +172,29 @@ function sk_decrypt_pii_row(array &$row): void
             $row[$col] = sk_decrypt_value($row[$col]);
         }
     }
+}
+
+/**
+ * One-way hash of an invitation activation code (SHA-256, uppercase hex).
+ *
+ * The plaintext code is NEVER stored — only this hash (UNIQUE code_hash).
+ * Verification uses hash_equals() so timing leaks nothing. Same pattern as
+ * password_hash, except deterministic (needed for lookup) and therefore
+ * brute-force resistant only via the 6-char random space + 48h expiry.
+ */
+function sk_invitation_code_hash(string $plainCode): string
+{
+    return hash('sha256', strtoupper(trim($plainCode)));
+}
+
+/**
+ * One-way hash of a normalized 09XXXXXXXXX mobile number (SHA-256 hex).
+ *
+ * invitee_phone is AES-encrypted (random IV, unsearchable), so this hash is
+ * the SQL lookup key that lets activation match code + mobile without
+ * decrypting every row. Caller must normalize first (admin_normalize_ph_mobile).
+ */
+function sk_phone_hash(string $normalizedPhone): string
+{
+    return hash('sha256', trim($normalizedPhone));
 }

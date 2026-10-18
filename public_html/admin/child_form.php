@@ -13,14 +13,14 @@ if ($editId > 0) {
     admin_require_access('children.create');
 }
 
-// Add mode lives in the modal on children.php — this page is edit-only.
+// Create mode lives in the unified Add Family form — this page is edit-only.
 // Stale create POSTs bounce back to the list instead of forking a second
-// create path that could drift out of sync with the modal handler.
+// create path that could drift out of sync with the family form handler.
 if ($editId <= 0) {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Child form to create records.', 'type' => 'error']);
+        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Family form to create records.', 'type' => 'error']);
     }
-    admin_redirect('/admin/children.php?modal=child');
+    admin_redirect('/admin/family_form.php');
 }
 
 function admin_next_child_code(): string
@@ -163,7 +163,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 
     if ($action === 'create') {
-        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Child form to create records.', 'type' => 'error']);
+        admin_redirect('/admin/children.php', ['notice' => 'Use the Add Family form to create records.', 'type' => 'error']);
     }
 
     admin_redirect('/admin/children.php', ['notice' => 'No action was performed.', 'type' => 'error']);

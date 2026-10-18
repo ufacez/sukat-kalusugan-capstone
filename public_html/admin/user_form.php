@@ -81,7 +81,7 @@ admin_layout_start(
         </div>
     </div>
 
-    <form class="admin-form-grid" method="post" data-validate-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>">
+    <form class="admin-form-grid" method="post" data-validate-form data-role-barangay-form action="<?php echo admin_e(app_url('/api/admin/users_update.php')); ?>">
         <input type="hidden" name="id" value="<?php echo (int)$editingUser['id']; ?>">
 
         <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
