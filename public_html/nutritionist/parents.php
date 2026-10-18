@@ -4,14 +4,6 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 
 $user = nutritionist_require_access();
 
-$editId = (int)($_GET['edit'] ?? 0);
-
-if ($editId > 0) {
-    admin_redirect(
-        '/nutritionist/parent_form.php?id=' . $editId
-    );
-}
-
 // Archive / restore (same behavior as the admin endpoints, but scoped to
 // the nutritionist's barangay and gated by parents.delete like admin).
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -117,6 +109,25 @@ $localAreaList = admin_fetch_all(
 	$localAreaParams
 );
 
+/* ── Modal data: barangays, households, parent types ─────────────── */
+$parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
+$isScopedUser = ($user['role'] ?? '') !== 'admin';
+$scopedBarangayId = $isScopedUser ? (int)($user['barangay_id'] ?? 0) : 0;
+$editBarangays = admin_barangay_options($isScopedUser ? $user : null);
+$lockedBarangayName = '';
+if ($isScopedUser) {
+	foreach ($editBarangays as $_b) {
+		if ((int)$_b['id'] === $scopedBarangayId) { $lockedBarangayName = (string)$_b['name']; break; }
+	}
+}
+$editHouseholds = [];
+if ($scopedBarangayId > 0) {
+	$editHouseholds = admin_fetch_all(
+		"SELECT id, household_code, address FROM households WHERE barangay_id = ? AND status = 'active' ORDER BY household_code",
+		'i', [$scopedBarangayId]
+	);
+}
+
 function nutritionist_parents_url(string $tab, ?int $localAreaId = null): string
 {
     global $localAreaFilter;
@@ -205,16 +216,22 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 					<tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;"><?php echo $tab === 'archived' ? 'No archived parents in your scope.' : 'No active parents in your scope yet.'; ?></td></tr>
 				<?php endif; ?>
 				<?php foreach ($tabParents as $parentIndex => $parent): ?>
+					<?php $_np = admin_split_full_name($parent['name']); ?>
 					<tr<?php echo admin_paged_row_attr($parentIndex, 5); ?>
 						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . ($parent['parent_code'] ?? '') . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'] . ' ' . ($parent['barangay'] ?? '') . ' ' . ($parent['local_area'] ?? ''))); ?>"
 						data-parent-id="<?php echo (int)$parent['id']; ?>"
 						data-parent-code="<?php echo nutritionist_e((string)($parent['parent_code'] ?? '')); ?>"
 						data-parent-name="<?php echo nutritionist_e($parent['name']); ?>"
+						data-parent-first-name="<?php echo nutritionist_e($_np['first']); ?>"
+						data-parent-middle-name="<?php echo nutritionist_e($_np['middle']); ?>"
+						data-parent-last-name="<?php echo nutritionist_e($_np['last']); ?>"
 						data-parent-type="<?php echo nutritionist_e($parent['parent_type']); ?>"
 						data-parent-email="<?php echo nutritionist_e($parent['email']); ?>"
 						data-parent-phone="<?php echo nutritionist_e((string)($parent['phone'] ?? '')); ?>"
 						data-parent-address="<?php echo nutritionist_e((string)($parent['address'] ?? '')); ?>"
 						data-parent-barangay="<?php echo nutritionist_e((string)($parent['barangay'] ?? '')); ?>"
+						data-parent-barangay-id="<?php echo (int)($parent['barangay_id'] ?? 0); ?>"
+						data-parent-local-area-id="<?php echo (int)($parent['local_area_id'] ?? 0); ?>"
 						data-parent-status="<?php echo nutritionist_e($parent['status']); ?>"
 						data-parent-children="<?php echo (int)$parent['children_count']; ?>"
 						data-household-id="<?php echo (int)($parent['household_id'] ?? 0); ?>"
@@ -241,7 +258,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 							<div class="admin-actions">
 								<button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View parent card" data-view-parent-card="<?php echo (int)$parent['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
 								<?php if (nutritionist_can_write('parents.update')): ?>
-								<button class="admin-icon-btn" title="Edit" type="button" data-record-edit-url="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php?id=' . (int)$parent['id'])); ?>"><?php echo admin_action_icon('edit'); ?></button>
+								<button class="admin-icon-btn" title="Edit" type="button" data-edit-parent-btn><?php echo admin_action_icon('edit'); ?></button>
 								<?php endif; ?>
 								<?php if (nutritionist_can_write('parents.delete')): ?>
 									<?php if ($tab === 'archived'): ?>
@@ -395,9 +412,251 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 })();
 </script>
 
-<div class="admin-modal-overlay record-edit-frame-overlay" id="record-edit-frame-overlay" hidden><div class="admin-modal record-edit-frame-modal" role="dialog" aria-modal="true" aria-label="Edit parent"><div class="admin-modal-head"><div><h3>Edit parent</h3><p class="users-edit-subtitle">Update the selected parent record.</p></div><button class="admin-modal-close" type="button" data-record-edit-close aria-label="Close">&times;</button></div><iframe title="Edit parent" data-record-edit-frame></iframe></div></div>
+
+<!-- ═══ Edit Parent Modal ═══ -->
+<div class="admin-edit-modal-overlay" id="edit-parent-overlay" hidden>
+<form class="admin-modal admin-modal--form users-edit-modal admin-edit-modal nutritionist-edit-parent-modal" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php')); ?>" role="dialog" aria-modal="true" aria-labelledby="edit-parent-modal-title">
+	<div class="admin-modal-head">
+		<div>
+			<h3 id="edit-parent-modal-title">Edit parent</h3>
+			<p class="admin-edit-modal-subtitle">Update the selected parent/guardian record.</p>
+		</div>
+		<button class="admin-modal-close" type="button" data-edit-parent-close aria-label="Close">&times;</button>
+	</div>
+	<div class="admin-edit-modal-body users-edit-body">
+		<input type="hidden" name="action" value="update">
+		<input type="hidden" name="id" id="ep-id" value="">
+
+		<div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
+
+		<!-- ── Personal information ── -->
+		<section class="admin-edit-card">
+			<h3><?php echo admin_sidebar_icon('children'); ?> Personal information</h3>
+			<p>The name shown on records and reports.</p>
+			<div class="admin-field-row">
+				<label class="admin-field">
+					<span>First name<span class="admin-required">*</span></span>
+					<input id="ep-first-name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Juan">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Middle name</span>
+					<input id="ep-middle-name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Reyes">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Surname<span class="admin-required">*</span></span>
+					<input id="ep-last-name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Dela Cruz">
+					<span class="admin-field-message"></span>
+				</label>
+			</div>
+		</section>
+
+		<!-- ── Contact & type ── -->
+		<section class="admin-edit-card">
+			<h3><?php echo admin_sidebar_icon('email'); ?> Contact &amp; type</h3>
+			<p>How this parent can be reached.</p>
+			<div class="admin-field-row">
+				<label class="admin-field">
+					<span>Email<span class="admin-required">*</span></span>
+					<input id="ep-email" type="email" name="email" required data-validate="email" placeholder="juan@example.com">
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Mobile number<span class="admin-required">*</span></span>
+					<input id="ep-phone" name="phone" required data-validate="phone-ph" placeholder="09171234567">
+					<span class="admin-field-message"></span>
+				</label>
+			</div>
+			<div class="admin-field-row" style="margin-top:10px;">
+				<label class="admin-field">
+					<span>Parent type<span class="admin-required">*</span></span>
+					<select id="ep-parent-type" name="parent_type" required data-label="Parent type">
+						<?php foreach ($parentTypes as $type): ?>
+							<option value="<?php echo nutritionist_e($type); ?>"><?php echo nutritionist_e($type); ?></option>
+						<?php endforeach; ?>
+					</select>
+					<span class="admin-field-message"></span>
+				</label>
+				<label class="admin-field">
+					<span>Status<span class="admin-required">*</span></span>
+					<select id="ep-status" name="status" required>
+						<option value="active">Active</option>
+						<option value="inactive">Inactive</option>
+					</select>
+				</label>
+			</div>
+		</section>
+
+		<!-- ── Assignment ── -->
+		<section class="admin-edit-card parent-assignment-card">
+			<h3><?php echo admin_sidebar_icon('barangays'); ?> Assignment</h3>
+			<input type="hidden" name="barangay_id" id="ep-barangay" value="<?php echo (int)$scopedBarangayId; ?>">
+			<label class="admin-field">
+				<span>Household / Spot</span>
+				<select name="household_id" id="ep-household">
+					<option value="">-- None --</option>
+					<?php foreach ($editHouseholds as $_hh): ?>
+						<option value="<?php echo (int)$_hh['id']; ?>"><?php echo nutritionist_e($_hh['household_code']); ?><?php echo $_hh['address'] !== null && $_hh['address'] !== '' ? ' · ' . nutritionist_e($_hh['address']) : ''; ?></option>
+					<?php endforeach; ?>
+				</select>
+			</label>
+			<input type="hidden" name="local_area_id" id="ep-local-area" value="">
+		</section>
+
+		<!-- ── Home address ── -->
+		<section class="admin-edit-card">
+			<h3><?php echo admin_sidebar_icon('barangays'); ?> Home address</h3>
+			<p>Used for the full address on records.</p>
+			<div class="admin-address-picker" data-psgc-picker data-psgc-address-target="ep-address">
+				<div class="admin-field-row">
+					<label class="admin-field">
+						<span>Province</span>
+						<select data-psgc="province"><option value="">Loading provinces…</option></select>
+					</label>
+					<label class="admin-field">
+						<span>City / Municipality</span>
+						<select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
+					</label>
+					<label class="admin-field">
+						<span>Barangay</span>
+						<select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
+					</label>
+					<label class="admin-field">
+						<span>Local area / Purok<span class="admin-required">*</span></span>
+						<select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
+					</label>
+				</div>
+				<label class="admin-field" style="margin-top:10px;">
+					<span>House no. / street<span class="admin-required">*</span></span>
+					<input data-psgc="street" placeholder="143 Mabini St.">
+				</label>
+				<div class="admin-address-status" data-psgc-status></div>
+				<div class="admin-address-preview" role="status" aria-live="polite">
+					<?php echo admin_sidebar_icon('barangays'); ?>
+					<div>
+						<span class="admin-address-preview-label">Full address</span>
+						<textarea id="ep-address" name="address" readonly></textarea>
+					</div>
+				</div>
+			</div>
+		</section>
+
+		<!-- ── Actions ── -->
+		<div class="admin-edit-actions">
+			<button class="admin-btn-secondary" type="button" data-edit-parent-close>Cancel</button>
+			<button class="admin-btn" type="submit"><?php echo admin_action_icon('save'); ?> Save changes</button>
+		</div>
+	</div>
+</form>
+</div>
+
 <script>
-(function(){var o=document.getElementById('record-edit-frame-overlay'),f=o&&o.querySelector('[data-record-edit-frame]');if(!o||!f)return;function close(){o.hidden=true;f.src='about:blank';document.body.classList.remove('admin-modal-open')}document.querySelectorAll('[data-record-edit-url]').forEach(function(b){b.addEventListener('click',function(){f.src=b.getAttribute('data-record-edit-url')+'&modal=1';o.hidden=false;document.body.classList.add('admin-modal-open')})});o.querySelector('[data-record-edit-close]').addEventListener('click',close);o.addEventListener('click',function(e){if(e.target===o)close()})})();
+(function () {
+	var overlay = document.getElementById('edit-parent-overlay');
+	if (!overlay) return;
+
+	var areaApiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
+	var scopedBgy = <?php echo (int)$scopedBarangayId; ?>;
+
+	function setVal(id, v) { var el = document.getElementById(id); if (el) el.value = v || ''; }
+
+	function loadLocalAreas(barangayId, selectedId) {
+		var sel = document.getElementById('ep-local-area');
+		if (!sel) return;
+		if (sel.tagName === 'INPUT') return;
+		sel.innerHTML = '<option value="">-- Select local area --</option>';
+		if (!barangayId || barangayId <= 0) return;
+		sel.innerHTML += '<option value="" disabled>Loading…</option>';
+		fetch(areaApiBase + '?barangay_id=' + barangayId)
+			.then(function (r) { return r.json(); })
+			.then(function (res) {
+				sel.innerHTML = '<option value="">-- Select local area --</option>';
+				if (!res.success || !res.data || res.data.length === 0) {
+					sel.innerHTML += '<option value="" disabled>No local areas registered</option>';
+					return;
+				}
+				res.data.forEach(function (area) {
+					if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) return;
+					var opt = document.createElement('option');
+					opt.value = area.id;
+					opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+					if (selectedId && parseInt(opt.value, 10) === selectedId) opt.selected = true;
+					sel.appendChild(opt);
+				});
+			})
+			.catch(function () {
+				sel.innerHTML = '<option value="">-- Select local area --</option><option value="" disabled>Failed to load</option>';
+			});
+	}
+
+	function openEditParent(row) {
+		if (!row) return;
+		var d = row.dataset;
+
+		setVal('ep-id', d.parentId);
+		setVal('ep-first-name', d.parentFirstName);
+		setVal('ep-middle-name', d.parentMiddleName);
+		setVal('ep-last-name', d.parentLastName);
+		setVal('ep-email', d.parentEmail);
+		setVal('ep-phone', d.parentPhone);
+		setVal('ep-address', d.parentAddress);
+
+		var ptSel = document.getElementById('ep-parent-type');
+		if (ptSel) ptSel.value = d.parentType || 'Guardian';
+
+		var stSel = document.getElementById('ep-status');
+		if (stSel) stSel.value = d.parentStatus || 'active';
+
+		var hhSel = document.getElementById('ep-household');
+		if (hhSel) hhSel.value = d.householdId || '';
+
+		var bgySel = document.getElementById('ep-barangay');
+		if (bgySel) bgySel.value = d.parentBarangayId || '';
+
+		var laId = parseInt(d.parentLocalAreaId || '0', 10);
+		setVal('ep-barangay', d.parentBarangayId || scopedBgy || '0');
+		setVal('ep-local-area', laId);
+		var picker = overlay.querySelector('[data-psgc-picker]');
+		if (picker) {
+			picker.dispatchEvent(new CustomEvent('psgc:hydrate-address', { bubbles: true }));
+		}
+
+		overlay.hidden = false;
+		document.body.classList.add('admin-modal-open');
+		var first = document.getElementById('ep-first-name');
+		if (first) first.focus();
+	}
+
+	function closeEditParent() {
+		overlay.hidden = true;
+		document.body.classList.remove('admin-modal-open');
+		overlay.querySelectorAll('.is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+		overlay.querySelectorAll('.admin-field-message').forEach(function (el) { el.textContent = ''; });
+		var banner = overlay.querySelector('[data-validate-banner]');
+		if (banner) banner.style.display = 'none';
+	}
+
+	// Edit button handlers
+	document.querySelectorAll('[data-edit-parent-btn]').forEach(function (btn) {
+		btn.addEventListener('click', function (e) {
+			e.stopPropagation();
+			openEditParent(btn.closest('tr'));
+		});
+	});
+
+	// Close handlers
+	overlay.querySelectorAll('[data-edit-parent-close]').forEach(function (el) {
+		el.addEventListener('click', closeEditParent);
+	});
+	overlay.addEventListener('click', function (e) {
+		if (e.target === overlay) closeEditParent();
+	});
+	document.addEventListener('keydown', function (e) {
+		if (e.key === 'Escape' && !overlay.hidden) closeEditParent();
+	});
+
+})();
 </script>
 
 <?php

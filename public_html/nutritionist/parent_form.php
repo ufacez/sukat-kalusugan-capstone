@@ -4,568 +4,234 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/display_ids.php';
 
 $user = nutritionist_require_access();
-$parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
-
-$editId = (int)($_GET['id'] ?? 0);
-
-if ($editId <= 0 && !nutritionist_can_write('parents.create')) {
-	admin_redirect('/nutritionist/parents.php', ['notice' => 'You do not have permission to create parents.', 'type' => 'error']);
-}
 
 /*
- * Create mode lives in the unified family form now — this page is
- * edit-only. POST update handling below is untouched. The bounce only
- * applies to GET: the edit form POSTs back here and carries the parent
- * id as a hidden field (plus ?id= in the action URL), so POST must
- * always reach the handler below.
+ * GET requests redirect away — the edit form is now an inline modal
+ * on parents.php, and create mode lives in the unified family form.
  */
-if ($editId <= 0 && ($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
-	admin_redirect('/nutritionist/family_form.php');
+if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {
+	admin_redirect('/nutritionist/parents.php');
 }
 
-if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+$parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
 
-	$action = (string)($_POST['action'] ?? '');
+$action = (string)($_POST['action'] ?? '');
 
-	if ($action === 'create') {
-		nutritionist_require_write('parents.create');
-	} elseif ($action === 'update') {
-		nutritionist_require_write('parents.update');
-	}
+if ($action === 'create') {
+	nutritionist_require_write('parents.create');
+} elseif ($action === 'update') {
+	nutritionist_require_write('parents.update');
+}
 
-	$parentId = (int)($_POST['id'] ?? 0);
+$parentId = (int)($_POST['id'] ?? 0);
 
-	if ($action !== 'create' && $action !== 'update') {
-		admin_redirect('/nutritionist/parents.php', ['notice' => 'No action was performed.', 'type' => 'error']);
-	}
-
-	$firstName = trim((string)($_POST['first_name'] ?? ''));
-	$middleName = trim((string)($_POST['middle_name'] ?? ''));
-	$lastName = trim((string)($_POST['last_name'] ?? ''));
-	$email = trim((string)($_POST['email'] ?? ''));
-	$phone = trim((string)($_POST['phone'] ?? ''));
-	$address = trim((string)($_POST['address'] ?? ''));
-	$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
-
-	/*
-	 * For non-admin nutritionists, the barangay is ALWAYS their
-	 * assigned barangay — they cannot pick a different one even if the
-	 * client tampers with the POST body. We force it server-side.
-	 */
-	$isAdmin = ($user['role'] ?? '') === 'admin';
-	$userBarangayId = $user['barangay_id'] ?? null;
-	$redirectBack = '/nutritionist/parent_form.php' . ($action === 'update' && $parentId > 0 ? '?id=' . $parentId : '');
-
-	if (!$isAdmin) {
-		if ($userBarangayId === null || $userBarangayId === '') {
-			/** @disregard */
-			admin_redirect($redirectBack , [
-				'notice' => 'Your account is not assigned to a barangay. Contact your administrator to set one before adding parents.',
-				'type' => 'error',
-			]);
-		}
-		$barangayId = (int)$userBarangayId;
-	} else {
-		$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
-		$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
-	}
-
-	$localAreaIdRaw = trim((string)($_POST['local_area_id'] ?? ''));
-	$localAreaId = $localAreaIdRaw !== '' ? (int)$localAreaIdRaw : null;
-	$status = trim((string)($_POST['status'] ?? 'active'));
-	$password = (string)($_POST['password'] ?? '');
-	$passwordConfirm = (string)($_POST['password_confirm'] ?? '');
-	$householdIdRaw = trim((string)($_POST['household_id'] ?? ''));
-	$householdId = $householdIdRaw !== '' ? (int)$householdIdRaw : null;
-
-	if (
-		!admin_is_valid_name_part($firstName, true)
-		|| !admin_is_valid_name_part($middleName, false)
-		|| !admin_is_valid_name_part($lastName, true)
-	) {
-		admin_redirect($redirectBack, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
-	}
-
-	$name = admin_combine_name($firstName, $middleName, $lastName);
-
-	if (!in_array($status, ['active', 'inactive'], true)) {
-		$status = 'active';
-	}
-
-	if (!in_array($parentType, $parentTypes, true)) {
-		$parentType = 'Guardian';
-	}
-
-	if ($name === '' || $email === '') {
-		admin_redirect($redirectBack, ['notice' => 'Name and email are required.', 'type' => 'error']);
-	}
-
-	if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-		admin_redirect($redirectBack, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
-	}
-
-	// Global uniqueness is enforced on ADD only — edits must always save
-	// (same-table conflicts still fail on the UNIQUE key with a generic
-	// message).
-	if ($action === 'create' && admin_email_in_use($email, null, null)) {
-		admin_redirect($redirectBack, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
-	}
-
-	if (!admin_is_valid_ph_mobile($phone)) {
-		admin_redirect($redirectBack, ['notice' => 'Enter a valid PH mobile number (e.g. 09171234567).', 'type' => 'error']);
-	}
-
-	$phone = (string)admin_normalize_ph_mobile($phone);
-
-	// AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
-	$name = (string)sk_encrypt_value($name);
-	$phone = (string)sk_encrypt_value($phone);
-	$address = (string)sk_encrypt_value($address);
-
-	if ($action === 'create' && $password === '') {
-		admin_redirect($redirectBack, ['notice' => 'Password is required.', 'type' => 'error']);
-	}
-
-	if ($password !== '' && !admin_is_strong_password($password)) {
-		admin_redirect($redirectBack, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
-	}
-
-	if ($password !== '' && $password !== $passwordConfirm) {
-		admin_redirect($redirectBack, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
-	}
-
-	/*
-	 * Local-area validation: if a local area is selected, it must
-	 * belong to the parent's barangay so a Dela Paz Norte parent can't
-	 * be assigned a Malpitic purok by accident.
-	 */
-	$existingParent = null;
-	if ($action === 'update') {
-		$existingParent = admin_fetch_one(
-			'SELECT id, barangay_id, local_area_id, status FROM parents WHERE id = ? LIMIT 1',
-			'i',
-			[$parentId]
-		);
-		if (!$existingParent) {
-			admin_redirect($redirectBack, ['notice' => 'Parent not found.', 'type' => 'error']);
-		}
-	}
-
-	if ($localAreaId !== null && $localAreaId > 0) {
-		if ($barangayId === null) {
-			admin_redirect($redirectBack, [
-				'notice' => 'A barangay is required before assigning a local area.',
-				'type' => 'error',
-			]);
-		}
-
-		$localAreaCheck = admin_fetch_one(
-			'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
-			'ii',
-			[$localAreaId, $barangayId]
-		);
-		$keepsExistingInactiveArea = $action === 'update'
-			&& $existingParent !== null
-			&& $localAreaId === (int)($existingParent['local_area_id'] ?? 0)
-			&& $barangayId === (int)($existingParent['barangay_id'] ?? 0);
-
-		if (!$localAreaCheck && !$keepsExistingInactiveArea) {
-			admin_redirect($redirectBack, [
-				'notice' => 'The selected local area is inactive or does not belong to the assigned barangay.',
-				'type' => 'error',
-			]);
-		}
-	}
-
-	/*
-	 * Household validation: if a household is selected, it must
-	 * belong to the parent's barangay.
-	 */
-	if ($householdId !== null && $barangayId !== null) {
-		$householdCheck = admin_fetch_one(
-			'SELECT id FROM households WHERE id = ? AND barangay_id = ? AND status = "active" LIMIT 1',
-			'ii',
-			[$householdId, $barangayId]
-		);
-		if (!$householdCheck) {
-			$householdId = null;
-		}
-	}
-
-	if ($action === 'create') {
-		$hash = password_hash($password, PASSWORD_DEFAULT);
-		$parentCode = sk_next_display_code('PAR');
-		$ok = admin_execute(
-			'INSERT INTO parents (parent_code, name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-			'sssssssiiis',
-			[$parentCode, $name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
-		);
-
-		if ($ok) {
-			$actor = current_user();
-			$newParentId = (int)get_db_connection()->insert_id;
-			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $parentCode . ' (#' . $newParentId . ') via nutritionist form');
-		}
-
-		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
-	}
-
-	if ($action === 'update' && $parentId > 0) {
-		if ($password !== '') {
-			$hash = password_hash($password, PASSWORD_DEFAULT);
-			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
-				'ssssssiiisi',
-				[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
-			);
-		} else {
-			$ok = admin_execute(
-				'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
-				'sssssiiisi',
-				[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
-			);
-		}
-
-		if ($ok) {
-			// Status flip via Edit cascades to children, same as Archive/Restore.
-			if ($status !== (string)($existingParent['status'] ?? 'active')) {
-				admin_cascade_parent_status($parentId, $status);
-			}
-			// Barangay move cascades too — otherwise children keep the old
-			// (or NULL) barangay_id and vanish from dashboard counts until
-			// each child edit form is re-saved.
-			if ($barangayId !== null && (int)$barangayId !== (int)($existingParent['barangay_id'] ?? 0)) {
-				admin_cascade_parent_barangay($parentId, $barangayId);
-			}
-			$actor = current_user();
-			log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $parentId . ' via nutritionist form');
-		}
-
-		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);
-	}
-
+if ($action !== 'create' && $action !== 'update') {
 	admin_redirect('/nutritionist/parents.php', ['notice' => 'No action was performed.', 'type' => 'error']);
 }
 
+$firstName = trim((string)($_POST['first_name'] ?? ''));
+$middleName = trim((string)($_POST['middle_name'] ?? ''));
+$lastName = trim((string)($_POST['last_name'] ?? ''));
+$email = trim((string)($_POST['email'] ?? ''));
+$phone = trim((string)($_POST['phone'] ?? ''));
+$address = trim((string)($_POST['address'] ?? ''));
+$parentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
 
 /*
- * LOAD PARENT FOR EDIT MODE
+ * For non-admin nutritionists, the barangay is ALWAYS their
+ * assigned barangay — they cannot pick a different one even if the
+ * client tampers with the POST body. We force it server-side.
  */
-$editingParent = null;
+$isAdmin = ($user['role'] ?? '') === 'admin';
+$userBarangayId = $user['barangay_id'] ?? null;
+$redirectBack = '/nutritionist/parents.php';
 
-if ($editId > 0) {
-	$editingParent = admin_fetch_one(
-			'SELECT id, name, email, parent_code, parent_type, phone, address, barangay_id, local_area_id, household_id, status
-		 FROM parents
-		 WHERE id = ?
-		 LIMIT 1',
+if (!$isAdmin) {
+	if ($userBarangayId === null || $userBarangayId === '') {
+		/** @disregard */
+		admin_redirect($redirectBack, [
+			'notice' => 'Your account is not assigned to a barangay. Contact your administrator to set one before adding parents.',
+			'type' => 'error',
+		]);
+	}
+	$barangayId = (int)$userBarangayId;
+} else {
+	$barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
+	$barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
+}
+
+$localAreaIdRaw = trim((string)($_POST['local_area_id'] ?? ''));
+$localAreaId = $localAreaIdRaw !== '' ? (int)$localAreaIdRaw : null;
+$status = trim((string)($_POST['status'] ?? 'active'));
+$password = (string)($_POST['password'] ?? '');
+$passwordConfirm = (string)($_POST['password_confirm'] ?? '');
+$householdIdRaw = trim((string)($_POST['household_id'] ?? ''));
+$householdId = $householdIdRaw !== '' ? (int)$householdIdRaw : null;
+
+if (
+	!admin_is_valid_name_part($firstName, true)
+	|| !admin_is_valid_name_part($middleName, false)
+	|| !admin_is_valid_name_part($lastName, true)
+) {
+	admin_redirect($redirectBack, ['notice' => 'Enter a valid first name and surname (letters only). Middle name is optional.', 'type' => 'error']);
+}
+
+$name = admin_combine_name($firstName, $middleName, $lastName);
+
+if (!in_array($status, ['active', 'inactive'], true)) {
+	$status = 'active';
+}
+
+if (!in_array($parentType, $parentTypes, true)) {
+	$parentType = 'Guardian';
+}
+
+if ($name === '' || $email === '') {
+	admin_redirect($redirectBack, ['notice' => 'Name and email are required.', 'type' => 'error']);
+}
+
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+	admin_redirect($redirectBack, ['notice' => 'Enter a valid email address.', 'type' => 'error']);
+}
+
+// Global uniqueness is enforced on ADD only — edits must always save
+// (same-table conflicts still fail on the UNIQUE key with a generic
+// message).
+if ($action === 'create' && admin_email_in_use($email, null, null)) {
+	admin_redirect($redirectBack, ['notice' => 'This email is already in use by another account. Use a different email address.', 'type' => 'error']);
+}
+
+if (!admin_is_valid_ph_mobile($phone)) {
+	admin_redirect($redirectBack, ['notice' => 'Enter a valid PH mobile number (e.g. 09171234567).', 'type' => 'error']);
+}
+
+$phone = (string)admin_normalize_ph_mobile($phone);
+
+// AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
+$name = (string)sk_encrypt_value($name);
+$phone = (string)sk_encrypt_value($phone);
+$address = (string)sk_encrypt_value($address);
+
+if ($action === 'create' && $password === '') {
+	admin_redirect($redirectBack, ['notice' => 'Password is required.', 'type' => 'error']);
+}
+
+if ($password !== '' && !admin_is_strong_password($password)) {
+	admin_redirect($redirectBack, ['notice' => 'Password must be at least 8 characters and include an uppercase letter, a lowercase letter, a number, and a special character.', 'type' => 'error']);
+}
+
+if ($password !== '' && $password !== $passwordConfirm) {
+	admin_redirect($redirectBack, ['notice' => 'Password and confirm password do not match.', 'type' => 'error']);
+}
+
+/*
+ * Local-area validation: if a local area is selected, it must
+ * belong to the parent's barangay so a Dela Paz Norte parent can't
+ * be assigned a Malpitic purok by accident.
+ */
+$existingParent = null;
+if ($action === 'update') {
+	$existingParent = admin_fetch_one(
+		'SELECT id, barangay_id, local_area_id, status FROM parents WHERE id = ? LIMIT 1',
 		'i',
-		[$editId]
+		[$parentId]
+	);
+	if (!$existingParent) {
+		admin_redirect($redirectBack, ['notice' => 'Parent not found.', 'type' => 'error']);
+	}
+}
+
+if ($localAreaId !== null && $localAreaId > 0) {
+	if ($barangayId === null) {
+		admin_redirect($redirectBack, [
+			'notice' => 'A barangay is required before assigning a local area.',
+			'type' => 'error',
+		]);
+	}
+
+	$localAreaCheck = admin_fetch_one(
+		'SELECT id FROM local_areas WHERE id = ? AND barangay_id = ? AND is_active = 1 LIMIT 1',
+		'ii',
+		[$localAreaId, $barangayId]
+	);
+	$keepsExistingInactiveArea = $action === 'update'
+		&& $existingParent !== null
+		&& $localAreaId === (int)($existingParent['local_area_id'] ?? 0)
+		&& $barangayId === (int)($existingParent['barangay_id'] ?? 0);
+
+	if (!$localAreaCheck && !$keepsExistingInactiveArea) {
+		admin_redirect($redirectBack, [
+			'notice' => 'The selected local area is inactive or does not belong to the assigned barangay.',
+			'type' => 'error',
+		]);
+	}
+}
+
+/*
+ * Household validation: if a household is selected, it must
+ * belong to the parent's barangay.
+ */
+if ($householdId !== null && $barangayId !== null) {
+	$householdCheck = admin_fetch_one(
+		'SELECT id FROM households WHERE id = ? AND barangay_id = ? AND status = "active" LIMIT 1',
+		'ii',
+		[$householdId, $barangayId]
+	);
+	if (!$householdCheck) {
+		$householdId = null;
+	}
+}
+
+if ($action === 'create') {
+	$hash = password_hash($password, PASSWORD_DEFAULT);
+	$parentCode = sk_next_display_code('PAR');
+	$ok = admin_execute(
+		'INSERT INTO parents (parent_code, name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+		'sssssssiiis',
+		[$parentCode, $name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
 	);
 
-	if ($editingParent === null) {
-		admin_redirect(
-			'/nutritionist/parents.php',
-			[
-				'notice' => 'Parent not found.',
-				'type' => 'error'
-			]
+	if ($ok) {
+		$actor = current_user();
+		$newParentId = (int)get_db_connection()->insert_id;
+		log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $parentCode . ' (#' . $newParentId . ') via nutritionist form');
+	}
+
+	admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
+}
+
+if ($action === 'update' && $parentId > 0) {
+	if ($password !== '') {
+		$hash = password_hash($password, PASSWORD_DEFAULT);
+		$ok = admin_execute(
+			'UPDATE parents SET name = ?, email = ?, password_hash = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
+			'ssssssiiisi',
+			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
+		);
+	} else {
+		$ok = admin_execute(
+			'UPDATE parents SET name = ?, email = ?, parent_type = ?, phone = ?, address = ?, barangay_id = ?, local_area_id = ?, household_id = ?, status = ? WHERE id = ?',
+			'sssssiiisi',
+			[$name, $email, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status, $parentId]
 		);
 	}
-}
 
-$editingNameParts = admin_split_full_name($editingParent['name'] ?? '');
-
-/*
- * Barangay list is scoped to the current user: a non-admin nutritionist
- * only ever sees their own barangay in the dropdown, and the assigned
- * barangay is enforced server-side in the POST handler above.
- */
-$isScopedUser = ($user['role'] ?? '') !== 'admin';
-$scopedBarangayId = $isScopedUser ? (int)($user['barangay_id'] ?? 0) : 0;
-$barangays = admin_barangay_options($isScopedUser ? $user : null);
-
-/*
- * On edit, if the editing parent's barangay falls outside the user's
- * scope (e.g. an admin is editing another barangay's record), force
- * the dropdown to show that barangay so the value is preserved.
- */
-if ($editingParent !== null) {
-    $editingBarangayId = (int)($editingParent['barangay_id'] ?? 0);
-    if ($editingBarangayId > 0) {
-        $found = false;
-        foreach ($barangays as $b) {
-            if ((int)$b['id'] === $editingBarangayId) { $found = true; break; }
-        }
-        if (!$found) {
-            $extra = admin_fetch_one(
-                "SELECT id, name, city_municipality, status FROM barangays WHERE id = ? LIMIT 1",
-                'i',
-                [$editingBarangayId]
-            );
-            if ($extra !== null) {
-                $barangays[] = $extra;
-            }
-        }
-    }
-}
-
-$householdBarangayFilter = (int)($editingParent['barangay_id'] ?? $scopedBarangayId);
-$households = [];
-if ($householdBarangayFilter > 0) {
-    $households = admin_fetch_all(
-        "SELECT id, household_code, address
-           FROM households
-          WHERE barangay_id = ? AND status = 'active'
-          ORDER BY household_code",
-        'i',
-        [$householdBarangayFilter]
-    );
-}
-
-$actions = '<a class="admin-btn-secondary" href="'
-	. nutritionist_e(app_url('/nutritionist/parents.php'))
-	. '">' . admin_action_icon('back') . ' Parents</a>';
-
-nutritionist_layout_start(
-	$editingParent ? 'Edit Parent' : 'Add Parent',
-	$editingParent ? 'Update this parent account.' : 'Create a new guardian record for linked child accounts.',
-	'parents',
-	$actions,
-	$editingParent ? 'Edit Parent' : 'Add Parent'
-);
-?>
-<?php if (isset($_GET['modal'])): ?><style>.admin-sidebar,.admin-topbar,.admin-pageheader{display:none!important}.admin-shell{display:block!important}.admin-main{margin:0!important}.admin-content{padding:12px!important}.nutritionist-form-head{display:none!important}.nutritionist-panel{margin:0!important;box-shadow:none!important}</style><?php endif; ?>
-<section class="nutritionist-panel">
-	<div class="nutritionist-form-head" style="margin-bottom:16px;">
-		<div>
-			<h2 class="admin-section-title" style="margin-bottom:2px;"><?php echo $editingParent ? 'Edit Parent' : 'Add Parent'; ?></h2>
-			<p class="admin-section-subtitle"><?php echo $editingParent ? nutritionist_e((string)$editingParent['name']) . ' ' . sk_code_badge((string)($editingParent['parent_code'] ?? '')) : 'Create a new guardian record for linked child accounts.'; ?></p>
-		</div>
-	</div>
-
-	<form class="nutritionist-form-grid<?php echo $editingParent ? ' record-edit-form' : ''; ?>" method="post" data-validate-form action="<?php echo nutritionist_e(app_url('/nutritionist/parent_form.php' . ($editingParent ? '?id=' . (int)$editingParent['id'] : ''))); ?>">
-		<input type="hidden" name="action" value="<?php echo $editingParent ? 'update' : 'create'; ?>">
-		<?php if ($editingParent): ?>
-			<input type="hidden" name="id" value="<?php echo (int)$editingParent['id']; ?>">
-		<?php endif; ?>
-
-		<div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
-
-		<div class="admin-field-wide">
-			<div class="admin-field-row">
-				<label class="admin-field">
-					<span>First name<span class="admin-required">*</span></span>
-					<input id="np_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" value="<?php echo nutritionist_e($editingNameParts['first']); ?>" placeholder="Juan">
-					<span class="admin-field-message"></span>
-				</label>
-				<label class="admin-field">
-					<span>Middle name</span>
-					<input id="np_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" value="<?php echo nutritionist_e($editingNameParts['middle']); ?>" placeholder="Reyes">
-					<span class="admin-field-message"></span>
-				</label>
-				<label class="admin-field">
-					<span>Surname<span class="admin-required">*</span></span>
-					<input id="np_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" value="<?php echo nutritionist_e($editingNameParts['last']); ?>" placeholder="Dela Cruz">
-					<span class="admin-field-message"></span>
-				</label>
-			</div>
-		</div>
-
-		<label class="admin-field">
-			<span>Email<span class="admin-required">*</span></span>
-			<input id="np_email" type="email" name="email" required data-validate="email" value="<?php echo nutritionist_e($editingParent['email'] ?? ''); ?>" placeholder="juan@example.com">
-			<span class="admin-field-message"></span>
-		</label>
-		<div class="admin-field-wide">
-			<div class="admin-field-row">
-				<label class="admin-field">
-					<span>Mobile number<span class="admin-required">*</span></span>
-					<input id="np_phone" name="phone" required data-validate="phone-ph" value="<?php echo nutritionist_e($editingParent['phone'] ?? ''); ?>" placeholder="09171234567">
-					<span class="admin-field-message"></span>
-				</label>
-				<label class="admin-field">
-					<span>Parent type<span class="admin-required">*</span></span>
-					<select id="np_parent_type" name="parent_type" required data-label="Parent type">
-						<?php foreach ($parentTypes as $type): ?>
-							<option value="<?php echo nutritionist_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo nutritionist_e($type); ?></option>
-						<?php endforeach; ?>
-					</select>
-					<span class="admin-field-message"></span>
-				</label>
-			</div>
-		</div>
-		<label class="admin-field">
-			<span>Assigned barangay <span class="admin-required">*</span></span>
-			<?php if ($isScopedUser): ?>
-				<?php
-				$lockedBarangayName = '';
-				$lockedBarangayId = $scopedBarangayId;
-				foreach ($barangays as $barangay) {
-					if ((int)$barangay['id'] === $scopedBarangayId) {
-						$lockedBarangayName = (string)$barangay['name'];
-						break;
-					}
-				}
-				?>
-				<div style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--admin-border);border-radius:8px;background:var(--admin-surface-alt);">
-					<span class="admin-pill is-info" style="font-weight:700;"><?php echo nutritionist_e($lockedBarangayName !== '' ? $lockedBarangayName : 'Your assigned barangay'); ?></span>
-					<span class="admin-mini">Locked to your account scope.</span>
-				</div>
-				<input type="hidden" name="barangay_id" value="<?php echo (int)$lockedBarangayId; ?>">
-			<?php else: ?>
-				<select name="barangay_id" id="pf-barangay-select" required>
-					<option value="">-- Select Barangay --</option>
-					<?php foreach ($barangays as $barangay): ?>
-						<option value="<?php echo (int)$barangay['id']; ?>" <?php echo (int)($editingParent['barangay_id'] ?? 0) === (int)$barangay['id'] ? 'selected' : ''; ?>><?php echo nutritionist_e($barangay['name']); ?></option>
-					<?php endforeach; ?>
-				</select>
-				<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Children will inherit this barangay for nutritional scope and reporting.</small>
-			<?php endif; ?>
-		</label>
-
-		<label class="admin-field">
-			<span>Local area / Purok</span>
-			<select name="local_area_id" id="pf-local-area-select" data-current-area="<?php echo (int)($editingParent['local_area_id'] ?? 0); ?>" data-scoped-barangay="<?php echo (int)$lockedBarangayId; ?>">
-				<option value="">-- Select local area --</option>
-			</select>
-			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking. Scoped to the assigned barangay.</small>
-		</label>
-
-		<label class="admin-field">
-			<span>Household / Spot</span>
-			<select name="household_id" id="pf-household-select" data-current-household="<?php echo (int)($editingParent['household_id'] ?? 0); ?>" data-scoped-barangay="<?php echo (int)$householdBarangayFilter; ?>">
-				<option value="">-- None --</option>
-				<?php foreach ($households as $hh): ?>
-					<option value="<?php echo (int)$hh['id']; ?>" <?php echo ((int)($editingParent['household_id'] ?? 0) === (int)$hh['id']) ? 'selected' : ''; ?>>
-						<?php echo nutritionist_e($hh['household_code']); ?><?php echo $hh['address'] !== null && $hh['address'] !== '' ? ' · ' . nutritionist_e($hh['address']) : ''; ?>
-					</option>
-				<?php endforeach; ?>
-			</select>
-			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Links this parent to a household spot on the barangay risk map. Scoped to the parent's barangay.</small>
-		</label>
-
-		<div class="admin-field-wide">
-			<div class="admin-address-picker" data-psgc-picker data-psgc-address-target="np_address">
-				<label class="admin-field">
-					<span>Province</span>
-					<select data-psgc="province"><option value="">Loading provinces…</option></select>
-				</label>
-				<label class="admin-field">
-					<span>City / Municipality</span>
-					<select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
-				</label>
-				<label class="admin-field">
-					<span>Barangay</span>
-					<select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
-				</label>
-				<label class="admin-field">
-					<span>Local area / Purok</span>
-					<select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
-				</label>
-			</div>
-			<label class="admin-field" style="margin-top:10px;">
-				<span>House no. / street</span>
-				<input data-psgc="street" placeholder="143 Mabini St.">
-			</label>
-			<div class="admin-address-status" data-psgc-status></div>
-			<div class="admin-address-preview" role="status" aria-live="polite">
-				<?php echo admin_sidebar_icon('barangays'); ?>
-				<div>
-					<span class="admin-address-preview-label">Full address</span>
-					<textarea id="np_address" name="address" readonly><?php echo nutritionist_e($editingParent['address'] ?? ''); ?></textarea>
-				</div>
-			</div>
-		</div>
-
-		<label class="admin-field">
-			<span>Status<span class="admin-required">*</span></span>
-			<select name="status" required>
-				<option value="active" <?php echo (($editingParent['status'] ?? 'active') === 'active') ? 'selected' : ''; ?>>Active</option>
-				<option value="inactive" <?php echo (($editingParent['status'] ?? 'active') === 'inactive') ? 'selected' : ''; ?>>Inactive</option>
-			</select>
-		</label>
-
-		<label class="admin-field admin-field-wide">
-			<span><?php echo $editingParent ? 'New password (optional)' : 'Password'; ?><?php echo $editingParent ? '' : '<span class="admin-required">*</span>'; ?></span>
-			<input id="np_password" type="password" name="password" <?php echo $editingParent ? '' : 'required'; ?> data-validate="password" autocomplete="new-password" placeholder="<?php echo $editingParent ? 'Leave blank to keep current password' : 'Create a strong password'; ?>">
-			<span class="admin-field-message"></span>
-			<ul class="admin-pw-checklist" data-pw-checklist-for="np_password">
-				<li data-pw-rule="length">At least 8 characters</li>
-				<li data-pw-rule="upper">One uppercase letter</li>
-				<li data-pw-rule="lower">One lowercase letter</li>
-				<li data-pw-rule="number">One number</li>
-				<li data-pw-rule="special">One special character</li>
-			</ul>
-			<div class="admin-pw-strength" data-pw-strength-for="np_password">
-				<div class="admin-pw-strength-track"><div class="admin-pw-strength-fill"></div></div>
-				<div class="admin-pw-strength-label"></div>
-			</div>
-		</label>
-		<label class="admin-field admin-field-wide">
-			<span><?php echo $editingParent ? 'Confirm new password' : 'Confirm password'; ?><?php echo $editingParent ? '' : '<span class="admin-required">*</span>'; ?></span>
-			<input id="np_password_confirm" type="password" name="password_confirm" <?php echo $editingParent ? '' : 'required'; ?> data-validate="confirm-password" data-match="np_password" autocomplete="new-password" placeholder="Re-type the password">
-			<span class="admin-field-message"></span>
-		</label>
-
-		<div class="admin-field admin-field-wide" style="align-content:end;">
-			<button class="admin-btn" type="submit"><?php echo admin_action_icon('save') . ' ' . ($editingParent ? 'Save changes' : 'Create parent'); ?></button>
-			<?php if ($editingParent): ?>
-				<a class="admin-btn-secondary" href="<?php echo nutritionist_e(app_url('/nutritionist/parents.php')); ?>" style="margin-left:8px;"><?php echo admin_action_icon('cancel'); ?> Cancel</a>
-			<?php endif; ?>
-		</div>
-	</form>
-</section>
-
-<script>
-(function() {
-	var barangaySelect = document.getElementById('pf-barangay-select');
-	var areaSelect = document.getElementById('pf-local-area-select');
-	var currentAreaId = parseInt(areaSelect.getAttribute('data-current-area') || '0', 10);
-	var scopedBarangayId = parseInt(areaSelect.getAttribute('data-scoped-barangay') || '0', 10);
-	var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
-
-	function loadAreas(barangayId, selectedId) {
-		areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
-		if (!barangayId || barangayId <= 0) return;
-		areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
-		fetch(apiBase + '?barangay_id=' + barangayId)
-			.then(function(r) { return r.json(); })
-			.then(function(res) {
-				areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
-				if (!res.success || !res.data || res.data.length === 0) {
-					areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
-					return;
-				}
-				res.data.forEach(function(area) {
-					if (parseInt(area.is_active, 10) !== 1 && parseInt(area.id, 10) !== selectedId) {
-						return;
-					}
-					var opt = document.createElement('option');
-					opt.value = area.id;
-					opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
-					if (selectedId && parseInt(opt.value, 10) === selectedId) opt.selected = true;
-					areaSelect.appendChild(opt);
-				});
-			})
-			.catch(function() {
-				areaSelect.innerHTML = '<option value="">-- Select local area --</option><option value="" disabled>Failed to load</option>';
-			});
+	if ($ok) {
+		// Status flip via Edit cascades to children, same as Archive/Restore.
+		if ($status !== (string)($existingParent['status'] ?? 'active')) {
+			admin_cascade_parent_status($parentId, $status);
+		}
+		// Barangay move cascades too — otherwise children keep the old
+		// (or NULL) barangay_id and vanish from dashboard counts until
+		// each child edit form is re-saved.
+		if ($barangayId !== null && (int)$barangayId !== (int)($existingParent['barangay_id'] ?? 0)) {
+			admin_cascade_parent_barangay($parentId, $barangayId);
+		}
+		$actor = current_user();
+		log_action($actor['id'] ?? null, 'UPDATE_PARENT', 'info', 'Updated parent #' . $parentId . ' via nutritionist form');
 	}
 
-	if (barangaySelect) {
-		barangaySelect.addEventListener('change', function() {
-			currentAreaId = 0;
-			loadAreas(parseInt(barangaySelect.value || '0', 10), 0);
-		});
-		var initial = parseInt(barangaySelect.value || '0', 10);
-		if (initial > 0) loadAreas(initial, currentAreaId);
-	} else if (scopedBarangayId > 0) {
-		// Scoped nutritionist: barangay is locked, so load areas once.
-		loadAreas(scopedBarangayId, currentAreaId);
-	}
-})();
-</script>
+	admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent updated.'] : ['notice' => 'Parent could not be updated. Check for a duplicate email.', 'type' => 'error']);
+}
 
-<?php
-nutritionist_layout_end();
+admin_redirect('/nutritionist/parents.php', ['notice' => 'No action was performed.', 'type' => 'error']);

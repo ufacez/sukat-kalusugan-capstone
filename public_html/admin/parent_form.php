@@ -50,7 +50,33 @@ admin_layout_start(
     $editingParent ? 'Edit Parent' : 'Add Parent'
 );
 ?>
-<?php if (isset($_GET['modal'])): ?><style>.admin-sidebar,.admin-topbar,.admin-pageheader{display:none!important}.admin-shell{display:block!important}.admin-main{margin:0!important}.admin-content{padding:12px!important}.admin-section-head{display:none!important}.admin-section{margin:0!important}</style><?php endif; ?>
+<?php if (isset($_GET['modal'])): ?><style>
+.admin-sidebar,.admin-topbar,.admin-pageheader{display:none!important}
+.admin-shell{display:block!important}
+.admin-main{margin:0!important}
+.admin-content{padding:0!important}
+.admin-section-head{display:none!important}
+.admin-section{margin:0!important}
+.admin-edit-layout{display:block!important}
+.record-edit-form{width:100%;max-width:none;margin:0;border:0;border-radius:0;box-shadow:none;padding:10px 24px 12px;background:var(--admin-page-gradient-start);grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;max-height:calc(94vh - 66px);overflow-y:auto}
+.record-edit-form > .admin-field-wide,
+.record-edit-form > .admin-field,
+.record-edit-form > .admin-field-row{min-width:0}
+.record-edit-form > .admin-field-wide{padding:10px 12px;border:1px solid var(--admin-border);border-radius:12px;background:var(--admin-surface)}
+.record-edit-form > .admin-field-wide > .admin-field-row{gap:6px}
+.record-edit-form > .admin-field-wide input,
+.record-edit-form > .admin-field-wide select,
+.record-edit-form > .admin-field-wide textarea,
+.record-edit-form > .admin-field input,
+.record-edit-form > .admin-field select{height:42px;padding:.55rem .7rem;border-radius:10px}
+.record-edit-form > .admin-field-wide{grid-column:1 / -1}
+.record-edit-form > .admin-field-wide{grid-column:1 / -1}
+.record-edit-form > .admin-field:nth-of-type(2){grid-column:auto}
+.record-edit-form > .admin-field-row{grid-column:1 / -1}
+.record-edit-form > .admin-edit-actions{grid-column:1 / -1;margin:2px -24px -16px;padding:10px 24px 12px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
+.admin-edit-sidebar{display:none!important}
+@media(max-width:620px){.record-edit-form{grid-template-columns:minmax(0,1fr);padding:12px 18px 16px}.record-edit-form > .admin-edit-actions{margin:2px -18px -16px;padding:10px 18px 12px}}
+</style><?php endif; ?>
 <section class="admin-section">
     <div class="admin-section-head">
         <div>

@@ -282,9 +282,9 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
 </section>
 
 <div class="admin-modal-overlay record-edit-frame-overlay" id="record-edit-frame-overlay" hidden>
-    <div class="admin-modal record-edit-frame-modal" role="dialog" aria-modal="true" aria-label="Edit record">
+    <div class="admin-modal record-edit-frame-modal parent-record-edit-frame-modal" role="dialog" aria-modal="true" aria-label="Edit record">
         <div class="admin-modal-head">
-            <div><h3>Edit record</h3><p class="users-edit-subtitle">Update the selected record.</p></div>
+            <div><h3>Edit parent</h3><p class="users-edit-subtitle">Update the selected parent/guardian record.</p></div>
             <button class="admin-modal-close" type="button" data-record-edit-close aria-label="Close">&times;</button>
         </div>
         <iframe title="Edit record" data-record-edit-frame></iframe>
@@ -369,28 +369,39 @@ body.admin-page .users-edit-modal{width:min(1120px,calc(100vw - 40px)) !importan
 .users-edit-modal .admin-modal-head{padding:20px 24px 14px;align-items:flex-start}
 .users-edit-modal .admin-modal-head h3{font-size:1.35rem;letter-spacing:-.02em}
 .users-edit-subtitle{margin:3px 0 0;color:var(--admin-muted);font-size:.82rem}
-.users-edit-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:10px;padding:12px 24px 16px;background:var(--admin-page-gradient-start);max-height:calc(94vh - 66px);overflow-y:auto}
+.users-edit-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;gap:8px;padding:10px 24px 12px;background:var(--admin-page-gradient-start);max-height:calc(94vh - 66px);overflow-y:auto}
+.users-edit-body > section,
+.users-edit-body .invite-form-card,
+.users-edit-body .admin-field,
+.users-edit-body .admin-address-picker{min-width:0}
 .users-edit-body > section:nth-of-type(1),
 .users-edit-body > section:nth-of-type(2){grid-column:auto}
 .users-edit-body > section:nth-of-type(3),
 .users-edit-body > section:nth-of-type(4),
 .users-edit-body > .admin-edit-actions{grid-column:1 / -1}
-.users-edit-body .invite-form-card{align-self:start;padding:12px 14px;border:1px solid var(--admin-border);border-radius:14px;background:var(--admin-surface)}
-.users-edit-body .invite-form-card-title{margin:0 0 7px;line-height:1.15}
-.users-edit-body .invite-form-card > p{margin:0 0 7px;color:var(--admin-muted);font-size:.66rem;line-height:1.2}
-.users-edit-body .invite-form-card .admin-field-row{gap:8px}
+.users-edit-body .invite-form-card{align-self:start;padding:10px 12px;border:1px solid var(--admin-border);border-radius:12px;background:var(--admin-surface)}
+.users-edit-body .invite-form-card-title{margin:0 0 5px;line-height:1.15}
+.users-edit-body .invite-form-card > p{margin:0 0 5px;color:var(--admin-muted);font-size:.64rem;line-height:1.15}
+.users-edit-body .invite-form-card .admin-field-row{gap:6px}
 .users-edit-body .invite-form-card .admin-field{gap:.25rem}
 .users-edit-phone-field{max-width:none;margin-top:4px}
 .users-edit-body .invite-form-card input,
-.users-edit-body .invite-form-card select{height:46px;padding:.65rem .8rem}
+.users-edit-body .invite-form-card select{height:42px;padding:.55rem .7rem}
 .users-edit-body .invite-form-card input,
 .users-edit-body .invite-form-card select{border-radius:10px}
 .users-edit-body .invite-form-card-title svg{width:17px;height:17px;flex:0 0 17px}
+.users-edit-body .invite-address-card .admin-address-picker{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.users-edit-body .invite-address-card .admin-address-picker > .admin-field{min-width:0}
+.users-edit-body .invite-address-card > .invite-house-field,
+.users-edit-body .invite-address-card > .admin-address-status,
+.users-edit-body .invite-address-card > .admin-address-preview{grid-column:1 / -1}
+.users-edit-body .invite-address-card .admin-address-picker .admin-field > span{display:block;min-height:1.8em;line-height:1.15}
+.users-edit-body .invite-address-card .admin-address-preview{min-width:0}
 .users-edit-body .admin-field-message{font-size:.66rem;line-height:1.15;min-height:.75em}
 .users-edit-body .admin-edit-access{margin-top:6px}
 .users-edit-body .admin-edit-access-options{gap:6px}
 .users-edit-body .admin-edit-access-option{min-height:58px;padding:8px}
-.users-edit-body .admin-edit-actions{margin:2px -24px -16px;padding:10px 24px 12px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
+.users-edit-body .admin-edit-actions{margin:2px -24px -12px;padding:8px 24px 10px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
 @media(max-width:620px){
  body.admin-page .users-edit-modal{width:calc(100vw - 24px);max-width:calc(100vw - 24px);max-height:calc(100dvh - 24px)}
  .users-edit-modal .admin-modal-head{padding:22px 18px 16px}

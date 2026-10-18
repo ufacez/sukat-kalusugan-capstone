@@ -101,7 +101,7 @@
 
 .nutritionist-page .nutritionist-legend {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
 }
 
@@ -589,7 +589,7 @@
 .who-ref-toolbar {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   flex-wrap: wrap;
   margin-bottom: 14px;
 }
@@ -5721,4 +5721,194 @@ html[data-theme="dark"] .nsk-status-row {
 html[data-theme="dark"] .nsk-status-code {
   background: rgba(255, 255, 255, 0.1);
   color: #c8d8cf;
+}
+
+/* ─── Nutritionist Edit Parent Modal (card layout) ────────────────── */
+.nutritionist-edit-parent-modal {
+  width: min(1120px, calc(100vw - 40px)) !important;
+  max-width: min(1120px, calc(100vw - 40px)) !important;
+  max-height: calc(100dvh - 32px);
+  overflow: hidden;
+  border-radius: 18px;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-modal-body {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 8px;
+  max-height: calc(94vh - 66px);
+  overflow-y: auto;
+  padding: 8px 24px 10px;
+  background: var(--admin-page-gradient-start);
+}
+
+.nutritionist-edit-parent-modal .admin-edit-modal-body > *,
+.nutritionist-edit-parent-modal .admin-edit-card,
+.nutritionist-edit-parent-modal .admin-field,
+.nutritionist-edit-parent-modal .admin-address-picker {
+  min-width: 0;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card {
+  padding: 10px 12px;
+  border: 1px solid var(--admin-border);
+  border-radius: 12px;
+  background: var(--admin-surface);
+  box-shadow: none;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card:nth-of-type(3),
+.nutritionist-edit-parent-modal .admin-edit-card:nth-of-type(4),
+.nutritionist-edit-parent-modal [data-validate-banner] {
+  grid-column: 1 / -1;
+}
+
+
+
+.nutritionist-edit-parent-modal .admin-edit-card h3 {
+  margin: 0;
+  color: var(--admin-text);
+  font-size: 0.92rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card h3 svg {
+  width: 16px;
+  height: 16px;
+  opacity: 0.7;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card > p {
+  margin: -2px 0 5px;
+  color: var(--admin-muted);
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card .admin-field-row {
+  gap: 6px;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-card .admin-field input,
+.nutritionist-edit-parent-modal .admin-edit-card .admin-field select,
+.nutritionist-edit-parent-modal .admin-edit-card .admin-field textarea {
+  width: 100%;
+  min-height: 42px;
+  padding: 0.55rem 0.7rem;
+  border-radius: 10px;
+}
+
+.nutritionist-edit-parent-modal .admin-edit-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin: 2px -24px -12px;
+  padding: 8px 24px 10px;
+  border-top: 1px solid var(--admin-border);
+  background: var(--admin-surface);
+}
+
+.nutritionist-edit-parent-modal .admin-edit-hint {
+  display: block;
+  margin-top: 5px;
+  color: var(--admin-muted);
+  font-size: 0.68rem;
+}
+
+.nutritionist-edit-parent-modal .admin-address-picker {
+  margin-top: 2px;
+  display: block;
+}
+
+.nutritionist-edit-parent-modal .admin-address-picker .admin-field-row {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.nutritionist-edit-parent-modal .admin-address-picker .admin-field > span {
+  display: block;
+  min-height: 1.8em;
+  line-height: 1.15;
+}
+
+.nutritionist-edit-parent-modal .admin-address-picker > .admin-field,
+.nutritionist-edit-parent-modal .admin-address-picker > .admin-address-status,
+.nutritionist-edit-parent-modal .admin-address-picker > .admin-address-preview {
+  min-width: 0;
+}
+
+.nutritionist-edit-parent-modal .admin-address-preview {
+  margin-top: 6px;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+}
+
+.nutritionist-edit-parent-modal .admin-address-preview svg {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  opacity: 0.6;
+}
+
+.nutritionist-edit-parent-modal .admin-address-preview-label {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--admin-muted);
+  margin-bottom: 2px;
+}
+
+.nutritionist-edit-parent-modal .admin-address-preview textarea {
+  width: 100%;
+  min-height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--admin-text);
+  font-size: 0.82rem;
+  font-weight: 600;
+  resize: none;
+  font-family: inherit;
+}
+
+@media (max-width: 760px) {
+  .nutritionist-edit-parent-modal .admin-edit-card.parent-assignment-card {
+    grid-column: 1 / -1;
+  }
+
+  .nutritionist-edit-parent-modal .admin-edit-card .admin-field-row,
+  .nutritionist-edit-parent-modal .admin-address-picker .admin-field-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 620px) {
+  .nutritionist-edit-parent-modal {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+  }
+
+  .nutritionist-edit-parent-modal .admin-edit-modal-body {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 12px 16px 16px;
+  }
+
+  .nutritionist-edit-parent-modal .admin-edit-actions {
+    margin: 2px -16px -16px;
+    padding: 10px 16px 12px;
+  }
 }
