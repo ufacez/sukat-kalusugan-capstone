@@ -18,13 +18,31 @@
 -- ============================================================================
 
 -- ---------------------------------------------------------------------------
--- 1. Add the columns
+-- 1. Add the columns (guarded: MySQL has no ADD COLUMN IF NOT EXISTS)
 -- ---------------------------------------------------------------------------
-ALTER TABLE users
-    ADD COLUMN IF NOT EXISTS user_code VARCHAR(12) NULL AFTER id;
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'users'
+      AND COLUMN_NAME = 'user_code'
+);
+SET @sql = IF(@col_exists > 0, 'SELECT 1',
+    'ALTER TABLE `users` ADD COLUMN `user_code` VARCHAR(12) NULL AFTER `id`');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
-ALTER TABLE parents
-    ADD COLUMN IF NOT EXISTS parent_code VARCHAR(12) NULL AFTER id;
+SET @col_exists = (
+    SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'parents'
+      AND COLUMN_NAME = 'parent_code'
+);
+SET @sql = IF(@col_exists > 0, 'SELECT 1',
+    'ALTER TABLE `parents` ADD COLUMN `parent_code` VARCHAR(12) NULL AFTER `id`');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- ---------------------------------------------------------------------------
 -- 2. Unique backstops (guarded: MariaDB has no ADD UNIQUE IF NOT EXISTS)
