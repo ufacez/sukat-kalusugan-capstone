@@ -10,6 +10,8 @@ Disallow: /admin/
 Disallow: /nutritionist/
 Disallow: /parent/
 Disallow: /kiosk/
+Disallow: /data/
+Disallow: /test/
 
 Sitemap: https://sukatkalusugan.app/sitemap.xml
 

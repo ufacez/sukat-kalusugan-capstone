@@ -31,6 +31,13 @@ RewriteEngine On
 # Never list directory contents.
 Options -Indexes
 
+# Defense-in-depth: block local-only, gitignored reference/scratch folders that
+# the app never uses at runtime (WHO reference sheets, manual tester). Served as
+# 404 so crawlers drop them instead of re-indexing a stray "data/test" dump.
+<IfModule mod_rewrite.c>
+    RewriteRule ^(data|test)/ - [R=404,L]
+</IfModule>
+
 # Block access to dotfiles (but /.well-known/security.txt is served by name,
 # not matched here since FilesMatch tests the file's basename).
 <FilesMatch "^\.">
