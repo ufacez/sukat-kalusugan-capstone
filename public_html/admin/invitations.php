@@ -136,6 +136,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $name = admin_combine_name($firstName, $middleName, $lastName);
         $emailRaw = trim((string)($_POST['email'] ?? ''));
         $usernameRaw = trim((string)($_POST['username'] ?? ''));
+        $houseNo = trim((string)($_POST['house_no'] ?? ''));
         $role = trim((string)($_POST['role'] ?? ''));
         $barangayIdRaw = trim((string)($_POST['barangay_id'] ?? ''));
         $barangayId = $barangayIdRaw !== '' ? (int)$barangayIdRaw : null;
@@ -150,6 +151,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($lastName === '' || !admin_is_valid_name_part($lastName, true)) {
             admin_flash_form_state($_POST, 'last_name');
             admin_redirect($inviteBack, ['notice' => 'Enter a valid surname (letters only, at least 2 characters).', 'type' => 'error']);
+        }
+        if ($houseNo === '') {
+            admin_flash_form_state($_POST, 'house_no');
+            admin_redirect($inviteBack, ['notice' => 'Enter a house number or street.', 'type' => 'error']);
         }
 
         if (!in_array($role, ['admin', 'nutritionist'], true)) {
@@ -554,9 +559,12 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
 <?php endif; ?>
 
 <div class="admin-modal-overlay" id="invite-overlay"<?php echo $inviteOpen ? '' : ' hidden'; ?>>
-    <div class="admin-modal admin-modal--form" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+    <div class="admin-modal admin-modal--form invite-modal" role="dialog" aria-modal="true" aria-labelledby="invite-title">
         <div class="admin-modal-head">
-            <h3 id="invite-title">Invite Staff</h3>
+            <div>
+                <h3 id="invite-title">Invite staff</h3>
+                <p class="invite-modal-subtitle">They’ll get a link to finish setting up their own account.</p>
+            </div>
             <button class="admin-modal-close" data-invite-close type="button" aria-label="Close">&times;</button>
         </div>
         <div class="admin-modal-body">
@@ -568,7 +576,8 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
 
                 <div class="admin-field-wide admin-flash is-error" data-validate-banner style="display:none;"></div>
 
-                <div class="admin-field-wide">
+                <section class="invite-form-card admin-field-wide">
+                    <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('users'); ?> General information</h4>
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'first_name' ? ' is-invalid' : ''; ?>">
                             <span>First name<span class="admin-required">*</span></span>
@@ -586,17 +595,26 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             <span class="admin-field-message"><?php echo $formErrorField === 'last_name' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>
-                </div>
+                </section>
 
-                <div class="admin-field-wide">
+                <section class="invite-form-card admin-field-wide">
+                    <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('clipboard'); ?> Contact</h4>
+                    <div class="admin-field-row invite-contact-row">
                     <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
                         <span>Email address</span>
                         <input name="email" id="invite-email-input" type="email" maxlength="150" placeholder="e.g. juan@gmail.com" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="width:100%;">
                         <span class="admin-field-message"><?php echo $formErrorField === 'email' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'Enter a valid email address.') : ''; ?></span>
                     </label>
-                </div>
+                        <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
+                            <span>Mobile number<span class="admin-required">*</span></span>
+                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09171234567" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                            <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
+                        </label>
+                    </div>
+                </section>
 
-                <div class="admin-field-wide">
+                <section class="invite-form-card admin-field-wide">
+                    <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('key'); ?> Access</h4>
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
                             <span>Username</span>
@@ -612,20 +630,21 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             <span class="admin-field-message"><?php echo $formErrorField === 'role' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>
-                </div>
-
-                <div class="admin-field-wide">
                     <div class="admin-field-row">
-                        <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
-                            <span>Mobile number<span class="admin-required">*</span></span>
-                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09171234567" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
-                            <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
+                        <label class="admin-field">
+                            <span>Barangay scope<span class="admin-required">*</span></span>
+                            <select name="barangay_id">
+                                <option value="">-- All barangays --</option>
+                                <?php foreach ($barangays as $b): ?>
+                                    <option value="<?php echo (int)$b['id']; ?>"<?php echo admin_old_value($old, 'barangay_id', '') !== '' && (int)admin_old_value($old, 'barangay_id') === (int)$b['id'] ? ' selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
+                                <?php endforeach; ?>
+                            </select>
                         </label>
                     </div>
-                </div>
+                </section>
 
-                <div class="admin-field-wide">
-                    <span style="font-size:0.88rem;font-weight:700;color:var(--admin-text);">Home address</span>
+                <section class="invite-form-card invite-address-card admin-field-wide">
+                    <h4 class="invite-form-card-title"><?php echo admin_sidebar_icon('barangays'); ?> Home address</h4>
                     <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="invite_address">
                         <label class="admin-field">
                             <span>Province</span>
@@ -640,36 +659,26 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
                         </label>
                         <label class="admin-field">
-                            <span>Purok / Local Area</span>
+                            <span>Local area / Purok<span class="admin-required">*</span></span>
                             <select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
                         </label>
                     </div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>House no. / street</span>
-                        <input data-psgc="street" placeholder="143 Purok 6">
+                    <label class="admin-field invite-house-field<?php echo $formErrorField === 'house_no' ? ' is-invalid' : ''; ?>" style="margin-top:10px;">
+                        <span>House no. / street<span class="admin-required">*</span></span>
+                        <input data-psgc="street" name="house_no" required placeholder="143 Mabini St.">
+                        <span class="admin-field-message"><?php echo $formErrorField === 'house_no' ? admin_e($formErrorNotice) : ''; ?></span>
                     </label>
                     <div class="admin-address-status" data-psgc-status></div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>Full address</span>
-                        <textarea id="invite_address" name="address" maxlength="255" rows="2" readonly><?php echo admin_e(admin_old_value($old, 'address')); ?></textarea>
-                    </label>
-                </div>
-
-                <div class="admin-field-wide">
-                    <div class="admin-field-row">
-                        <label class="admin-field">
-                            <span>Barangay scope</span>
-                            <select name="barangay_id">
-                                <option value="">-- All barangays --</option>
-                                <?php foreach ($barangays as $b): ?>
-                                    <option value="<?php echo (int)$b['id']; ?>"<?php echo admin_old_value($old, 'barangay_id', '') !== '' && (int)admin_old_value($old, 'barangay_id') === (int)$b['id'] ? ' selected' : ''; ?>><?php echo admin_e($b['name']); ?></option>
-                                <?php endforeach; ?>
-                            </select>
-                        </label>
+                    <div class="admin-address-preview" role="status" aria-live="polite">
+                        <?php echo admin_sidebar_icon('barangays'); ?>
+                        <div>
+                            <span class="admin-address-preview-label">Full address</span>
+                            <textarea id="invite_address" name="address" maxlength="255" rows="2" readonly placeholder="Your complete address will appear here."><?php echo admin_e(admin_old_value($old, 'address')); ?></textarea>
+                        </div>
                     </div>
-                </div>
+                </section>
 
-                <div class="admin-field admin-field-wide" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
+                <div class="admin-field admin-field-wide invite-actions" style="display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;">
                     <button class="admin-btn-secondary" type="button" data-invite-close>Cancel</button>
                     <button class="admin-btn is-create" type="submit" <?php echo $pendingCount >= 3 ? 'disabled style="opacity:.5;cursor:not-allowed;"' : ''; ?>><?php echo admin_action_icon('add'); ?> Generate Invitation</button>
                 </div>
@@ -679,6 +688,34 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
 </div>
 
 <style>
+.invite-modal{max-width:min(760px,calc(100vw - 24px));border-radius:18px}
+.invite-modal .admin-modal-head{padding:28px 30px 20px;align-items:flex-start}
+.invite-modal .admin-modal-head h3{font-size:1.35rem;letter-spacing:-.02em}
+.invite-modal-subtitle{margin:5px 0 0;color:var(--admin-muted);font-size:.9rem}
+.invite-modal .admin-modal-body{padding:22px 30px 28px;background:var(--admin-page-gradient-start)}
+.invite-modal .admin-form-grid{gap:18px}
+.invite-form-card{padding:20px;border:1px solid var(--admin-border);border-radius:14px;background:var(--admin-surface)}
+.invite-form-card-title{display:flex;align-items:center;gap:9px;margin:0 0 16px;font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:var(--admin-muted)}
+.invite-form-card-title svg{width:17px;height:17px;color:var(--admin-primary)}
+.invite-form-card .admin-field-row{gap:12px}
+.invite-form-card .admin-field{min-width:0}
+.invite-form-card input,.invite-form-card select,.invite-form-card textarea{border-radius:10px}
+.invite-address-card .admin-address-picker{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.invite-address-card .admin-address-picker .admin-field:nth-child(3){grid-column:1}
+.invite-address-card .admin-address-picker .admin-field:nth-child(4){grid-column:2}
+.invite-address-card .admin-address-picker + .invite-house-field{margin-top:14px!important}
+.invite-address-card textarea{min-height:0;height:1.35em}
+.invite-modal .admin-field-message{font-size:.66rem;line-height:1.15;min-height:.75em}
+.invite-actions{margin:4px -30px -28px;padding:16px 30px 18px;border-top:1px solid var(--admin-border);background:var(--admin-surface)}
+@media(max-width:620px){
+  .invite-modal .admin-modal-head{padding:22px 18px 16px}
+  .invite-modal .admin-modal-body{padding:16px 18px 20px}
+  .invite-form-card{padding:16px}
+  .invite-actions{margin-left:-18px;margin-right:-18px;margin-bottom:-20px;padding-left:18px;padding-right:18px}
+  .invite-address-card .admin-address-picker{grid-template-columns:minmax(0,1fr)}
+  .invite-address-card .admin-address-picker .admin-field:nth-child(3),
+  .invite-address-card .admin-address-picker .admin-field:nth-child(4){grid-column:auto}
+}
 .invite-info-section + .invite-info-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border)}
 .invite-info-heading{margin:0 0 10px;font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--admin-muted)}
 .invite-info-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 18px;margin:0;font-size:0.87rem;align-items:baseline}

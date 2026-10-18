@@ -80,7 +80,7 @@ $settingsEsc = $settingsEscaper;
                         </label>
                     <?php endif; ?>
                     <label class="admin-field">
-                        <span>Phone</span>
+                        <span>Mobile number</span>
                         <input id="account_phone" name="phone" data-validate="phone-ph" data-label="Phone" autocomplete="tel" inputmode="tel" placeholder="09171234567" value="<?php echo $settingsEsc((string)($settingsProfile['phone'] ?? '')); ?>">
                         <span class="admin-field-message"></span>
                     </label>
@@ -118,9 +118,15 @@ $settingsEsc = $settingsEscaper;
                             </div>
                         </label>
                     </div>
-                    <label class="admin-field acct-field"><span>House no. / street</span><input data-psgc="street" placeholder="e.g. 143 Purok 6"></label>
+                    <label class="admin-field acct-field"><span>House no. / street</span><input data-psgc="street" placeholder="e.g. 143 Mabini St."></label>
                     <div class="admin-address-status" data-psgc-status role="status" aria-live="polite"></div>
-                    <label class="admin-field acct-field"><span>Full address</span><input id="account_address" type="text" name="address" maxlength="255" readonly value="<?php echo $settingsEsc((string)($settingsProfile['address'] ?? '')); ?>"></label>
+                    <div class="admin-address-preview" role="status" aria-live="polite">
+                        <?php echo admin_sidebar_icon('barangays'); ?>
+                        <div>
+                            <span class="admin-address-preview-label">Full address</span>
+                            <input id="account_address" type="text" name="address" maxlength="255" readonly value="<?php echo $settingsEsc((string)($settingsProfile['address'] ?? '')); ?>">
+                        </div>
+                    </div>
                 </div>
             </section>
         </form>

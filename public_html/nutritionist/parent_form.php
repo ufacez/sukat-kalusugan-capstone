@@ -154,7 +154,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 	if ($localAreaId !== null && $localAreaId > 0) {
 		if ($barangayId === null) {
 			admin_redirect($redirectBack, [
-				'notice' => 'A Barangay is required before assigning a Local Area.',
+				'notice' => 'A barangay is required before assigning a local area.',
 				'type' => 'error',
 			]);
 		}
@@ -171,7 +171,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 		if (!$localAreaCheck && !$keepsExistingInactiveArea) {
 			admin_redirect($redirectBack, [
-				'notice' => 'Selected Local Area is inactive or does not belong to the assigned Barangay.',
+				'notice' => 'The selected local area is inactive or does not belong to the assigned barangay.',
 				'type' => 'error',
 			]);
 		}
@@ -384,7 +384,7 @@ nutritionist_layout_start(
 					<span class="admin-field-message"></span>
 				</label>
 				<label class="admin-field">
-					<span>Parent Type<span class="admin-required">*</span></span>
+					<span>Parent type<span class="admin-required">*</span></span>
 					<select id="np_parent_type" name="parent_type" required data-label="Parent type">
 						<?php foreach ($parentTypes as $type): ?>
 							<option value="<?php echo nutritionist_e($type); ?>" <?php echo (($editingParent['parent_type'] ?? 'Guardian') === $type) ? 'selected' : ''; ?>><?php echo nutritionist_e($type); ?></option>
@@ -395,7 +395,7 @@ nutritionist_layout_start(
 			</div>
 		</div>
 		<label class="admin-field">
-			<span>Assigned Barangay <span class="admin-required">*</span></span>
+			<span>Assigned barangay <span class="admin-required">*</span></span>
 			<?php if ($isScopedUser): ?>
 				<?php
 				$lockedBarangayName = '';
@@ -424,9 +424,9 @@ nutritionist_layout_start(
 		</label>
 
 		<label class="admin-field">
-			<span>Local Area / Purok</span>
+			<span>Local area / Purok</span>
 			<select name="local_area_id" id="pf-local-area-select" data-current-area="<?php echo (int)($editingParent['local_area_id'] ?? 0); ?>" data-scoped-barangay="<?php echo (int)$lockedBarangayId; ?>">
-				<option value="">-- Select Local Area --</option>
+				<option value="">-- Select local area --</option>
 			</select>
 			<small style="display:block;margin-top:5px;color:var(--admin-muted);font-size:11px;">Optional. Children will inherit this local area for prevalence tracking. Scoped to the assigned barangay.</small>
 		</label>
@@ -445,7 +445,6 @@ nutritionist_layout_start(
 		</label>
 
 		<div class="admin-field-wide">
-			<span style="font-size:0.88rem;font-weight:700;color:var(--admin-text);">Home address</span>
 			<div class="admin-address-picker" data-psgc-picker data-psgc-address-target="np_address">
 				<label class="admin-field">
 					<span>Province</span>
@@ -460,19 +459,22 @@ nutritionist_layout_start(
 					<select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
 				</label>
 				<label class="admin-field">
-					<span>Purok / Local Area</span>
+					<span>Local area / Purok</span>
 					<select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
 				</label>
 			</div>
 			<label class="admin-field" style="margin-top:10px;">
 				<span>House no. / street</span>
-				<input data-psgc="street" placeholder="143 Purok 6">
+				<input data-psgc="street" placeholder="143 Mabini St.">
 			</label>
 			<div class="admin-address-status" data-psgc-status></div>
-			<label class="admin-field" style="margin-top:10px;">
-				<span>Full address</span>
-				<textarea id="np_address" name="address" readonly><?php echo nutritionist_e($editingParent['address'] ?? ''); ?></textarea>
-			</label>
+			<div class="admin-address-preview" role="status" aria-live="polite">
+				<?php echo admin_sidebar_icon('barangays'); ?>
+				<div>
+					<span class="admin-address-preview-label">Full address</span>
+					<textarea id="np_address" name="address" readonly><?php echo nutritionist_e($editingParent['address'] ?? ''); ?></textarea>
+				</div>
+			</div>
 		</div>
 
 		<label class="admin-field">
@@ -523,13 +525,13 @@ nutritionist_layout_start(
 	var apiBase = '<?php echo app_url("/api/admin/local_areas.php"); ?>';
 
 	function loadAreas(barangayId, selectedId) {
-		areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+		areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
 		if (!barangayId || barangayId <= 0) return;
 		areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
 		fetch(apiBase + '?barangay_id=' + barangayId)
 			.then(function(r) { return r.json(); })
 			.then(function(res) {
-				areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+				areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
 				if (!res.success || !res.data || res.data.length === 0) {
 					areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
 					return;
@@ -546,7 +548,7 @@ nutritionist_layout_start(
 				});
 			})
 			.catch(function() {
-				areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+				areaSelect.innerHTML = '<option value="">-- Select local area --</option><option value="" disabled>Failed to load</option>';
 			});
 	}
 

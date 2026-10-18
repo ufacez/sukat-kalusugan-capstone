@@ -170,6 +170,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
     $pEmail = trim((string)($_POST['email'] ?? ''));
     $pPhone = trim((string)($_POST['phone'] ?? ''));
     $pAddress = trim((string)($_POST['address'] ?? ''));
+    $pHouseNo = trim((string)($_POST['house_no'] ?? ''));
     $pParentType = trim((string)($_POST['parent_type'] ?? 'Guardian'));
     $pPassword = (string)($_POST['password'] ?? '');
     $pPasswordConfirm = (string)($_POST['password_confirm'] ?? '');
@@ -180,6 +181,21 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             admin_redirect($backUrl, ['notice' => 'Your account is not assigned to a barangay. Contact your administrator before adding families.', 'type' => 'error']);
         }
         $pBarangayId = (int)$userBarangayId;
+        if ($pHouseNo === '') {
+            admin_redirect($backUrl, ['notice' => 'Ilagay ang house number o street.', 'type' => 'error']);
+        }
+
+        $assignedBarangay = admin_fetch_one(
+            'SELECT name FROM barangays WHERE id = ? LIMIT 1',
+            'i',
+            [$pBarangayId]
+        );
+        if ($assignedBarangay === null || trim((string)($assignedBarangay['name'] ?? '')) === '') {
+            admin_redirect($backUrl, ['notice' => 'Hindi makita ang barangay ng account mo. Contact your administrator.', 'type' => 'error']);
+        }
+
+        $pAddress = $pHouseNo . ', Brgy. ' . trim((string)$assignedBarangay['name'])
+            . ', City of San Fernando, Pampanga';
     } else {
         $barangayRaw = trim((string)($_POST['barangay_id'] ?? ''));
         $pBarangayId = $barangayRaw !== '' ? (int)$barangayRaw : null;
@@ -242,7 +258,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             [$pLocalAreaId, $pBarangayId]
         );
         if (!$areaCheck) {
-            admin_redirect($backUrl, ['notice' => 'Selected Local Area is inactive or does not belong to the assigned Barangay.', 'type' => 'error']);
+            admin_redirect($backUrl, ['notice' => 'The selected local area is inactive or does not belong to the assigned barangay.', 'type' => 'error']);
         }
     } else {
         // Required — unless the barangay has no registered local areas yet,
@@ -256,6 +272,24 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
             admin_redirect($backUrl, ['notice' => 'Pumili ng local area / purok.', 'type' => 'error']);
         }
         $pLocalAreaId = null;
+    }
+
+    if (!$isAdmin) {
+        $addressParts = [$pHouseNo];
+        if ($pLocalAreaId !== null) {
+            $areaRow = admin_fetch_one(
+                'SELECT area_name FROM local_areas WHERE id = ? LIMIT 1',
+                'i',
+                [$pLocalAreaId]
+            );
+            if ($areaRow !== null && trim((string)($areaRow['area_name'] ?? '')) !== '') {
+                $addressParts[] = trim((string)$areaRow['area_name']);
+            }
+        }
+        $addressParts[] = 'Brgy. ' . trim((string)$assignedBarangay['name']);
+        $addressParts[] = 'City of San Fernando';
+        $addressParts[] = 'Pampanga';
+        $pAddress = implode(', ', $addressParts);
     }
 
     // Household must belong to the parent barangay (silent null like parent_form).
@@ -501,9 +535,10 @@ nutritionist_layout_start(
 .ff-child-remove{border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-danger,#dc2626);border-radius:7px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer;flex-shrink:0}
 .ff-child-body{padding:14px;display:flex;flex-direction:column;gap:12px}
 .ff-child-body .admin-field-row{flex-wrap:wrap}
+.ff-child-body .admin-field-row.ff-child-name-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr);gap:12px}
 .ff-child .ff-details{margin:4px 14px 12px}
 .ff-child-body .admin-field{min-width:0}
-@media(max-width:560px){.ff-child-body .admin-field-row{flex-direction:column}}
+@media(max-width:560px){.ff-child-body .admin-field-row{flex-direction:column}.ff-child-body .admin-field-row.ff-child-name-row{display:flex}}
 .ff-add-child{width:100%;border:1px dashed var(--admin-border);border-radius:10px;background:transparent;color:var(--admin-primary);font-weight:700;font-size:13px;padding:12px;cursor:pointer}
 .ff-add-child:hover{border-color:var(--admin-primary);background:var(--admin-surface-alt)}
 .ff-add-child:disabled{opacity:.45;cursor:not-allowed}
@@ -546,6 +581,14 @@ nutritionist_layout_start(
 .pw-tools .admin-btn-secondary{padding:6px 12px;font-size:12px}
 .ff-col .admin-address-picker{grid-template-columns:minmax(0,1fr)}
 .ff-col input:not([type="checkbox"]):not([type="radio"]),.ff-col select,.ff-col textarea,.ff-child input:not([type="checkbox"]):not([type="radio"]),.ff-child select,.ff-add-child,.parent-picker-btn{border-radius:12px}
+.ff-address-card{margin:18px 0 16px;padding:16px;border:1px solid var(--admin-border);border-radius:12px;background:var(--admin-surface-alt);box-shadow:0 4px 14px rgba(11,110,79,.05)}
+.ff-address-card-title{display:flex;align-items:center;gap:8px;margin:0 0 12px;font-size:17px;font-weight:800;color:var(--admin-text)}
+.ff-address-card-sub{margin:0 0 14px;font-size:11px;color:var(--admin-muted)}
+.ff-address-card .admin-address-picker{margin-top:12px}
+.ff-address-card textarea{min-height:72px}
+.ff-address-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+.ff-col .admin-field-message{font-size:10px;line-height:1.15;min-height:.8em}
+@media(max-width:560px){.ff-address-fields{grid-template-columns:minmax(0,1fr)}}
 .pw-wrap{position:relative;display:block}
 .pw-wrap input{width:100%;padding-right:42px;box-sizing:border-box}
 .pw-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--admin-muted);padding:6px;display:flex;align-items:center;justify-content:center;border-radius:8px}
@@ -601,7 +644,7 @@ nutritionist_layout_start(
             <p class="ff-col-sub">Guardian account. Children inherit the details below.</p>
 
         <div class="admin-field-wide">
-            <div class="admin-field-row">
+                <div class="admin-field-row ff-child-name-row">
                 <label class="admin-field">
                     <span>First name<span class="admin-required">*</span></span>
                     <input id="ff_p_first" name="first_name" required maxlength="60" data-validate="name" data-label="Parent first name" placeholder="Juan" autocomplete="off">
@@ -652,12 +695,27 @@ nutritionist_layout_start(
         </label>
         <?php endif; ?>
 
-        <label class="admin-field">
-            <span>Local area / Purok<span class="admin-required">*</span></span>
-            <select name="local_area_id" id="ff-local-area-select" required data-scoped-barangay="<?php echo (int)$scopedBarangayId; ?>">
-                <option value="">-- Select Local Area --</option>
-            </select>
-        </label>
+        <div class="admin-field-wide ff-address-card">
+            <div class="ff-address-fields">
+                <label class="admin-field">
+                    <span>House no. / street<span class="admin-required">*</span></span>
+                    <input id="ff-house-no" data-psgc="street" name="house_no" required maxlength="255" placeholder="143" autocomplete="address-line1">
+                </label>
+                <label class="admin-field">
+                    <span>Local area / Purok<span class="admin-required">*</span></span>
+                    <select name="local_area_id" id="ff-local-area-select" required data-scoped-barangay="<?php echo (int)$scopedBarangayId; ?>">
+                        <option value="">-- Select local area --</option>
+                    </select>
+                </label>
+            </div>
+            <div class="admin-address-preview" role="status" aria-live="polite">
+                <?php echo admin_sidebar_icon('barangays'); ?>
+                <div>
+                    <span class="admin-address-preview-label">Full address</span>
+                    <input id="ff_address" name="address" type="text" readonly placeholder="Your complete address will appear here.">
+                </div>
+            </div>
+        </div>
 
         <details class="ff-details admin-field-wide">
             <summary><span class="ff-ico"><?php echo admin_sidebar_icon('key'); ?></span> Optional parent details</summary>
@@ -714,8 +772,7 @@ nutritionist_layout_start(
                     </div>
                 </div>
                 <div class="admin-field-wide">
-                    <span style="font-size:0.88rem;font-weight:700;color:var(--admin-text);">Home address</span>
-                    <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="ff_address">
+                    <div class="admin-address-picker" data-psgc-picker data-psgc-address-target="ff_address" data-psgc-street-target="ff-house-no" data-psgc-area-target="ff-local-area-select"<?php echo $isScopedUser ? ' data-psgc-locked-barangay="' . nutritionist_e($lockedBarangayName) . '"' : ''; ?>>
                         <label class="admin-field">
                             <span>Province</span>
                             <select data-psgc="province"><option value="">Loading provinces…</option></select>
@@ -729,16 +786,9 @@ nutritionist_layout_start(
                             <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
                         </label>
                     </div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>House no. / street</span>
-                        <input data-psgc="street" placeholder="143 Purok 6" autocomplete="off">
-                    </label>
                     <div class="admin-address-status" data-psgc-status></div>
-                    <label class="admin-field" style="margin-top:10px;">
-                        <span>Full address</span>
-                        <textarea id="ff_address" name="address" readonly></textarea>
-                    </label>
                 </div>
+
             </div>
         </details>
         </div>
@@ -794,12 +844,12 @@ nutritionist_layout_start(
                 <input name="children[__IDX__][middle_name]" maxlength="60" data-validate="name" data-label="Child middle name" placeholder="Santos" autocomplete="off" data-c="middle">
                 <span class="admin-field-message"></span>
             </label>
-            </div>
             <label class="admin-field">
                 <span>Surname<span class="admin-required">*</span></span>
                 <input name="children[__IDX__][last_name]" required maxlength="60" data-validate="name" data-label="Child surname" placeholder="Dela Cruz" autocomplete="off" data-c="last">
                 <span class="admin-field-message"></span>
             </label>
+            </div>
             <div class="admin-field-row">
             <label class="admin-field">
                 <span>Birthdate<span class="admin-required">*</span></span>
@@ -937,13 +987,13 @@ nutritionist_layout_start(
 
     function loadAreas(barangayId) {
         if (!areaSelect) return;
-        areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+        areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
         if (!barangayId || barangayId <= 0) return;
         areaSelect.innerHTML += '<option value="" disabled>Loading...</option>';
         fetch(areaApi + '?barangay_id=' + barangayId)
             .then(function(r) { return r.json(); })
             .then(function(res) {
-                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option>';
+                areaSelect.innerHTML = '<option value="">-- Select local area --</option>';
                 if (!res.success || !res.data || res.data.length === 0) {
                     areaSelect.innerHTML += '<option value="" disabled>No local areas registered</option>';
                     return;
@@ -952,12 +1002,13 @@ nutritionist_layout_start(
                     if (parseInt(area.is_active, 10) !== 1) return;
                     var opt = document.createElement('option');
                     opt.value = area.id;
-                    opt.textContent = area.area_type.charAt(0).toUpperCase() + area.area_type.slice(1) + ': ' + area.area_name;
+                    opt.textContent = area.area_name;
+                    opt.dataset.name = area.area_name;
                     areaSelect.appendChild(opt);
                 });
             })
             .catch(function() {
-                areaSelect.innerHTML = '<option value="">-- Select Local Area --</option><option value="" disabled>Failed to load</option>';
+                areaSelect.innerHTML = '<option value="">-- Select local area --</option><option value="" disabled>Failed to load</option>';
             });
     }
     if (barangaySelect) {

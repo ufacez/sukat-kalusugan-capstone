@@ -444,12 +444,21 @@
     const provinceSelect = root.querySelector('[data-psgc="province"]');
     const citySelect = root.querySelector('[data-psgc="city"]');
     const barangaySelect = root.querySelector('[data-psgc="barangay"]');
+    const lockedBarangayName = (root.getAttribute("data-psgc-locked-barangay") || "").trim();
     // The street input, purok select and status message sit around the select
     // grid (the picker root is itself a CSS grid), so look in the surrounding
     // field wrapper instead of only inside root.
+    const form = root.closest("form");
     const scope = root.closest(".admin-field-wide") || root.parentElement || root;
-    const streetInput = scope.querySelector('[data-psgc="street"]');
-    const areaSelect = scope.querySelector('[data-psgc="area"]');
+    const streetTargetId = root.getAttribute("data-psgc-street-target");
+    const areaTargetId = root.getAttribute("data-psgc-area-target");
+    const streetInput = (streetTargetId ? document.getElementById(streetTargetId) : null)
+      || scope.querySelector('[data-psgc="street"]')
+      || (form ? form.querySelector('[data-psgc="street"]') : null)
+      || (form ? form.querySelector('input[name="house_no"]') : null);
+    const areaSelect = (areaTargetId ? document.getElementById(areaTargetId) : null)
+      || scope.querySelector('[data-psgc="area"]')
+      || (form ? form.querySelector("#ff-local-area-select") : null);
     const targetId = root.getAttribute("data-psgc-address-target");
     const target = targetId ? document.getElementById(targetId) : null;
     const status = scope.querySelector("[data-psgc-status]");
@@ -465,7 +474,8 @@
     }
 
     function selectedName(select) {
-      return select ? select.selectedOptions[0]?.dataset.name || "" : "";
+      if (!select || !select.selectedOptions[0] || select.value === "") return "";
+      return select.selectedOptions[0].dataset.name || select.selectedOptions[0].textContent.trim() || "";
     }
 
     function rebuildAddress() {
@@ -621,8 +631,22 @@
       .then((data) => {
         const barangays = (data.barangays || []).map((name) => ({ code: name, name }));
         fillSelect(barangaySelect, barangays, "-- Select barangay --");
-        barangaySelect.disabled = false;
+        if (lockedBarangayName !== "") {
+          const lockedOption = Array.from(barangaySelect.options).find(
+            (option) => (option.dataset.name || option.value).toLowerCase() === lockedBarangayName.toLowerCase()
+          );
+
+          if (!lockedOption) {
+            throw new Error("Assigned barangay is missing from the CSFP barangay list");
+          }
+
+          barangaySelect.value = lockedOption.value;
+          barangaySelect.disabled = true;
+        } else {
+          barangaySelect.disabled = false;
+        }
         hydrateFromStoredAddress();
+        rebuildAddress();
         setStatus("");
         // Lets host pages (e.g. the account settings save-bar baseline)
         // react once the picker has finished populating + hydrating.

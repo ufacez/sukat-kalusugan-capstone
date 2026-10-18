@@ -1727,6 +1727,57 @@
   color: var(--admin-danger);
 }
 
+.admin-address-preview {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+}
+
+.admin-address-preview > svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+  color: var(--admin-primary);
+}
+
+.admin-address-preview > div {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.admin-address-preview-label {
+  display: block;
+  margin-bottom: 1px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.1;
+}
+
+.admin-address-preview input,
+.admin-address-preview textarea {
+  width: 100%;
+  min-height: 0;
+  height: 1.35em;
+  padding: 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.admin-address-preview input {
+  display: block;
+}
+
 .admin-toolbar {
   display: flex;
   gap: 10px;

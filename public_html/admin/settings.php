@@ -151,6 +151,6 @@ $settingsLastLoginText = $lastLoginText;
 $settingsEscaper = 'admin_e';
 $settingsShowUsername = true;
 
-admin_layout_start('Account settings', 'Manage your profile, contact details, and password.', 'settings');
+admin_layout_start('Settings', 'Manage your account details.', 'settings');
 require __DIR__ . '/../includes/account_settings_view.php';
 admin_layout_end();

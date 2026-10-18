@@ -128,7 +128,10 @@ $avatarColor    = admin_avatar_color($fullName !== '' ? $fullName : ($actor['ema
 $avatarInitials = $fullName !== '' ? admin_initials($fullName) : strtoupper(substr((string)($actor['email'] ?? 'U'), 0, 1));
 $storedAddress  = (string)($myAccount['address'] ?? '');
 $lastLoginRaw = (string)($myAccount['last_login'] ?? '');
-$lastLoginText = $lastLoginRaw !== '' ? date('D, g:i A', strtotime($lastLoginRaw)) : 'Today';
+$lastLoginTimestamp = $lastLoginRaw !== '' ? strtotime($lastLoginRaw) : false;
+$lastLoginText = $lastLoginTimestamp !== false
+    ? date('M j, Y \a\t g:i A', $lastLoginTimestamp)
+    : 'Not yet signed in';
 
 $settingsProfile = $myAccount;
 $settingsRoleLabel = 'Nutritionist';
