@@ -25,6 +25,7 @@ if ($editId > 0) {
 
 $staff = admin_fetch_all(
     'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay,
+            u.user_code,
             u.status, u.access_level, u.last_login, u.created_at, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
@@ -64,6 +65,7 @@ if ($canViewParents) {
             p.name,
             p.email,
             p.phone,
+            p.parent_code,
             p.barangay_id,
             b.name AS barangay,
             la.area_name AS local_area,
@@ -75,7 +77,7 @@ if ($canViewParents) {
          LEFT JOIN local_areas la ON la.id = p.local_area_id
          LEFT JOIN children c ON c.parent_id = p.id AND c.status = 'active'
          WHERE p.status = 'active'
-         GROUP BY p.id, p.name, p.email, p.phone, p.barangay_id, b.name, la.area_name, p.status, p.created_at
+         GROUP BY p.id, p.name, p.email, p.phone, p.parent_code, p.barangay_id, b.name, la.area_name, p.status, p.created_at
          ORDER BY p.id DESC"
     );
 
@@ -183,6 +185,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
         <table class="admin-table" id="users-table">
             <thead>
                 <tr>
+                    <th>Code</th>
                     <th>Name</th>
                     <th>Role</th>
                     <th>Access</th>
@@ -199,7 +202,8 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                     $roleName = (string)($user['role_name'] ?? '');
                     $roleLabel = $roleName === 'admin' ? 'Admin' : 'Nutritionist';
                     ?>
-                    <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-role="<?php echo admin_e($roleName); ?>" data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $roleLabel . ' ' . $al . ' ' . (string)($user['barangay'] ?? ''))); ?>">
+                    <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-role="<?php echo admin_e($roleName); ?>" data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . ($user['user_code'] ?? '') . ' ' . $roleLabel . ' ' . $al . ' ' . (string)($user['barangay'] ?? ''))); ?>">
+                        <td style="font-family:monospace;"><?php echo admin_e((string)($user['user_code'] ?? '')); ?></td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:<?php echo admin_avatar_color($user['name']); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($user['name']); ?></span>
@@ -252,7 +256,8 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
                 <?php endforeach; ?>
                 <?php foreach ($parents as $parentIndex => $parent): ?>
                     <?php $kidCount = (int)$parent['children_count']; ?>
-                    <tr<?php echo admin_paged_row_attr($parentIndex + count($staff), 10); ?> data-role="parent" data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' parent ' . (string)($parent['barangay'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
+                    <tr<?php echo admin_paged_row_attr($parentIndex + count($staff), 10); ?> data-role="parent" data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'] . ' ' . ($parent['parent_code'] ?? '') . ' parent ' . (string)($parent['barangay'] ?? '') . ' ' . (string)($parent['phone'] ?? ''))); ?>">
+                        <td style="font-family:monospace;"><?php echo admin_e((string)($parent['parent_code'] ?? '')); ?></td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>

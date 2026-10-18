@@ -74,6 +74,7 @@ $rows = admin_fetch_all(
     'SELECT a.created_at, a.action, a.level, a.description, a.ip_address,
             COALESCE(u.email, p.email, "System") AS actor,
             COALESCE(u.name, p.name, "System") AS actor_name,
+            COALESCE(u.user_code, p.parent_code) AS actor_code,
             COALESCE(a.user_type, r.name, "system") AS resolved_type
      ' . $auditJoins . '
      WHERE 1=1 ' . $filterWhere . '
@@ -81,17 +82,18 @@ $rows = admin_fetch_all(
      LIMIT 5000'
 );
 
-$header = ['Time', 'Actor name', 'Actor email', 'Role', 'Action', 'Level', 'Description', 'IP address'];
+$header = ['Time', 'User', 'User ID', 'Email', 'Role', 'Action', 'Level', 'Description', 'IP address'];
 $dataRows = [];
 foreach ($rows as $row) {
     $dataRows[] = [
         (string)($row['created_at'] ?? ''),
         (string)($row['actor_name'] ?? ''),
+        (string)($row['actor_code'] ?? ''),
         (string)($row['actor'] ?? ''),
         (string)($row['resolved_type'] ?? ''),
         (string)($row['action'] ?? ''),
         (string)($row['level'] ?? ''),
-        (string)($row['description'] ?? ''),
+        (string)sk_audit_description_codes($row['description'] ?? ''),
         (string)($row['ip_address'] ?? ''),
     ];
 }
@@ -149,21 +151,24 @@ if ($format === 'pdf') {
     $pdf->Cell(0, 5, ($filterBits !== [] ? implode('  |  ', $filterBits) . '  |  ' : '') . 'Generated: ' . date('F j, Y g:i A') . '  |  ' . count($dataRows) . ' row(s)', 0, 1, 'C');
     $pdf->Ln(3);
     // A4 landscape usable width is 273mm after the base 12mm margins.
-    $cols = ['Time', 'Actor', 'Role', 'Action', 'Level', 'Description', 'IP'];
-    $widths = [27, 38, 20, 36, 15, 112, 25];
+    // Mirrors the CSV/XLSX header exactly so nothing appears "missing".
+    $cols = ['Time', 'User', 'User ID', 'Email', 'Role', 'Action', 'Level', 'Description', 'IP'];
+    $widths = [22, 30, 18, 40, 18, 28, 13, 79, 25];
     pdf_table_header($pdf, $cols, $widths, '106E4F', 6);
     $pdf->SetFont('helvetica', '', 6);
     $pdfRows = array_slice($dataRows, 0, 1000);
     foreach ($pdfRows as $ri => $pdfRow) {
         $pdf->SetFillColor($ri % 2 === 0 ? 240 : 255, $ri % 2 === 0 ? 248 : 255, $ri % 2 === 0 ? 244 : 255);
         $cells = [
-            (string)($pdfRow[0] ?? ''),
-            mb_strimwidth((string)($pdfRow[1] ?? ''), 0, 26, '…'),
-            (string)($pdfRow[3] ?? ''),
-            mb_strimwidth((string)($pdfRow[4] ?? ''), 0, 26, '…'),
-            strtoupper((string)($pdfRow[5] ?? '')),
-            mb_strimwidth((string)($pdfRow[6] ?? ''), 0, 150, '…'),
-            (string)($pdfRow[7] ?? ''),
+            mb_strimwidth((string)($pdfRow[0] ?? ''), 0, 19, '…'),
+            mb_strimwidth((string)($pdfRow[1] ?? ''), 0, 24, '…'),
+            (string)($pdfRow[2] ?? ''),
+            mb_strimwidth((string)($pdfRow[3] ?? ''), 0, 32, '…'),
+            (string)($pdfRow[4] ?? ''),
+            mb_strimwidth((string)($pdfRow[5] ?? ''), 0, 24, '…'),
+            strtoupper((string)($pdfRow[6] ?? '')),
+            mb_strimwidth((string)($pdfRow[7] ?? ''), 0, 65, '…'),
+            (string)($pdfRow[8] ?? ''),
         ];
         foreach ($cells as $ci => $cell) {
             $pdf->Cell($widths[$ci], 6, $cell, 1, 0, 'L', true);

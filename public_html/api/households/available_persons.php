@@ -118,7 +118,7 @@ if ($type === 'children') {
 }
 
 $rows = admin_fetch_all(
-    "SELECT id, name, email, phone, parent_type
+    "SELECT id, name, email, parent_code, phone, parent_type
        FROM parents
       WHERE barangay_id = ?
         AND status = 'active'
@@ -133,6 +133,7 @@ $list = array_map(static function ($r) {
         'id' => (int)$r['id'],
         'name' => $r['name'] ?? '',
         'email' => $r['email'] ?? '',
+        'parent_code' => $r['parent_code'] ?? '',
         'phone' => $r['phone'] ?? '',
         'parent_type' => $r['parent_type'] ?? '',
     ];

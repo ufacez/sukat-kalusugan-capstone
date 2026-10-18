@@ -1075,6 +1075,22 @@
   margin-right: 8px;
 }
 
+/* Human-readable display ID (ADM-0001 / NUT-0001 / PAR-0001 / CHD-0001). */
+.sk-code {
+  display: inline-block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--admin-muted);
+  background: var(--admin-surface-alt);
+  border: 1px solid var(--admin-border);
+  border-radius: 5px;
+  padding: 1px 6px;
+}
+
 .admin-table-wrap {
   overflow: auto;
   border: 1px solid var(--admin-border);

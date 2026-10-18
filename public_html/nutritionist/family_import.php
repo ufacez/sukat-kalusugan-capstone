@@ -23,6 +23,7 @@ require_once __DIR__ . '/../includes/nutritionist_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
 require_once __DIR__ . '/../includes/xlsx_lite.php';
 require_once __DIR__ . '/../includes/export_preview.php';
+require_once __DIR__ . '/../includes/display_ids.php';
 
 const ML_IMPORT_DEFAULT_PASSWORD = 'PalitanMo@123';
 const ML_IMPORT_MAX_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -733,17 +734,18 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST' && (($_POST['action'] ?? '') =
                 $pType = 'Guardian';
                 $pStatus = 'active';
                 $one = 1;
+                $pCode = sk_next_display_code('PAR');
                 $insParent = mysqli_prepare(
                     $conn,
-                    "INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status, needs_completion, must_change_password)
-                     VALUES (?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, ?, ?, ?)"
+                    "INSERT INTO parents (parent_code, name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status, needs_completion, must_change_password)
+                     VALUES (?, ?, ?, ?, ?, NULL, NULL, ?, NULL, NULL, ?, ?, ?)"
                 );
                 if ($insParent === false) {
                     throw new RuntimeException('Hindi ma-save ang parent (' . $mName . ').');
                 }
                 // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
                 $mNameEnc = (string)sk_encrypt_value($mName);
-                mysqli_stmt_bind_param($insParent, 'ssssisii', $mNameEnc, $email, $hash, $pType, $barangayId, $pStatus, $one, $one);
+                mysqli_stmt_bind_param($insParent, 'sssssisii', $pCode, $mNameEnc, $email, $hash, $pType, $barangayId, $pStatus, $one, $one);
                 if (!mysqli_stmt_execute($insParent)) {
                     mysqli_stmt_close($insParent);
                     throw new RuntimeException('Hindi ma-save ang parent (' . $mName . ').');

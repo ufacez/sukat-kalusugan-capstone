@@ -8,6 +8,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/admin_helpers.php';
 require_once __DIR__ . '/../../includes/audit_logger.php';
+require_once __DIR__ . '/../../includes/display_ids.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
@@ -204,8 +205,8 @@ $address = $decryptedAddress !== '' ? (string)sk_encrypt_value($decryptedAddress
 
 $inviteStmt = mysqli_prepare(
     $conn,
-    "INSERT INTO users (name, email, username, password_hash, role_id, barangay_id, phone, address, status, access_level)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 'full')"
+    "INSERT INTO users (user_code, name, email, username, password_hash, role_id, barangay_id, phone, address, status, access_level)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', 'full')"
 );
 
 if ($inviteStmt === false) {
@@ -214,11 +215,17 @@ if ($inviteStmt === false) {
     exit;
 }
 
-mysqli_stmt_bind_param($inviteStmt, 'sssssiss', $displayName, $email, $username, $passwordHash, $roleId, $barangayId, $phone, $address);
+// Allocate the staff display code in the same transaction as the account
+// creation + invitation consumption.
+mysqli_begin_transaction($conn);
+$userCode = sk_next_staff_code($roleId);
+
+mysqli_stmt_bind_param($inviteStmt, 'sssssiiss', $userCode, $displayName, $email, $username, $passwordHash, $roleId, $barangayId, $phone, $address);
 $created = mysqli_stmt_execute($inviteStmt);
 
 if (!$created) {
     mysqli_stmt_close($inviteStmt);
+    mysqli_rollback($conn);
     http_response_code(500);
     echo json_encode(['success' => false, 'message' => 'Could not create account. Please try again.']);
     exit;
@@ -228,10 +235,11 @@ $newUserId = (int)mysqli_insert_id($conn);
 mysqli_stmt_close($inviteStmt);
 
 admin_execute("UPDATE invitations SET status = 'used', used_at = NOW() WHERE id = ?", 'i', [$invitation['id']]);
+mysqli_commit($conn);
 
 log_action($newUserId, 'ACCOUNT_ACTIVATED', 'info', sprintf(
     // Privacy: role only — never the name/email.
-    'Staff account activated via invitation code — role: %s',
+    'Staff account activated via invitation code (' . $userCode . ') — role: %s',
     $invitation['role']
 ));
 

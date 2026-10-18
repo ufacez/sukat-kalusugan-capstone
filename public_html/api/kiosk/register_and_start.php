@@ -6,6 +6,7 @@ require_once __DIR__ . '/../../includes/db.php';
 require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/measurement_sessions.php';
+require_once __DIR__ . '/../../includes/display_ids.php';
 
 api_require_method(['POST']);
 
@@ -69,15 +70,16 @@ try {
         if (is_array($parentRow)) {
             $parentId = (int)$parentRow['id'];
         } else {
+            $parentCode = sk_next_display_code('PAR');
             $insParent = mysqli_prepare($conn,
-                'INSERT INTO parents (name, email, password_hash, parent_type, barangay_id, status, created_at, updated_at)
-                 VALUES (?, ?, ?, \'Guardian\', ?, \'active\', NOW(), NOW())'
+                'INSERT INTO parents (parent_code, name, email, password_hash, parent_type, barangay_id, status, created_at, updated_at)
+                 VALUES (?, ?, ?, ?, \'Guardian\', ?, \'active\', NOW(), NOW())'
             );
             if ($insParent === false) throw new RuntimeException('Unable to create walk-in parent.');
             $dummyHash = password_hash('kiosk_walkin_' . time(), PASSWORD_DEFAULT);
             // AES-256-GCM at-rest PII (passthrough while APP_ENCRYPTION_KEY is unset).
             $kioskParentNameEnc = (string)sk_encrypt_value($kioskParentName);
-            mysqli_stmt_bind_param($insParent, 'sssi', $kioskParentNameEnc, $kioskParentEmail, $dummyHash, $barangayId);
+            mysqli_stmt_bind_param($insParent, 'ssssi', $parentCode, $kioskParentNameEnc, $kioskParentEmail, $dummyHash, $barangayId);
             if (!mysqli_stmt_execute($insParent)) {
                 $err = mysqli_stmt_error($insParent);
                 mysqli_stmt_close($insParent);

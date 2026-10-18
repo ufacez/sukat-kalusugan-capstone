@@ -354,7 +354,7 @@ function nutritionist_layout_start(string $title, string $subtitle, string $acti
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
     echo '<span class="admin-topbar-name">' . nutritionist_e($userName) . '</span>';
-    echo '<span class="admin-topbar-role">' . nutritionist_e(ucfirst($userRole)) . '</span>';
+            echo '<span class="admin-topbar-role">' . nutritionist_e(ucfirst($userRole)) . '</span>';
     echo '</div>';
     echo '</div>';
     echo '</div>';

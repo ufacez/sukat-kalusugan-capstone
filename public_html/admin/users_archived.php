@@ -8,7 +8,7 @@ admin_require_access('users.delete');
 $deleteId = (int)($_GET['delete'] ?? 0);
 
 $users = admin_fetch_all(
-    'SELECT u.id, u.name, u.email, u.username, u.phone, b.name AS barangay, u.status, r.name AS role_name
+    'SELECT u.id, u.name, u.email, u.username, u.user_code, u.phone, b.name AS barangay, u.status, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
      LEFT JOIN barangays b ON b.id = u.barangay_id
@@ -63,6 +63,7 @@ $deleteTarget = admin_fetch_one('SELECT id, name, email FROM users WHERE id = ? 
         <table class="admin-table" id="archived-users-table">
             <thead>
                 <tr>
+                    <th>Code</th>
                     <th>Role</th>
                     <th>Name</th>
                     <th>Username</th>
@@ -73,10 +74,11 @@ $deleteTarget = admin_fetch_one('SELECT id, name, email FROM users WHERE id = ? 
             </thead>
             <tbody>
                 <?php if ($users === []): ?>
-                    <tr><td colspan="6" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived users.</td></tr>
+                    <tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived users.</td></tr>
                 <?php else: ?>
                     <?php foreach ($users as $userIndex => $user): ?>
-                        <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . $user['email'] . ' ' . $user['username'])); ?>">
+                        <tr<?php echo admin_paged_row_attr($userIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($user['name'] . ' ' . ($user['user_code'] ?? '') . ' ' . $user['email'] . ' ' . $user['username'])); ?>">
+                            <td style="font-family:monospace;"><?php echo admin_e((string)($user['user_code'] ?? '')); ?></td>
                             <td><span class="admin-pill <?php echo $user['role_name'] === 'admin' ? 'is-warn' : 'is-success'; ?>"><?php echo admin_e(ucfirst($user['role_name'])); ?></span></td>
                             <td><?php echo admin_e($user['name']); ?></td>
                             <td><?php echo admin_e($user['username'] ?? ''); ?></td>

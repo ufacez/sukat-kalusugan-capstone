@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../includes/nutritionist_helpers.php';
+require_once __DIR__ . '/../includes/display_ids.php';
 
 $user = nutritionist_require_access();
 $parentTypes = ['Father', 'Mother', 'Guardian', 'Grandparent', 'Other'];
@@ -193,16 +194,17 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
 
 	if ($action === 'create') {
 		$hash = password_hash($password, PASSWORD_DEFAULT);
+		$parentCode = sk_next_display_code('PAR');
 		$ok = admin_execute(
-			'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-			'ssssssiiis',
-			[$name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
+			'INSERT INTO parents (parent_code, name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+			'sssssssiiis',
+			[$parentCode, $name, $email, $hash, $parentType, $phone, $address, $barangayId, $localAreaId, $householdId, $status]
 		);
 
 		if ($ok) {
 			$actor = current_user();
 			$newParentId = (int)get_db_connection()->insert_id;
-			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account #' . $newParentId . ' via nutritionist form');
+			log_action($actor['id'] ?? null, 'CREATE_PARENT', 'info', 'Created parent account ' . $parentCode . ' (#' . $newParentId . ') via nutritionist form');
 		}
 
 		admin_redirect('/nutritionist/parents.php', $ok ? ['notice' => 'Parent added.'] : ['notice' => 'Parent could not be added. Check for a duplicate email.', 'type' => 'error']);
@@ -253,7 +255,7 @@ $editingParent = null;
 
 if ($editId > 0) {
 	$editingParent = admin_fetch_one(
-		'SELECT id, name, email, parent_type, phone, address, barangay_id, local_area_id, household_id, status
+			'SELECT id, name, email, parent_code, parent_type, phone, address, barangay_id, local_area_id, household_id, status
 		 FROM parents
 		 WHERE id = ?
 		 LIMIT 1',
@@ -337,7 +339,7 @@ nutritionist_layout_start(
 	<div class="nutritionist-form-head" style="margin-bottom:16px;">
 		<div>
 			<h2 class="admin-section-title" style="margin-bottom:2px;"><?php echo $editingParent ? 'Edit Parent' : 'Add Parent'; ?></h2>
-			<p class="admin-section-subtitle"><?php echo $editingParent ? nutritionist_e((string)$editingParent['name']) : 'Create a new guardian record for linked child accounts.'; ?></p>
+			<p class="admin-section-subtitle"><?php echo $editingParent ? nutritionist_e((string)$editingParent['name']) . ' ' . sk_code_badge((string)($editingParent['parent_code'] ?? '')) : 'Create a new guardian record for linked child accounts.'; ?></p>
 		</div>
 	</div>
 

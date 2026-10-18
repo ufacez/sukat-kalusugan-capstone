@@ -27,7 +27,7 @@ $editingParent = null;
 
 if ($editId > 0) {
     $editingParent = admin_fetch_one(
-        'SELECT id, name, email, parent_type, phone, address, barangay_id, local_area_id, status
+        'SELECT id, name, email, parent_code, parent_type, phone, address, barangay_id, local_area_id, status
          FROM parents WHERE id = ? LIMIT 1',
         'i',
         [$editId]
@@ -54,7 +54,7 @@ admin_layout_start(
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title"><?php echo $editingParent ? 'Edit Parent' : 'Add Parent'; ?></h2>
-            <p class="admin-section-subtitle"><?php echo $editingParent ? admin_e((string)$editingParent['name']) : 'Create a new guardian record.'; ?></p>
+            <p class="admin-section-subtitle"><?php echo $editingParent ? admin_e((string)$editingParent['name']) . ' ' . sk_code_badge((string)($editingParent['parent_code'] ?? '')) : 'Create a new guardian record.'; ?></p>
         </div>
     </div>
 

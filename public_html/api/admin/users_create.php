@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/../../includes/admin_helpers.php';
+require_once __DIR__ . '/../../includes/display_ids.php';
 
 start_secure_session();
 require_permission('users.create');
@@ -79,24 +80,33 @@ if (admin_username_in_use($username)) {
 
 $hash = password_hash($password, PASSWORD_DEFAULT);
 $conn = get_db_connection();
-$stmt = mysqli_prepare($conn, 'INSERT INTO users (name, email, username, password_hash, phone, role_id, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+
+// Allocate the display code inside the same transaction as the insert so a
+// failed create never burns a code (ADM-#### / NUT-####).
+mysqli_begin_transaction($conn);
+$userCode = sk_next_staff_code($roleId);
+
+$stmt = mysqli_prepare($conn, 'INSERT INTO users (user_code, name, email, username, password_hash, phone, role_id, barangay_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
 
 if ($stmt === false) {
+    mysqli_rollback($conn);
     admin_redirect('/admin/user_form.php', ['notice' => 'Unable to create user right now.', 'type' => 'error']);
 }
 
-mysqli_stmt_bind_param($stmt, 'sssssiis', $name, $email, $username, $hash, $phone, $roleId, $barangayId, $status);
+mysqli_stmt_bind_param($stmt, 'ssssssiis', $userCode, $name, $email, $username, $hash, $phone, $roleId, $barangayId, $status);
 
 if (!mysqli_stmt_execute($stmt)) {
     mysqli_stmt_close($stmt);
+    mysqli_rollback($conn);
     admin_redirect('/admin/user_form.php', ['notice' => 'User could not be created. Check for duplicate email or username.', 'type' => 'error']);
 }
 
 mysqli_stmt_close($stmt);
+mysqli_commit($conn);
 
 $actor = current_user();
 $newUserId = (int)$conn->insert_id;
-log_action($actor['id'] ?? null, 'CREATE_USER', 'info', 'Created staff #' . $newUserId . ' as ' . $roleName);
+log_action($actor['id'] ?? null, 'CREATE_USER', 'info', 'Created staff #' . $newUserId . ' (' . $userCode . ') as ' . $roleName);
 
 admin_redirect('/admin/users.php', ['notice' => 'User created successfully.', 'type' => 'success']);
 

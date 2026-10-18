@@ -83,6 +83,7 @@ $logs = admin_fetch_all(
     'SELECT a.id, a.action, a.level, a.description, a.ip_address, a.created_at, a.user_type,
             COALESCE(u.email, p.email, "System") AS actor,
             COALESCE(u.name, p.name, "System") AS actor_name,
+            COALESCE(u.user_code, p.parent_code) AS actor_code,
             COALESCE(a.user_type, r.name, "system") AS resolved_type
      ' . $auditJoins . '
      WHERE 1=1 ' . $filterWhere . '
@@ -506,6 +507,12 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     $dateLine = $dateObj->format('M j Y');
                     $timeLine = $dateObj->format('H:i');
 
+                    // Swap numeric person ids ("Staff login (#4)", "Updated
+                    // parent #607") for their display codes. The description
+                    // already names whoever was touched / logged in, so no
+                    // separate actor-code prefix is shown.
+                    $descText = sk_audit_description_codes($log['description'] ?? '');
+
                     // Human-readable label. The older "INVITATION_*" form is
                     // also recognized so historic rows render nicely until
                     // the audit log is rotated/archived.
@@ -523,7 +530,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                     elseif ($actionLabel === 'PASSWORD_RESET_REQUEST') $actionLabel = 'Request password reset';
                     elseif ($actionLabel === 'PASSWORD_RESET_COMPLETE') $actionLabel = 'Complete password reset';
                     ?>
-                    <tr data-filter-text="<?php echo admin_e(strtolower($log['actor'] . ' ' . $log['actor_name'] . ' ' . $actionLabel . ' ' . ($log['description'] ?? '') . ' ' . $roleLabel)); ?>">
+                    <tr data-filter-text="<?php echo admin_e(strtolower($log['actor'] . ' ' . $log['actor_name'] . ' ' . ($log['actor_code'] ?? '') . ' ' . $actionLabel . ' ' . $descText . ' ' . $roleLabel)); ?>">
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:<?php echo admin_e($avatarColor); ?>;width:32px;height:32px;font-size:0.7rem;"><?php echo admin_e($initials); ?></span>
@@ -544,7 +551,7 @@ admin_layout_start('Audit Logs', 'Track user activity, security events, and syst
                             <div><?php echo admin_e($dateLine); ?></div>
                             <div class="admin-mini"><?php echo admin_e($timeLine); ?></div>
                         </td>
-                        <td style="color:var(--admin-muted);font-size:0.82rem;"><?php echo admin_e($log['description'] ?? ''); ?></td>
+                        <td style="color:var(--admin-muted);font-size:0.82rem;"><?php echo admin_e($descText); ?></td>
                     </tr>
                 <?php endforeach; ?>
             </tbody>

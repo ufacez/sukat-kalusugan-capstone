@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../includes/admin_helpers.php';
 require_once __DIR__ . '/../includes/who_calculator.php';
+require_once __DIR__ . '/../includes/display_ids.php';
 
 const FAMILY_DEFAULT_PASSWORD = 'PalitanMo@123';
 
@@ -288,10 +289,11 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         if ($mode === 'new') {
         $pName = admin_combine_name($pFirst, $pMiddle, $pLast);
         $hash = password_hash($pPassword, PASSWORD_DEFAULT);
+        $pCode = sk_next_display_code('PAR');
 
         $insParent = mysqli_prepare(
             $conn,
-            'INSERT INTO parents (name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
+            'INSERT INTO parents (parent_code, name, email, password_hash, parent_type, phone, address, barangay_id, local_area_id, household_id, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)'
         );
         if ($insParent === false) {
             throw new RuntimeException('Hindi ma-save ang parent record. Subukan muli.');
@@ -301,7 +303,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         $pName = (string)sk_encrypt_value($pName);
         $pPhone = $pPhone !== null && $pPhone !== '' ? (string)sk_encrypt_value($pPhone) : $pPhone;
         $pAddress = $pAddress !== null && $pAddress !== '' ? (string)sk_encrypt_value($pAddress) : $pAddress;
-        mysqli_stmt_bind_param($insParent, 'ssssssiiis', $pName, $pEmail, $hash, $pParentType, $pPhone, $pAddress, $pBarangayId, $pLocalAreaId, $pHouseholdId, $pStatus);
+        mysqli_stmt_bind_param($insParent, 'sssssssiiis', $pCode, $pName, $pEmail, $hash, $pParentType, $pPhone, $pAddress, $pBarangayId, $pLocalAreaId, $pHouseholdId, $pStatus);
         if (!mysqli_stmt_execute($insParent)) {
             mysqli_stmt_close($insParent);
             throw new RuntimeException('Hindi ma-save ang parent. Maaaring duplicate ang email.');
@@ -318,7 +320,7 @@ if (($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
         // so 0 would fail with errno 1452 when no purok is chosen.
         $parentLocalAreaId = ($pLocalAreaId !== null && $pLocalAreaId > 0) ? (int)$pLocalAreaId : null;
         $parentHouseholdId = ($pHouseholdId !== null && $pHouseholdId > 0) ? (int)$pHouseholdId : null;
-        $parentLabel = '#' . $parentId;
+        $parentLabel = $pCode;
         } else {
         // Existing parent: children inherit its barangay / purok / household.
         $existingParentId = (int)($_POST['existing_parent_id'] ?? 0);

@@ -144,7 +144,7 @@ foreach ($children as $c) {
 }
 
 $parents = admin_fetch_all(
-    'SELECT p.id, p.name, p.email, p.phone, p.parent_type, p.address
+    'SELECT p.id, p.name, p.email, p.parent_code, p.phone, p.parent_type, p.address
        FROM parents p
       WHERE p.household_id = ? AND p.status = "active"
       ORDER BY p.name',
@@ -158,6 +158,7 @@ foreach ($parents as $p) {
         'id' => (int)$p['id'],
         'name' => $p['name'] ?? '',
         'email' => $p['email'] ?? '',
+        'parent_code' => $p['parent_code'] ?? '',
         'phone' => $p['phone'] ?? '',
         'parent_type' => $p['parent_type'] ?? '',
         'address' => $p['address'] ?? '',

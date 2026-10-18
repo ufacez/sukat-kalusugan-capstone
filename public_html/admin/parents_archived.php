@@ -12,6 +12,7 @@ $parents = admin_fetch_all(
         p.id,
         p.name,
         p.email,
+        p.parent_code,
         p.parent_type,
         p.phone,
         p.barangay_id,
@@ -24,7 +25,7 @@ $parents = admin_fetch_all(
      LEFT JOIN local_areas la ON la.id = p.local_area_id
      LEFT JOIN children c ON c.parent_id = p.id
      WHERE p.status = 'inactive'
-     GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.barangay_id, b.name, la.area_name, p.status
+     GROUP BY p.id, p.name, p.email, p.parent_code, p.parent_type, p.phone, p.barangay_id, b.name, la.area_name, p.status
      ORDER BY p.id DESC"
 );
 
@@ -48,6 +49,7 @@ admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'use
         <table class="admin-table" id="archived-parents-table">
             <thead>
                 <tr>
+                    <th>Code</th>
                     <th>Name</th>
                     <th>Type</th>
                     <th>Email</th>
@@ -59,10 +61,11 @@ admin_layout_start('Archived Parents', 'Restore archived parent accounts.', 'use
             </thead>
             <tbody>
                 <?php if ($parents === []): ?>
-                    <tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived parents.</td></tr>
+                    <tr><td colspan="8" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived parents.</td></tr>
                 <?php else: ?>
                     <?php foreach ($parents as $parentIndex => $parent): ?>
-                        <tr<?php echo admin_paged_row_attr($parentIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . $parent['email'])); ?>">
+                        <tr<?php echo admin_paged_row_attr($parentIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($parent['name'] . ' ' . ($parent['parent_code'] ?? '') . ' ' . $parent['email'])); ?>">
+                            <td style="font-family:monospace;"><?php echo admin_e((string)($parent['parent_code'] ?? '')); ?></td>
                             <td>
                                 <div style="display:flex;align-items:center;gap:10px;">
                                     <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($parent['name']); ?></span>

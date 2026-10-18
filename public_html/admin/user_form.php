@@ -16,7 +16,7 @@ $roles = admin_fetch_all('SELECT name FROM roles ORDER BY name ASC');
 $barangays = admin_barangay_options();
 
 $editingUser = admin_fetch_one(
-    'SELECT u.id, u.name, u.email, u.username, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
+    'SELECT u.id, u.name, u.email, u.username, u.user_code, u.phone, u.barangay_id, b.name AS barangay, u.status, r.name AS role_name
      FROM users u
      INNER JOIN roles r ON r.id = u.role_id
      LEFT JOIN barangays b ON b.id = u.barangay_id
@@ -77,7 +77,7 @@ admin_layout_start(
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">Edit User</h2>
-            <p class="admin-section-subtitle"><?php echo admin_e((string)$editingUser['name']); ?> · <?php echo admin_e(ucfirst((string)$editingUser['role_name'])); ?></p>
+            <p class="admin-section-subtitle"><?php echo admin_e((string)$editingUser['name']); ?> · <?php echo admin_e(ucfirst((string)$editingUser['role_name'])); ?> <?php echo sk_code_badge((string)($editingUser['user_code'] ?? '')); ?></p>
         </div>
     </div>
 

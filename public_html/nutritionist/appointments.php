@@ -120,7 +120,7 @@ $baseSelect = "SELECT a.id, a.child_id, a.parent_id, a.scheduled_at, a.notes, a.
 		a.status AS appt_status,
 		c.first_name, c.last_name, c.child_code, c.birthdate, c.sex,
 		bg.name AS barangay_name,
-		p.name AS parent_name, p.phone AS parent_phone
+		p.name AS parent_name, p.parent_code AS parent_code, p.phone AS parent_phone
 	 FROM appointments a
 	 INNER JOIN children c ON c.id = a.child_id
 	 LEFT JOIN barangays bg ON bg.id = c.barangay_id
@@ -155,7 +155,7 @@ $now = new DateTimeImmutable('now');
 $nrChildrenParams = [];
 $nrChildrenScope = nutritionist_scope_fragment($user, 'c.barangay_id', $nrChildrenParams);
 $nrChildren = admin_fetch_all(
-	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
+	"SELECT c.id, c.first_name, c.last_name, c.parent_id, p.name AS parent_name, p.parent_code, p.parent_type, p.phone AS parent_phone, p.status AS parent_status
 	 FROM children c
 	 INNER JOIN parents p ON p.id = c.parent_id
 	 WHERE {$nrChildrenScope} AND c.status = 'active'
@@ -302,12 +302,12 @@ $tabUrl = static function (string $tab, string $month) {
 					</td>
 					<td>
 						<?php if ($activeTab === 'incoming'): ?>
-							<?php echo nutritionist_e($req['parent_name'] ?? 'â€”'); ?>
+							<?php echo nutritionist_e($req['parent_name'] ?? 'â€”'); ?> <?php echo sk_code_badge((string)($req['parent_code'] ?? '')); ?>
 							<?php if ($req['parent_phone']): ?>
 								<div style="font-size:10px;color:var(--admin-muted);"><?php echo nutritionist_e($req['parent_phone']); ?></div>
 							<?php endif; ?>
 						<?php else: ?>
-							<?php echo $fromParent ? nutritionist_e($req['parent_name'] ?? 'Parent') : '<span style="color:var(--admin-muted);">You</span>'; ?>
+							<?php echo $fromParent ? nutritionist_e($req['parent_name'] ?? 'Parent') . ' ' . sk_code_badge((string)($req['parent_code'] ?? '')) : '<span style="color:var(--admin-muted);">You</span>'; ?>
 						<?php endif; ?>
 					</td>
 					<td><?php echo nutritionist_e($req['barangay_name'] ?? ''); ?></td>

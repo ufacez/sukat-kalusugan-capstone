@@ -68,6 +68,7 @@ $parents = admin_fetch_all(
 		p.id,
 		p.name,
 		p.email,
+		p.parent_code,
 		p.parent_type,
 		p.phone,
 		p.address,
@@ -89,7 +90,7 @@ $parents = admin_fetch_all(
 	 LEFT JOIN households h ON h.id = p.household_id AND h.status = 'active'
      LEFT JOIN children c ON c.parent_id = p.id AND {$childScope}
 	 WHERE {$parentScope}" . ($localAreaFilter > 0 ? ' AND p.local_area_id = ?' : '') . "
-	 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.local_area_id, la.area_name, la.area_type, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
+	 GROUP BY p.id, p.name, p.email, p.parent_code, p.parent_type, p.phone, p.address, p.barangay_id, bg.name, p.local_area_id, la.area_name, la.area_type, p.status, p.household_id, h.household_code, h.address, h.lat, h.lng
 	 ORDER BY p.id DESC",
 	str_repeat('i', count($childScopeParams) + count($parentScopeParams) + ($localAreaFilter > 0 ? 1 : 0)),
 	array_merge($childScopeParams, $parentScopeParams, $localAreaFilter > 0 ? [$localAreaFilter] : [])
@@ -205,8 +206,9 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 				<?php endif; ?>
 				<?php foreach ($tabParents as $parentIndex => $parent): ?>
 					<tr<?php echo admin_paged_row_attr($parentIndex, 5); ?>
-						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'] . ' ' . ($parent['barangay'] ?? '') . ' ' . ($parent['local_area'] ?? ''))); ?>"
+						data-filter-text="<?php echo nutritionist_e(strtolower($parent['name'] . ' ' . ($parent['parent_code'] ?? '') . ' ' . $parent['parent_type'] . ' ' . $parent['email'] . ' ' . $parent['phone'] . ' ' . $parent['address'] . ' ' . ($parent['barangay'] ?? '') . ' ' . ($parent['local_area'] ?? ''))); ?>"
 						data-parent-id="<?php echo (int)$parent['id']; ?>"
+						data-parent-code="<?php echo nutritionist_e((string)($parent['parent_code'] ?? '')); ?>"
 						data-parent-name="<?php echo nutritionist_e($parent['name']); ?>"
 						data-parent-type="<?php echo nutritionist_e($parent['parent_type']); ?>"
 						data-parent-email="<?php echo nutritionist_e($parent['email']); ?>"
@@ -227,6 +229,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 								<div class="parent-name-text">
 									<div class="parent-name"><?php echo nutritionist_e($parent['name']); ?></div>
 									<div class="admin-mini"><?php echo nutritionist_e((string)($parent['address'] ?? '')); ?></div>
+									<div class="admin-mini" style="font-family:monospace;"><?php echo nutritionist_e((string)($parent['parent_code'] ?? '')); ?></div>
 								</div>
 							</div>
 						</td>
@@ -279,6 +282,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 			<div class="pc-cols">
 				<div class="pc-card">
 					<h3 class="pc-section">Contact information</h3>
+					<div class="pc-row"><span class="label">Parent ID</span><span class="value" id="pc-code">—</span></div>
 					<div class="pc-row"><span class="label">Email</span><span class="value" id="pc-email">—</span></div>
 					<div class="pc-row"><span class="label">Phone</span><span class="value" id="pc-phone">—</span></div>
 					<div class="pc-row"><span class="label">Type</span><span class="value" id="pc-type">—</span></div>
@@ -325,6 +329,7 @@ nutritionist_layout_start('Parents', 'Linked guardians and household contact inf
 
 		text('pc-name', name);
 		text('pc-sub', get('type') + ' · ' + get('email'));
+		text('pc-code', get('code'));
 
 		text('pc-email', get('email'));
 		text('pc-phone', get('phone'));

@@ -92,7 +92,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_account'])) {
         : ['notice' => 'Account could not be updated. This email or username may already be in use.', 'type' => 'error']);
 }
 
-$myAccount = admin_fetch_one('SELECT name, email, username, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
+$myAccount = admin_fetch_one('SELECT name, email, username, user_code, phone, address FROM users WHERE id = ? LIMIT 1', 'i', [(int)$actor['id']]);
 $fullName = trim((string)($myAccount['name'] ?? ''));
 $nameParts = $fullName === '' ? ['', ''] : preg_split('/\s+/', $fullName);
 if (count($nameParts) === 1) {
@@ -125,6 +125,7 @@ nutritionist_layout_start('Settings', 'Manage your account details.', 'settings'
                     <?php echo admin_e($avatarInitials); ?>
                 </span>
             </div>
+            <div style="text-align:center;margin-bottom:6px;"><?php echo sk_code_badge((string)($myAccount['user_code'] ?? '')); ?></div>
 
             <h3 class="admin-settings-subhead">Basic Info</h3>
 

@@ -396,7 +396,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // legacy `code` column is history-only and stays out of every query.
 $invitations = admin_fetch_all(
             "SELECT i.id, i.invitee_name, i.invitee_email, i.invitee_phone, i.barangay_id, i.role, i.status, i.expires_at, i.used_at, i.created_at,
-            u.name AS inviter_name,
+                   u.name AS inviter_name,
+                   u.user_code AS inviter_code,
             b.name AS barangay_name
      FROM invitations i
      INNER JOIN users u ON u.id = i.inviter_user_id
@@ -477,7 +478,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             ?>
                             <span class="admin-pill <?php echo $statusClass; ?>"><?php echo admin_e(ucfirst($inv['status'])); ?></span>
                         </td>
-                        <td><?php echo admin_e($inv['inviter_name']); ?></td>
+                        <td><?php echo admin_e($inv['inviter_name']); ?> <?php echo sk_code_badge((string)($inv['inviter_code'] ?? '')); ?></td>
                         <td>
                             <?php if ($inv['status'] === 'pending'): ?>
                             <div class="admin-actions">

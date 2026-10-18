@@ -4,6 +4,7 @@ require_once __DIR__ . '/auth_middleware.php';
 require_once __DIR__ . '/audit_logger.php';
 require_once __DIR__ . '/confirm_modal.php';
 require_once __DIR__ . '/crypto.php';
+require_once __DIR__ . '/display_ids.php';
 
 function admin_e(string $value): string
 {
@@ -383,6 +384,121 @@ function admin_scalar(string $sql, string $types = '', array $params = [], int $
 function admin_find_role_id(string $roleName): int
 {
     return admin_scalar('SELECT id FROM roles WHERE name = ? LIMIT 1', 's', [$roleName]);
+}
+
+/**
+ * id => display-code maps for audit descriptions.
+ *
+ * The log_action() call sites write numeric ids into descriptions
+ * ("Staff login (#4)", "Updated parent #607"). These maps let the audit
+ * views swap those ids for the human-readable codes (ADM-0001 / NUT-0001 /
+ * PAR-0001 / CHD-0001 / HH-0001 / device code / area code / barangay name)
+ * without rewriting stored rows. All tables involved are small; the result
+ * is cached per request.
+ *
+ * @return array<string, array<int,string>>
+ */
+function sk_audit_code_maps(): array
+{
+    static $maps = null;
+    if ($maps !== null) {
+        return $maps;
+    }
+    $build = static function (string $sql, string $idCol, string $codeCol): array {
+        $out = [];
+        foreach (admin_fetch_all($sql) as $row) {
+            $code = trim((string)($row[$codeCol] ?? ''));
+            if ($code !== '') {
+                $out[(int)$row[$idCol]] = $code;
+            }
+        }
+        return $out;
+    };
+
+    return $maps = [
+        'staff'     => $build('SELECT id, user_code FROM users', 'id', 'user_code'),
+        'parent'    => $build('SELECT id, parent_code FROM parents', 'id', 'parent_code'),
+        'child'     => $build('SELECT id, child_code FROM children', 'id', 'child_code'),
+        'household' => $build('SELECT id, household_code FROM households', 'id', 'household_code'),
+        'device'    => $build('SELECT id, device_code FROM devices', 'id', 'device_code'),
+        'area'      => $build('SELECT id, COALESCE(area_code, area_name) AS label FROM local_areas', 'id', 'label'),
+        'barangay'  => $build('SELECT id, name AS label FROM barangays', 'id', 'label'),
+    ];
+}
+
+/**
+ * Rewrite the numeric ids in an audit description to their display code,
+ * e.g. "Staff login (#4)" -> "Staff login NUT-0001", "Updated child CHD-0022
+ * (699)" -> "Updated child CHD-0022". Ids whose entity has no human code
+ * (appointments, invitations, measurement/batch ids) are left untouched;
+ * unknown ids fall back to the original "#N" form.
+ */
+function sk_audit_description_codes(?string $description): string
+{
+    $description = trim((string)$description);
+    if ($description === '' || !preg_match('/\d/', $description)) {
+        return $description;
+    }
+    $maps = sk_audit_code_maps();
+    $code = static function (string $kind, string $id) use ($maps): string {
+        $n = (int)$id;
+        return $maps[$kind][$n] ?? ('#' . $n);
+    };
+    $rewrites = [
+        // Staff / parent login & logout.
+        '/(\b(?:Staff|Admin)\s+(?:login|logout))\s*\(#(\d+)\)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('staff', $m[2]),
+        '/(\bParent\s+(?:login|logout))\s*\(#(\d+)\)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('parent', $m[2]),
+        // Staff records (password reset / update / archive / restore / delete).
+        '/(\bstaff account)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('staff', $m[2]),
+        '/(\b(?:Updated|Archived|Restored|Permanently deleted)\s+staff)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('staff', $m[2]),
+        // Parent records.
+        '/(\b(?:Created|Updated)\s+parent account)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('parent', $m[2]),
+        '/(\b(?:Updated|Archived|Restored|Unassigned)\s+parent)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('parent', $m[2]),
+        // Staff access-level change.
+        '/(\bUpdated\s+user)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('staff', $m[2]),
+        // Device ("Updated device 3634" / "device #3").
+        '/(\bdevice)\s+#?(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('device', $m[2]),
+        // Household, replacing an existing "(HH-xxxx)" too so it isn't doubled.
+        '/(\bhousehold)\s+#(\d+)(?:\s*\(([A-Z]{2,3}-\d{3,4})\))?/i'
+            => static fn(array $m): string => $m[1] . ' ' . (($m[3] ?? '') !== '' ? $m[3] : $code('household', $m[2])),
+        // Child (used by appointment descriptions, e.g. "for child #670").
+        '/(\bchild)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('child', $m[2]),
+        // Local area ("Updated local area #17").
+        '/(\blocal area)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('area', $m[2]),
+        // Barangay ("in barangay #36").
+        '/(\bbarangay)\s+#(\d+)/i'
+            => static fn(array $m): string => $m[1] . ' ' . $code('barangay', $m[2]),
+    ];
+    foreach ($rewrites as $pattern => $callback) {
+        $result = preg_replace_callback($pattern, $callback, $description);
+        if ($result !== null) {
+            $description = $result;
+        }
+    }
+    // Parenthetical cleanup (plain substitutions): a display code wrapped in
+    // parentheses becomes bare ("(CHD-0022)" -> "CHD-0022"), then any leftover
+    // pure numeric-id parentheses are dropped ("CHD-0007 (699)" -> "CHD-0007").
+    $strips = [
+        '/\s*\(\s*([A-Z]{3}-\d{4})\s*\)/' => ' $1',
+        '/\s*\(#?\d+\)/' => '',
+    ];
+    foreach ($strips as $pattern => $replacement) {
+        $result = preg_replace($pattern, $replacement, $description);
+        if ($result !== null) {
+            $description = $result;
+        }
+    }
+    return $description;
 }
 
 /**
@@ -1192,7 +1308,7 @@ function admin_layout_start(string $title, string $subtitle, string $activeSecti
     echo '<span class="admin-avatar" style="background:' . admin_avatar_color($userName) . '">' . admin_initials($userName) . '</span>';
     echo '<div class="admin-topbar-profile-text">';
     echo '<span class="admin-topbar-name">' . admin_e($userName) . '</span>';
-    echo '<span class="admin-topbar-role">' . admin_e(ucfirst($userRole)) . '</span>';
+            echo '<span class="admin-topbar-role">' . admin_e(ucfirst($userRole)) . '</span>';
     echo '</div>';
     echo '</div>';
     echo '</div>';

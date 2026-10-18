@@ -113,7 +113,7 @@ $archivedChildren = [];
 if ($tab === 'archived') {
 	if ($canViewStaff) {
 		$archivedUsers = admin_fetch_all(
-			'SELECT u.id, u.name, u.email, u.username, u.phone, b.name AS barangay, u.status, r.name AS role_name
+			'SELECT u.id, u.name, u.email, u.username, u.user_code, u.phone, b.name AS barangay, u.status, r.name AS role_name
 			 FROM users u
 			 INNER JOIN roles r ON r.id = u.role_id
 			 LEFT JOIN barangays b ON b.id = u.barangay_id
@@ -127,6 +127,7 @@ if ($tab === 'archived') {
 				p.id,
 				p.name,
 				p.email,
+				p.parent_code,
 				p.parent_type,
 				p.phone,
 				p.barangay_id,
@@ -137,7 +138,7 @@ if ($tab === 'archived') {
 			 LEFT JOIN barangays b ON b.id = p.barangay_id
 			 LEFT JOIN children c ON c.parent_id = p.id
 			 WHERE p.status = 'inactive'
-			 GROUP BY p.id, p.name, p.email, p.parent_type, p.phone, p.barangay_id, b.name, p.status
+			 GROUP BY p.id, p.name, p.email, p.parent_code, p.parent_type, p.phone, p.barangay_id, b.name, p.status
 			 ORDER BY p.id DESC"
 		);
 	}
@@ -173,6 +174,7 @@ if ($tab === 'archived') {
 			'kind_label' => ucfirst((string)($u['role_name'] ?? 'staff')),
 			'pill' => $isAdminRow ? 'is-warn' : 'is-success',
 			'name' => (string)($u['name'] ?? ''),
+			'code' => (string)($u['user_code'] ?? ''),
 			'sub' => (string)($u['username'] ?? ''),
 			'detail' => (string)($u['email'] ?? ''),
 			'barangay' => (string)($u['barangay'] ?? 'All barangays'),
@@ -189,6 +191,7 @@ if ($tab === 'archived') {
 			'kind_label' => 'Parent',
 			'pill' => 'is-info',
 			'name' => (string)($p['name'] ?? ''),
+			'code' => (string)($p['parent_code'] ?? ''),
 			'sub' => (string)($p['parent_type'] ?? ''),
 			'detail' => (string)($p['email'] ?? ''),
 			'barangay' => (string)($p['barangay'] ?? ''),
@@ -206,6 +209,7 @@ if ($tab === 'archived') {
 			'kind_label' => 'Child',
 			'pill' => 'is-muted',
 			'name' => $fullName !== '' ? $fullName : (string)($c['child_code'] ?? ''),
+			'code' => (string)($c['child_code'] ?? ''),
 			'sub' => (string)($c['birthdate'] ?? ''),
 			'detail' => (string)($c['child_code'] ?? '') . ' · ' . (string)($c['parent_name'] ?? ''),
 			'barangay' => (string)($c['barangay'] ?? ''),
@@ -337,6 +341,7 @@ admin_layout_start('Archive', 'Archived admin, nutritionist, parent and child re
 		<table class="admin-table" id="archive-table">
 			<thead>
 				<tr>
+					<th>Code</th>
 					<th>Type</th>
 					<th>Name</th>
 					<th>Detail</th>
@@ -347,10 +352,11 @@ admin_layout_start('Archive', 'Archived admin, nutritionist, parent and child re
 			</thead>
 			<tbody>
 				<?php if ($archiveRows === []): ?>
-					<tr><td colspan="6" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived records.</td></tr>
+					<tr><td colspan="7" style="color:var(--admin-muted);text-align:center;padding:24px;">No archived records.</td></tr>
 				<?php else: ?>
 					<?php foreach ($archiveRows as $rowIndex => $ar): ?>
-						<tr<?php echo admin_paged_row_attr($rowIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($ar['kind'] . ' ' . $ar['kind_label'] . ' ' . $ar['name'] . ' ' . $ar['sub'] . ' ' . $ar['detail'] . ' ' . $ar['barangay'] . ' ' . $ar['info'])); ?>">
+						<tr<?php echo admin_paged_row_attr($rowIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower($ar['kind'] . ' ' . $ar['kind_label'] . ' ' . $ar['name'] . ' ' . ($ar['code'] ?? '') . ' ' . $ar['sub'] . ' ' . $ar['detail'] . ' ' . $ar['barangay'] . ' ' . $ar['info'])); ?>">
+							<td style="font-family:monospace;"><?php echo admin_e((string)($ar['code'] ?? '')); ?></td>
 							<td><span class="admin-pill <?php echo admin_e($ar['pill']); ?>"><?php echo admin_e($ar['kind_label']); ?></span></td>
 							<td>
 								<div style="font-weight:600;color:var(--admin-text);"><?php echo admin_e($ar['name']); ?></div>

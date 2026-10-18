@@ -867,6 +867,7 @@ nutritionist_layout_start('Barangay Spot Map', '', 'risk_map');
             html += '<div class="admin-spotmap-person-list">';
             parents.forEach(function (p) {
                 var meta = p.parent_type || 'Guardian';
+                if (p.parent_code) meta = p.parent_code + ' · ' + meta;
                 if (p.phone) meta += ' · ' + p.phone;
                 html += '<div class="admin-spotmap-person" data-parent-id="' + p.id + '">';
                 html += '<div class="admin-spotmap-person-info">';
