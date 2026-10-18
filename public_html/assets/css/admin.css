@@ -1506,6 +1506,13 @@
   line-height: 1.35;
 }
 
+/* Read-only address preview (auto-built from the picker). */
+.admin-field textarea[readonly] {
+  background: var(--admin-surface-alt);
+  color: var(--admin-muted);
+  cursor: default;
+}
+
 /* ---- Required-field asterisk ---- */
 .admin-required {
   color: var(--admin-danger);
@@ -1625,7 +1632,7 @@
 /* ---- PSGC address picker ---- */
 .admin-address-picker {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 10px;
 }
 

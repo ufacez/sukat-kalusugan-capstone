@@ -639,6 +639,10 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                             <span>Barangay</span>
                             <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
                         </label>
+                        <label class="admin-field">
+                            <span>Purok / Local Area</span>
+                            <select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
+                        </label>
                     </div>
                     <label class="admin-field" style="margin-top:10px;">
                         <span>House no. / street</span>
@@ -647,7 +651,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-address-status" data-psgc-status></div>
                     <label class="admin-field" style="margin-top:10px;">
                         <span>Full address</span>
-                        <textarea id="invite_address" name="address" maxlength="255" rows="2"><?php echo admin_e(admin_old_value($old, 'address')); ?></textarea>
+                        <textarea id="invite_address" name="address" maxlength="255" rows="2" readonly><?php echo admin_e(admin_old_value($old, 'address')); ?></textarea>
                     </label>
                 </div>
 

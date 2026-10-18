@@ -459,6 +459,10 @@ nutritionist_layout_start(
 					<span>Barangay</span>
 					<select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
 				</label>
+				<label class="admin-field">
+					<span>Purok / Local Area</span>
+					<select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
+				</label>
 			</div>
 			<label class="admin-field" style="margin-top:10px;">
 				<span>House no. / street</span>
@@ -467,8 +471,7 @@ nutritionist_layout_start(
 			<div class="admin-address-status" data-psgc-status></div>
 			<label class="admin-field" style="margin-top:10px;">
 				<span>Full address</span>
-				<textarea id="np_address" name="address"><?php echo nutritionist_e($editingParent['address'] ?? ''); ?></textarea>
-				<span class="admin-field-hint">Auto-filled from the picker above; you can still edit it directly.</span>
+				<textarea id="np_address" name="address" readonly><?php echo nutritionist_e($editingParent['address'] ?? ''); ?></textarea>
 			</label>
 		</div>
 

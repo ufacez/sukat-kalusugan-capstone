@@ -195,9 +195,32 @@ $mustChangeBanner = (($_GET['must_change'] ?? '') !== '' && ($_GET['must_change'
 			</label>
 				<div class="admin-field admin-field-wide">
 					<span>Address</span>
-					<label class="admin-field" style="margin-top:6px;">
+					<div class="admin-address-picker" data-psgc-picker data-psgc-address-target="account_address">
+						<label class="admin-field">
+							<span>Province</span>
+							<select data-psgc="province"><option value="">Loading provinces…</option></select>
+						</label>
+						<label class="admin-field">
+							<span>City / Municipality</span>
+							<select data-psgc="city" disabled><option value="">-- Select province first --</option></select>
+						</label>
+						<label class="admin-field">
+							<span>Barangay</span>
+							<select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
+						</label>
+						<label class="admin-field">
+							<span>Purok / Local Area</span>
+							<select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
+						</label>
+					</div>
+					<label class="admin-field" style="margin-top:10px;">
+						<span>House no. / street</span>
+						<input data-psgc="street" placeholder="143 Purok 6" value="">
+					</label>
+					<div class="admin-address-status" data-psgc-status></div>
+					<label class="admin-field" style="margin-top:10px;">
 						<span>Full address</span>
-						<textarea id="account_address" name="address" maxlength="255" rows="2" placeholder="House no. / street, barangay, city"><?php echo parent_e($storedAddress); ?></textarea>
+						<textarea id="account_address" name="address" maxlength="255" rows="2" readonly placeholder="Auto-built from province / city / barangay / street"><?php echo parent_e($storedAddress); ?></textarea>
 					</label>
 				</div>
 			</div>

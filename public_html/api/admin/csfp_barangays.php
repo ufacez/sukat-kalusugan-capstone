@@ -3,7 +3,14 @@
 require_once __DIR__ . '/../../includes/admin_helpers.php';
 
 start_secure_session();
-require_permission('barangays.view');
+require_login();
+
+// Parents also use the address picker (parent/settings.php) to build their
+// own home address, so this read-only list of official CSFP barangays is
+// open to any signed-in user. Staff still need the barangays.view grant.
+if (!is_parent_session()) {
+    require_permission('barangays.view');
+}
 
 /**
  * Official 35 barangays of the City of San Fernando, Pampanga.

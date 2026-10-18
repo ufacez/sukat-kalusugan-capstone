@@ -173,6 +173,10 @@ nutritionist_layout_start('Settings', 'Manage your account details.', 'settings'
                             <span>Barangay</span>
                             <select data-psgc="barangay" disabled><option value="">-- Select city/municipality first --</option></select>
                         </label>
+                        <label class="admin-field">
+                            <span>Purok / Local Area</span>
+                            <select data-psgc="area" disabled><option value="">-- Select barangay first --</option></select>
+                        </label>
                     </div>
                     <label class="admin-field" style="margin-top:10px;">
                         <span>House no. / street</span>
@@ -181,7 +185,7 @@ nutritionist_layout_start('Settings', 'Manage your account details.', 'settings'
                     <div class="admin-address-status" data-psgc-status></div>
                     <label class="admin-field" style="margin-top:10px;">
                         <span>Full address</span>
-                        <textarea id="account_address" name="address" maxlength="255" rows="2" placeholder="Auto-built from province / city / barangay / street"><?php echo admin_e($storedAddress); ?></textarea>
+                        <textarea id="account_address" name="address" maxlength="255" rows="2" readonly placeholder="Auto-built from province / city / barangay / street"><?php echo admin_e($storedAddress); ?></textarea>
                     </label>
                 </div>
             </div>

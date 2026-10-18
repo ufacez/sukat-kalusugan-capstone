@@ -741,8 +741,7 @@ admin_layout_start(
                     <div class="admin-address-status" data-psgc-status></div>
                     <label class="admin-field" style="margin-top:10px;">
                         <span>Full address</span>
-                        <textarea id="ff_address" name="address"></textarea>
-                        <span class="admin-field-hint">Auto-filled from the picker above; you can still edit it directly.</span>
+                        <textarea id="ff_address" name="address" readonly></textarea>
                     </label>
                 </div>
             </div>

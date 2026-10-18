@@ -441,10 +441,15 @@
     const provinceSelect = root.querySelector('[data-psgc="province"]');
     const citySelect = root.querySelector('[data-psgc="city"]');
     const barangaySelect = root.querySelector('[data-psgc="barangay"]');
-    const streetInput = root.querySelector('[data-psgc="street"]');
+    // The street input, purok select and status message sit around the select
+    // grid (the picker root is itself a CSS grid), so look in the surrounding
+    // field wrapper instead of only inside root.
+    const scope = root.closest(".admin-field-wide") || root.parentElement || root;
+    const streetInput = scope.querySelector('[data-psgc="street"]');
+    const areaSelect = scope.querySelector('[data-psgc="area"]');
     const targetId = root.getAttribute("data-psgc-address-target");
     const target = targetId ? document.getElementById(targetId) : null;
-    const status = root.querySelector("[data-psgc-status]");
+    const status = scope.querySelector("[data-psgc-status]");
 
     if (!provinceSelect || !citySelect || !barangaySelect) {
       return;
@@ -456,19 +461,135 @@
       status.classList.toggle("is-error", !!isError);
     }
 
+    function selectedName(select) {
+      return select ? select.selectedOptions[0]?.dataset.name || "" : "";
+    }
+
     function rebuildAddress() {
       if (!target) return;
 
       const street = streetInput ? streetInput.value.trim() : "";
-      const barangayName = barangaySelect.selectedOptions[0]?.dataset.name || "";
-      const cityName = citySelect.selectedOptions[0]?.dataset.name || "";
-      const provinceName = provinceSelect.selectedOptions[0]?.dataset.name || "";
+      const areaName = selectedName(areaSelect);
+      const barangayName = selectedName(barangaySelect);
+      const cityName = selectedName(citySelect);
+      const provinceName = selectedName(provinceSelect);
 
-      const parts = [street, barangayName ? "Brgy. " + barangayName : "", cityName, provinceName].filter(
-        (part) => part !== ""
-      );
+      const parts = [
+        street,
+        areaName,
+        barangayName ? "Brgy. " + barangayName : "",
+        cityName,
+        provinceName,
+      ].filter((part) => part !== "");
 
       target.value = parts.join(", ");
+    }
+
+    // Load the purok / local area list for the currently selected barangay.
+    // `preferredName` lets the hydrator re-select the area from a saved address.
+    function loadAreas(preferredName) {
+      if (!areaSelect) {
+        rebuildAddress();
+        return;
+      }
+
+      function fillAreaOptions(items, selected) {
+        areaSelect.innerHTML = "";
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "-- Select purok / area (optional) --";
+        areaSelect.appendChild(placeholder);
+
+        items.forEach((item) => {
+          const option = document.createElement("option");
+          option.value = item.name;
+          option.textContent = item.name;
+          option.dataset.name = item.name;
+          areaSelect.appendChild(option);
+        });
+
+        if (selected) {
+          const match = Array.from(areaSelect.options).find(
+            (option) => (option.dataset.name || "").toLowerCase() === selected.toLowerCase()
+          );
+          if (match) areaSelect.value = match.value;
+        }
+
+        areaSelect.disabled = items.length === 0;
+      }
+
+      const barangayName = selectedName(barangaySelect);
+
+      if (barangayName === "") {
+        fillAreaOptions([], "");
+        rebuildAddress();
+        return;
+      }
+
+      areaSelect.disabled = true;
+      areaSelect.innerHTML = "";
+      const loading = document.createElement("option");
+      loading.value = "";
+      loading.textContent = "Loading puroks…";
+      areaSelect.appendChild(loading);
+
+      fetch("../api/admin/barangay_local_areas.php?barangay_name=" + encodeURIComponent(barangayName))
+        .then((response) => {
+          if (!response.ok) throw new Error("barangay local areas request failed");
+          return response.json();
+        })
+        .then((data) => {
+          fillAreaOptions(Array.isArray(data.areas) ? data.areas : [], preferredName || "");
+          rebuildAddress();
+        })
+        .catch(() => {
+          fillAreaOptions([], "");
+          rebuildAddress();
+        });
+    }
+
+    // Re-hydrate the picker from a previously-saved combined address so the
+    // house no./street, purok and barangay survive when editing a record.
+    function hydrateFromStoredAddress() {
+      if (!target || !target.value) return;
+
+      const segments = target.value
+        .split(",")
+        .map((segment) => segment.trim())
+        .filter((segment) => segment !== "");
+
+      if (segments.length === 0) return;
+
+      const isBarangay = (segment) => /^brgy\.?\s/i.test(segment);
+      const isCity = (segment) => segment.toLowerCase() === CSFP_CITY.toLowerCase();
+      const isProvince = (segment) => segment.toLowerCase() === CSFP_PROVINCE.toLowerCase();
+
+      // Everything that is not the barangay / city / province, in order:
+      // [house no./street, purok] for the canonical layout.
+      const localParts = segments.filter(
+        (segment) => !isBarangay(segment) && !isCity(segment) && !isProvince(segment)
+      );
+
+      if (streetInput && localParts[0]) {
+        streetInput.value = localParts[0];
+      }
+
+      const areaName = localParts.length > 1 ? localParts[1] : "";
+
+      // Match the "Brgy. X" segment to an option. If it cannot be matched, keep
+      // the stored address as-is so legacy free-text rows are never rewritten.
+      const brgySegment = segments.find(isBarangay);
+      if (!brgySegment) return;
+
+      const brgyName = brgySegment.replace(/^brgy\.?\s*/i, "").trim().toLowerCase();
+      const option = Array.from(barangaySelect.options).find(
+        (candidate) => (candidate.dataset.name || candidate.value).toLowerCase() === brgyName
+      );
+
+      if (!option) return;
+
+      barangaySelect.value = option.value;
+      loadAreas(areaName);
     }
 
     // CSFP is the only locale — lock province and city to fixed options.
@@ -477,10 +598,14 @@
     setFixedOption(citySelect, "csfp", CSFP_CITY);
     citySelect.disabled = true;
 
-    barangaySelect.addEventListener("change", rebuildAddress);
+    barangaySelect.addEventListener("change", () => loadAreas());
 
     if (streetInput) {
       streetInput.addEventListener("input", rebuildAddress);
+    }
+
+    if (areaSelect) {
+      areaSelect.addEventListener("change", rebuildAddress);
     }
 
     setStatus("Loading barangays…");
@@ -494,10 +619,11 @@
         const barangays = (data.barangays || []).map((name) => ({ code: name, name }));
         fillSelect(barangaySelect, barangays, "-- Select barangay --");
         barangaySelect.disabled = false;
+        hydrateFromStoredAddress();
         setStatus("");
       })
       .catch(() => {
-        setStatus("Couldn't load the CSFP barangay list. You can still type the address manually below.", true);
+        setStatus("Couldn't load the CSFP barangay list. Please reload the page and try again.", true);
       });
   }
 
