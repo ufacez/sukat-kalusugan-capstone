@@ -4838,14 +4838,31 @@ body.admin-page .appointments-table {
   .acct-savebar {
     flex-direction: column;
     align-items: stretch;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .acct-savebar-hint {
+    line-height: 1.35;
   }
 
   .acct-savebar-actions {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
     margin-left: 0;
   }
 
   .acct-savebar-actions .admin-btn,
   .acct-savebar-actions .admin-btn-secondary {
-    flex: 1;
+    width: 100%;
+    min-width: 0;
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 360px) {
+  .acct-savebar-actions {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
