@@ -31,8 +31,8 @@ function sms_is_configured(): bool
 /**
  * Send a plain-text SMS via Semaphore (https://api.semaphore.co).
  *
- * @param string $toNormalized Canonical 09XXXXXXXXX number (see
- *   admin_normalize_ph_mobile()). The +63 international form is derived here.
+ * @param string $toNormalized Canonical 09XXXXXXXXX number (normalized by the
+ *   shared PH mobile helper). The +63 international form is derived here.
  * @param string $message      Plain-text body (GSM-7 safe recommended).
  * @return bool True when Semaphore accepted the message.
  */

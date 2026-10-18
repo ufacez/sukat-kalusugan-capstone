@@ -13,6 +13,7 @@ require_once __DIR__ . '/../../includes/api_helpers.php';
 require_once __DIR__ . '/../../includes/auth_middleware.php';
 require_once __DIR__ . '/../../includes/crypto.php';
 require_once __DIR__ . '/../../includes/who_calculator.php';
+require_once __DIR__ . '/../../includes/admin_helpers.php';
 
 api_require_method(['GET']);
 
@@ -68,7 +69,7 @@ $sql = 'SELECT c.id, c.child_code, c.first_name, c.last_name, c.sex,
         LEFT JOIN barangays b ON b.id = c.barangay_id
         WHERE c.id = ?' . $scopeSql;
 $stmt = mysqli_prepare($db, $sql);
-mysqli_stmt_bind_param($stmt, $scopeTypes, ...$scopeParams);
+admin_bind_params($stmt, $scopeTypes, $scopeParams);
 mysqli_stmt_execute($stmt);
 $child = mysqli_fetch_assoc(mysqli_stmt_get_result($stmt));
 mysqli_stmt_close($stmt);
