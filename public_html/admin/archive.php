@@ -12,9 +12,9 @@ admin_require_access('children.view');
 $tab = ($_GET['tab'] ?? 'archived') === 'auto' ? 'auto' : 'archived';
 
 // Kind filter is server-side (like the nutritionist children tabs) so it
-// works with or without JS: ?tab=archived&kind=all|staff|parent|child.
+// works with or without JS: ?tab=archived&kind=all|admin|nutritionist|parent|child.
 $kind = strtolower((string)($_GET['kind'] ?? 'all'));
-if (!in_array($kind, ['all', 'staff', 'parent', 'child'], true)) {
+if (!in_array($kind, ['all', 'admin', 'nutritionist', 'parent', 'child'], true)) {
 	$kind = 'all';
 }
 
@@ -167,10 +167,11 @@ if ($tab === 'archived') {
 $archiveRows = [];
 if ($tab === 'archived') {
 	foreach ($archivedUsers as $u) {
+		$isAdminRow = (string)($u['role_name'] ?? '') === 'admin';
 		$archiveRows[] = [
-			'kind' => 'staff',
+			'kind' => $isAdminRow ? 'admin' : 'nutritionist',
 			'kind_label' => ucfirst((string)($u['role_name'] ?? 'staff')),
-			'pill' => (($u['role_name'] ?? '') === 'admin') ? 'is-warn' : 'is-success',
+			'pill' => $isAdminRow ? 'is-warn' : 'is-success',
 			'name' => (string)($u['name'] ?? ''),
 			'sub' => (string)($u['username'] ?? ''),
 			'detail' => (string)($u['email'] ?? ''),
@@ -225,7 +226,7 @@ $eligibleCount = count($eligible);
 $kindTotals = array_count_values(array_column($archiveRows, 'kind'));
 
 // Clamp kind to permitted sections, then filter rows for display.
-if (($kind === 'staff' && !$canViewStaff)
+if ((in_array($kind, ['admin', 'nutritionist'], true) && !$canViewStaff)
 	|| ($kind === 'parent' && !$canViewParents)
 	|| ($kind === 'child' && !$canViewChildren)
 ) {
@@ -260,11 +261,15 @@ $restoreSvg = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 
 
 $archiveBase = app_url('/admin/archive.php');
 
-$cntStaff = (int)($kindTotals['staff'] ?? 0);
+$cntAdmin = (int)($kindTotals['admin'] ?? 0);
+$cntNutritionist = (int)($kindTotals['nutritionist'] ?? 0);
 $cntParent = (int)($kindTotals['parent'] ?? 0);
 $cntChild = (int)($kindTotals['child'] ?? 0);
 
-admin_layout_start('Archive', 'Archived staff, parent and child records, plus automatic archival of children aged 60 months and older.', 'archive');
+// How many distinct kind pills are viewable (staff counts as two: admin + nutritionist).
+$visibleKindCount = ($canViewStaff ? 2 : 0) + ($canViewParents ? 1 : 0) + ($canViewChildren ? 1 : 0);
+
+admin_layout_start('Archive', 'Archived admin, nutritionist, parent and child records, plus automatic archival of children aged 60 months and older.', 'archive');
 ?>
 
 <style>
@@ -316,10 +321,11 @@ admin_layout_start('Archive', 'Archived staff, parent and child records, plus au
 			<p class="admin-section-subtitle"><?php echo (int)$archivedTotal; ?> archived record(s).</p>
 		</div>
 		<div class="admin-toolbar" style="margin:0;">
-			<?php if (($canViewStaff ? 1 : 0) + ($canViewParents ? 1 : 0) + ($canViewChildren ? 1 : 0) > 1): ?>
+			<?php if ($visibleKindCount > 1): ?>
 			<div class="rp-kind-pills" role="tablist" aria-label="Filter by record type">
 				<a class="rp-kind-pill <?php echo $kind === 'all' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'all' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=all'); ?>">All (<?php echo (int)$archivedTotal; ?>)</a>
-				<?php if ($canViewStaff): ?><a class="rp-kind-pill <?php echo $kind === 'staff' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'staff' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=staff'); ?>">Staff (<?php echo (int)$cntStaff; ?>)</a><?php endif; ?>
+				<?php if ($canViewStaff): ?><a class="rp-kind-pill <?php echo $kind === 'admin' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'admin' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=admin'); ?>">Admins (<?php echo (int)$cntAdmin; ?>)</a><?php endif; ?>
+				<?php if ($canViewStaff): ?><a class="rp-kind-pill <?php echo $kind === 'nutritionist' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'nutritionist' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=nutritionist'); ?>">Nutritionists (<?php echo (int)$cntNutritionist; ?>)</a><?php endif; ?>
 				<?php if ($canViewParents): ?><a class="rp-kind-pill <?php echo $kind === 'parent' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'parent' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=parent'); ?>">Parents (<?php echo (int)$cntParent; ?>)</a><?php endif; ?>
 				<?php if ($canViewChildren): ?><a class="rp-kind-pill <?php echo $kind === 'child' ? 'is-active' : ''; ?>" role="tab" aria-selected="<?php echo $kind === 'child' ? 'true' : 'false'; ?>" href="<?php echo admin_e($archiveBase . '?tab=archived&kind=child'); ?>">Children (<?php echo (int)$cntChild; ?>)</a><?php endif; ?>
 			</div>

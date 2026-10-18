@@ -126,7 +126,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $resendTargets = $masked . ($resendHasEmail ? ' / ' . $resendEmail : '');
         admin_redirect('/admin/invitations.php', ['notice' => ($smsOk && (!$resendHasEmail || $emailOk))
             ? 'New code sent to ' . $resendTargets . '. The old code no longer works.'
-            : 'New code issued for ' . $resendTargets . ', but delivery failed — check SMTP/Semaphore settings. The code was NOT shown here.']);
+            : 'New code created for ' . $resendTargets . ', but we could not deliver it right now — tap Resend to try again.']);
     }
 
     if ($formAction === 'create') {
@@ -364,15 +364,20 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         unset($plainCode);
 
         $maskedPhone = substr($normalizedPhone, 0, 4) . '***' . substr($normalizedPhone, -2);
-        $channels = $email !== null ? 'SMS + email' : 'SMS';
+        $noticeTarget = $maskedPhone . ($email !== null ? ' / ' . $email : '');
         if ($smsSent && ($email === null || $emailSent)) {
-            $noticeParam = 'Invitation sent via ' . $channels . ' to ' . $maskedPhone
-                . ($email !== null ? ' / ' . $email : '') . '. The code is hidden for privacy.';
+            $noticeParam = 'Invitation sent successfully to ' . $noticeTarget . '. The code stays hidden for security.';
         } else {
-            $noticeParam = 'Invitation created for ' . $maskedPhone . ($email !== null ? ' / ' . $email : '') . '.'
-                . ($smsSent ? '' : ' SMS could not be sent — check Semaphore settings and the number.')
-                . ($email !== null && !$emailSent ? ' Email could not be sent — check SMTP settings.' : '')
-                . ' The code was NOT shown here; use Resend to issue a new one.';
+            $failedChannels = [];
+            if (!$smsSent) {
+                $failedChannels[] = 'SMS';
+            }
+            if ($email !== null && !$emailSent) {
+                $failedChannels[] = 'email';
+            }
+            $noticeParam = 'Invitation created for ' . $noticeTarget . '. The '
+                . implode(' and ', $failedChannels)
+                . ' notification could not be delivered right now — tap Resend to send the code again.';
         }
         admin_clear_form_state();
         admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);
@@ -390,10 +395,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 // Codes are hashed (code_hash) and never selected or displayed. The
 // legacy `code` column is history-only and stays out of every query.
 $invitations = admin_fetch_all(
-    "SELECT i.id, i.invitee_name, i.invitee_email, i.invitee_phone, i.role, i.status, i.created_at,
-            u.name AS inviter_name
+            "SELECT i.id, i.invitee_name, i.invitee_email, i.invitee_phone, i.barangay_id, i.role, i.status, i.expires_at, i.used_at, i.created_at,
+            u.name AS inviter_name,
+            b.name AS barangay_name
      FROM invitations i
      INNER JOIN users u ON u.id = i.inviter_user_id
+     LEFT JOIN barangays b ON b.id = i.barangay_id
      ORDER BY i.created_at DESC",
     '', []
 );
@@ -488,6 +495,41 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                                     </button>
                                 </form>
+                            </div>
+                            <?php else: ?>
+                            <?php
+                            // Finished invitations (used / expired / cancelled):
+                            // show a read-only details modal. Codes are NEVER
+                            // included — only hashed and never displayed.
+                            $infoPhone = (string)($inv['invitee_phone'] ?? '');
+                            $infoPhone = $infoPhone !== '' ? substr($infoPhone, 0, 4) . '***' . substr($infoPhone, -2) : '—';
+                            $fmtDate = static function ($dt): string {
+                                $dt = (string)($dt ?? '');
+                                if ($dt === '' || str_starts_with($dt, '0000')) {
+                                    return '—';
+                                }
+                                $ts = strtotime($dt);
+                                return $ts ? date('M j, Y g:i A', $ts) : '—';
+                            };
+                            $infoPayload = [
+                                'name'     => (string)($inv['invitee_name'] ?? ''),
+                                'email'    => (string)($inv['invitee_email'] ?? '') !== '' ? (string)$inv['invitee_email'] : '—',
+                                'phone'    => $infoPhone,
+                                'role'     => ucfirst((string)($inv['role'] ?? '')),
+                                'barangay' => (string)($inv['barangay_name'] ?? '') !== '' ? (string)$inv['barangay_name'] : 'All barangays',
+                                'status'   => ucfirst((string)($inv['status'] ?? '')),
+                                'inviter'  => (string)($inv['inviter_name'] ?? ''),
+                                'invited'  => $fmtDate($inv['created_at'] ?? null),
+                                'expires'  => $fmtDate($inv['expires_at'] ?? null),
+                                'used'     => $fmtDate($inv['used_at'] ?? null),
+                            ];
+                            ?>
+                            <div class="admin-actions">
+                                <button type="button" class="admin-icon-btn" title="View details" aria-label="View invitation details"
+                                        data-invite-info
+                                        data-invite="<?php echo admin_e(json_encode($infoPayload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE)); ?>">
+                                    <?php echo admin_action_icon('view'); ?>
+                                </button>
                             </div>
                             <?php endif; ?>
                         </td>
@@ -630,6 +672,96 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
         </div>
     </div>
 </div>
+
+<style>
+.invite-info-section + .invite-info-section{margin-top:14px;padding-top:14px;border-top:1px solid var(--admin-border)}
+.invite-info-heading{margin:0 0 10px;font-size:0.7rem;font-weight:800;letter-spacing:0.09em;text-transform:uppercase;color:var(--admin-muted)}
+.invite-info-list{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 18px;margin:0;font-size:0.87rem;align-items:baseline}
+.invite-info-list dt{color:var(--admin-muted);font-weight:600;white-space:nowrap}
+.invite-info-list dd{margin:0;color:var(--admin-text);word-break:break-word}
+</style>
+
+<div class="admin-modal-overlay" id="invite-info-overlay" hidden>
+    <div class="admin-modal" style="max-width:460px;" role="dialog" aria-modal="true" aria-labelledby="invite-info-title">
+        <div class="admin-modal-head">
+            <h3 id="invite-info-title">Invitation details</h3>
+            <button class="admin-modal-close" data-invite-info-close type="button" aria-label="Close">&times;</button>
+        </div>
+        <div class="admin-modal-body">
+            <section class="invite-info-section">
+                <h4 class="invite-info-heading">Invitee</h4>
+                <dl class="invite-info-list">
+                    <dt>Name</dt><dd id="ii-name">&mdash;</dd>
+                    <dt>Email</dt><dd id="ii-email">&mdash;</dd>
+                    <dt>Mobile</dt><dd id="ii-phone">&mdash;</dd>
+                    <dt>Status</dt><dd id="ii-status">&mdash;</dd>
+                </dl>
+            </section>
+            <section class="invite-info-section">
+                <h4 class="invite-info-heading">Role &amp; access</h4>
+                <dl class="invite-info-list">
+                    <dt>Role</dt><dd id="ii-role">&mdash;</dd>
+                    <dt>Barangay scope</dt><dd id="ii-barangay">&mdash;</dd>
+                </dl>
+            </section>
+            <section class="invite-info-section">
+                <h4 class="invite-info-heading">Timeline</h4>
+                <dl class="invite-info-list">
+                    <dt>Invited by</dt><dd id="ii-inviter">&mdash;</dd>
+                    <dt>Invited on</dt><dd id="ii-invited">&mdash;</dd>
+                    <dt>Expires on</dt><dd id="ii-expires">&mdash;</dd>
+                    <dt>Activated on</dt><dd id="ii-used">&mdash;</dd>
+                </dl>
+            </section>
+            <div style="display:flex;justify-content:flex-end;margin-top:16px;">
+                <button class="admin-btn-secondary" data-invite-info-close type="button">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function(){
+    var overlay = document.getElementById('invite-info-overlay');
+    if (!overlay) return;
+    function fill(id, value) {
+        var el = document.getElementById(id);
+        if (el) el.textContent = (value === undefined || value === null || value === '') ? '—' : value;
+    }
+    function openInfo(btn) {
+        var d = {};
+        try { d = JSON.parse(btn.getAttribute('data-invite') || '{}'); } catch (e) { d = {}; }
+        fill('ii-name', d.name);
+        fill('ii-email', d.email);
+        fill('ii-phone', d.phone);
+        fill('ii-role', d.role);
+        fill('ii-barangay', d.barangay);
+        fill('ii-status', d.status);
+        fill('ii-inviter', d.inviter);
+        fill('ii-invited', d.invited);
+        fill('ii-expires', d.expires);
+        fill('ii-used', d.used);
+        overlay.hidden = false;
+        document.body.style.overflow = 'hidden';
+    }
+    function closeInfo() {
+        overlay.hidden = true;
+        document.body.style.overflow = '';
+    }
+    document.querySelectorAll('[data-invite-info]').forEach(function(b) {
+        b.addEventListener('click', function() { openInfo(b); });
+    });
+    overlay.querySelectorAll('[data-invite-info-close]').forEach(function(b) {
+        b.addEventListener('click', closeInfo);
+    });
+    overlay.addEventListener('click', function(e) {
+        if (e.target === overlay) closeInfo();
+    });
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && !overlay.hidden) closeInfo();
+    });
+})();
+</script>
 
 <script>
 (function(){

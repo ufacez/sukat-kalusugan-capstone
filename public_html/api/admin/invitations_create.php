@@ -183,8 +183,19 @@ unset($plainCode);
 $maskedPhone = substr($normalizedPhone, 0, 4) . '***' . substr($normalizedPhone, -2);
 $target = $maskedPhone . ($email !== null ? ' / ' . $email : '');
 // The code is NEVER included in the notice (private).
-$noticeParam = ($smsSent && ($email === null || $emailSent))
-    ? 'Invitation sent to ' . $target . '. The code is hidden for privacy.'
-    : 'Invitation created for ' . $target . ', but delivery failed — check SMTP/Semaphore settings. The code was NOT shown here; use Resend to issue a new one.';
+if ($smsSent && ($email === null || $emailSent)) {
+    $noticeParam = 'Invitation sent successfully to ' . $target . '. The code stays hidden for security.';
+} else {
+    $failedChannels = [];
+    if (!$smsSent) {
+        $failedChannels[] = 'SMS';
+    }
+    if ($email !== null && !$emailSent) {
+        $failedChannels[] = 'email';
+    }
+    $noticeParam = 'Invitation created for ' . $target . '. The '
+        . implode(' and ', $failedChannels)
+        . ' notification could not be delivered right now — tap Resend to send the code again.';
+}
 
 admin_redirect('/admin/invitations.php', ['notice' => $noticeParam]);
