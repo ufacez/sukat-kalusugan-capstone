@@ -73,6 +73,7 @@ if ($user !== null) {
             <ul style="margin:0 0 8px 18px;line-height:1.6;font-size:.92rem;">
                 <li>Record weight/height and track WHO growth standards</li>
                 <li>Separate staff and parent access with role checks</li>
+                <li>No software, installers, or downloads — only account-gated report exports</li>
                 <li>Philippines Data Privacy Act (RA 10173) notice in <a class="link" href="privacy.php">Privacy</a></li>
             </ul>
             <p style="display:flex;gap:.6rem;flex-wrap:wrap;margin:12px 0;justify-content:center;">

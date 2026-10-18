@@ -3,10 +3,30 @@
 # it at the project root by mistake instead.
 Options -Indexes
 
+# Block dotfiles (.env, .git/, etc.). .well-known is excepted so
+# /.well-known/security.txt stays reachable.
 <FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Block secrets and build artifacts even if the docroot is wrong.
+<FilesMatch "\.(sql|sqlite|db|log|ini|lock)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^(composer\.(json|lock)|backup_.*|\.env.*)$">
     Require all denied
 </FilesMatch>
 
 RedirectMatch 403 ^/db/
 RedirectMatch 403 ^/docs/
 RedirectMatch 403 ^/logs/
+RedirectMatch 403 ^/vendor/
+RedirectMatch 403 ^/\.git/
+RedirectMatch 403 ^/\.env
+
+# Keep responsible-disclosure file reachable.
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule ^\.well-known/ - [L]
+</IfModule>

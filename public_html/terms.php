@@ -34,6 +34,8 @@ start_secure_session();
 <li>Do not test security, scrape, or access other users' records. Report issues to espirituean@gmail.com.</li>
 <li>We may suspend accounts that misuse the system or enter false data.</li>
 </ul>
+<h3>No software downloads</h3>
+<p style="font-size:.92rem;">These terms are the end-user agreement for using this website. Sukat Kalusugan distributes no software, installers, or bundled programs. Report exports (Excel/CSV/PDF) are data files generated on request for authorized, signed-in accounts and are governed by these terms and our <a class="link" href="privacy.php">privacy notice</a>.</p>
 <p style="font-size:.92rem;">Contact: <a class="link" href="mailto:espirituean@gmail.com">espirituean@gmail.com</a> / 09614730364, Philippines.</p>
 <p class="auth-card-footer"><a class="link" href="./">Home</a> &middot; <a class="link" href="about.php">About</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="contact.php">Contact</a></p>
 </section>

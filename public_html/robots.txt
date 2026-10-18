@@ -4,14 +4,15 @@ Allow: /about.php
 Allow: /privacy.php
 Allow: /terms.php
 Allow: /contact.php
-Allow: /auth/login.php
-Allow: /auth/forgot-password.php
+Allow: /auth/
 Disallow: /api/
 Disallow: /admin/
 Disallow: /nutritionist/
 Disallow: /parent/
 Disallow: /kiosk/
-Disallow: /auth/activate.php
-Disallow: /auth/reset-password.php
 
 Sitemap: https://sukatkalusugan.app/sitemap.xml
+
+# Note: /auth/* pages are crawlable on purpose so their X-Robots-Tag
+# (noindex, nofollow, noarchive) is honored. A Disallow would hide that
+# signal and let the URL be indexed without it.

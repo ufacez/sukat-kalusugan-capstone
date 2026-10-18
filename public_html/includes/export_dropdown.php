@@ -73,6 +73,8 @@ function export_dropdown_assets(): string
 .export-dd-trigger-icon{width:28px;height:28px;min-height:28px;padding:0;justify-content:center}
 .export-dd-trigger-icon::after{display:none}
 .export-dd-trigger-icon svg{width:15px;height:15px}
+.export-dd-note{margin:4px 2px 2px;padding:8px 8px 2px;border-top:1px solid var(--admin-border,#e5e7eb);font-size:11px;line-height:1.4;color:var(--admin-muted,#6b7280)}
+.export-dd-note .link{color:inherit;text-decoration:underline}
 </style>
 <script>
 (function(){
@@ -160,6 +162,7 @@ function export_dropdown(string $xlsxUrl, ?string $csvUrl = null, ?string $pdfUr
 			. '<span><span class="export-dd-label">PDF document</span><br><span class="export-dd-sub">Official printable copy</span></span>'
 			. '<span class="fmt">PDF</span></a>';
 	}
+	$html .= '<p class="export-dd-note">Authorized data export. By downloading you accept our <a class="link" href="' . $esc(app_url('/terms.php')) . '" target="_blank" rel="noopener">Terms</a> and <a class="link" href="' . $esc(app_url('/privacy.php')) . '" target="_blank" rel="noopener">Privacy notice</a>.</p>';
 	$html .= '</div></details>';
 	return $html;
 }

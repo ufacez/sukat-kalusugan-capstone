@@ -44,6 +44,14 @@ start_secure_session();
 </ul>
 <h3>Security</h3>
 <p style="font-size:.92rem;">HTTPS everywhere (except constrained ESP32 device endpoints), hashed passwords, HttpOnly Secure session cookies, role checks on every page/API, audit logging.</p>
+<h3>Third parties &amp; data transmission</h3>
+<p style="font-size:.92rem;">Some data leaves this server to run the service. We do not sell data or share it for advertising.</p>
+<ul style="line-height:1.6;font-size:.92rem;margin:0 0 8px 18px;">
+<li><strong>Firebase Realtime Database (Google)</strong> — a live mirror of the latest measurement so the kiosk tablet can display the result in real time.</li>
+<li><strong>Google Gemini / OpenAI</strong> — when a staff member uses the AI assistant or growth insights, the relevant non-identifying health figures may be sent to generate a summary. No account passwords are sent.</li>
+<li><strong>Email/SMS provider (SMTP/SMS gateway)</strong> — used only to deliver account invitations, activation, and password-reset links.</li>
+<li>These providers process data on our behalf under their own terms; we send only what each task needs.</li>
+</ul>
 <h3>Your rights (RA 10173)</h3>
 <p style="font-size:.92rem;">You may request access, correction, or deletion of your and your child's data via <a class="link" href="mailto:espirituean@gmail.com">espirituean@gmail.com</a> / 09614730364. We respond within a reasonable time and delete test data on request.</p>
 <h3>Retention</h3>

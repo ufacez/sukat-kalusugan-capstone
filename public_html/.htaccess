@@ -31,7 +31,17 @@ RewriteEngine On
 # Never list directory contents.
 Options -Indexes
 
-# Block access to dotfiles.
+# Block access to dotfiles (but /.well-known/security.txt is served by name,
+# not matched here since FilesMatch tests the file's basename).
 <FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
+
+# Defense-in-depth: never serve secrets or build artifacts from the webroot.
+<FilesMatch "\.(sql|sqlite|db|log|ini|lock)$">
+    Require all denied
+</FilesMatch>
+
+<FilesMatch "^(composer\.(json|lock)|backup_.*)$">
     Require all denied
 </FilesMatch>

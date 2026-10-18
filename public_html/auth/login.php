@@ -88,7 +88,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                 <p class="muted">Use your staff username/email or parent email and password.</p>
             </div>
 
-            <div class="flash flash-notice" role="status">Sukat Kalusugan is a student capstone by <strong>Group A4Tech</strong> (OLFU). Authorized accounts only — no public sign-up. Accounts are issued by the project team. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>
+            <div class="flash flash-notice" role="status">Sukat Kalusugan is a student capstone by <strong>Group A4Tech</strong> (OLFU). Authorized accounts only — no public sign-up. Accounts are issued by the project team. We ask for your username/email and password only to verify the account we issued to you. This page is not affiliated with OLFU, Google, or any bank or government login, and we never ask for payment details. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>
 
             <?php if ($error !== ''): ?>
                 <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>

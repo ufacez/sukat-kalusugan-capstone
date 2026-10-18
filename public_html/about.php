@@ -34,6 +34,8 @@ start_secure_session();
 <li>Parent accounts created by staff for their own children</li>
 <li>No self sign-up, no downloads, no payments</li>
 </ul>
+<h3>No software is distributed here</h3>
+<p style="font-size:.92rem;">This website offers <strong>no software, installers, browser extensions, or executables</strong>. The only files it ever produces are printable report exports (Excel/CSV/PDF) generated for a signed-in account that is authorized to view those records. Nothing is installed on your device, and this site is not affiliated with Our Lady of Fatima University or any bank, government, or health login.</p>
 <h3>Contact</h3>
 <p style="font-size:.92rem;">Group A4Tech<br>Email: <a class="link" href="mailto:espirituean@gmail.com">espirituean@gmail.com</a><br>Phone: 09614730364<br>Philippines</p>
 <p class="auth-card-footer"><a class="link" href="./">Home</a> &middot; <a class="link" href="privacy.php">Privacy</a> &middot; <a class="link" href="terms.php">Terms</a> &middot; <a class="link" href="contact.php">Contact</a></p>

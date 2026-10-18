@@ -160,6 +160,30 @@ function maybe_enforce_https(): void
 }
 
 /**
+ * Paths that must never be indexed: credential pages (/auth/) and every
+ * authenticated area. Emitted as X-Robots-Tag (noindex) rather than a
+ * robots.txt Disallow, because a Disallowed URL can still be indexed without
+ * its noindex signal. Report/download responses under these paths inherit the
+ * header too, so crawlers never sample an export file.
+ */
+function private_area_noindex_path(): bool
+{
+    $uri = (string)($_SERVER['REQUEST_URI'] ?? '');
+    $path = $uri !== ''
+        ? (string)parse_url($uri, PHP_URL_PATH)
+        : (string)($_SERVER['SCRIPT_NAME'] ?? '');
+    if ($path === '') {
+        return false;
+    }
+    foreach (['/auth/', '/api/', '/admin/', '/nutritionist/', '/parent/', '/kiosk/'] as $prefix) {
+        if (str_contains($path, $prefix)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+/**
  * Security headers. HSTS is only sent over HTTPS (sending it over HTTP is
  * ignored by browsers and would be misleading). Other hardening headers are
  * safe on both schemes and skipped for ESP32 polling responses to keep the
@@ -192,4 +216,9 @@ function send_security_headers(): void
     // (email template, old DB content), the browser upgrades it to https://
     // instead of dropping the padlock.
     header("Content-Security-Policy: upgrade-insecure-requests", false);
+
+    // Keep credential pages, dashboards, and export downloads out of search.
+    if (private_area_noindex_path()) {
+        header('X-Robots-Tag: noindex, nofollow, noarchive', false);
+    }
 }

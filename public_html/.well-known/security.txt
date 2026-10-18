@@ -1,0 +1,6 @@
+Contact: mailto:espirituean@gmail.com
+Expires: 2027-12-31T23:59:59.000Z
+Preferred-Languages: en, tl
+Canonical: https://sukatkalusugan.app/.well-known/security.txt
+Policy: https://sukatkalusugan.app/terms.php
+Acknowledgments: https://sukatkalusugan.app/about.php
