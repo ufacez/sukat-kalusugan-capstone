@@ -21,7 +21,7 @@ $raw = file_get_contents('php://input');
 $input = json_decode($raw ?: '{}', true);
 
 if (!is_array($input)) {
-    api_error('Invalid JSON request.', 400);
+    api_error('Invalid JSON request.', 400, ['code' => 'invalid_json']);
 }
 
 /*
@@ -66,11 +66,11 @@ $isRecheck = (bool)(
 */
 
 if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
-    api_error('Invalid device ID.', 400);
+    api_error('Invalid device ID.', 400, ['code' => 'invalid_device']);
 }
 
 if ($childId <= 0) {
-    api_error('A valid child must be selected.', 400);
+    api_error('A valid child must be selected.', 400, ['code' => 'child_required']);
 }
 
 /*
@@ -93,7 +93,7 @@ $preDeviceStmt = mysqli_prepare(
 );
 
 if ($preDeviceStmt === false) {
-    api_error('Unable to prepare device lookup.', 500);
+    api_error('Unable to prepare device lookup.', 500, ['code' => 'unable_device_lookup']);
 }
 
 mysqli_stmt_bind_param($preDeviceStmt, 's', $deviceCode);
@@ -107,7 +107,7 @@ $preDeviceRow = (
 mysqli_stmt_close($preDeviceStmt);
 
 if (!is_array($preDeviceRow)) {
-    api_error('Device not registered: ' . $deviceCode, 400);
+    api_error('Device not registered: ' . $deviceCode, 400, ['code' => 'device_not_registered']);
 }
 
 $deviceDbId = (int)$preDeviceRow['id'];
@@ -532,7 +532,8 @@ try {
     if (!is_array($sessionRow)) {
         api_error(
             'Measurement session was created but could not be loaded.',
-            500
+            500,
+            ['code' => 'session_load_failed']
         );
     }
 
@@ -573,8 +574,23 @@ try {
         . $e->getMessage()
     );
 
+    // Map the few controlled RuntimeException messages that the kiosk UI
+    // shows to the operator onto stable translation codes. Everything else
+    // stays generic so internal SQL details are never surfaced.
+    $exceptionMessage = $e->getMessage();
+    $errorCode = 'server_error';
+
+    if (str_contains($exceptionMessage, 'already active')) {
+        $errorCode = 'session_already_active';
+    } elseif (str_contains($exceptionMessage, 'Device not registered')) {
+        $errorCode = 'device_not_registered';
+    } elseif (str_contains($exceptionMessage, 'child was not found')) {
+        $errorCode = 'child_not_found';
+    }
+
     api_error(
-        $e->getMessage(),
-        500
+        $exceptionMessage,
+        500,
+        ['code' => $errorCode]
     );
 }

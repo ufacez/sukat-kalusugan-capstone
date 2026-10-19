@@ -10,6 +10,46 @@
   const data = window.KIOSK_DATA || {};
   const body = document.body;
 
+  // ============================================================
+  // I18N
+  // ============================================================
+  // Active-language dictionary is embedded by kiosk_index.php into
+  // window.KIOSK_DATA.i18n (see includes/kiosk_i18n.php). Keys are shared
+  // with the server-rendered markup; missing keys fall back to the key
+  // itself, and {placeholder} tokens are interpolated from `vars`.
+  const i18n =
+    data && typeof data.i18n === "object" && data.i18n
+      ? data.i18n
+      : {};
+
+  function t(key, vars) {
+    let str = Object.prototype.hasOwnProperty.call(i18n, key)
+      ? i18n[key]
+      : key;
+    if (vars) {
+      Object.keys(vars).forEach(function (name) {
+        str = str.split("{" + name + "}").join(String(vars[name]));
+      });
+    }
+    return str;
+  }
+
+  // Map a server error envelope to a localized message. The kiosk APIs send
+  // a stable machine-readable `code` (see public_html/api/kiosk/*) so the UI
+  // stays in one language; unknown codes fall back to the server message.
+  function apiErrorMessage(json, fallbackKey) {
+    const code =
+      json && typeof json.code === "string" ? json.code.trim() : "";
+    const key = code ? "errors." + code : "";
+    if (key && Object.prototype.hasOwnProperty.call(i18n, key)) {
+      return t(key);
+    }
+    return (
+      (json && typeof json.message === "string" && json.message) ||
+      t(fallbackKey || "errors.server_error")
+    );
+  }
+
   // No hardcoded fallback: an unregistered/empty device must stay empty.
   // Previously this fell back to "ESP32-KIOSK-01", so a bare kiosk URL
   // showed the "Device not registered" banner yet silently loaded that
@@ -193,12 +233,11 @@
     if (ageEl) {
       var months = child.age_months || 0;
       var days = child.age_days || 0;
-      var primary = months >= 12
-        ? Math.floor(months / 12) + " taon, " + (months % 12) + " buwan"
-        : months + " buwan";
-      ageEl.textContent = primary + " (" + days + " araw)";
+      ageEl.textContent = months >= 12
+        ? t("age.years_months_days", { y: Math.floor(months / 12), m: months % 12, d: days })
+        : t("age.months_days", { m: months, d: days });
     }
-    if (sexEl) sexEl.textContent = child.sex === "Male" ? "Lalaki" : "Babae";
+    if (sexEl) sexEl.textContent = child.sex === "Male" ? t("sex.male") : t("sex.female");
   }
 
   function selectChildFromPreview(child) {
@@ -212,12 +251,12 @@
     var months = c.age_months || 0;
     var days = c.age_days || 0;
     var ageText = months >= 12
-      ? Math.floor(months / 12) + " taon, " + (months % 12) + " buwan · " + days + " araw"
-      : months + " buwan · " + days + " araw";
+      ? t("age.years_months_dot_days", { y: Math.floor(months / 12), m: months % 12, d: days })
+      : t("age.months_dot_days", { m: months, d: days });
     var firstInitial = (c.first_name || "?").charAt(0).toUpperCase();
     var lastInitial = (c.last_name || "?").charAt(0).toUpperCase();
     var initials = firstInitial + lastInitial;
-    var sexLabel = c.sex === "Male" ? "Lalaki" : "Babae";
+    var sexLabel = c.sex === "Male" ? t("sex.male") : t("sex.female");
     var sexIcon = c.sex === "Male" ? "♂" : "♀";
 
     return (
@@ -247,7 +286,7 @@
     if (!matches || matches.length === 0) {
       lookupPreview.innerHTML =
         '<div class="kiosk-lookup-preview-empty">' +
-          'Walang nahanap na record. Subukan ang ibang pangalan o Child ID.' +
+          escapeHtml(t("lookup.no_record")) +
         '</div>';
       lookupPreview.hidden = false;
       return;
@@ -328,8 +367,8 @@
       if (!match) {
         showLookupState("idle");
         pushFeed(
-          "Hindi nahanap",
-          "Walang record na may ganiyang Child ID. Subukan muli.",
+          t("lookup.not_found_title"),
+          t("lookup.simple_no_record"),
           "warn"
         );
         return;
@@ -809,8 +848,8 @@
 
       if (newCount > 0) {
         pushFeed(
-          "Nag-i-update ang listahan",
-          `${newCount} bagong bata nabunuan sa system.`,
+          t("feed.children_updated_title"),
+          t("feed.children_updated_detail", { n: newCount }),
           "info"
         );
       }
@@ -879,7 +918,7 @@
 
   function formatChildName(child) {
     if (!child) {
-      return "Choose a child";
+      return t("results.select_child");
     }
 
     return (
@@ -1380,7 +1419,7 @@
     if (refs.processingErrorMessage) {
       refs.processingErrorMessage.textContent =
         message ||
-        "Something went wrong with the measurement.";
+        t("processing.error_default");
     }
   }
 
@@ -1420,25 +1459,25 @@
 
     if (state.processingStarted) {
       button.textContent =
-        "Pinoproseso...";
+        t("measure.process_btn_busy");
     } else if (ready) {
       button.textContent =
-        "I-process ang measurement";
+        t("measure.process");
     } else if (
       state.weightLocked &&
       !state.heightLocked
     ) {
       button.textContent =
-        "Naghihintay ng Taas";
+        t("measure.wait_height_btn");
     } else if (
       !state.weightLocked &&
       state.heightLocked
     ) {
       button.textContent =
-        "Naghihintay ng Timbang";
+        t("measure.wait_weight_btn");
     } else {
       button.textContent =
-        "Naghihintay ng Stable na Reading";
+        t("measure.wait_stable_btn");
     }
   }
 
@@ -1465,29 +1504,29 @@
 
     if (refs.weightStatus) {
       refs.weightStatus.textContent =
-        "Weight captured";
+        t("measure.weight_captured");
     }
 
     if (refs.heightStatus) {
       refs.heightStatus.textContent =
-        "Height captured";
+        t("measure.height_captured");
     }
 
     setProgress(
       60,
-      "Measurement ready. Click Process Measurement."
+      t("measure.ready_click")
     );
 
     if (heroNote) {
       heroNote.textContent =
-        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
+        t("device.hero_online");
     }
 
     updateProcessButton();
 
     pushFeed(
-      "Measurement ready",
-      "Weight and height captured. Waiting for operator."
+      t("measure.ready_feed_title"),
+      t("measure.ready_feed_detail")
     );
 
     saveSessionToStorage();
@@ -1502,8 +1541,8 @@
   function selectChild(childId) {
     if (isMeasurementActive()) {
       pushFeed(
-        "Selection locked",
-        "Wait for the current measurement to finish.",
+        t("feed.selection_locked_title"),
+        t("feed.selection_locked_active"),
         "warn"
       );
 
@@ -1512,8 +1551,8 @@
 
     if (state.processingStarted) {
       pushFeed(
-        "Selection locked",
-        "The current measurement is being processed.",
+        t("feed.selection_locked_title"),
+        t("feed.selection_locked_processing"),
         "warn"
       );
 
@@ -1551,7 +1590,7 @@
 
     if (child) {
       pushFeed(
-        "Child selected",
+        t("feed.child_selected_title"),
         `${
           child.child_code || "Child"
         } · ${formatChildName(child)}`
@@ -1618,10 +1657,10 @@
       startButton.textContent =
         state.submitting ||
         state.startRequestInProgress
-          ? "Sinisimulan..."
+          ? t("welcome.starting")
           : deviceUnavailable
-          ? "Device Offline"
-          : "SIMULAN";
+          ? t("welcome.device_offline")
+          : t("welcome.start");
     }
 
     /*
@@ -1721,7 +1760,8 @@
 
   function setWeight(
     value,
-    message = "Reading weight..."
+    message,
+    tone
   ) {
     const weight =
       Number(value);
@@ -1740,7 +1780,7 @@
 
     if (refs.weightStatus) {
       refs.weightStatus.textContent =
-        message;
+        message || t("measure.weight_reading");
     }
 
     // Update stability icon
@@ -1751,7 +1791,7 @@
     if (weightStatusIcon) {
       weightStatusIcon.className =
         "kiosk-status-icon " +
-        (message.includes("stable") || message.includes("captured")
+        (tone === "stable"
           ? "stable"
           : "waiting");
     }
@@ -1799,7 +1839,7 @@
 
     setChip(
       loadCellChip,
-      "Scale: Live",
+      t("chip.scale_live"),
       true
     );
 
@@ -1818,7 +1858,8 @@
 
   function setHeight(
     value,
-    message = "Reading height..."
+    message,
+    tone
   ) {
     const height =
       Number(value);
@@ -1837,7 +1878,7 @@
 
     if (refs.heightStatus) {
       refs.heightStatus.textContent =
-        message;
+        message || t("measure.height_reading");
     }
 
     // Update stability icon
@@ -1848,7 +1889,7 @@
     if (heightStatusIcon) {
       heightStatusIcon.className =
         "kiosk-status-icon " +
-        (message.includes("stable") || message.includes("captured")
+        (tone === "stable"
           ? "stable"
           : "waiting");
     }
@@ -1884,7 +1925,7 @@
 
     setChip(
       lidarChip,
-      "LiDAR: Live",
+      t("chip.lidar_live"),
       true
     );
 
@@ -2106,7 +2147,7 @@
 
     setChip(
       connectedChip,
-      "Device: Connected",
+      t("chip.device_connected"),
       true
     );
 
@@ -2139,7 +2180,7 @@
 
       const readyMessage =
         payload.message ||
-        "Please step on the platform now.";
+        t("measure.stand_now");
 
       setProgress(
         10,
@@ -2150,12 +2191,12 @@
 
       if (refs.weightStatus) {
         refs.weightStatus.textContent =
-          "Tumayo sa platform...";
+          t("measure.standing");
       }
 
       if (refs.heightStatus) {
         refs.heightStatus.textContent =
-          "Tumayo sa platform...";
+          t("measure.standing");
       }
 
       saveSessionToStorage();
@@ -2212,8 +2253,9 @@
         setWeight(
           weight,
           locked
-            ? "Timbang stable"
-            : "Binabasa ang timbang..."
+            ? t("measure.weight_stable")
+            : t("measure.weight_reading"),
+          locked ? "stable" : "waiting"
         );
       }
 
@@ -2228,8 +2270,9 @@
         setHeight(
           height,
           locked
-            ? "Taas stable"
-            : "Binabasa ang taas..."
+            ? t("measure.height_stable")
+            : t("measure.height_reading"),
+          locked ? "stable" : "waiting"
         );
       }
 
@@ -2258,8 +2301,8 @@
         state.weightLocked = true;
         state.heightLocked = true;
 
-        setWeight(finalWeight, "Huling timbang na stable");
-        setHeight(finalHeight, "Huling taas na stable");
+        setWeight(finalWeight, t("measure.final_weight"), "stable");
+        setHeight(finalHeight, t("measure.final_height"), "stable");
         markMeasurementReady();
       } else {
         // Sync with ESP32: it clears finalReady on any jitter
@@ -2286,7 +2329,7 @@
       setProgress(
         progress,
         payload.message ||
-          "Stand still while the sensors capture your measurement..."
+          t("measure.stand_still_progress")
       );
 
       saveSessionToStorage();
@@ -2310,7 +2353,8 @@
 
         setWeight(
           weight,
-          "Weight captured"
+          t("measure.weight_captured"),
+          "stable"
         );
       }
 
@@ -2320,7 +2364,8 @@
 
         setHeight(
           height,
-          "Height captured"
+          t("measure.height_captured"),
+          "stable"
         );
       }
 
@@ -2342,8 +2387,8 @@
       markMeasurementReady();
 
       pushFeed(
-        "Sensors complete",
-        "Weight and height captured. Click Process Measurement."
+        t("measure.sensors_complete_title"),
+        t("measure.sensors_complete_detail")
       );
 
       saveSessionToStorage();
@@ -2379,21 +2424,21 @@
       showProcessingError(
         payload.message ||
           payload.error_message ||
-          "Measurement failed."
+          t("processing.failed_default")
       );
 
       setProgress(
         100,
         payload.message ||
           payload.error_message ||
-          "Measurement failed."
+          t("processing.failed_default")
       );
 
       pushFeed(
-        "Measurement failed",
+        t("processing.error_title"),
         payload.message ||
           payload.error_message ||
-          "Unknown measurement error.",
+          t("processing.unknown_error"),
         "error"
       );
 
@@ -2446,7 +2491,7 @@
 
         setChip(
           connectedChip,
-          "Device: Offline",
+          t("chip.device_offline"),
           false
         );
 
@@ -2470,7 +2515,7 @@
 
       setChip(
         connectedChip,
-        "Device: Connected",
+        t("chip.device_connected"),
         true
       );
 
@@ -2687,7 +2732,7 @@
 
       setChip(
         connectedChip,
-        "Device: Offline",
+        t("chip.device_offline"),
         false
       );
 
@@ -2706,7 +2751,7 @@
       if (!wsEnabled) {
         setChip(
           connectedChip,
-          "Device: Offline",
+          t("chip.device_offline"),
           false
         );
       }
@@ -2714,7 +2759,7 @@
       if (wsEnabled && !wsConnected) {
         setChip(
           connectedChip,
-          "Device: Waiting",
+          t("chip.device_waiting"),
           false
         );
       }
@@ -2824,12 +2869,12 @@
           welcomeDot.classList.add("online");
         }
         if (welcomeLabel) {
-          welcomeLabel.textContent = "Device online";
+          welcomeLabel.textContent = t("welcome.device_online");
         }
 
         setChip(
           connectedChip,
-          "Device: Connected",
+          t("chip.device_connected"),
           true
         );
 
@@ -2839,8 +2884,8 @@
         stopFirebasePolling();
 
         pushFeed(
-          "WebSocket connected",
-          "Live sensor data via local network."
+        t("device.ws_connected_title"),
+        t("device.ws_connected_detail")
         );
       };
 
@@ -3041,8 +3086,9 @@
       setWeight(
         weight,
         locked
-          ? "Timbang stable"
-          : "Binabasa ang timbang..."
+          ? t("measure.weight_stable")
+          : t("measure.weight_reading"),
+        locked ? "stable" : "waiting"
       );
     }
 
@@ -3057,8 +3103,9 @@
       setHeight(
         height,
         locked
-          ? "Taas stable"
-          : "Binabasa ang taas..."
+          ? t("measure.height_stable")
+          : t("measure.height_reading"),
+        locked ? "stable" : "waiting"
       );
     }
 
@@ -3115,12 +3162,14 @@
 
         setWeight(
           finalWeight,
-          "Huling timbang na stable"
+          t("measure.final_weight"),
+          "stable"
         );
 
         setHeight(
           finalHeight,
-          "Huling taas na stable"
+          t("measure.final_height"),
+          "stable"
         );
 
         markMeasurementReady();
@@ -3150,7 +3199,7 @@
       setProgress(
         progress,
         payload.message ||
-          "Stand still while the sensors capture your measurement..."
+          t("measure.stand_still_progress")
       );
 
       saveSessionToStorage();
@@ -3168,13 +3217,13 @@
       if (hasWeight) {
         state.weightLocked = true;
 
-        setWeight(weight, "Weight captured");
+        setWeight(weight, t("measure.weight_captured"), "stable");
       }
 
       if (hasHeight) {
         state.heightLocked = true;
 
-        setHeight(height, "Height captured");
+        setHeight(height, t("measure.height_captured"), "stable");
       }
 
       state.phase = "live";
@@ -3193,8 +3242,8 @@
       markMeasurementReady();
 
       pushFeed(
-        "Sensors complete",
-        "Weight and height captured. Click Process Measurement."
+        t("measure.sensors_complete_title"),
+        t("measure.sensors_complete_detail")
       );
 
       saveSessionToStorage();
@@ -3221,21 +3270,21 @@
       showProcessingError(
         payload.message ||
           payload.error_message ||
-          "Measurement failed."
+          t("processing.failed_default")
       );
 
       setProgress(
         100,
         payload.message ||
           payload.error_message ||
-          "Measurement failed."
+          t("processing.failed_default")
       );
 
       pushFeed(
-        "Measurement failed",
+        t("processing.error_title"),
         payload.message ||
           payload.error_message ||
-          "Unknown measurement error.",
+          t("processing.unknown_error"),
         "error"
       );
 
@@ -3315,8 +3364,7 @@
         json?.success !== true
       ) {
         throw new Error(
-          json?.message ||
-            "Unable to load measurement status."
+          apiErrorMessage(json, "errors.unable_load_status")
         );
       }
 
@@ -3349,10 +3397,11 @@
         );
 
         pushFeed(
-          "Session mismatch",
-          `Expected SQL session #${expectedSessionId}, but server returned #${
-            returnedSessionId || "unknown"
-          }.`,
+          t("errors.session_mismatch"),
+          t("feed.session_mismatch_detail", {
+            expected: expectedSessionId,
+            received: returnedSessionId || "?"
+          }),
           "error"
         );
 
@@ -3388,7 +3437,7 @@
       ) {
         processingFailed(
           payload.error_message ||
-            "Measurement failed."
+            t("processing.failed_default")
         );
 
         return payload;
@@ -3517,8 +3566,8 @@
       setStep("child-lookup");
 
       pushFeed(
-        "Child lookup",
-        "Enter Child ID to find the record."
+        t("feed.child_lookup_title"),
+        t("feed.child_lookup_detail")
       );
 
       return false;
@@ -3550,8 +3599,9 @@
         dueCheckJson?.success === true &&
         dueCheckJson?.data?.is_due === false
       ) {
-        const nextDue =
-          dueCheckJson?.data?.next_due || "unknown";
+        const nextDueRaw =
+          dueCheckJson?.data?.next_due || null;
+        const nextDue = nextDueRaw || "unknown";
         const reason =
           dueCheckJson?.data?.reason || "";
 
@@ -3589,18 +3639,37 @@
         }
 
         if (notDueAge) {
-          notDueAge.textContent =
-            child.age_display || "";
+          var notDueMonths = Number(child.age_months);
+          var notDueDays = Number(child.age_days);
+
+          if (typeof child.age_display === "string" && child.age_display !== "") {
+            notDueAge.textContent = child.age_display;
+          } else if (Number.isFinite(notDueMonths)) {
+            notDueAge.textContent =
+              notDueMonths >= 12
+                ? t("age.years_months_days", {
+                    y: Math.floor(notDueMonths / 12),
+                    m: notDueMonths % 12,
+                    d: Number.isFinite(notDueDays) ? notDueDays : 0
+                  })
+                : t("age.months_days", {
+                    m: notDueMonths,
+                    d: Number.isFinite(notDueDays) ? notDueDays : 0
+                  });
+          } else {
+            notDueAge.textContent = "";
+          }
         }
 
         if (notDueSex) {
           notDueSex.textContent =
-            child.sex === "male"
-              ? "Lalaki"
-              : "Babae";
+            sexLabel(child.sex);
         }
 
-        if (notDueReason) {
+        if (notDueReason && nextDueRaw === null) {
+          // No scheduled date (e.g. aged out of the 0-59 month coverage).
+          notDueReason.textContent = t("notdue.aged_out");
+        } else if (notDueReason) {
           var formattedDate = nextDue;
           try {
             var parts = nextDue.split("-");
@@ -3624,14 +3693,14 @@
               /\(in (\d+) days?\)/
             );
           var daysText = daysMatch
-            ? " " + daysMatch[0]
+            ? t("notdue.days", { n: daysMatch[1] })
             : "";
 
           notDueReason.textContent =
-            "Hindi pa due. Next scheduled: " +
-            formattedDate +
-            daysText +
-            ".";
+            t("notdue.reason", {
+              date: formattedDate,
+              days: daysText
+            });
         }
 
         // Offer anytime double-check: when the child was already
@@ -3653,7 +3722,7 @@
                 /already been recorded/i.test(reason || "")
               ) {
                 notDueReason.textContent =
-                  "Nasukat na ngayong araw. Puwede pa ring mag-double-check nang hindi magbabago ang schedule.";
+                  t("notdue.already_today");
               }
             } else {
               recheckBtn.hidden = true;
@@ -3691,8 +3760,8 @@
       isMeasurementActive()
     ) {
       pushFeed(
-        "Start blocked",
-        "A measurement is already active.",
+        t("measure.start_blocked_title"),
+        t("measure.start_blocked_active"),
         "warn"
       );
 
@@ -3704,8 +3773,8 @@
       state.processingStarted
     ) {
       pushFeed(
-        "Start blocked",
-        "The current measurement is still being processed.",
+        t("measure.start_blocked_title"),
+        t("measure.start_blocked_processing"),
         "warn"
       );
 
@@ -3722,8 +3791,8 @@
       // disabled because markMeasurementReady() never fires without
       // live data, so no measurement can be submitted.
       pushFeed(
-        "Device offline",
-        "Hindi makakonekta sa device. I-check ang ESP32 at subukan muli.",
+        t("device.offline"),
+        t("measure.device_offline_feed"),
         "warn"
       );
     }
@@ -3784,8 +3853,7 @@
         json?.success !== true
       ) {
         throw new Error(
-          json?.message ||
-            "Could not start measurement."
+          apiErrorMessage(json, "errors.start_failed")
         );
       }
 
@@ -3803,7 +3871,7 @@
         newSessionId <= 0
       ) {
         throw new Error(
-          "Server did not return a valid measurement session ID."
+          t("errors.invalid_session_response")
         );
       }
 
@@ -3905,7 +3973,7 @@
 
       setProgress(
         10,
-        "Tumayo sa platform ngayon."
+        t("measure.stand_now")
       );
 
       if (refs.weightReadout) {
@@ -3920,12 +3988,12 @@
 
       if (refs.weightStatus) {
         refs.weightStatus.textContent =
-          "Tumayo sa platform...";
+          t("measure.standing");
       }
 
       if (refs.heightStatus) {
         refs.heightStatus.textContent =
-          "Tumayo sa platform...";
+          t("measure.standing");
       }
 
       if (refs.weightBars) {
@@ -3941,27 +4009,28 @@
 
       setChip(
         connectedChip,
-        "Device: Waiting",
+        t("chip.device_waiting"),
         false
       );
 
       setChip(
         loadCellChip,
-        "Scale: Waiting",
+        t("chip.scale_waiting"),
         false
       );
 
       setChip(
         lidarChip,
-        "LiDAR: Waiting",
+        t("chip.lidar_waiting"),
         false
       );
 
       pushFeed(
-        "Measurement started",
-        `${
-          child.child_code || "Child"
-        } · Session #${newSessionId} · waiting for ESP32`
+        t("measure.started_feed_title"),
+        t("measure.started_feed_detail", {
+          code: child.child_code || t("common.child"),
+          id: newSessionId
+        })
       );
 
       startFirebasePolling();
@@ -3989,9 +4058,9 @@
       syncStartButtonState();
 
       pushFeed(
-        "Start failed",
+        t("measure.start_failed_title"),
         error.message ||
-          "Unable to contact server.",
+          t("errors.unable_contact_server"),
         "error"
       );
 
@@ -4017,7 +4086,7 @@
         if (errorBanner && errorText) {
           errorText.textContent =
             error.message ||
-            "Hindi nagsimula ang measurement. Subukan muli.";
+            t("measure.start_error_default");
           errorBanner.hidden =
             false;
         }
@@ -4183,8 +4252,8 @@
 
     if (!state.child) {
       pushFeed(
-        "Processing blocked",
-        "No child selected.",
+        t("processing.blocked_title"),
+        t("processing.no_child"),
         "warn"
       );
 
@@ -4201,8 +4270,8 @@
       // snapshot ("No manual fallback"). Sending PROCESS early makes
       // the ESP32 go ERROR with "FINAL SNAPSHOT IS NOT READY".
       pushFeed(
-        "Processing blocked",
-        "Weight and height are not ready.",
+        t("processing.blocked_title"),
+        t("processing.not_ready"),
         "warn"
       );
       return;
@@ -4210,8 +4279,8 @@
 
     if (!state.session) {
       pushFeed(
-        "Processing blocked",
-        "No active measurement session.",
+        t("processing.blocked_title"),
+        t("processing.no_session"),
         "warn"
       );
 
@@ -4240,8 +4309,8 @@
 
     if (!sessionId) {
       pushFeed(
-        "Processing blocked",
-        "The measurement session ID is missing.",
+        t("processing.blocked_title"),
+        t("processing.missing_session_id"),
         "error"
       );
 
@@ -4261,7 +4330,7 @@
     if (processBtnRef) {
       processBtnRef.disabled = true;
       processBtnRef.textContent =
-        "Hinihintay ang device...";
+        t("processing.waiting_device_btn");
     }
 
     const sessionReady = await waitForSessionMeasuring(
@@ -4270,8 +4339,8 @@
 
     if (!sessionReady) {
       pushFeed(
-        "Processing blocked",
-        "Ang device ay hindi pa handa. Subukan ulit pagkatapos ng ilang segundo.",
+        t("processing.blocked_title"),
+        t("processing.device_not_ready"),
         "warn"
       );
 
@@ -4280,7 +4349,7 @@
           processBtnOriginalDisabled;
         processBtnRef.textContent =
           processBtnOriginalText ||
-          "I-process ang measurement";
+          t("measure.process");
       }
 
       return;
@@ -4288,7 +4357,7 @@
 
     if (processBtnRef) {
       processBtnRef.textContent =
-        "Isinusumite...";
+        t("processing.submitting_btn");
     }
 
     /*
@@ -4363,9 +4432,8 @@
 
       if (!processRequestOk) {
         pushFeed(
-          "Processing blocked",
-          json?.message ||
-            "Could not request processing from the device.",
+          t("processing.blocked_title"),
+          apiErrorMessage(json, "processing.request_failed"),
           "error"
         );
       }
@@ -4376,8 +4444,8 @@
       );
 
       pushFeed(
-        "Processing blocked",
-        "Could not reach the server to request processing.",
+        t("processing.blocked_title"),
+        t("processing.server_unreachable"),
         "error"
       );
     }
@@ -4388,7 +4456,7 @@
           processBtnOriginalDisabled;
         processBtnRef.textContent =
           processBtnOriginalText ||
-          "I-process ang measurement";
+          t("measure.process");
       }
       return;
     }
@@ -4423,15 +4491,15 @@
 
     setProgress(
       65,
-      "Hinihintay mag-send ng sukat yung device..."
+      t("processing.wait_send")
     );
 
     pushFeed(
-      "Processing started",
-      `${
-        state.child.child_code ||
-        "Child"
-      } · Session #${sessionId} · waiting for ESP32 to finalize`
+      t("processing.started_feed_title"),
+      t("processing.started_feed_detail", {
+        code: state.child.child_code || t("common.child"),
+        id: sessionId
+      })
     );
 
     if (state.processingTimer) {
@@ -4464,8 +4532,8 @@
         setProgress(
           Math.round(currentPct),
           elapsed < smoothDurationMs / 2
-            ? "Hinihintay mag-send ng sukat yung device..."
-            : "Kumukuha ng data para sa mga growth indicators..."
+            ? t("processing.wait_send")
+            : t("processing.gathering")
         );
         return;
       }
@@ -4477,7 +4545,7 @@
 
       setProgress(
         94,
-        "Fina-finalize na yung sukat, wait lang..."
+        t("processing.finalizing")
       );
 
       const status = await refreshMeasurementStatus(false);
@@ -4565,7 +4633,7 @@
       ) {
         processingFailed(
           status.error_message ||
-            "Measurement processing failed."
+            t("processing.failed_default")
         );
 
         return;
@@ -4576,7 +4644,7 @@
         maxAttempts
       ) {
         processingFailed(
-          "The server did not confirm the completed measurement."
+          t("processing.not_confirmed")
         );
 
         return;
@@ -4588,7 +4656,7 @@
           94 +
             attempts * 0.05
         ),
-        "Waiting for SQL to confirm the measurement..."
+        t("processing.waiting_sql")
       );
 
       state.backendCompletionTimer =
@@ -4648,7 +4716,7 @@
     );
 
     pushFeed(
-      "Processing failed",
+      t("processing.failed_feed_title"),
       message,
       "error"
     );
@@ -4763,6 +4831,50 @@
     return "is-normal";
   }
 
+  // Display-only translation of canonical status enums. The English
+  // enum strings are still what pills/badges key off (see
+  // nutritionalStatusPillClass/BadgeClass) — only the visible label is
+  // localized so WHO classifications stay stable.
+  function statusLabel(status) {
+    const normalized = String(status || "").trim().toLowerCase();
+
+    if (normalized === "") {
+      return t("common.pending");
+    }
+
+    const keyMap = {
+      "normal": "status.normal",
+      "tall": "status.tall",
+      "underweight": "status.moderately_underweight",
+      "moderately underweight": "status.moderately_underweight",
+      "severely underweight": "status.severely_underweight",
+      "overweight": "status.overweight",
+      "obese": "status.obese",
+      "stunted": "status.moderately_stunted",
+      "moderately stunted": "status.moderately_stunted",
+      "severely stunted": "status.severely_stunted",
+      "wasted": "status.moderately_wasted",
+      "moderately wasted": "status.moderately_wasted",
+      "severely wasted": "status.severely_wasted",
+      "pending": "status.pending"
+    };
+
+    return keyMap[normalized]
+      ? t(keyMap[normalized])
+      : String(status);
+  }
+
+  function sexLabel(value) {
+    const normalized = String(value || "").trim().toLowerCase();
+    if (normalized === "male" || normalized === "m") {
+      return t("sex.male");
+    }
+    if (normalized === "female" || normalized === "f") {
+      return t("sex.female");
+    }
+    return String(value || "—");
+  }
+
   function applyStatusPillClass(status) {
     if (!refs.resultStatus) {
       return;
@@ -4805,7 +4917,7 @@
     ) {
       refs.resultFlagReason.textContent =
         reason ||
-        "One or more readings look unusual for this child. Please double-check height and weight.";
+        t("results.flag_default");
     }
   }
 
@@ -4877,8 +4989,12 @@ function finishResults(
 
     refs.resultMeta.textContent =
       ageMonths >= 12
-        ? `${Math.floor(ageMonths / 12)} taon, ${ageMonths % 12} buwan (${ageDays} araw)`
-        : `${ageMonths} buwan (${ageDays} araw)`;
+        ? t("age.years_months_days", {
+            y: Math.floor(ageMonths / 12),
+            m: ageMonths % 12,
+            d: ageDays
+          })
+        : t("age.months_days", { m: ageMonths, d: ageDays });
   }
 
   // ==========================================================
@@ -4919,7 +5035,7 @@ function finishResults(
 
   if (refs.resultStatus) {
     refs.resultStatus.textContent =
-      nutritionalStatus;
+      statusLabel(nutritionalStatus);
   }
 
   applyStatusPillClass(
@@ -5006,7 +5122,7 @@ function finishResults(
 
   if (refs.resultSource) {
     refs.resultSource.textContent =
-      "ESP32 → Firebase → SQL → WHO";
+      t("results.source_chain");
   }
 
   // ==========================================================
@@ -5015,7 +5131,7 @@ function finishResults(
 
   if (refs.resultSex) {
     refs.resultSex.textContent =
-      child?.sex || measurement?.sex || "—";
+      sexLabel(child?.sex || measurement?.sex) || "—";
   }
 
   // ==========================================================
@@ -5071,19 +5187,19 @@ function finishResults(
     "—";
 
   if (refs.resultWfaStatus) {
-    refs.resultWfaStatus.textContent = wfaStatus;
+    refs.resultWfaStatus.textContent = statusLabel(wfaStatus);
     refs.resultWfaStatus.className =
       "kiosk-status-badge " + nutritionalStatusBadgeClass(wfaStatus);
   }
 
   if (refs.resultHfaStatus) {
-    refs.resultHfaStatus.textContent = hfaStatus;
+    refs.resultHfaStatus.textContent = statusLabel(hfaStatus);
     refs.resultHfaStatus.className =
       "kiosk-status-badge " + nutritionalStatusBadgeClass(hfaStatus);
   }
 
   if (refs.resultWflhStatus) {
-    refs.resultWflhStatus.textContent = wflhStatus;
+    refs.resultWflhStatus.textContent = statusLabel(wflhStatus);
     refs.resultWflhStatus.className =
       "kiosk-status-badge " + nutritionalStatusBadgeClass(wflhStatus);
   }
@@ -5094,13 +5210,13 @@ function finishResults(
 
   setProgress(
     100,
-    "Measurement complete"
+    t("results.complete_progress")
   );
 
   setStep("results");
 
   pushFeed(
-    "Measurement complete",
+    t("results.complete_feed_title"),
     `${
       payload.child_code ||
       child?.child_code ||
@@ -5304,8 +5420,9 @@ function finishResults(
       setWeight(
         state.weight,
         state.weightLocked
-          ? "Weight captured"
-          : "Weight restored"
+          ? t("measure.weight_captured")
+          : t("measure.weight_restored"),
+        "stable"
       );
     }
 
@@ -5317,8 +5434,9 @@ function finishResults(
       setHeight(
         state.height,
         state.heightLocked
-          ? "Height captured"
-          : "Height restored"
+          ? t("measure.height_captured")
+          : t("measure.height_restored"),
+        "stable"
       );
     }
 
@@ -5349,12 +5467,12 @@ function finishResults(
     } else {
       setProgress(
         20,
-        "Restored active measurement session. Waiting for sensors..."
+        t("feed.session_restored_detail")
       );
     }
 
     pushFeed(
-      "Session restored",
+      t("feed.session_restored_title"),
       `${
         child.child_code ||
         "Child"
@@ -5576,7 +5694,7 @@ function finishResults(
 
     if (refs.currentChildLabel) {
       refs.currentChildLabel.textContent =
-        "Choose a child";
+        t("results.select_child");
     }
 
     if (searchInput) {
@@ -5594,7 +5712,7 @@ function finishResults(
 
     if (refs.weightStatus) {
       refs.weightStatus.textContent =
-        "Naghihintay ng timbang...";
+        t("measure.wait_weight");
     }
 
     if (refs.heightReadout) {
@@ -5604,7 +5722,7 @@ function finishResults(
 
     if (refs.heightStatus) {
       refs.heightStatus.textContent =
-        "Naghihintay ng taas...";
+        t("measure.wait_height");
     }
 
     if (refs.heightBar) {
@@ -5620,12 +5738,12 @@ function finishResults(
 
     if (refs.resultChild) {
       refs.resultChild.textContent =
-        "Name";
+        t("results.name_placeholder");
     }
 
     if (refs.resultMeta) {
       refs.resultMeta.textContent =
-        "-- months old";
+        t("results.age_placeholder");
     }
 
     if (refs.resultHeight) {
@@ -5655,7 +5773,7 @@ function finishResults(
 
     if (refs.resultStatus) {
       refs.resultStatus.textContent =
-        "Pending";
+        t("status.pending");
     }
 
     applyStatusPillClass("");
@@ -5664,32 +5782,32 @@ function finishResults(
     if (refs.resultSource) {
       refs.resultSource.textContent =
         firebaseEnabled
-          ? "ESP32 → Firebase → SQL"
-          : "Firebase unavailable";
+          ? t("results.source_chain_short")
+          : t("results.firebase_unavailable");
     }
 
     setProgress(
       0,
-      "Handa nang sumukat"
+      t("results.ready_note")
     );
 
     setChip(
       lidarChip,
-      "LiDAR: Waiting",
+      t("chip.lidar_waiting"),
       false
     );
 
     setChip(
       loadCellChip,
-      "Scale: Waiting",
+      t("chip.scale_waiting"),
       false
     );
 
     setChip(
       connectedChip,
       firebaseEnabled
-        ? "Device: Waiting"
-        : "Device: Firebase Off",
+        ? t("chip.device_waiting")
+        : t("chip.device_firebase_off"),
       false
     );
 
@@ -5699,7 +5817,7 @@ function finishResults(
 
     if (heroNote) {
       heroNote.textContent =
-        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
+        t("device.hero_online");
     }
 
     syncStartButtonState();
@@ -5719,8 +5837,8 @@ function finishResults(
       state.phase !== "error"
     ) {
       pushFeed(
-        "Reset blocked",
-        "Wait for measurement processing to finish.",
+        t("feed.reset_blocked_title"),
+        t("feed.reset_blocked_detail"),
         "warn"
       );
 
@@ -5757,8 +5875,8 @@ function finishResults(
 
     clearSelectionAndSession(
       "welcome",
-      "Kiosk reset",
-      "Ready for the next child."
+      t("feed.kiosk_reset_title"),
+      t("feed.kiosk_reset_detail")
     );
   }
 
@@ -5770,7 +5888,7 @@ function finishResults(
     if (!firebaseEnabled) {
       setChip(
         connectedChip,
-        "Device: Firebase Off",
+        t("chip.device_firebase_off"),
         false
       );
 
@@ -5799,7 +5917,7 @@ function finishResults(
 
         setChip(
           connectedChip,
-          "Device: Firebase Ready",
+          t("chip.device_firebase_ready"),
           true
         );
 
@@ -5808,7 +5926,7 @@ function finishResults(
 
       setChip(
         connectedChip,
-        "Device: Firebase Error",
+        t("chip.device_firebase_error"),
         false
       );
 
@@ -5824,7 +5942,7 @@ function finishResults(
 
       setChip(
         connectedChip,
-        "Device: Offline",
+        t("chip.device_offline"),
         false
       );
 
@@ -5911,14 +6029,14 @@ function finishResults(
         welcomeDot.classList.toggle("online", online);
       }
       if (welcomeLabel) {
-        welcomeLabel.textContent = online ? "Device online" : "Device offline";
+        welcomeLabel.textContent = online ? t("welcome.device_online") : t("welcome.device_offline");
       }
 
       setChip(
         connectedChip,
         online
-          ? "Device: Online"
-          : "Device: Offline",
+          ? t("chip.device_online")
+          : t("chip.device_offline"),
         online
       );
 
@@ -5926,8 +6044,8 @@ function finishResults(
         lidarChip,
         payload.lidar_status ===
           "ready"
-          ? "LiDAR: Ready"
-          : "LiDAR: Waiting",
+          ? t("chip.lidar_ready")
+          : t("chip.lidar_waiting"),
         payload.lidar_status ===
           "ready"
       );
@@ -5936,8 +6054,8 @@ function finishResults(
         loadCellChip,
         payload.loadcell_status ===
           "ready"
-          ? "Scale: Ready"
-          : "Scale: Waiting",
+          ? t("chip.scale_ready")
+          : t("chip.scale_waiting"),
         payload.loadcell_status ===
           "ready"
       );
@@ -5945,10 +6063,10 @@ function finishResults(
       if (heroNote && state.step === "welcome") {
         heroNote.textContent =
           online
-            ? "Select a child, then start the measurement."
+            ? t("device.hero_online")
             : (
                 payload.message ||
-                "Kiosk device is offline. Check the ESP32 power and Wi-Fi connection."
+                t("device.hero_offline")
               );
       }
 
@@ -5963,9 +6081,9 @@ function finishResults(
         !online
       ) {
         pushFeed(
-          "Device offline",
+          t("device.stopped_feed_title"),
           payload.message ||
-            "The kiosk device stopped responding.",
+            t("device.stopped_feed_detail"),
           "error"
         );
       } else if (
@@ -5974,8 +6092,8 @@ function finishResults(
         online
       ) {
         pushFeed(
-          "Device online",
-          "The kiosk device is connected and ready.",
+          t("device.online_feed_title"),
+          t("device.online_feed_detail"),
           "info"
         );
       }
@@ -6004,24 +6122,24 @@ function finishResults(
         welcomeDot.classList.remove("online");
       }
       if (welcomeLabel) {
-        welcomeLabel.textContent = "Device offline";
+        welcomeLabel.textContent = t("welcome.device_offline");
       }
 
       setChip(
         connectedChip,
-        "Device: Offline",
+        t("chip.device_offline"),
         false
       );
 
       if (heroNote && state.step === "welcome") {
         heroNote.textContent =
-          "Kiosk device is offline. Check the ESP32 power and Wi-Fi connection.";
+          t("device.hero_offline");
       }
 
       if (wasOnline) {
         pushFeed(
-          "Device offline",
-          "Lost contact with the kiosk device.",
+          t("device.offline"),
+          t("device.lost_contact"),
           "error"
         );
       }
@@ -6304,20 +6422,22 @@ function finishResults(
               state.notDueChild || getSelectedChild() || foundChild;
             if (!recheckChild) {
               pushFeed(
-                "Walang napiling bata",
-                "Maghanap muna ng bata bago mag-double-check.",
+                t("feed.no_child_title"),
+                t("feed.no_child_double_check"),
                 "warn"
               );
               return;
             }
             state.child = recheckChild;
             pushFeed(
-              "Double-check",
-              "Recheck para kay " +
-                (recheckChild.first_name || "") +
-                " " +
-                (recheckChild.last_name || "") +
-                " — hindi magbabago ang schedule."
+              t("feed.double_check_title"),
+              t("feed.double_check_detail", {
+                name: (
+                  (recheckChild.first_name || "") +
+                  " " +
+                  (recheckChild.last_name || "")
+                ).trim()
+              })
             );
             startMeasurementFlow({
               recheck: true,
@@ -6338,15 +6458,15 @@ function finishResults(
               state.child || getSelectedChild() || foundChild;
             if (!recheckChild) {
               pushFeed(
-                "Walang napiling bata",
-                "Maghanap muna ng bata bago mag-double-check.",
+                t("feed.no_child_title"),
+                t("feed.no_child_double_check"),
                 "warn"
               );
               return;
             }
             pushFeed(
-              "Sukatin ulit",
-              "Double-check na pagsukat — hindi magbabago ang schedule."
+              t("feed.measure_again_title"),
+              t("feed.measure_again_detail")
             );
             startMeasurementFlow({
               recheck: true,
@@ -6368,8 +6488,8 @@ function finishResults(
               state.child || getSelectedChild() || foundChild;
             if (!restartChild) {
               pushFeed(
-                "Walang napiling bata",
-                "Maghanap muna ng bata bago umulit ng sukat.",
+                t("feed.no_child_title"),
+                t("feed.no_child_restart"),
                 "warn"
               );
               return;
@@ -6388,10 +6508,10 @@ function finishResults(
               refs.heightReadout.textContent = "--.-";
             }
             if (refs.weightStatus) {
-              refs.weightStatus.textContent = "Naghihintay...";
+              refs.weightStatus.textContent = t("measure.waiting");
             }
             if (refs.heightStatus) {
-              refs.heightStatus.textContent = "Naghihintay...";
+              refs.heightStatus.textContent = t("measure.waiting");
             }
             if (refs.weightBars) {
               refs.weightBars.innerHTML = "";
@@ -6401,10 +6521,10 @@ function finishResults(
               refs.heightBar.style.width = "0%";
             }
             pushFeed(
-              "Inulit ang sukat",
+              t("feed.restart_title"),
               restartRecheck
-                ? "Bagong double-check session — hindi magbabago ang schedule."
-                : "Bagong pagsukat para sa parehong bata."
+                ? t("feed.restart_recheck")
+                : t("feed.restart_normal")
             );
             startMeasurementFlow({
               restart: true,
@@ -6424,7 +6544,7 @@ function finishResults(
             event.preventDefault();
             if (foundChild) {
               state.child = foundChild;
-              pushFeed("Bata napili", foundChild.first_name + " " + foundChild.last_name);
+              pushFeed(t("feed.child_selected_confirm_title"), foundChild.first_name + " " + foundChild.last_name);
               // Reset the readouts so they don't show stale data from a
               // previous attempt.
               if (refs.weightReadout) {
@@ -6434,10 +6554,10 @@ function finishResults(
                 refs.heightReadout.textContent = "--.-";
               }
               if (refs.weightStatus) {
-                refs.weightStatus.textContent = "Naghihintay...";
+                refs.weightStatus.textContent = t("measure.waiting");
               }
               if (refs.heightStatus) {
-                refs.heightStatus.textContent = "Naghihintay...";
+                refs.heightStatus.textContent = t("measure.waiting");
               }
               if (refs.weightBars) {
                 refs.weightBars.innerHTML = "";
@@ -6455,41 +6575,41 @@ function finishResults(
               ) {
                 setChip(
                   connectedChip,
-                  "Device: Offline",
+                  t("chip.device_offline"),
                   false
                 );
                 setChip(
                   loadCellChip,
-                  "Scale: Offline",
+                  t("chip.scale_offline"),
                   false
                 );
                 setChip(
                   lidarChip,
-                  "LiDAR: Offline",
+                  t("chip.lidar_offline"),
                   false
                 );
                 if (refs.weightStatus) {
                   refs.weightStatus.textContent =
-                    "Device offline";
+                    t("welcome.device_offline");
                 }
                 if (refs.heightStatus) {
                   refs.heightStatus.textContent =
-                    "Device offline";
+                    t("welcome.device_offline");
                 }
               } else {
                 setChip(
                   connectedChip,
-                  "Device: Waiting",
+                  t("chip.device_waiting"),
                   false
                 );
                 setChip(
                   loadCellChip,
-                  "Scale: Waiting",
+                  t("chip.scale_waiting"),
                   false
                 );
                 setChip(
                   lidarChip,
-                  "LiDAR: Waiting",
+                  t("chip.lidar_waiting"),
                   false
                 );
               }
@@ -6502,8 +6622,8 @@ function finishResults(
               startMeasurementFlow();
             } else {
               pushFeed(
-                "Walang napiling bata",
-                "Maghanap muna ng bata bago magpatuloy.",
+                t("feed.no_child_title"),
+                t("feed.no_child_continue"),
                 "warn"
               );
             }
@@ -6597,7 +6717,7 @@ function finishResults(
               var remaining = thankyouAutoSeconds - elapsed;
               if (remaining < 0) remaining = 0;
               if (thankyouCountdownEl) {
-                thankyouCountdownEl.textContent = "Babalik sa home sa " + remaining + "s — o pindutin ang Balik sa Home.";
+                thankyouCountdownEl.textContent = t("thankyou.countdown", { n: remaining });
               }
               if (thankyouProgressBar) {
                 thankyouProgressBar.style.width = ((remaining / thankyouAutoSeconds) * 100) + "%";
@@ -6654,8 +6774,8 @@ function finishResults(
               state.processingStarted
             ) {
               pushFeed(
-                "Back blocked",
-                "The current measurement is being processed.",
+                t("feed.back_blocked_title"),
+                t("feed.back_blocked_detail"),
                 "warn"
               );
 
@@ -6668,15 +6788,15 @@ function finishResults(
             ) {
               if (
                 !confirm(
-                  "A measurement is active. Going back will cancel the current session. Continue?"
+                  t("errors.confirm_cancel_session")
                 )
               ) {
                 return;
               }
 
               pushFeed(
-                "Cancelling",
-                "Ending active measurement session...",
+                t("feed.cancelling_title"),
+                t("feed.cancelling_detail"),
                 "info"
               );
 
@@ -6701,15 +6821,15 @@ function finishResults(
                 .then(function () {
             clearSelectionAndSession(
               "child-lookup",
-              "Back to lookup",
-              "Session cancelled. Enter Child ID to continue."
+              t("feed.back_to_lookup_title"),
+              t("feed.session_cancelled_detail")
             );
                 })
                 .catch(function () {
                   clearSelectionAndSession(
                     "child-lookup",
-                    "Back to lookup",
-                    "Child deselected. Enter Child ID to continue."
+                    t("feed.back_to_lookup_title"),
+                    t("feed.child_deselected_detail")
                   );
                 });
 
@@ -6718,8 +6838,8 @@ function finishResults(
 
             clearSelectionAndSession(
               "child-lookup",
-              "Back to lookup",
-              "Child deselected. Enter Child ID to continue."
+              t("feed.back_to_lookup_title"),
+              t("feed.child_deselected_detail")
             );
 
             return;
@@ -6812,8 +6932,8 @@ function finishResults(
           '<svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#d4e5dc" stroke-width="2"><circle cx="24" cy="24" r="20"/><line x1="18" y1="24" x2="30" y2="24"/><line x1="24" y1="18" x2="24" y2="30"/></svg>' +
           "<p>" +
           (q
-            ? "Walang nakitang resulta para sa \"" + q + "\""
-            : "Wala pang rehistradong bata sa kiosk na ito.") +
+            ? t("view.no_match", { q: q })
+            : t("view.empty")) +
           "</p></div>";
         return;
       }
@@ -6827,11 +6947,11 @@ function finishResults(
           var statusClass = nutritionalStatusBadgeClass(c.status);
           var ageText =
             c.age_months >= 12
-              ? Math.floor(c.age_months / 12) +
-                " taon, " +
-                (c.age_months % 12) +
-                " buwan"
-              : c.age_months + " buwan";
+              ? t("age.years_months", {
+                  y: Math.floor(c.age_months / 12),
+                  m: c.age_months % 12
+                })
+              : t("age.months", { m: c.age_months });
           return (
             '<div class="kiosk-view-results-card" data-child-id="' +
             c.id +
@@ -6846,15 +6966,15 @@ function finishResults(
             '<div class="kiosk-view-results-card-meta">' +
             ageText +
             " &middot; " +
-            (c.sex === "Male" ? "Lalaki" : "Babae") +
+            sexLabel(c.sex) +
             " &middot; " +
-            (c.barangay || "N/A") +
+            (c.barangay || t("common.na")) +
             "</div>" +
             "</div>" +
             '<span class="kiosk-view-results-card-badge ' +
             statusClass +
             '">' +
-            (c.status || "Pending") +
+            statusLabel(c.status) +
             "</span>" +
             "</div>"
           );
@@ -7058,14 +7178,14 @@ function finishResults(
 
     if (heroNote) {
       heroNote.textContent =
-        "Pumili ng bata, pagkatapos ay simulan ang pagsukat.";
+        t("device.hero_online");
     }
 
     if (refs.resultSource) {
       refs.resultSource.textContent =
         firebaseEnabled
-          ? "ESP32 → Firebase → SQL"
-          : "Firebase unavailable";
+          ? t("results.source_chain_short")
+          : t("results.firebase_unavailable");
     }
 
     updateProcessButton();

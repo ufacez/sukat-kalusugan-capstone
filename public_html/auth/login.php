@@ -85,10 +85,7 @@ $notice = trim((string)($_GET['notice'] ?? ''));
             <div class="auth-card-header">
                 <p class="eyebrow">Welcome back</p>
                 <h2 id="sign-in-title">Sign in to continue</h2>
-                <p class="muted">Use your staff or parent username/email and password.</p>
             </div>
-
-            <div class="flash flash-notice" role="status">Sukat Kalusugan is a student capstone by <strong>Group A4Tech</strong> (OLFU). Authorized accounts only — no public sign-up. Accounts are issued by the project team. We ask for your username/email and password only to verify the account we issued to you. This page is not affiliated with OLFU, Google, or any bank or government login, and we never ask for payment details. Questions? <a class="link" href="../contact.php">Contact us</a>.</div>
 
             <?php if ($error !== ''): ?>
                 <div class="flash flash-error" role="alert"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></div>
@@ -135,7 +132,6 @@ $notice = trim((string)($_GET['notice'] ?? ''));
                 New staff? <a class="link" href="activate.php">Activate your account</a><br>
                 <span style="font-size:.78rem;"><a class="link" href="../about.php">About</a> &middot; <a class="link" href="../privacy.php">Privacy</a> &middot; <a class="link" href="../terms.php">Terms</a> &middot; <a class="link" href="../contact.php">Contact</a></span>
             </p>
-            <div style="text-align:center;margin-top:.9rem;font-size:.75rem;color:#94a3b8;">Group A4Tech &middot; Capstone project &mdash; not an official OLFU system.</div>
         </section>
     </main>
 

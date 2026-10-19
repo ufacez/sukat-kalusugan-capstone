@@ -36,7 +36,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 }
 
 if ($childId <= 0) {
-    api_error('A valid child ID is required.', 400);
+    api_error('A valid child ID is required.', 400, ['code' => 'child_required']);
 }
 
 // Validate device if provided (barangay scope check)
@@ -50,7 +50,7 @@ if ($deviceCode !== '') {
     );
 
     if ($device === null) {
-        api_error('Device not found: ' . $deviceCode, 404);
+        api_error('Device not found: ' . $deviceCode, 404, ['code' => 'device_not_found']);
     }
 
     // Check barangay scope: if device has a barangay assigned,
@@ -66,7 +66,8 @@ if ($deviceCode !== '') {
             api_error(
                 'This child is not authorized for measurement at this kiosk. '
                 . 'Child belongs to a different barangay.',
-                403
+                403,
+                ['code' => 'child_barangay']
             );
         }
     }
@@ -80,7 +81,7 @@ $childRow = admin_fetch_one(
 );
 
 if ($childRow === null) {
-    api_error('Child not found or inactive.', 404);
+    api_error('Child not found or inactive.', 404, ['code' => 'child_not_found']);
 }
 
 $ageMonths = 0;

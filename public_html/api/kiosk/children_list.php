@@ -17,7 +17,7 @@ $deviceCode = api_string(
 );
 
 if ($deviceCode !== '' && !preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
-    api_error('Invalid device ID.', 400);
+    api_error('Invalid device ID.', 400, ['code' => 'invalid_device']);
 }
 
 $conn = get_db_connection();

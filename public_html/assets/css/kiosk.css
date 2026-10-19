@@ -2819,6 +2819,80 @@ body[data-kiosk-step="processing"] .kiosk-screen[data-kiosk-screen="welcome"].is
   animation: none;
 }
 
+/* ================================================================
+   LANGUAGE TOGGLE (welcome screen only)
+   ================================================================ */
+
+.kiosk-lang-toggle {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 20;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  margin: 0;
+  background: var(--sk-white);
+  border: 1px solid var(--sk-border);
+  border-radius: 999px;
+  box-shadow: var(--sk-shadow-sm);
+}
+
+/* Beat `.kiosk-screen.is-active > * { margin: auto; }` so the toggle
+   stays pinned to the top-right instead of being centered. */
+.kiosk-screen[data-kiosk-screen="welcome"] > .kiosk-lang-toggle {
+  margin: 0;
+}
+
+.kiosk-lang-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  color: var(--sk-text-secondary);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-decoration: none;
+  transition:
+    background-color 0.2s var(--sk-transition),
+    color 0.2s var(--sk-transition);
+}
+
+.kiosk-lang-btn:hover {
+  background: var(--sk-mint-soft);
+  color: var(--sk-green);
+}
+
+.kiosk-lang-btn.is-active {
+  background: var(--sk-green);
+  color: var(--sk-white);
+  box-shadow: 0 2px 10px rgba(11, 110, 79, 0.3);
+}
+
+.kiosk-lang-btn:focus-visible {
+  outline: 2px solid var(--sk-green-light);
+  outline-offset: 2px;
+}
+
+@media (max-width: 600px) {
+  .kiosk-lang-toggle {
+    top: 12px;
+    right: 12px;
+  }
+
+  .kiosk-lang-btn {
+    min-width: 56px;
+    min-height: 40px;
+    padding: 0 14px;
+    font-size: 14px;
+  }
+}
+
 /* ---- Reduced motion: fully static kiosk, all states stay legible ---- */
 @media (prefers-reduced-motion: reduce) {
   .kiosk-shell *,

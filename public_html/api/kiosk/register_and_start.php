@@ -14,7 +14,7 @@ $raw = file_get_contents('php://input');
 $input = json_decode($raw ?: '{}', true);
 
 if (!is_array($input)) {
-    api_error('Invalid JSON request.', 400);
+    api_error('Invalid JSON request.', 400, ['code' => 'invalid_json']);
 }
 
 $deviceCode = api_string($input['device_id'] ?? $input['device'] ?? 'ESP32-KIOSK-01', 'ESP32-KIOSK-01');
@@ -29,7 +29,7 @@ $sex = api_string($input['sex'] ?? '', '');
 $barangayId = !empty($input['barangay_id']) ? api_int($input['barangay_id'], 0) : 0;
 
 if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
-    api_error('Invalid device ID.', 400);
+    api_error('Invalid device ID.', 400, ['code' => 'invalid_device']);
 }
 
 $conn = get_db_connection();
@@ -171,7 +171,7 @@ try {
     mysqli_commit($conn);
 
     $sessionRow = measurement_session_fetch_by_id_for_device($conn, $sessionId, $deviceCode);
-    if (!is_array($sessionRow)) api_error('Measurement session was created but could not be loaded.', 500);
+    if (!is_array($sessionRow)) api_error('Measurement session was created but could not be loaded.', 500, ['code' => 'session_load_failed']);
 
     $payload = measurement_session_row_to_payload($sessionRow);
     $payload['location'] = $location;
@@ -187,5 +187,17 @@ try {
 } catch (Throwable $e) {
     mysqli_rollback($conn);
     error_log('[SukatKalusugan] register_and_start.php: ' . $e->getMessage());
-    api_error($e->getMessage(), 500);
+
+    $exceptionMessage = $e->getMessage();
+    $errorCode = 'server_error';
+
+    if (str_contains($exceptionMessage, 'already active')) {
+        $errorCode = 'session_already_active';
+    } elseif (str_contains($exceptionMessage, 'Device not registered')) {
+        $errorCode = 'device_not_registered';
+    } elseif (str_contains($exceptionMessage, 'child was not found')) {
+        $errorCode = 'child_not_found';
+    }
+
+    api_error($exceptionMessage, 500, ['code' => $errorCode]);
 }

@@ -3,6 +3,10 @@ require_once __DIR__ . '/../includes/db.php';
 require_once __DIR__ . '/../includes/firebase_sync.php';
 require_once __DIR__ . '/../includes/kiosk_helpers.php';
 require_once __DIR__ . '/../includes/auth_middleware.php';
+require_once __DIR__ . '/../includes/kiosk_i18n.php';
+
+$kioskLang = kiosk_lang();
+kiosk_persist_lang();
 
 $deviceCode = trim((string)($_GET['device'] ?? ''));
 $kioskBarangay = ($deviceCode !== '') ? kiosk_resolve_device_barangay($deviceCode) : null;
@@ -127,6 +131,8 @@ $appData = [
     'children' => $childrenPayload,
     'devices' => $devicePayload,
     'barangays' => array_map(fn($b) => ['id' => (int)$b['id'], 'name' => (string)$b['name']], $barangays),
+    'lang' => $kioskLang,
+    'i18n' => kiosk_translations($kioskLang),
     'demoMode' => false,
     'company' => 'Sukat Kalusugan',
     'firebase' => ['databaseUrl' => $firebaseUrl, 'enabled' => $firebaseUrl !== ''],
@@ -152,14 +158,23 @@ $appData = [
         'sessionTimeoutSeconds' => 180,
     ],
 ];
+
+// Toggle link target: keeps the ?device= scope, swaps only the language.
+$kioskLangUrl = static function (string $lang) use ($deviceCode): string {
+    $params = ['lang' => $lang];
+    if ($deviceCode !== '') {
+        $params['device'] = $deviceCode;
+    }
+    return '?' . http_build_query($params, '', '&amp;');
+};
 ?>
 <!doctype html>
-<html lang="tl">
+<html lang="<?php echo $kioskLang === 'tl' ? 'tl' : 'en'; ?>">
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width,initial-scale=1" />
         <meta name="theme-color" content="#0b6e4f" />
-        <title>Sukat Kalusugan | Kiosk</title>
+        <title><?php echo kiosk_e(kiosk_t('brand.title')); ?></title>
         <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/app.css?v=' . (@filemtime(__DIR__ . '/../assets/css/app.css') ?: time()))); ?>" />
         <link rel="stylesheet" href="<?php echo kiosk_e(app_url('/assets/css/kiosk.css?v=' . (@filemtime(__DIR__ . '/../assets/css/kiosk.css') ?: time()))); ?>" />
         <link rel="icon" type="image/svg+xml" href="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg')); ?>" />
@@ -171,17 +186,22 @@ $appData = [
             <!-- STEP 1: WELCOME / HOME -->
             <!-- ============================================================ -->
             <section class="kiosk-screen is-active" data-kiosk-screen="welcome">
+                <div class="kiosk-lang-toggle" role="group" aria-label="<?php echo kiosk_e(kiosk_t('lang.switch_label')); ?>">
+                    <a class="kiosk-lang-btn<?php echo $kioskLang === 'tl' ? ' is-active' : ''; ?>" href="<?php echo $kioskLangUrl('tl'); ?>" rel="nofollow"><?php echo kiosk_e(kiosk_t('lang.tagalog')); ?></a>
+                    <a class="kiosk-lang-btn<?php echo $kioskLang === 'en' ? ' is-active' : ''; ?>" href="<?php echo $kioskLangUrl('en'); ?>" rel="nofollow"><?php echo kiosk_e(kiosk_t('lang.english')); ?></a>
+                </div>
+
                 <div class="kiosk-welcome">
                     <div class="auth-logo-group">
                         <div class="mark-standalone-icon" aria-hidden="true">
-                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" alt="Sukat Kalusugan Icon" class="mark-icon-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logo_fordark.svg?v=2')); ?>">
+                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" alt="<?php echo kiosk_e(kiosk_t('brand.alt_icon')); ?>" class="mark-icon-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logo_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logo_fordark.svg?v=2')); ?>">
                         </div>
 
                         <div class="mark-standalone" aria-hidden="true">
-                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" alt="Sukat Kalusugan" class="mark-standalone-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_fordark.svg?v=2')); ?>">
+                            <img src="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" alt="<?php echo kiosk_e(kiosk_t('brand.alt_logo')); ?>" class="mark-standalone-img" data-logo-light="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_forlight.svg?v=2')); ?>" data-logo-dark="<?php echo kiosk_e(app_url('/assets/img/logo/logotext_fordark.svg?v=2')); ?>">
                         </div>
 
-                        <p class="auth-tagline">Tamang <span class="hl">Sukat</span>, Gabay sa wastong <span class="hl">Kalusugan</span>.</p>
+                        <p class="auth-tagline"><?php echo kiosk_t('welcome.tagline'); ?></p>
                     </div>
 
                     <div class="kiosk-welcome-clock" data-kiosk-live-clock>--:--</div>
@@ -189,12 +209,12 @@ $appData = [
 
                     <div class="kiosk-device-status" data-kiosk-device-status>
                         <span class="kiosk-device-dot offline"></span>
-                        <span class="kiosk-device-label">Device offline</span>
+                        <span class="kiosk-device-label"><?php echo kiosk_e(kiosk_t('welcome.device_offline')); ?></span>
                     </div>
 
                     <div class="kiosk-welcome-actions">
                         <button class="kiosk-btn kiosk-btn-primary kiosk-btn-lg" type="button" data-kiosk-action="start">
-                            SIMULAN
+                            <?php echo kiosk_e(kiosk_t('welcome.start')); ?>
                         </button>
                     </div>
                 </div>
@@ -205,28 +225,28 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="privacy" hidden>
                 <div class="kiosk-form-screen">
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
 
                     <div class="kiosk-privacy-hero">
-                        <h2 class="kiosk-privacy-title">Privacy Notice</h2>
-                        <p class="kiosk-privacy-lead">Paalala sa Data Privacy bago magsimula</p>
+                        <h2 class="kiosk-privacy-title"><?php echo kiosk_e(kiosk_t('privacy.title')); ?></h2>
+                        <p class="kiosk-privacy-lead"><?php echo kiosk_e(kiosk_t('privacy.lead')); ?></p>
                     </div>
 
                     <div class="kiosk-privacy-grid">
                         <div class="kiosk-privacy-tile">
                             <div class="kiosk-privacy-tile-num">1</div>
                             <div class="kiosk-privacy-tile-body">
-                                <h3>Data Collection</h3>
-                                <p class="kiosk-privacy-tile-sub">Impormasyong kokolektahin</p>
+                                <h3><?php echo kiosk_e(kiosk_t('privacy.collect_title')); ?></h3>
+                                <p class="kiosk-privacy-tile-sub"><?php echo kiosk_e(kiosk_t('privacy.collect_sub')); ?></p>
                                 <div class="kiosk-privacy-tags">
-                                    <span class="kiosk-tag">Pangalan</span>
-                                    <span class="kiosk-tag">Edad</span>
-                                    <span class="kiosk-tag">Kasarian</span>
-                                    <span class="kiosk-tag">Timbang</span>
-                                    <span class="kiosk-tag">Taas</span>
-                                    <span class="kiosk-tag">Barangay</span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.name')); ?></span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.age')); ?></span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.sex')); ?></span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.weight')); ?></span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.height')); ?></span>
+                                    <span class="kiosk-tag"><?php echo kiosk_e(kiosk_t('privacy.tag.barangay')); ?></span>
                                 </div>
                             </div>
                         </div>
@@ -234,18 +254,18 @@ $appData = [
                         <div class="kiosk-privacy-tile">
                             <div class="kiosk-privacy-tile-num">2</div>
                             <div class="kiosk-privacy-tile-body">
-                                <h3>Layunin</h3>
-                                <p class="kiosk-privacy-tile-sub">Bakit kokolektahin</p>
-                                <p>Pagsukat, nutritional assessment, monitoring, at research para sa SukatKalusugan study.</p>
+                                <h3><?php echo kiosk_e(kiosk_t('privacy.purpose_title')); ?></h3>
+                                <p class="kiosk-privacy-tile-sub"><?php echo kiosk_e(kiosk_t('privacy.purpose_sub')); ?></p>
+                                <p><?php echo kiosk_e(kiosk_t('privacy.purpose_body')); ?></p>
                             </div>
                         </div>
 
                         <div class="kiosk-privacy-tile">
                             <div class="kiosk-privacy-tile-num">3</div>
                             <div class="kiosk-privacy-tile-body">
-                                <h3>Proteksyon</h3>
-                                <p class="kiosk-privacy-tile-sub">Paano poprotektahan</p>
-                                <p>Kumpidensyal. Maa-access lamang ng awtorisadong tao na kasangkot sa pag-aaral.</p>
+                                <h3><?php echo kiosk_e(kiosk_t('privacy.protection_title')); ?></h3>
+                                <p class="kiosk-privacy-tile-sub"><?php echo kiosk_e(kiosk_t('privacy.protection_sub')); ?></p>
+                                <p><?php echo kiosk_e(kiosk_t('privacy.protection_body')); ?></p>
                             </div>
                         </div>
                     </div>
@@ -254,7 +274,7 @@ $appData = [
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z"/>
                         </svg>
-                        Basahin ang buong Privacy Notice
+                        <?php echo kiosk_e(kiosk_t('privacy.read_full')); ?>
                     </button>
 
                     <div class="kiosk-info-sheet-tile">
@@ -264,8 +284,8 @@ $appData = [
                             </svg>
                         </div>
                         <div class="kiosk-info-sheet-body">
-                            <h3>Information Sheet</h3>
-                            <p class="kiosk-privacy-tile-sub">Impormasyon tungkol sa pag-aaral</p>
+                            <h3><?php echo kiosk_e(kiosk_t('privacy.info_sheet_title')); ?></h3>
+                            <p class="kiosk-privacy-tile-sub"><?php echo kiosk_e(kiosk_t('privacy.info_sheet_sub')); ?></p>
                         </div>
                     </div>
 
@@ -273,25 +293,25 @@ $appData = [
                         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="16" height="16">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z"/>
                         </svg>
-                        Basahin ang Information Sheet
+                        <?php echo kiosk_e(kiosk_t('privacy.read_info_sheet')); ?>
                     </button>
 
                     <div class="kiosk-privacy-checks">
                         <label class="kiosk-privacy-checkbox">
                             <input type="checkbox" id="privacyCheckbox" />
                             <span class="kiosk-privacy-checkmark"></span>
-                            <span>Nabasa at sang-ayon ako sa Privacy Notice</span>
+                            <span><?php echo kiosk_e(kiosk_t('privacy.check_notice')); ?></span>
                         </label>
 
                         <label class="kiosk-privacy-checkbox">
                             <input type="checkbox" id="infoSheetCheckbox" />
                             <span class="kiosk-privacy-checkmark"></span>
-                            <span>Nabasa at naintindihan ko ang Information Sheet</span>
+                            <span><?php echo kiosk_e(kiosk_t('privacy.check_sheet')); ?></span>
                         </label>
                     </div>
 
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="privacy-continue" disabled id="privacyContinueBtn">
-                        MAGPATULOY
+                        <?php echo kiosk_e(kiosk_t('privacy.continue')); ?>
                     </button>
                 </div>
             </section>
@@ -302,7 +322,7 @@ $appData = [
             <section class="kiosk-screen" data-kiosk-screen="child-lookup" hidden>
                 <div class="kiosk-lookup">
                     <!-- Back button (positioned absolute top-left) -->
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-privacy" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-privacy" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
 
@@ -312,19 +332,19 @@ $appData = [
                             <span class="kiosk-device-dot online"></span>
                             <span data-kiosk-lookup-barangay><?php echo kiosk_e($kioskBarangay['name'] ?? ''); ?></span>
                             <?php if (!$kioskRegistered): ?>
-                                <span style="display:block;font-size:.8rem;color:#b91c1c;">Device not registered — contact admin to assign this kiosk.</span>
+                                <span style="display:block;font-size:.8rem;color:#b91c1c;"><?php echo kiosk_e(kiosk_t('lookup.unregistered')); ?></span>
                             <?php endif; ?>
                         </div>
                         <div class="kiosk-lookup-status">
                             <span class="kiosk-device-dot online"></span>
-                            KIOSK READY
+                            <?php echo kiosk_e(kiosk_t('lookup.ready')); ?>
                         </div>
                     </div>
 
                     <!-- Main content -->
                     <div class="kiosk-lookup-body">
-                        <h1 class="kiosk-lookup-title">Sino ang susukatin?</h1>
-                        <p class="kiosk-lookup-subtitle">I-type ang Child ID o pangalan ng bata para mahanap ang record niya.</p>
+                        <h1 class="kiosk-lookup-title"><?php echo kiosk_e(kiosk_t('lookup.title')); ?></h1>
+                        <p class="kiosk-lookup-subtitle"><?php echo kiosk_e(kiosk_t('lookup.subtitle')); ?></p>
 
                         <!-- Error banner (shown when start fails) -->
                         <div class="kiosk-lookup-error" id="lookupError" hidden>
@@ -332,7 +352,7 @@ $appData = [
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="#dc2626" width="20" height="20"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z"/></svg>
                             </div>
                             <span class="kiosk-lookup-error-text" id="lookupErrorText"></span>
-                            <button class="kiosk-lookup-error-dismiss" type="button" id="lookupErrorDismiss" aria-label="Isara">
+                            <button class="kiosk-lookup-error-dismiss" type="button" id="lookupErrorDismiss" aria-label="<?php echo kiosk_e(kiosk_t('common.close')); ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="16" height="16"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -341,8 +361,8 @@ $appData = [
                         <div class="kiosk-lookup-state" data-lookup-state="idle">
                             <div class="kiosk-lookup-input-group">
                                 <svg class="kiosk-lookup-input-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z"/></svg>
-                                <input class="kiosk-lookup-input" type="text" id="childIdInput" placeholder="Ilagay ang Child ID o pangalan..." autocomplete="off" autocapitalize="characters" spellcheck="false" />
-                                <button class="kiosk-lookup-clear" type="button" id="clearChildId" aria-label="Linisin" hidden>
+                                <input class="kiosk-lookup-input" type="text" id="childIdInput" placeholder="<?php echo kiosk_e(kiosk_t('lookup.placeholder')); ?>" autocomplete="off" autocapitalize="characters" spellcheck="false" />
+                                <button class="kiosk-lookup-clear" type="button" id="clearChildId" aria-label="<?php echo kiosk_e(kiosk_t('common.clear')); ?>" hidden>
                                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="18" height="18"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                                 </button>
                             </div>
@@ -351,12 +371,12 @@ $appData = [
                             <div class="kiosk-lookup-preview" id="lookupPreview" hidden></div>
 
                             <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block kiosk-lookup-submit" type="button" id="lookupSubmit">
-                                HANAPIN
+                                <?php echo kiosk_e(kiosk_t('lookup.search')); ?>
                             </button>
 
                             <div class="kiosk-lookup-help">
-                                <span>Walang Child ID?</span>
-                                <button class="kiosk-lookup-help-btn" type="button" data-kiosk-action="open-lookup-help">Pindutin ito!</button>
+                                <span><?php echo kiosk_e(kiosk_t('lookup.no_id')); ?></span>
+                                <button class="kiosk-lookup-help-btn" type="button" data-kiosk-action="open-lookup-help"><?php echo kiosk_e(kiosk_t('lookup.tap_here')); ?></button>
                             </div>
                         </div>
 
@@ -364,8 +384,8 @@ $appData = [
                         <div class="kiosk-lookup-state" data-lookup-state="searching" hidden>
                             <div class="kiosk-lookup-loading">
                                 <div class="kiosk-lookup-spinner"></div>
-                                <p class="kiosk-lookup-loading-text">Hahanapin ang record...</p>
-                                <p class="kiosk-lookup-loading-sub">Sandali lamang.</p>
+                                <p class="kiosk-lookup-loading-text"><?php echo kiosk_e(kiosk_t('lookup.searching')); ?></p>
+                                <p class="kiosk-lookup-loading-sub"><?php echo kiosk_e(kiosk_t('lookup.searching_sub')); ?></p>
                             </div>
                         </div>
 
@@ -374,7 +394,7 @@ $appData = [
                             <div class="kiosk-lookup-found-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="#fff" width="28" height="28"><path stroke-linecap="round" stroke-linejoin="round" d="m4.5 12.75 6 6 9-13.5"/></svg>
                             </div>
-                            <p class="kiosk-lookup-found-label">RECORD FOUND</p>
+                            <p class="kiosk-lookup-found-label"><?php echo kiosk_e(kiosk_t('lookup.found')); ?></p>
 
                             <div class="kiosk-lookup-found-card">
                                 <div class="kiosk-lookup-found-name" id="foundChildName">—</div>
@@ -388,10 +408,10 @@ $appData = [
 
                             <div class="kiosk-lookup-found-actions">
                                 <button class="kiosk-btn kiosk-btn-outline" type="button" data-kiosk-action="lookup-retry">
-                                    Hanapin Ulit
+                                    <?php echo kiosk_e(kiosk_t('lookup.retry')); ?>
                                 </button>
                                 <button class="kiosk-btn kiosk-btn-primary" type="button" data-kiosk-action="lookup-confirm">
-                                    Simulan na
+                                    <?php echo kiosk_e(kiosk_t('lookup.confirm')); ?>
                                 </button>
                             </div>
                         </div>
@@ -401,7 +421,7 @@ $appData = [
                             <div class="kiosk-lookup-found-icon" style="background: #fee2e2;">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="#dc2626" width="28" height="28"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                             </div>
-                            <p class="kiosk-lookup-found-label" style="color: #dc2626;">HINDI PA DUE</p>
+                            <p class="kiosk-lookup-found-label" style="color: #dc2626;"><?php echo kiosk_e(kiosk_t('lookup.not_due')); ?></p>
 
                             <div class="kiosk-lookup-found-card">
                                 <div class="kiosk-lookup-found-name" id="notDueChildName">&mdash;</div>
@@ -417,10 +437,10 @@ $appData = [
 
                             <div class="kiosk-lookup-found-actions">
                                 <button class="kiosk-btn kiosk-btn-outline kiosk-btn-block" type="button" data-kiosk-action="not-due-recheck" id="notDueRecheckBtn" hidden>
-                                    Sukatin Pa Rin (double-check)
+                                    <?php echo kiosk_e(kiosk_t('lookup.recheck')); ?>
                                 </button>
                                 <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="lookup-retry">
-                                    Hanapin Ulit
+                                    <?php echo kiosk_e(kiosk_t('lookup.retry')); ?>
                                 </button>
                             </div>
                         </div>
@@ -431,8 +451,8 @@ $appData = [
                 <div class="kiosk-lookup-help-overlay" id="lookupHelpModal" hidden>
                     <div class="kiosk-lookup-help-modal">
                         <div class="kiosk-lookup-help-header">
-                            <h3>Kailangan ng tulong?</h3>
-                            <button class="kiosk-modal-close" type="button" data-kiosk-action="close-lookup-help" aria-label="Isara">
+                            <h3><?php echo kiosk_e(kiosk_t('lookup.help_title')); ?></h3>
+                            <button class="kiosk-modal-close" type="button" data-kiosk-action="close-lookup-help" aria-label="<?php echo kiosk_e(kiosk_t('common.close')); ?>">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="22" height="22"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
@@ -440,11 +460,11 @@ $appData = [
                             <div class="kiosk-lookup-help-icon">
                                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="#0b6e4f" width="28" height="28"><path stroke-linecap="round" stroke-linejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z"/></svg>
                             </div>
-                            <p>Kung wala pang Child ID ang bata, mangyaring magpatulong sa health worker upang ma-register ang bata sa system.</p>
+                            <p><?php echo kiosk_e(kiosk_t('lookup.help_body')); ?></p>
                         </div>
                         <div class="kiosk-lookup-help-footer">
                             <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="close-lookup-help">
-                                ISARA
+                                <?php echo kiosk_e(kiosk_t('lookup.help_close')); ?>
                             </button>
                         </div>
                     </div>
@@ -456,12 +476,12 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="measurement" hidden>
                 <div class="kiosk-form-screen">
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-lookup" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-lookup" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
 
-                    <h2 class="kiosk-form-title">SUKAT NG TAAS AT TIMBANG</h2>
-                    <p class="kiosk-form-subtitle">Tumayo nang tuwid sa platform.<br>Huwag muna gumalaw habang sinusukat.</p>
+                    <h2 class="kiosk-form-title"><?php echo kiosk_e(kiosk_t('measure.title')); ?></h2>
+                    <p class="kiosk-form-subtitle"><?php echo kiosk_t('measure.subtitle'); ?></p>
 
                     <div class="kiosk-measure-layout">
                         <!-- Ruler (no child figure) -->
@@ -480,22 +500,22 @@ $appData = [
                         <!-- Stacked live cards: HEIGHT + WEIGHT -->
                         <div class="kiosk-live-stack">
                             <div class="kiosk-live-card kiosk-live-card-sm">
-                                <div class="kiosk-live-label">TAAS</div>
+                                <div class="kiosk-live-label"><?php echo kiosk_e(kiosk_t('measure.height')); ?></div>
                                 <div class="kiosk-live-value" data-kiosk-height-readout>--.-</div>
                                 <div class="kiosk-live-unit">cm</div>
                                 <div class="kiosk-live-status" data-kiosk-height-status>
                                     <span class="kiosk-status-icon waiting"></span>
-                                    Naghihintay...
+                                    <?php echo kiosk_e(kiosk_t('measure.waiting')); ?>
                                 </div>
                             </div>
 
                             <div class="kiosk-live-card kiosk-live-card-sm">
-                                <div class="kiosk-live-label">TIMBANG</div>
+                                <div class="kiosk-live-label"><?php echo kiosk_e(kiosk_t('measure.weight')); ?></div>
                                 <div class="kiosk-live-value" data-kiosk-weight-readout>--.--</div>
                                 <div class="kiosk-live-unit">kg</div>
                                 <div class="kiosk-live-status" data-kiosk-weight-status>
                                     <span class="kiosk-status-icon waiting"></span>
-                                    Naghihintay...
+                                    <?php echo kiosk_e(kiosk_t('measure.waiting')); ?>
                                 </div>
                                 <div class="kiosk-weight-bar" aria-hidden="true">
                                     <div class="kiosk-weight-bar-track">
@@ -515,11 +535,11 @@ $appData = [
 
                     <div class="kiosk-reminder">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#0b6e4f" stroke-width="1.5"><circle cx="8" cy="8" r="7"/><line x1="8" y1="7" x2="8" y2="11"/><circle cx="8" cy="5" r="0.6" fill="#0b6e4f"/></svg>
-                        <span>Hintaying maging stable ang dalawang sensor bago kunin ang sukat.</span>
+                        <span><?php echo kiosk_e(kiosk_t('measure.reminder')); ?></span>
                     </div>
 
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="process-measurement" disabled id="processBtn">
-                        I-process ang measurement
+                        <?php echo kiosk_e(kiosk_t('measure.process')); ?>
                     </button>
                     <div class="kiosk-step-dots">
                         <span class="kiosk-dot-ind"></span>
@@ -536,10 +556,10 @@ $appData = [
                 <div class="kiosk-processing-wrap">
                     <div class="kiosk-live-error" data-kiosk-processing-error hidden>
                         <div class="kiosk-live-error-body">
-                            <strong>Nabigo ang pagsukat</strong>
+                            <strong><?php echo kiosk_e(kiosk_t('processing.error_title')); ?></strong>
                             <span data-kiosk-processing-error-message>—</span>
                         </div>
-                        <button class="kiosk-btn kiosk-btn-outline" type="button" data-kiosk-action="reset">Okay, Bumalik</button>
+                        <button class="kiosk-btn kiosk-btn-outline" type="button" data-kiosk-action="reset"><?php echo kiosk_e(kiosk_t('measure.reset')); ?></button>
                     </div>
                     <div class="kiosk-processing-ring">
                         <svg viewBox="0 0 200 200" aria-hidden="true">
@@ -548,10 +568,10 @@ $appData = [
                         </svg>
                         <div class="kiosk-processing-label">
                             <strong data-kiosk-progress-value>0%</strong>
-                            <span data-kiosk-process-stage>Pinoproseso ang pagsukat...</span>
+                            <span data-kiosk-process-stage><?php echo kiosk_e(kiosk_t('processing.stage')); ?></span>
                         </div>
                     </div>
-                    <p class="kiosk-processing-note">Maghintay lamang, ilang segundo lang ito.</p>
+                    <p class="kiosk-processing-note"><?php echo kiosk_e(kiosk_t('processing.note')); ?></p>
                 </div>
             </section>
 
@@ -560,12 +580,12 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="results" hidden>
                 <div class="kiosk-form-screen">
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="reset" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="reset" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
 
-                    <h2 class="kiosk-form-title">RESULTA</h2>
-                    <p class="kiosk-form-subtitle">Narito ang resulta ng pagsukat.</p>
+                    <h2 class="kiosk-form-title"><?php echo kiosk_e(kiosk_t('results.title')); ?></h2>
+                    <p class="kiosk-form-subtitle"><?php echo kiosk_e(kiosk_t('results.subtitle')); ?></p>
 
                     <div class="kiosk-result-child-card">
                         <div class="kiosk-result-child-avatar" aria-hidden="true">
@@ -576,11 +596,11 @@ $appData = [
                             <div class="kiosk-result-child-meta">
                                 <span class="kiosk-result-meta-item">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                    <span data-kiosk-result-meta>3 taon, 2 buwan (38 buwan)</span>
+                                    <span data-kiosk-result-meta><?php echo kiosk_e(kiosk_t('age.months')); ?></span>
                                 </span>
                                 <span class="kiosk-result-meta-item">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                                    <span data-kiosk-result-sex>Lalaki</span>
+                                    <span data-kiosk-result-sex><?php echo kiosk_e(kiosk_t('sex.male')); ?></span>
                                 </span>
                                 <span class="kiosk-result-meta-item">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
@@ -593,32 +613,32 @@ $appData = [
 
                     <div class="kiosk-result-measurements">
                         <div class="kiosk-result-row">
-                            <span class="kiosk-result-label">Timbang</span>
+                            <span class="kiosk-result-label"><?php echo kiosk_e(kiosk_t('results.weight_label')); ?></span>
                             <span class="kiosk-result-val" data-kiosk-result-weight>28.6 kg</span>
                         </div>
                         <div class="kiosk-result-row">
-                            <span class="kiosk-result-label">Taas</span>
+                            <span class="kiosk-result-label"><?php echo kiosk_e(kiosk_t('results.height_label')); ?></span>
                             <span class="kiosk-result-val" data-kiosk-result-height>120.4 cm</span>
                         </div>
                     </div>
 
-                    <h3 class="kiosk-result-section-title">NUTRITIONAL STATUS</h3>
+                    <h3 class="kiosk-result-section-title"><?php echo kiosk_e(kiosk_t('results.section')); ?></h3>
                     <div class="kiosk-result-status-grid">
                         <div class="kiosk-result-status-row">
-                            <span>Weight-for-Age (WFA)</span>
+                            <span><?php echo kiosk_e(kiosk_t('results.axis_wfa')); ?></span>
                             <span class="kiosk-status-badge is-normal" data-kiosk-result-wfa-status>Normal</span>
                         </div>
                         <div class="kiosk-result-status-row">
-                            <span>Height-for-Age (HFA)</span>
+                            <span><?php echo kiosk_e(kiosk_t('results.axis_hfa')); ?></span>
                             <span class="kiosk-status-badge is-normal" data-kiosk-result-hfa-status>Normal</span>
                         </div>
                         <div class="kiosk-result-status-row">
-                            <span>Weight-for-Length/Height (WFL/H)</span>
+                            <span><?php echo kiosk_e(kiosk_t('results.axis_wflh')); ?></span>
                             <span class="kiosk-status-badge is-normal" data-kiosk-result-wflh-status>Normal</span>
                         </div>
                     </div>
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="finish">
-                        Done
+                        <?php echo kiosk_e(kiosk_t('results.done')); ?>
                     </button>
                 </div>
             </section>
@@ -628,17 +648,17 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="thankyou" hidden>
                 <div class="kiosk-thankyou">
-                    <h2 class="kiosk-thankyou-title">Matagumpay!</h2>
+                    <h2 class="kiosk-thankyou-title"><?php echo kiosk_e(kiosk_t('thankyou.title')); ?></h2>
                     <div class="kiosk-thankyou-check">
                         <svg width="80" height="80" viewBox="0 0 80 80" fill="none">
                             <circle cx="40" cy="40" r="38" fill="#0b6e4f"/>
                             <path d="M24 40l10 10 22-22" stroke="#fff" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
                         </svg>
                     </div>
-                    <p class="kiosk-thankyou-msg">Nai-save na ang sukat<br>sa system.</p>
+                    <p class="kiosk-thankyou-msg"><?php echo kiosk_t('thankyou.msg'); ?></p>
 
                     <button class="kiosk-btn kiosk-btn-primary kiosk-btn-lg" type="button" data-kiosk-action="reset">
-                        Balik sa Home
+                        <?php echo kiosk_e(kiosk_t('thankyou.home')); ?>
                     </button>
                     <div class="kiosk-thankyou-progress" aria-hidden="true"><span id="thankyouProgressBar"></span></div>
                     <p class="sr-only" id="thankyouCountdown" aria-live="polite"></p>
@@ -650,19 +670,19 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="view-results" hidden>
                 <div class="kiosk-form-screen">
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
-                    <h2 class="kiosk-form-title">MGA RESULTA</h2>
-                    <p class="kiosk-form-subtitle">Piliin ang bata para makita ang mga naunang resulta.</p>
+                    <h2 class="kiosk-form-title"><?php echo kiosk_e(kiosk_t('view.title')); ?></h2>
+                    <p class="kiosk-form-subtitle"><?php echo kiosk_e(kiosk_t('view.subtitle')); ?></p>
                     <div class="kiosk-view-results-search">
                         <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="#7a998c" stroke-width="2"><circle cx="8" cy="8" r="6"/><line x1="12.5" y1="12.5" x2="16" y2="16"/></svg>
-                        <input class="kiosk-input" type="text" id="viewResultsSearch" placeholder="Hanapin ang pangalan..." />
+                        <input class="kiosk-input" type="text" id="viewResultsSearch" placeholder="<?php echo kiosk_e(kiosk_t('view.search')); ?>" />
                     </div>
                     <div class="kiosk-view-results-list" id="viewResultsList">
                         <div class="kiosk-view-results-empty">
                             <svg width="48" height="48" viewBox="0 0 48 48" fill="none" stroke="#d4e5dc" stroke-width="2"><circle cx="24" cy="24" r="20"/><line x1="18" y1="24" x2="30" y2="24"/><line x1="24" y1="18" x2="24" y2="30"/></svg>
-                            <p>Wala pang rehistradong bata sa kiosk na ito.</p>
+                            <p><?php echo kiosk_e(kiosk_t('view.empty')); ?></p>
                         </div>
                     </div>
                 </div>
@@ -673,18 +693,18 @@ $appData = [
             <!-- ============================================================ -->
             <section class="kiosk-screen" data-kiosk-screen="info" hidden>
                 <div class="kiosk-form-screen">
-                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="Bumalik">
+                    <button class="kiosk-back-btn" type="button" data-kiosk-action="back-to-welcome" aria-label="<?php echo kiosk_e(kiosk_t('common.back')); ?>">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                     </button>
-                    <h2 class="kiosk-form-title">TUNGKOL SA<br>SUKAT KALUSUGAN</h2>
+                    <h2 class="kiosk-form-title"><?php echo kiosk_t('info.title'); ?></h2>
                     <div class="kiosk-info-scroll">
                         <div class="kiosk-info-card">
                             <div class="kiosk-info-card-icon kiosk-info-icon-green">
                                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2"><circle cx="14" cy="10" r="7"/><path d="M14 17v6M10 23h8"/></svg>
                             </div>
                             <div>
-                                <h3>Ano ang Sukat Kalusugan?</h3>
-                                <p>Ang Sukat Kalusugan ay isang sistema para sa pagsubaybay sa nutrisyon at kalusugan ng mga bata. Sinusukat ang taas at timbang ng bata upang matukoy kung siya ay nabibilang sa wastong nutritional status ayon sa mga pamantayan ng WHO.</p>
+                                <h3><?php echo kiosk_e(kiosk_t('info.about_title')); ?></h3>
+                                <p><?php echo kiosk_e(kiosk_t('info.about_body')); ?></p>
                             </div>
                         </div>
                         <div class="kiosk-info-card">
@@ -692,11 +712,8 @@ $appData = [
                                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2"><rect x="4" y="4" width="20" height="20" rx="3"/><path d="M8 14l4 4 8-8"/></svg>
                             </div>
                             <div>
-                                <h3>Paano Gumagana?</h3>
-                                <p>1. Pindutin ang <strong>"Simulan na"</strong><br>
-                                2. Ilagay ang pangalan, araw ng kapanganakan, kasarian, at barangay ng bata<br>
-                                3. Sundin ang mga tagubilin para sa pagsukat ng taas at timbang<br>
-                                4. Tingnan ang resulta pagkatapos ng pagsukat</p>
+                                <h3><?php echo kiosk_e(kiosk_t('info.how_title')); ?></h3>
+                                <p><?php echo kiosk_t('info.how_body'); ?></p>
                             </div>
                         </div>
                         <div class="kiosk-info-card">
@@ -704,9 +721,8 @@ $appData = [
                                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2"><circle cx="14" cy="14" r="11"/><line x1="14" y1="8" x2="14" y2="14"/><circle cx="14" cy="19" r="1" fill="#fff"/></svg>
                             </div>
                             <div>
-                                <h3>Mga Sukat</h3>
-                                <p><strong>Taas (Height):</strong> Sinusukat ang taas ng bata nang nakatayo nang tuwid. Mahalaga para sa Height-for-Age (HFA).<br><br>
-                                <strong>Timbang (Weight):</strong> Sinusukat ang timbang ng bata sa timbangan. Mahalaga para sa Weight-for-Age (WFA) at Weight-for-Length/Height (WFL/H).</p>
+                                <h3><?php echo kiosk_e(kiosk_t('info.measure_title')); ?></h3>
+                                <p><?php echo kiosk_t('info.measure_body'); ?></p>
                             </div>
                         </div>
                         <div class="kiosk-info-card">
@@ -714,13 +730,8 @@ $appData = [
                                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2"><rect x="3" y="6" width="22" height="16" rx="3"/><path d="M8 12h4M8 16h6"/></svg>
                             </div>
                             <div>
-                                <h3>Nutritional Status</h3>
-                                <p>Gumagamit ang system ng WHO z-scores para matukoy ang status:<br><br>
-                                <span class="kiosk-info-badge is-normal">Normal</span> – Nasa wastong timbang at taas<br>
-                                <span class="kiosk-info-badge is-underweight">Underweight</span> – Mababa ang timbang para sa edad<br>
-                                <span class="kiosk-info-badge is-stunted">Stunted</span> – Mababa ang taas para sa edad<br>
-                                <span class="kiosk-info-badge is-wasted">Wasted</span> – Mababa ang timbang para sa taas<br>
-                                <span class="kiosk-info-badge is-overweight">Overweight</span> – Mabigat para sa taas</p>
+                                <h3><?php echo kiosk_e(kiosk_t('info.status_title')); ?></h3>
+                                <p><?php echo kiosk_t('info.status_body'); ?></p>
                             </div>
                         </div>
                         <div class="kiosk-info-card">
@@ -728,11 +739,8 @@ $appData = [
                                 <svg width="28" height="28" viewBox="0 0 28 28" fill="none" stroke="#fff" stroke-width="2"><path d="M14 4l10 16H4z"/><line x1="14" y1="11" x2="14" y2="16"/><circle cx="14" cy="19" r="1" fill="#fff"/></svg>
                             </div>
                             <div>
-                                <h3>Mga Paalala</h3>
-                                <p>• Siguraduhing tama ang impormasyong inilagay<br>
-                                • Ang mga resulta ay para sa monitoring lamang at hindi kapalit ng konsultasyon sa doktor<br>
-                                • Kung may alinlangan, kumonsulta sa inyong nutritionist o doktor<br>
-                                • Para sa mga emergency, tumawag sa inyong local health center</p>
+                                <h3><?php echo kiosk_e(kiosk_t('info.reminders_title')); ?></h3>
+                                <p><?php echo kiosk_t('info.reminders_body'); ?></p>
                             </div>
                         </div>
                     </div>
@@ -745,98 +753,17 @@ $appData = [
             <div class="kiosk-modal-overlay" id="privacyModal" hidden>
                 <div class="kiosk-modal">
                     <div class="kiosk-modal-header">
-                        <h2>PRIVACY NOTICE</h2>
-                        <button class="kiosk-modal-close" type="button" data-kiosk-action="close-privacy-modal" aria-label="Isara">
+                        <h2><?php echo kiosk_e(kiosk_t('doc.privacy_title')); ?></h2>
+                        <button class="kiosk-modal-close" type="button" data-kiosk-action="close-privacy-modal" aria-label="<?php echo kiosk_e(kiosk_t('common.close')); ?>">
                             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <div class="kiosk-modal-body">
-                        <p class="kiosk-modal-lead">Your privacy matters to us.</p>
-                        <p>SukatKalusugan is a study-based system designed to support the collection and assessment of children's anthropometric measurements. Before participating, we want you to understand how information collected through the system will be handled.</p>
-
-                        <h4>1. INFORMATION WE COLLECT</h4>
-                        <p>For the purposes of the study, SukatKalusugan may collect information necessary for the assessment of the child, including:</p>
-                        <ul>
-                            <li>Child ID or reference number</li>
-                            <li>Name, when required</li>
-                            <li>Date of birth or age</li>
-                            <li>Sex</li>
-                            <li>Barangay or other information required by the study</li>
-                            <li>Weight</li>
-                            <li>Height or length</li>
-                            <li>Date and time of measurement</li>
-                            <li>Nutritional assessment results</li>
-                            <li>WHO-based growth assessment and classification</li>
-                        </ul>
-                        <p>Only information necessary for the stated study purposes will be collected.</p>
-
-                        <h4>2. WHY DO WE COLLECT THIS INFORMATION?</h4>
-                        <p>The information is collected for the purposes of the SukatKalusugan study, including:</p>
-                        <ul>
-                            <li>conducting anthropometric measurements;</li>
-                            <li>assessing the nutritional status of children;</li>
-                            <li>generating nutritional assessment results;</li>
-                            <li>supporting monitoring and reporting related to the study; and</li>
-                            <li>supporting the research, evaluation, and development of the SukatKalusugan system.</li>
-                        </ul>
-                        <p>The information will only be used for the specific purposes covered by the approved study and data request.</p>
-
-                        <h4>3. HOW WILL THE INFORMATION BE USED?</h4>
-                        <p>The collected information may be processed to generate measurements and nutritional indicators such as:</p>
-                        <ul>
-                            <li>Weight-for-Age (WFA)</li>
-                            <li>Height-for-Age (HFA)</li>
-                            <li>Weight-for-Height/Length (WFH/WFL)</li>
-                        </ul>
-                        <p>The system may use the child's age, sex, weight, and height/length to generate the corresponding assessment results based on the applicable WHO Child Growth Standards.</p>
-
-                        <h4>4. WHO MAY ACCESS THE INFORMATION?</h4>
-                        <p>Access to the collected information will be limited to authorized individuals involved in the study and the operation of the SukatKalusugan system, according to their assigned responsibilities.</p>
-                        <p>Personal information of the child will not be made publicly available or accessed by unauthorized persons.</p>
-
-                        <h4>5. HOW WILL THE INFORMATION BE PROTECTED?</h4>
-                        <ul>
-                            <li>Reasonable technical, physical, and organizational safeguards will be applied to protect the information against unauthorized access, disclosure, alteration, loss, or misuse.</li>
-                            <li>Authorized system users will only be given access to information necessary for their assigned responsibilities.</li>
-                            <li>All persons who are authorized to access the information are expected to maintain its confidentiality.</li>
-                        </ul>
-
-                        <h4>6. CONFIDENTIALITY</h4>
-                        <p>Information collected through the study will be treated as confidential.</p>
-                        <p>The information obtained through the approved data request will be used only for the specific purposes stated in the study and related documentation.</p>
-                        <p>Unauthorized access, processing, use, or disclosure of the information is not permitted.</p>
-
-                        <h4>7. DATA SHARING AND DISCLOSURE</h4>
-                        <p>Personal information will not be disclosed or shared with unauthorized individuals or organizations.</p>
-                        <p>Any authorized use, disclosure, or processing of the information must be consistent with the purposes of the study and applicable data privacy requirements.</p>
-
-                        <h4>8. DATA RETENTION</h4>
-                        <p>Study information will be retained only for the period necessary to fulfill the approved purposes of the study and applicable requirements.</p>
-                        <p>When the information is no longer necessary, it will be securely disposed of, deleted, or anonymized when appropriate and in accordance with the applicable study policies.</p>
-
-                        <h4>9. YOUR PRIVACY RIGHTS</h4>
-                        <p>Under the Data Privacy Act of 2012 (Republic Act No. 10173), data subjects have rights concerning their personal information, subject to applicable laws and requirements.</p>
-                        <p>These may include the right to:</p>
-                        <ul>
-                            <li>be informed about the processing of personal information;</li>
-                            <li>access personal information;</li>
-                            <li>request correction of inaccurate information;</li>
-                            <li>object to certain processing when applicable; and</li>
-                            <li>request deletion or blocking when applicable.</li>
-                        </ul>
-                        <p>For information concerning a child, these rights may be exercised by the child's parent or legal guardian, when appropriate.</p>
-
-                        <h4>10. DATA PRIVACY COMMITMENT</h4>
-                        <p>SukatKalusugan recognizes the importance of protecting children's personal information.</p>
-                        <p>The collection and processing of information for this study will be conducted in accordance with the Republic Act No. 10173, or the Data Privacy Act of 2012, and the applicable data privacy policies and security procedures governing the approved study and data request.</p>
-
-                        <h4>ACKNOWLEDGMENT</h4>
-                        <p>Before proceeding with the measurement, please make sure that you have read and understood this Privacy Notice.</p>
-                        <p><em>I have read and understood this Privacy Notice and understand how my child's information may be collected and used for the purposes of the SukatKalusugan study.</em></p>
+<?php echo kiosk_t('doc.privacy_body'); ?>
                     </div>
                     <div class="kiosk-modal-footer">
                         <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="close-privacy-modal">
-                            NAIINTINDIHAN KO
+                            <?php echo kiosk_e(kiosk_t('doc.understand')); ?>
                         </button>
                     </div>
                 </div>
@@ -848,61 +775,17 @@ $appData = [
             <div class="kiosk-modal-overlay" id="infoSheetModal" hidden>
                 <div class="kiosk-modal">
                     <div class="kiosk-modal-header">
-                        <h2>INFORMATION SHEET</h2>
-                        <button class="kiosk-modal-close" type="button" data-kiosk-action="close-info-sheet" aria-label="Isara">
+                        <h2><?php echo kiosk_e(kiosk_t('doc.info_title')); ?></h2>
+                        <button class="kiosk-modal-close" type="button" data-kiosk-action="close-info-sheet" aria-label="<?php echo kiosk_e(kiosk_t('common.close')); ?>">
                             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" width="24" height="24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/></svg>
                         </button>
                     </div>
                     <div class="kiosk-modal-body">
-                        <h4>Introduction</h4>
-                        <p>We are students from the College of Computer Studies at Our Lady of Fatima University conducting research for our capstone project, "SukatKalusugan: A Smart Kiosk-Based Anthropometric Monitoring System with a Web Application for the City Health Office in the City of San Fernando, Pampanga." This study is being carried out at the City Health Office of the City of San Fernando, Pampanga, with the aim of improving the speed and accuracy of data collection through the use of innovative technology.</p>
-
-                        <h4>Purpose of the Research</h4>
-                        <p>The purpose of this study is to design and develop a smart kiosk-based system for monitoring anthropometric measures that integrates IoT sensors, AI analysis for decision supporting, and a web application for the collection, monitoring, and management of anthropometric data. The system aims to provide accurate real-time measurements and identify trends and patterns in anthropometric classifications among children aged 24-59 months in accordance to WHO standards, supporting health monitoring and promotes awareness of their nutritional and physical growth status.</p>
-
-                        <h4>Type of Research Intervention</h4>
-                        <p>Participation will involve parents, nutritionists, and IT experts testing the smart kiosk-based anthropometric monitoring system with the help of City Nutrition Program Coordinators from City Health Office. Participants will use the kiosk and web application to collect and view anthropometric data, while the system tracks measurements over time to identify trends and patterns that may support follow-up monitoring. Participants will also evaluate the system through an ISO 25010-based survey and interview.</p>
-
-                        <h4>Participant Selection</h4>
-                        <p>You are invited to participate because your experience as a parent/guardian, nutritionist, or IT expert is valuable in helping us understand child nutrition monitoring and in improving the system.</p>
-
-                        <h4>Voluntary Participation</h4>
-                        <p>Your participation in this study is entirely voluntary. You may choose not to participate or to withdraw from the study at any time without providing a reason. If you decide to withdraw, you will no longer be considered a participant and will no longer be involved in any part of the study or its activities. Choosing not to participate or withdrawing from the study will not result in any penalty, disadvantage, or loss of any health services or benefits that you are entitled to receive from the City Health Office. Your decision will not affect your relationship with the researchers, the City Health Office, Our Lady of Fatima University, or any other institution involved in the study.</p>
-
-                        <h4>Procedures</h4>
-                        <p>The researchers invite you to help them understand the child nutrition monitoring methods at the City Health Office of the City of San Fernando, Pampanga and how the SukatKalusugan system can improve the process. If you agree to participate, you will be asked to sign consent forms for documentation.</p>
-                        <p>You will be asked to:</p>
-                        <ul>
-                            <li>Interact with the SukatKalusugan system (kiosk and web application) to collect and view children's anthropometric measurements, which will take approximately 1 hour.</li>
-                            <li>Complete a survey based on ISO 25010 standards to evaluate the system's functionality, reliability, usability, and other quality attributes, which will take approximately 15-20 minutes.</li>
-                            <li>Participate in a brief interview (10-15 minutes) to provide feedback on your experience.</li>
-                        </ul>
-                        <p>If you prefer not to answer any question in the survey or in the interview, you may skip them and proceed to the next activity. All information collected will be kept confidential. Your name will not appear on the survey or interview records; instead, a unique number will identify your responses. Only the researchers, the capstone adviser, and panelists will have access to the data.</p>
-
-                        <h4>Duration</h4>
-                        <p>The activities will take approximately 1 hour in total to complete. The research will be conducted from June 2026 to December 2026. During this period, we may contact you occasionally through email or phone for follow-up or additional input.</p>
-
-                        <h4>Risks</h4>
-                        <p>There are no anticipated physical risks associated with this study. The anthropometric measurements collected by the system are non-invasive and will not cause physical harm to participants. However, there may be minor discomfort or inconvenience while using the kiosk or providing information required for the study. Participants may choose not to answer any question or may withdraw from the study at any time without penalty. To protect privacy and confidentiality, appropriate security measures will be implemented to safeguard the data collected through the kiosk and web application.</p>
-
-                        <h4>Benefits</h4>
-                        <p>As a parent/guardian, nutritionist, or IT expert, your participation will help improve the development of a smart kiosk-based anthropometric monitoring system for children aged 24–59 months. Your involvement will contribute to evaluating the system's ability to collect anthropometric measurements, monitor records, and identify trends and patterns over time. You will gain experience with an innovative IoT and your feedback will help improve the usability, functionality, and reliability of the kiosk and web application.</p>
-
-                        <h4>Reimbursements</h4>
-                        <p>There will be no financial or material incentives provided for participating in this research.</p>
-
-                        <h4>Confidentiality</h4>
-                        <p>All information collected during this study will be kept strictly confidential and will only be accessible to the research team, the capstone adviser, and panel members for academic evaluation purposes. Personal information and anthropometric records will be stored securely, and participant identities will be protected through the use of unique identifiers or codes instead of names whenever possible. The collected data will be used solely for research purposes and will be handled in accordance with the Data Privacy Act of 2012 (Republic Act No. 10173) of the Philippines. Upon completion of the study, all records will be securely retained or disposed of following institutional and data privacy guidelines.</p>
-
-                        <h4>Sharing the Results</h4>
-                        <p>Any information you provide during this study will remain confidential and will not be shared outside the research team. No data will be linked to your name. The insights gained from this research will be shared with you and the City Health Office of the City of San Fernando Pampanga before any public dissemination. The researchers plan to publish the results so others may benefit from the study as well.</p>
-
-                        <h4>Right to Refuse or Withdraw</h4>
-                        <p>Participation in this research is entirely voluntary. Choosing not to participate will not affect your employment, duties, responsibilities, or relationship with the City Health Office in any way. You may also withdraw from the study at any time without any penalty or negative consequences. At the end of the data collection process, you will have the opportunity to review your responses and may request modifications or the removal of any information that you are not comfortable sharing.</p>
+<?php echo kiosk_t('doc.info_body'); ?>
                     </div>
                     <div class="kiosk-modal-footer">
                         <button class="kiosk-btn kiosk-btn-primary kiosk-btn-block" type="button" data-kiosk-action="close-info-sheet">
-                            NAIINTINDIHAN KO
+                            <?php echo kiosk_e(kiosk_t('doc.understand')); ?>
                         </button>
                     </div>
                 </div>
@@ -913,7 +796,7 @@ $appData = [
             <!-- Hidden sidebar for activity feed (admin) -->
             <aside class="kiosk-sidepanel" aria-hidden="true">
             <div class="kiosk-side-card">
-                <h3>Aktibidad</h3>
+                <h3><?php echo kiosk_e(kiosk_t('feed.title')); ?></h3>
                 <div class="kiosk-feed" data-kiosk-feed></div>
             </div>
         </aside>

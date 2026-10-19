@@ -22,7 +22,7 @@ $sessionId = api_int(
 );
 
 if (!preg_match('/^[A-Za-z0-9_-]{3,50}$/', $deviceCode)) {
-    api_error('Invalid device ID.', 400);
+    api_error('Invalid device ID.', 400, ['code' => 'invalid_device']);
 }
 
 $conn = get_db_connection();
@@ -72,7 +72,8 @@ if ($sessionId > 0) {
 if (!$row) {
     api_error(
         'Measurement session not found for this device.',
-        404
+        404,
+        ['code' => 'session_not_found']
     );
 }
 
@@ -88,7 +89,8 @@ if ($sessionId > 0 && $returnedSessionId !== $sessionId) {
 
     api_error(
         'Measurement session mismatch.',
-        409
+        409,
+        ['code' => 'session_mismatch']
     );
 }
 

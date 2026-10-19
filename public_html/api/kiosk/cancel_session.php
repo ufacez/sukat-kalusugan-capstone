@@ -32,14 +32,16 @@ if (
 ) {
     api_error(
         'Invalid device ID.',
-        400
+        400,
+        ['code' => 'invalid_device']
     );
 }
 
 if ($sessionId <= 0) {
     api_error(
         'A valid session ID is required.',
-        400
+        400,
+        ['code' => 'session_id_required']
     );
 }
 
@@ -111,7 +113,8 @@ try {
 
         api_error(
             'Unable to cancel session.',
-            500
+            500,
+            ['code' => 'unable_cancel']
         );
     }
 
@@ -143,7 +146,8 @@ try {
 
         api_error(
             'Unable to cancel session.',
-            500
+            500,
+            ['code' => 'unable_cancel']
         );
     }
 
@@ -171,6 +175,7 @@ try {
 
     api_error(
         'Unable to cancel session.',
-        500
+        500,
+        ['code' => 'unable_cancel']
     );
 }

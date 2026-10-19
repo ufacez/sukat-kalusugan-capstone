@@ -44,14 +44,16 @@ if (
 ) {
     api_error(
         'Invalid device ID.',
-        400
+        400,
+        ['code' => 'invalid_device']
     );
 }
 
 if ($sessionId <= 0) {
     api_error(
         'A valid session ID is required.',
-        400
+        400,
+        ['code' => 'session_id_required']
     );
 }
 
@@ -86,7 +88,8 @@ try {
 
         api_error(
             'Measurement session not found for this device.',
-            404
+            404,
+            ['code' => 'session_not_found']
         );
     }
 
@@ -111,7 +114,8 @@ try {
             'Measurement is not currently active for this session.',
             409,
             [
-                'status' => $status
+                'status' => $status,
+                'code' => 'session_not_active'
             ]
         );
     }
@@ -154,7 +158,8 @@ try {
 
         api_error(
             'Unable to request processing.',
-            500
+            500,
+            ['code' => 'unable_process']
         );
     }
 
@@ -186,7 +191,8 @@ try {
 
         api_error(
             'Unable to request processing.',
-            500
+            500,
+            ['code' => 'unable_process']
         );
     }
 
@@ -242,7 +248,8 @@ try {
             'Measurement session already moved on.',
             409,
             [
-                'status' => $latestStatus
+                'status' => $latestStatus,
+                'code' => 'session_moved_on'
             ]
         );
     }
@@ -288,6 +295,7 @@ try {
 
     api_error(
         'Unable to request processing.',
-        500
+        500,
+        ['code' => 'unable_process']
     );
 }
