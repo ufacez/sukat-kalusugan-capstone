@@ -206,7 +206,6 @@ $children = admin_fetch_all(
         p.email AS parent_email,
         p.address AS parent_address,
         h.household_code AS household_code,
-        h.address AS household_address,
         h.lat AS household_lat,
         h.lng AS household_lng,
         lm.measurement_date AS last_measurement_date,
@@ -532,7 +531,6 @@ nutritionist_layout_start(
                         data-child-birthdate="<?php echo nutritionist_e((string)$child['birthdate']); ?>"
                         data-child-age="<?php echo (int)$age['months']; ?>"
                         data-child-localarea="<?php echo nutritionist_e((string)($child['local_area'] ?? '')); ?>"
-                        data-child-areatype="<?php echo nutritionist_e((string)($child['area_type'] ?? '')); ?>"
                         data-child-address="<?php echo nutritionist_e($parentAddress); ?>"
                         data-child-barangay="<?php echo nutritionist_e((string)($child['barangay'] ?? '')); ?>"
                         data-child-ip="<?php echo !empty($child['is_ip']) ? '1' : '0'; ?>"
@@ -547,9 +545,9 @@ nutritionist_layout_start(
                         data-parent-kind="<?php echo nutritionist_e((string)($child['parent_kind'] ?? '')); ?>"
                         data-parent-phone="<?php echo nutritionist_e((string)($child['parent_phone'] ?? '')); ?>"
                         data-parent-email="<?php echo nutritionist_e((string)($child['parent_email'] ?? '')); ?>"
+                        data-parent-address="<?php echo nutritionist_e($parentAddress); ?>"
                         data-household-id="<?php echo (int)($child['household_id'] ?? 0); ?>"
                         data-household-code="<?php echo nutritionist_e((string)($child['household_code'] ?? '')); ?>"
-                        data-household-address="<?php echo nutritionist_e((string)($child['household_address'] ?? '')); ?>"
                         data-household-lat="<?php echo $child['household_lat'] !== null ? nutritionist_e((string)$child['household_lat']) : ''; ?>"
                         data-household-lng="<?php echo $child['household_lng'] !== null ? nutritionist_e((string)$child['household_lng']) : ''; ?>"
                     >
@@ -668,7 +666,7 @@ nutritionist_layout_start(
                     <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
                     <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
                     <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
-                    <div class="cc-row"><span class="label">Household address</span><span class="value" id="cc-household-address">—</span></div>
+                    <div class="cc-row"><span class="label">Full address</span><span class="value" id="cc-parent-address">—</span></div>
                 </div>
             </div>
         </div>
@@ -776,8 +774,7 @@ nutritionist_layout_start(
         text('cc-disability', get('disability') === '1' ? 'Yes' : 'No');
 
         var localArea = get('localarea');
-        var areaType = get('areatype');
-        text('cc-localarea', (areaType && localArea) ? (areaType.charAt(0).toUpperCase() + areaType.slice(1) + ': ' + localArea) : (localArea || '—'));
+        text('cc-localarea', localArea);
         text('cc-barangay', get('barangay'));
 
         text('cc-parent-name', getP('name'));
@@ -786,9 +783,8 @@ nutritionist_layout_start(
         text('cc-parent-email', getP('email'));
 
         var hhCode = getH('code');
-        var hhAddress = getH('address');
         text('cc-household-code', hhCode || '—');
-        text('cc-household-address', hhAddress || '—');
+        text('cc-parent-address', getP('address'));
 
         renderMeasureStrip(row);
 
@@ -905,6 +901,7 @@ body.nutritionist-page .child-edit-modal{width:min(720px,calc(100vw - 40px)) !im
             ['id','first_name','middle_name','last_name','birthdate','sex','parent_id','local_area_id'].forEach(function(name){
                 var input=field(name); if(input) input.value=button.dataset[name.replace(/_([a-z])/g,function(_,c){return c.toUpperCase();})]||'';
             });
+            field('id').value=button.dataset.childId||'';
             field('is_ip').checked=button.dataset.isIp==='1';
             field('has_disability').checked=button.dataset.hasDisability==='1';
             options.forEach(function(option){var cb=option.querySelector('input');option.classList.toggle('is-selected',cb.checked);});

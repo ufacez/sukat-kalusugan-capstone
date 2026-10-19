@@ -360,11 +360,24 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
 <?php endif; ?>
 
 <style>
-#users-table{min-width:680px}
+#users-table{min-width:900px;table-layout:auto}
 #users-table th,#users-table td{vertical-align:middle}
 #users-table td:nth-child(2),#users-table td:nth-child(3){white-space:nowrap}
+#users-table th:nth-child(1),#users-table td:nth-child(1),
+#users-table th:nth-child(3),#users-table td:nth-child(3),
+#users-table th:nth-child(4),#users-table td:nth-child(4),
+#users-table th:nth-child(5),#users-table td:nth-child(5),
+#users-table th:nth-child(6),#users-table td:nth-child(6){width:1%;white-space:nowrap}
+#users-table th:nth-child(1),#users-table td:nth-child(1){width:130px}
+#users-table th:nth-child(2),#users-table td:nth-child(2){width:360px;min-width:300px}
+#users-table th:nth-child(3),#users-table td:nth-child(3){width:135px}
+#users-table th:nth-child(4),#users-table td:nth-child(4){width:135px}
+#users-table th:nth-child(5),#users-table td:nth-child(5){width:115px}
+#users-table th:nth-child(6),#users-table td:nth-child(6){width:110px}
+#users-table td:nth-child(2)>div{min-width:0}
+#users-table td:nth-child(2) .admin-mini{max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #users-table th:last-child,#users-table td:last-child{text-align:center}
-#users-table .admin-actions{justify-content:center}
+#users-table .admin-actions{justify-content:center;gap:8px}
 body.admin-page .users-edit-modal{width:min(1120px,calc(100vw - 40px)) !important;max-width:min(1120px,calc(100vw - 40px)) !important;max-height:calc(100dvh - 32px);border-radius:18px;overflow:hidden}
 .users-edit-modal .admin-modal-head{padding:20px 24px 14px;align-items:flex-start}
 .users-edit-modal .admin-modal-head h3{font-size:1.35rem;letter-spacing:-.02em}

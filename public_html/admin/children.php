@@ -44,15 +44,24 @@ $children = admin_fetch_all(
         bg.name AS barangay,
         c.parent_id,
         p.name AS parent_name,
+        p.parent_type AS parent_kind,
+        p.phone AS parent_phone,
+        p.email AS parent_email,
+        p.address AS parent_address,
+        h.household_code,
         lm.measurement_date,
         lm.created_at AS measured_at,
         lm.height_cm,
         lm.weight_kg,
-        lm.nutritional_status
+        lm.nutritional_status,
+        lm.wfa_status,
+        lm.hfa_status,
+        lm.wfh_status
      FROM children c
      LEFT JOIN parents p ON p.id = c.parent_id
      LEFT JOIN barangays bg ON bg.id = c.barangay_id
      LEFT JOIN local_areas la ON la.id = c.local_area_id
+     LEFT JOIN households h ON h.id = c.household_id AND h.status = 'active'
      LEFT JOIN measurements lm ON lm.id = (
         SELECT m.id FROM measurements m WHERE m.child_id = c.id
         ORDER BY m.measurement_date DESC, m.id DESC LIMIT 1
@@ -88,7 +97,7 @@ if ($canAddChild && has_permission('parents.create')) {
     $actions .= '<a class="admin-btn" href="' . admin_e(app_url('/admin/family_form.php')) . '">' . admin_action_icon('add') . ' Add family</a>';
 }
 
-admin_layout_start('Children', 'Registered child profiles, growth status, and nutritional tracking.', 'children', $actions);
+admin_layout_start('Children', 'Registered child profiles. Click any row to view the child information card.', 'children', $actions);
 ?>
 <section class="admin-grid-cards">
     <article class="admin-card">
@@ -158,16 +167,47 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
             </thead>
             <tbody>
                 <?php foreach ($children as $childIndex => $child): ?>
-                    <tr<?php echo admin_paged_row_attr($childIndex, 10); ?> data-filter-text="<?php echo admin_e(strtolower((string)$child['child_code'] . ' ' . (string)$child['first_name'] . ' ' . (string)($child['middle_name'] ?? '') . ' ' . (string)$child['last_name'] . ' ' . (string)($child['parent_name'] ?? '') . ' ' . (string)($child['barangay'] ?? ''))); ?>">
+                    <?php
+                    $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
+                    $fullName = trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name']);
+                    $parentAddress = (string)($child['parent_address'] ?? '');
+                    $lastDate = $child['measurement_date'] ?? null;
+                    ?>
+                    <tr<?php echo admin_paged_row_attr($childIndex, 10); ?>
+                        class="row-link"
+                        data-filter-text="<?php echo admin_e(strtolower((string)$child['child_code'] . ' ' . $fullName . ' ' . (string)($child['parent_name'] ?? '') . ' ' . (string)($child['barangay'] ?? '') . ' ' . (string)($child['local_area_name'] ?? '') . ' ' . $parentAddress)); ?>"
+                        data-child-id="<?php echo (int)$child['id']; ?>"
+                        data-child-name="<?php echo admin_e($fullName); ?>"
+                        data-child-code="<?php echo admin_e((string)$child['child_code']); ?>"
+                        data-child-sex="<?php echo admin_e((string)$child['sex']); ?>"
+                        data-child-birthdate="<?php echo admin_e((string)$child['birthdate']); ?>"
+                        data-child-age="<?php echo (int)$age['months']; ?>"
+                        data-child-localarea="<?php echo admin_e((string)($child['local_area_name'] ?? '')); ?>"
+                        data-child-address="<?php echo admin_e($parentAddress); ?>"
+                        data-child-barangay="<?php echo admin_e((string)($child['barangay'] ?? '')); ?>"
+                        data-child-ip="<?php echo !empty($child['is_ip']) ? '1' : '0'; ?>"
+                        data-child-disability="<?php echo !empty($child['has_disability']) ? '1' : '0'; ?>"
+                        data-meas-date="<?php echo ($lastDate !== null && $lastDate !== '') ? admin_e((string)$lastDate) : ''; ?>"
+                        data-meas-weight="<?php echo $child['weight_kg'] !== null ? admin_e((string)(float)$child['weight_kg']) : ''; ?>"
+                        data-meas-height="<?php echo $child['height_cm'] !== null ? admin_e((string)(float)$child['height_cm']) : ''; ?>"
+                        data-meas-wfa="<?php echo admin_e((string)($child['wfa_status'] ?? '')); ?>"
+                        data-meas-hfa="<?php echo admin_e((string)($child['hfa_status'] ?? '')); ?>"
+                        data-meas-wfh="<?php echo admin_e((string)($child['wfh_status'] ?? '')); ?>"
+                        data-parent-name="<?php echo admin_e((string)($child['parent_name'] ?? '')); ?>"
+                        data-parent-kind="<?php echo admin_e((string)($child['parent_kind'] ?? '')); ?>"
+                        data-parent-phone="<?php echo admin_e((string)($child['parent_phone'] ?? '')); ?>"
+                        data-parent-email="<?php echo admin_e((string)($child['parent_email'] ?? '')); ?>"
+                        data-parent-address="<?php echo admin_e($parentAddress); ?>"
+                        data-household-code="<?php echo admin_e((string)($child['household_code'] ?? '')); ?>"
+                    >
                         <td style="font-family:monospace;"><?php echo admin_e($child['child_code']); ?></td>
                         <td>
                             <div style="display:flex;align-items:center;gap:10px;">
                                 <span class="admin-avatar" style="background:var(--admin-primary);color:var(--admin-text-on-primary);width:32px;height:32px;font-size:0.7rem;"><?php echo admin_initials($child['first_name'] . ' ' . $child['last_name']); ?></span>
                                 <div>
-                                    <div style="font-weight:700;"><?php echo admin_e(trim($child['first_name'] . ' ' . ($child['middle_name'] ?? '') . ' ' . $child['last_name'])); ?></div>
+                                    <div style="font-weight:700;"><?php echo admin_e($fullName); ?></div>
                                     <div class="admin-mini">
                                         <?php
-                                            $age = doh_age((string)$child['birthdate']) ?? ['days' => 0, 'months' => 0];
                                             echo admin_e((string)$child['sex']);
                                             echo ' &middot; ';
                                             echo (int)$age['days']; ?> day<?php echo (int)$age['days'] === 1 ? '' : 's'; ?> · <?php echo (int)$age['months']; ?> months
@@ -189,8 +229,9 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                             <?php endif; ?>
                         </td>
                         <td>
-                            <?php if (has_permission('children.update') || has_permission('children.delete')): ?>
-                            <div class="admin-actions">
+                            <div class="admin-actions" onclick="event.stopPropagation();">
+                                <button type="button" class="admin-icon-btn admin-icon-btn-primary" title="View child card" data-view-card="<?php echo (int)$child['id']; ?>"><?php echo admin_action_icon('view'); ?></button>
+                                <?php if (has_permission('children.update') || has_permission('children.delete')): ?>
                                 <?php if (has_permission('children.update')): ?>
                                     <button class="admin-icon-btn" title="Edit" type="button"
                                         data-child-edit
@@ -216,8 +257,8 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
                                         </button>
                                     </form>
                                 <?php endif; ?>
+                                <?php endif; ?>
                             </div>
-                            <?php endif; ?>
                         </td>
                     </tr>
                 <?php endforeach; ?>
@@ -225,6 +266,65 @@ admin_layout_start('Children', 'Registered child profiles, growth status, and nu
         </table>
     </div>
 </section>
+
+<!--
+    Child information card modal. Opened from the row's "view" button or by
+    clicking anywhere on the row. Latest measurement strip on top, then
+    grouped Child / Parent-guardian / Address columns.
+-->
+<div class="cc-overlay" id="cc-overlay" aria-hidden="true" role="dialog" aria-modal="true">
+    <div class="cc-modal">
+        <div class="cc-head">
+            <div class="avatar" id="cc-avatar">--</div>
+            <div class="meta">
+                <div class="name" id="cc-name">Child name</div>
+                <div class="sub" id="cc-sub">—</div>
+            </div>
+            <button type="button" class="close" id="cc-close" aria-label="Close">×</button>
+        </div>
+        <div class="cc-body">
+            <div class="cc-measure">
+                <div class="m-title">Current measurement (latest)</div>
+                <div class="m-grid" id="cc-measure-grid">
+                    <div class="m-stat"><span class="k">Weight</span><span class="v" id="cc-m-weight">—</span></div>
+                    <div class="m-stat"><span class="k">Height</span><span class="v" id="cc-m-height">—</span></div>
+                    <div class="m-stat"><span class="k">Date</span><span class="v" id="cc-m-date" style="font-size:15px;">—</span></div>
+                    <div class="m-pills" id="cc-m-pills"></div>
+                </div>
+                <div class="m-empty" id="cc-m-empty" style="display:none;">Not yet weighed — no measurement on record.</div>
+            </div>
+            <div class="cc-cols">
+                <div class="cc-card">
+                    <div class="cc-section">Child information</div>
+                    <div class="cc-row"><span class="label">Child code</span><span class="value" id="cc-code">—</span></div>
+                    <div class="cc-row"><span class="label">Sex</span><span class="value" id="cc-sex">—</span></div>
+                    <div class="cc-row"><span class="label">Birthdate</span><span class="value" id="cc-birthdate">—</span></div>
+                    <div class="cc-row"><span class="label">Age</span><span class="value" id="cc-age">—</span></div>
+                    <div class="cc-row"><span class="label">IP group</span><span class="value" id="cc-ip">—</span></div>
+                    <div class="cc-row"><span class="label">With disability</span><span class="value" id="cc-disability">—</span></div>
+                </div>
+                <div class="cc-card">
+                    <div class="cc-section">Parent / guardian</div>
+                    <div class="cc-row"><span class="label">Name</span><span class="value" id="cc-parent-name">—</span></div>
+                    <div class="cc-row"><span class="label">Relationship</span><span class="value" id="cc-parent-kind">—</span></div>
+                    <div class="cc-row"><span class="label">Phone</span><span class="value" id="cc-parent-phone">—</span></div>
+                    <div class="cc-row"><span class="label">Email</span><span class="value" id="cc-parent-email">—</span></div>
+                </div>
+                <div class="cc-card">
+                    <div class="cc-section">Address</div>
+                    <div class="cc-row"><span class="label">Local area</span><span class="value" id="cc-localarea">—</span></div>
+                    <div class="cc-row"><span class="label">Barangay</span><span class="value" id="cc-barangay">—</span></div>
+                    <div class="cc-row"><span class="label">Household code</span><span class="value" id="cc-household-code">—</span></div>
+                    <div class="cc-row"><span class="label">Full address</span><span class="value" id="cc-parent-address">—</span></div>
+                </div>
+            </div>
+        </div>
+        <div class="cc-foot">
+            <?php if ($canEditChild): ?><a class="admin-btn-secondary" id="cc-edit" href="#">Edit profile</a><?php endif; ?>
+            <button type="button" class="admin-btn" id="cc-close-2">Close</button>
+        </div>
+    </div>
+</div>
 
 <?php if ($canEditChild): ?>
 <div class="admin-modal-overlay" id="child-edit-overlay" hidden>
@@ -287,6 +387,51 @@ body.admin-page .child-edit-modal{width:min(720px,calc(100vw - 40px)) !important
   body.admin-page .child-edit-modal{width:calc(100vw - 24px) !important;max-width:calc(100vw - 24px) !important}
   .child-edit-body{padding:12px 16px 16px}
   .child-edit-body .admin-edit-actions{margin:2px -16px -16px;padding:10px 16px 12px}
+}
+
+/* Child detail card — opened by row click / view button */
+.admin-table .row-link{cursor:pointer;transition:background-color .12s}
+.admin-table .row-link:hover td{background:var(--admin-surface-alt)}
+.cc-overlay{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:1000;padding:20px}
+.cc-overlay.is-open{display:flex}
+.cc-modal{background:var(--admin-surface);border:1px solid var(--admin-border);border-radius:14px;width:100%;max-width:1000px;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.18);display:flex;flex-direction:column}
+.cc-head{display:flex;align-items:center;gap:14px;padding:18px 22px;border-bottom:1px solid var(--admin-border);position:sticky;top:0;background:var(--admin-surface);z-index:1}
+.cc-head .avatar{width:60px;height:60px;border-radius:50%;background:var(--admin-primary);color:var(--admin-text-on-primary,#fff);font-weight:700;font-size:20px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.cc-head .meta{min-width:0;flex:1}
+.cc-head .name{font-size:19px;font-weight:700;color:var(--admin-text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc-head .sub{font-size:13px;color:var(--admin-muted);margin-top:2px}
+.cc-head .close{background:none;border:none;color:var(--admin-muted);font-size:28px;line-height:1;cursor:pointer;padding:8px 14px;border-radius:8px;min-width:48px;min-height:48px}
+.cc-head .close:hover{background:var(--admin-surface-alt);color:var(--admin-text)}
+.cc-body{padding:20px 22px}
+.cc-measure{background:var(--admin-primary-soft);border:1px solid var(--admin-border);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.cc-measure .m-title{font-size:13px;font-weight:700;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px}
+.cc-measure .m-grid{display:flex;gap:18px;flex-wrap:wrap;align-items:center}
+.cc-measure .m-stat{display:flex;flex-direction:column;gap:2px;min-width:90px}
+.cc-measure .m-stat .k{font-size:12px;color:var(--admin-muted);font-weight:600}
+.cc-measure .m-stat .v{font-size:17px;font-weight:700;color:var(--admin-text)}
+.cc-measure .m-pills{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-left:auto}
+.cc-measure .m-pills .admin-pill{font-size:13px;padding:5px 12px}
+.cc-measure .m-empty{font-size:14px;color:var(--admin-muted);font-style:italic}
+.cc-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.cc-card{background:var(--admin-surface-alt);border:1px solid var(--admin-border);border-radius:12px;padding:14px 16px;min-width:0}
+.cc-section{font-weight:700;font-size:13px;color:var(--admin-text);text-transform:uppercase;letter-spacing:.05em;margin:0 0 6px}
+.cc-row{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:9px 0;border-bottom:1px solid var(--admin-border);font-size:14px}
+.cc-row:last-child{border-bottom:none}
+.cc-row .label{color:var(--admin-muted);font-weight:500;flex-shrink:0}
+.cc-row .value{font-weight:600;color:var(--admin-text);text-align:right;flex:1;min-width:0;word-break:break-word}
+.cc-foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 22px;border-top:1px solid var(--admin-border);background:var(--admin-surface-alt);border-bottom-left-radius:14px;border-bottom-right-radius:14px}
+.cc-foot .admin-btn,.cc-foot .admin-btn-secondary{min-height:44px;display:inline-flex;align-items:center;font-size:14px}
+@media (max-width: 860px){
+  .cc-cols{grid-template-columns:1fr}
+  .cc-measure .m-pills{margin-left:0}
+}
+@media (max-width: 560px){
+  .cc-modal{max-width:calc(100vw - 16px);max-height:85vh}
+  .cc-row{flex-direction:column;gap:4px}
+  .cc-row .value{text-align:left}
+  .cc-head{padding:14px 16px}
+  .cc-body{padding:14px 16px}
+  .cc-foot{padding:12px 16px}
 }
 </style>
 <script>
@@ -354,6 +499,153 @@ body.admin-page .child-edit-modal{width:min(720px,calc(100vw - 40px)) !important
     });
     overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !overlay.hidden) close(); });
+})();
+</script>
+
+<script>
+(function () {
+    var overlay = document.getElementById('cc-overlay');
+    if (!overlay) return;
+
+    function val(id) { return document.getElementById(id); }
+    function text(id, v) { var el = val(id); if (el) el.textContent = (v === null || v === undefined || v === '') ? '—' : v; }
+    function ccEsc(s) {
+        return String(s).replace(/[&<>"']/g, function (ch) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+        });
+    }
+
+    // Mirrors PHP status-class mapping for the short status codes.
+    function ccStatusClass(s) {
+        var x = String(s || '').toLowerCase().trim();
+        if (x === 'normal' || x === 'n' || x === 'tall' || x === 't') return 'is-success';
+        if (x === 'muw' || x === 'mst' || x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam' || x.indexOf('moderately') === 0) return 'is-warn';
+        if (x === 'ow' || x === 'ob' || x === 'overweight' || x === 'obese') return 'is-orange';
+        if (x === 'suw' || x === 'sst' || x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam' || x.indexOf('severely') === 0) return 'is-danger';
+        if (x.indexOf('refer') !== -1) return 'is-info';
+        return 'is-muted';
+    }
+
+    function ccWfhShort(code) {
+        var x = String(code || '').toLowerCase().trim();
+        if (x === 'sw' || x === 'sw/sam' || x === 'sw(sam)' || x === 'sam') return 'SW/SAM';
+        if (x === 'mw' || x === 'mw/mam' || x === 'mw(mam)' || x === 'mam') return 'MW/MAM';
+        return String(code || '');
+    }
+
+    function ccFormatDate(iso) {
+        var p = String(iso || '').split('-');
+        if (p.length < 3) return String(iso || '');
+        var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        var mi = parseInt(p[1], 10) - 1;
+        if (mi < 0 || mi > 11) return String(iso || '');
+        return months[mi] + ' ' + parseInt(p[2], 10) + ', ' + p[0];
+    }
+
+    function ccPill(axisLabel, fullCode, displayCode) {
+        return '<span class="admin-pill ' + ccStatusClass(fullCode) + '" title="' + ccEsc(axisLabel) + ': ' + ccEsc(fullCode) + '">'
+            + ccEsc(axisLabel) + ': ' + ccEsc(displayCode) + '</span>';
+    }
+
+    function renderMeasureStrip(row) {
+        var getM = function (k) { return row.getAttribute('data-meas-' + k) || ''; };
+        var mDate = getM('date');
+        var hasMeas = mDate !== '';
+        var grid = val('cc-measure-grid');
+        var empty = val('cc-m-empty');
+        if (grid) grid.style.display = hasMeas ? '' : 'none';
+        if (empty) empty.style.display = hasMeas ? 'none' : '';
+        if (!hasMeas) {
+            var pills = val('cc-m-pills');
+            if (pills) pills.innerHTML = '';
+            return;
+        }
+        var mW = getM('weight');
+        var mH = getM('height');
+        text('cc-m-weight', mW !== '' ? (parseFloat(mW).toFixed(2) + ' kg') : '—');
+        text('cc-m-height', mH !== '' ? (parseFloat(mH).toFixed(1) + ' cm') : '—');
+        text('cc-m-date', ccFormatDate(mDate));
+        var wfa = getM('wfa');
+        var hfa = getM('hfa');
+        var wfhRaw = getM('wfh');
+        var wfh = wfhRaw !== '' ? ccWfhShort(wfhRaw) : '';
+        var html = [];
+        if (wfa) html.push(ccPill('WFA', wfa, wfa));
+        if (hfa) html.push(ccPill('HFA', hfa, hfa));
+        if (wfh) html.push(ccPill('WFH', wfhRaw, wfh));
+        var pillsEl = val('cc-m-pills');
+        if (pillsEl) pillsEl.innerHTML = html.join('');
+    }
+
+    function openCard(row) {
+        if (!row) return;
+        var get = function (k) { return row.getAttribute('data-child-' + k) || ''; };
+        var getP = function (k) { return row.getAttribute('data-parent-' + k) || ''; };
+        var getH = function (k) { return row.getAttribute('data-household-' + k) || ''; };
+
+        var name = get('name');
+        var code = get('code');
+        var initials = (name.split(' ').filter(Boolean).slice(0, 2).map(function (s) { return s.charAt(0).toUpperCase(); }).join('')) || '--';
+
+        val('cc-avatar').textContent = initials;
+        text('cc-name', name);
+        text('cc-sub', code + ' · ' + (get('sex') || '—'));
+
+        text('cc-code', code);
+        text('cc-sex', get('sex'));
+        text('cc-birthdate', get('birthdate'));
+        text('cc-age', get('age') + ' m');
+        text('cc-ip', get('ip') === '1' ? 'Yes' : 'No');
+        text('cc-disability', get('disability') === '1' ? 'Yes' : 'No');
+
+        text('cc-localarea', get('localarea'));
+        text('cc-barangay', get('barangay'));
+
+        text('cc-parent-name', getP('name'));
+        text('cc-parent-kind', getP('kind'));
+        text('cc-parent-phone', getP('phone'));
+        text('cc-parent-email', getP('email'));
+
+        text('cc-household-code', getH('code') || '—');
+        text('cc-parent-address', getP('address'));
+
+        renderMeasureStrip(row);
+
+        var editLink = val('cc-edit');
+        if (editLink) {
+            editLink.setAttribute('href', '<?php echo admin_e(app_url('/admin/child_form.php')); ?>?id=' + (row.getAttribute('data-child-id') || ''));
+        }
+
+        overlay.classList.add('is-open');
+        overlay.setAttribute('aria-hidden', 'false');
+        document.body.style.overflow = 'hidden';
+    }
+
+    function closeCard() {
+        overlay.classList.remove('is-open');
+        overlay.setAttribute('aria-hidden', 'true');
+        document.body.style.overflow = '';
+    }
+
+    document.querySelectorAll('[data-view-card]').forEach(function (btn) {
+        btn.addEventListener('click', function (e) {
+            e.stopPropagation();
+            openCard(btn.closest('tr.row-link'));
+        });
+    });
+
+    document.querySelectorAll('#children-table tr.row-link').forEach(function (row) {
+        row.addEventListener('click', function () { openCard(row); });
+    });
+
+    val('cc-close').addEventListener('click', closeCard);
+    val('cc-close-2').addEventListener('click', closeCard);
+    overlay.addEventListener('click', function (e) {
+        if (e.target === overlay) closeCard();
+    });
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && overlay.classList.contains('is-open')) closeCard();
+    });
 })();
 </script>
 
