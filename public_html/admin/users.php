@@ -160,7 +160,7 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
     </article>
 </section>
 
-<section class="admin-section">
+<section class="admin-section user-directory-section">
     <div class="admin-section-head">
         <div>
             <h2 class="admin-section-title">User Directory</h2>
@@ -428,13 +428,18 @@ body.admin-page .users-edit-modal{width:min(1120px,calc(100vw - 40px)) !importan
  .users-edit-phone-field{max-width:none}
  .users-edit-body .admin-edit-actions{margin-left:-18px;margin-right:-18px;margin-bottom:-16px;padding-left:18px;padding-right:18px}
 }
-.admin-section-head{flex-wrap:wrap}
+.user-directory-section .admin-section-head{flex-wrap:nowrap}
 .admin-section-head .admin-toolbar{flex:1 1 auto;justify-content:flex-end}
 .admin-toolbar .admin-search{flex:1 1 200px;min-width:0}
-.rp-role-pills{display:flex;gap:6px;flex-wrap:wrap}
+.user-directory-section .rp-role-pills{display:flex;gap:6px;flex-wrap:nowrap}
 .rp-role-pill{font-size:12px;font-weight:600;padding:7px 14px;border-radius:999px;border:1px solid var(--admin-border);background:var(--admin-surface);color:var(--admin-muted);cursor:pointer;transition:all .15s;white-space:nowrap}
 .rp-role-pill:hover{border-color:rgba(11,110,79,.35);color:var(--admin-primary)}
 .rp-role-pill.is-active{background:var(--admin-primary-soft);color:var(--admin-primary);border-color:rgba(11,110,79,.35)}
+@media(max-width:880px){
+ .user-directory-section .admin-section-head{flex-wrap:wrap;flex-direction:column;align-items:stretch}
+ .user-directory-section .admin-toolbar{flex-wrap:wrap!important;align-items:stretch}
+ .user-directory-section .rp-role-pills{flex-wrap:wrap;overflow-x:auto}
+}
 </style>
 
 <script>

@@ -2250,6 +2250,31 @@
   border-color: var(--admin-primary);
   background: var(--admin-primary);
   color: var(--admin-text-on-primary);
+}
+
+.user-directory-section .admin-section-head {
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.user-directory-section .admin-section-head > div:last-child {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.user-directory-section .admin-toolbar {
+  flex-wrap: nowrap !important;
+  width: 100%;
+}
+
+.user-directory-section .rp-role-pills {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.user-directory-section .admin-search {
+  min-width: 0;
+  flex: 1 1 auto;
   margin-bottom: 16px;
 }
 
@@ -4337,6 +4362,22 @@ body.admin-page .appointments-table-wrap {
 body.nutritionist-page .appointments-table,
 body.admin-page .appointments-table {
   min-width: 640px;
+}
+
+@media (max-width: 880px) {
+  .user-directory-section .admin-section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .user-directory-section .admin-toolbar {
+    align-items: stretch;
+    flex-wrap: wrap !important;
+  }
+
+  .user-directory-section .rp-role-pills {
+    overflow-x: auto;
+  }
 }
 
 @media (max-width: 720px) {
