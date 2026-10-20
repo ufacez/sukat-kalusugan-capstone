@@ -168,11 +168,11 @@ admin_layout_start('User Management', 'Staff and parent accounts in one director
         </div>
         <div class="admin-toolbar" style="margin:0;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
             <div class="rp-role-pills" role="tablist" aria-label="Filter by account type">
-                <button type="button" class="rp-role-pill is-active" data-role-pill="" role="tab" aria-selected="true">All</button>
-                <button type="button" class="rp-role-pill" data-role-pill="admin" role="tab" aria-selected="false">Admins</button>
-                <button type="button" class="rp-role-pill" data-role-pill="nutritionist" role="tab" aria-selected="false">Nutritionists</button>
+                <button type="button" class="rp-role-pill is-active" data-role-pill="" role="tab" aria-selected="true">All (<?php echo count($staff) + count($parents); ?>)</button>
+                <button type="button" class="rp-role-pill" data-role-pill="admin" role="tab" aria-selected="false">Admins (<?php echo (int)$adminCount; ?>)</button>
+                <button type="button" class="rp-role-pill" data-role-pill="nutritionist" role="tab" aria-selected="false">Nutritionists (<?php echo (int)$nutritionistCount; ?>)</button>
                 <?php if ($canViewParents): ?>
-                <button type="button" class="rp-role-pill" data-role-pill="parent" role="tab" aria-selected="false">Parents</button>
+                <button type="button" class="rp-role-pill" data-role-pill="parent" role="tab" aria-selected="false">Parents (<?php echo count($parents); ?>)</button>
                 <?php endif; ?>
             </div>
             <input class="admin-search" type="search" placeholder="Search users" data-admin-filter="#users-table">
