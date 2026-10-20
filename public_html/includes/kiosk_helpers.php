@@ -3,9 +3,9 @@
 require_once __DIR__ . '/who_calculator.php';
 require_once __DIR__ . '/crypto.php';
 
-function kiosk_e(string $value): string
+function kiosk_e(?string $value): string
 {
-    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
 function kiosk_fetch_all(string $sql, string $types = '', array $params = []): array

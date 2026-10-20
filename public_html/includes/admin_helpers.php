@@ -6,9 +6,9 @@ require_once __DIR__ . '/confirm_modal.php';
 require_once __DIR__ . '/crypto.php';
 require_once __DIR__ . '/display_ids.php';
 
-function admin_e(string $value): string
+function admin_e(?string $value): string
 {
-    return htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
+    return htmlspecialchars($value ?? '', ENT_QUOTES, 'UTF-8');
 }
 
 function admin_nav_items(): array
@@ -105,8 +105,9 @@ function admin_topbar_theme_toggle(): string
         . '</button>';
 }
 
-function admin_initials(string $name): string
+function admin_initials(?string $name): string
 {
+    $name = (string)$name;
     $parts = array_filter(explode(' ', trim($name)));
     if (count($parts) >= 2) {
         return sk_strtoupper(sk_substr($parts[0], 0, 1) . sk_substr(end($parts), 0, 1));
@@ -151,8 +152,9 @@ function admin_paged_noscript(): string
         . 'table.parent-table > tbody > tr[style]{display:table-row !important;}</style></noscript>';
 }
 
-function admin_avatar_color(string $name): string
+function admin_avatar_color(?string $name): string
 {
+    $name = (string)$name;
     $colors = ['#0b6e4f','#1a6b5a','#2e8b6e','#3a7d5c','#4e9a6f','#2d8f6f','#347a5c','#408c6a'];
     $hash = 0;
     for ($i = 0; $i < sk_strlen($name); $i++) {

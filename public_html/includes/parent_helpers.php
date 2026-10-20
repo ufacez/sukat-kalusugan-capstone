@@ -3,7 +3,7 @@
 require_once __DIR__ . '/admin_helpers.php';
 require_once __DIR__ . '/who_calculator.php';
 
-function parent_e(string $value): string
+function parent_e(?string $value): string
 {
     return admin_e($value);
 }

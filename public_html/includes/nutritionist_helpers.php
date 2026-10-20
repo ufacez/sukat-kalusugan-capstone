@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/admin_helpers.php';
 
-function nutritionist_e(string $value): string
+function nutritionist_e(?string $value): string
 {
     return admin_e($value);
 }
