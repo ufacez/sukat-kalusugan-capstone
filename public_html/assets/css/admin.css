@@ -2217,6 +2217,39 @@
   gap: 10px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.rp-role-pills {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rp-role-pill {
+  appearance: none;
+  border: 1px solid var(--admin-border);
+  border-radius: 7px;
+  padding: 0.35rem 0.65rem;
+  background: var(--admin-surface-alt);
+  color: var(--admin-text);
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1.1;
+  cursor: pointer;
+  transition: background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+
+.rp-role-pill:hover,
+.rp-role-pill:focus-visible {
+  border-color: var(--admin-primary);
+  color: var(--admin-primary);
+}
+
+.rp-role-pill.is-active {
+  border-color: var(--admin-primary);
+  background: var(--admin-primary);
+  color: var(--admin-text-on-primary);
   margin-bottom: 16px;
 }
 
