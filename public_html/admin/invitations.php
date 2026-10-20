@@ -61,7 +61,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if ($resendNorm === null) {
             admin_redirect('/admin/invitations.php', ['notice' => 'This invitation has no usable mobile number — cancel it and create a new one.', 'type' => 'error']);
         }
-        $resendHasEmail = $resendEmail !== '' && filter_var($resendEmail, FILTER_VALIDATE_EMAIL) !== false;
+        // Auto-generated @sukat.kalusugan addresses are login identifiers
+        // only — never an SMTP destination.
+        $resendHasEmail = $resendEmail !== ''
+            && filter_var($resendEmail, FILTER_VALIDATE_EMAIL) !== false
+            && !admin_is_internal_login_email($resendEmail);
         $resendMethod = $resendHasEmail ? 'both' : 'sms';
         $newPlain = strtoupper(bin2hex(random_bytes(3)));
         $newHash = sk_invitation_code_hash($newPlain);
@@ -81,7 +85,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             (string)($inv['role'] ?? 'staff')
         ));
         $resendName = (string)($inv['invitee_name'] ?? '');
-        $resendRole = (string)($inv['role'] ?? 'nutritionist');
         $emailOk = false;
         $smsOk = false;
         if ($resendHasEmail) {
@@ -93,17 +96,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $resendEmail,
                     'Sukat Kalusugan — Your New Activation Code',
                     sprintf(
-                        "Hello %s,\n\nYour activation code was re-issued. Your NEW code: %s\n\nActivate at:\n%s\n\nEnter the code WITH your mobile number (%s). The old code no longer works. Expires in 48 hours. Do not share.\n\n— Sukat Kalusugan System",
+                        "Hello %s,\n\nYour activation code was re-issued. Your NEW code: %s\n\nActivate at:\n%s\n\nEnter the code on the activation page. The old code no longer works. Expires in 48 hours. Do not share.\n\n— Sukat Kalusugan System",
                         $resendName,
                         $newPlain,
-                        $activateUrl,
-                        $resendNorm
+                        $activateUrl
                     ),
                     email_template_action(
                         'Your Sukat Kalusugan activation code was re-issued.',
                         'Hello ' . $resendName . ',',
                         'Your new activation code',
-                        ['An administrator re-sent your invitation. Your old code no longer works — use the new one below with your mobile number.'],
+                        ['An administrator re-sent your invitation. Your old code no longer works — use the new one below.'],
                         'Activate account',
                         $activateUrl,
                         'Your new activation code',
@@ -117,7 +119,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         try {
             require_once __DIR__ . '/../includes/sms.php';
-            $smsOk = send_invite_sms($resendNorm, $newPlain, $resendRole);
+            $smsOk = send_invite_sms($resendNorm, $newPlain);
         } catch (Throwable $e) {
             error_log('[SukatKalusugan] Invitation resend SMS failed: ' . $e->getMessage());
         }
@@ -169,8 +171,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             admin_redirect($inviteBack, ['notice' => 'Select a barangay — nutritionists cannot have "All barangays" scope.', 'type' => 'error']);
         }
 
-        // Optional staff username (3-30 chars). Blank = auto-generated at
-        // activation. Must be unique across existing staff accounts.
+        // Optional staff username (3-30 chars). Blank = auto-generated
+        // now as firstname+surname+staff-code suffix. Must be unique
+        // across existing staff accounts when supplied.
         $username = $usernameRaw !== '' ? $usernameRaw : null;
         if ($username !== null) {
             if (preg_match('/^[A-Za-z0-9._]{3,30}$/', $username) !== 1) {
@@ -195,7 +198,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $normalizedPhone = (string)admin_normalize_ph_mobile($phoneRaw);
 
         // Email is optional. Validate/unique-check only when provided.
-        $email = $emailRaw !== '' ? $emailRaw : null;
+        // Blank email = auto-generated internal login address; it is never
+        // an SMTP destination and SMS remains the delivery channel.
+        $emailProvided = $emailRaw !== '';
+        $email = $emailProvided ? $emailRaw : null;
         if ($email !== null) {
             if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
                 admin_flash_form_state($_POST, 'email');
@@ -207,8 +213,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
 
-        // Derived delivery method: SMS always, email only when we have one.
-        $method = $email !== null ? 'both' : 'sms';
+        // Derived delivery method: SMS always, email only when supplied.
+        $method = $emailProvided ? 'both' : 'sms';
 
         $address = trim((string)($_POST['address'] ?? ''));
         if (sk_strlen($address) > 255) {
@@ -260,9 +266,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             [],
             0
         );
-        if ($hasCodeHashCol <= 0 || $hasPhoneHashCol <= 0) {
+        $hasReservedCodeCol = (int)admin_scalar(
+            "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'invitations' AND COLUMN_NAME = 'invitee_user_code'",
+            '',
+            [],
+            0
+        );
+        if ($hasUsernameCol <= 0 || $hasCodeHashCol <= 0 || $hasPhoneHashCol <= 0 || $hasReservedCodeCol <= 0) {
             admin_flash_form_state($_POST);
-            admin_redirect($inviteBack, ['notice' => 'Database migration required (db/20261009_invitation_private_sms.sql). Ask your administrator to import it first.', 'type' => 'error']);
+            admin_redirect($inviteBack, ['notice' => 'Database migration required (db/20261009_invitation_private_sms.sql and db/20261020_invitation_reserved_user_code.sql). Ask your administrator to import them first.', 'type' => 'error']);
         }
         // Extremely unlikely, but never store a duplicate code hash.
         $tries = 0;
@@ -271,24 +283,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $codeHash = sk_invitation_code_hash($plainCode);
             $tries++;
         }
-        if ($hasUsernameCol > 0) {
-            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_username, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)');
-        } else {
-            $stmt = mysqli_prepare($conn, 'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)');
+        // Reserve the staff display code in the same transaction as the
+        // invitation insert, so a failed insert never leaks a counter value.
+        $roleId = admin_find_role_id($role);
+        if ($roleId <= 0) {
+            admin_flash_form_state($_POST);
+            admin_redirect($inviteBack, ['notice' => 'Invalid role configuration.', 'type' => 'error']);
         }
+
+        mysqli_begin_transaction($conn);
+        $reservedUserCode = sk_next_staff_code($roleId);
+
+        // Auto login = firstname + surname + code suffix (middle ignored).
+        $autoLogin = admin_make_staff_login($firstName, $lastName, $reservedUserCode);
+        if ($username === null) {
+            $username = $autoLogin['username'];
+        }
+        if (!$emailProvided) {
+            $email = $autoLogin['email'];
+        }
+
+        $stmt = mysqli_prepare(
+            $conn,
+            'INSERT INTO invitations (inviter_user_id, invitee_name, invitee_email, invitee_username, invitee_user_code, invitee_phone, invitee_phone_hash, invitee_address, barangay_id, role, code, code_hash, method, expires_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)'
+        );
         if ($stmt === false) {
+            mysqli_rollback($conn);
             admin_flash_form_state($_POST);
             admin_redirect($inviteBack, ['notice' => 'Unable to create invitation.', 'type' => 'error']);
         }
         $inviterId = (int)($actor['id'] ?? 0);
-        if ($hasUsernameCol > 0) {
-            mysqli_stmt_bind_param($stmt, 'issssssissss', $inviterId, $encName, $email, $username, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
-        } else {
-            if ($username !== null) {
-                error_log('[SukatKalusugan] Invitation username dropped (migration not applied): ' . $username);
-            }
-            mysqli_stmt_bind_param($stmt, 'isssssissss', $inviterId, $encName, $email, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
-        }
+        mysqli_stmt_bind_param($stmt, 'isssssssissss', $inviterId, $encName, $email, $username, $reservedUserCode, $encPhone, $phoneHash, $encAddress, $barangayId, $role, $codeHash, $method, $expiresAt);
         try {
             $ok = mysqli_stmt_execute($stmt);
         } catch (mysqli_sql_exception $e) {
@@ -298,31 +323,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         mysqli_stmt_close($stmt);
 
         if (!$ok) {
+            mysqli_rollback($conn);
             admin_flash_form_state($_POST);
             admin_redirect($inviteBack, ['notice' => 'Failed to create invitation.', 'type' => 'error']);
         }
+        $newInvitationId = (int)$conn->insert_id;
+        mysqli_commit($conn);
 
         log_action($actor['id'] ?? null, 'CREATE_INVITATION', 'info', sprintf(
             // Privacy: invitation id + role only — never the invitee
             // name/email, and never the activation code.
             'Generated %s invitation #%d — role: %s',
             $method,
-            (int)$conn->insert_id,
+            $newInvitationId,
             $role
         ));
 
         // Deliver the code over the invitee's own channels only. The code
         // is NEVER echoed back to the admin UI. SMS is always sent (the
-        // mobile number is required); email is sent only when supplied.
+        // mobile number is required); email is sent only for a supplied
+        // address — never for the auto @sukat.kalusugan login identifier.
         $emailSent = false;
         $smsSent = false;
-        if ($email !== null) {
+        if ($emailProvided) {
             try {
                 require_once __DIR__ . '/../includes/mailer.php';
                 require_once __DIR__ . '/../includes/email_template.php';
                 // Absolute live URL (APP_URL) so the emailed button works
                 // from any host. No ?code= prefill — the invitee types the
-                // code from their email/SMS plus their mobile number.
+                // code from their email/SMS.
                 $activateUrl = app_absolute_url('/auth/activate.php');
                 $subject = 'Sukat Kalusugan — Activate Your Staff Account';
                 $body = sprintf(
@@ -330,14 +359,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     "An administrator has invited you to join Sukat Kalusugan as a %s.\n\n" .
                     "Your activation code: %s\n\n" .
                     "To activate your account, visit:\n%s\n\n" .
-                    "Enter the code above WITH your mobile number (%s) and set your password.\n\n" .
+                    "Enter the code above and set your password.\n\n" .
                     "This code expires in 48 hours. Do not share it.\n\n" .
                     "— Sukat Kalusugan System",
                     $name,
                     ucfirst($role),
                     $plainCode,
-                    $activateUrl,
-                    $normalizedPhone
+                    $activateUrl
                 );
                 $htmlBody = email_template_action(
                     'You have been invited to join Sukat Kalusugan as ' . ucfirst($role) . '.',
@@ -345,13 +373,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     'Activate your staff account',
                     [
                         'An administrator has invited you to join Sukat Kalusugan as a ' . ucfirst($role) . '.',
-                        'Click the button below to open the activation page, then enter your code WITH your mobile number.',
+                        'Click the button below to open the activation page, then enter your code.',
                     ],
                     'Activate account',
                     $activateUrl,
                     'Your activation code',
                     $plainCode,
-                    'This code expires in 48 hours. You will also need the mobile number on this invitation. Do not share your code.'
+                    'This code expires in 48 hours. Do not share your code.'
                 );
                 $emailSent = send_mail($email, $subject, $body, $htmlBody);
             } catch (Throwable $e) {
@@ -360,7 +388,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
         try {
             require_once __DIR__ . '/../includes/sms.php';
-            $smsSent = send_invite_sms($normalizedPhone, $plainCode, $role);
+            $smsSent = send_invite_sms($normalizedPhone, $plainCode);
         } catch (Throwable $e) {
             error_log('[SukatKalusugan] Invitation SMS failed: ' . $e->getMessage());
         }
@@ -369,15 +397,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         unset($plainCode);
 
         $maskedPhone = substr($normalizedPhone, 0, 4) . '***' . substr($normalizedPhone, -2);
-        $noticeTarget = $maskedPhone . ($email !== null ? ' / ' . $email : '');
-        if ($smsSent && ($email === null || $emailSent)) {
+        $noticeTarget = $maskedPhone . ($emailProvided ? ' / ' . $email : '');
+        if (!$emailProvided) {
+            $noticeTarget .= ' — auto login: ' . $email;
+        }
+        if ($smsSent && (!$emailProvided || $emailSent)) {
             $noticeParam = 'Invitation sent successfully to ' . $noticeTarget . '. The code stays hidden for security.';
         } else {
             $failedChannels = [];
             if (!$smsSent) {
                 $failedChannels[] = 'SMS';
             }
-            if ($email !== null && !$emailSent) {
+            if ($emailProvided && !$emailSent) {
                 $failedChannels[] = 'email';
             }
             $noticeParam = 'Invitation created for ' . $noticeTarget . '. The '
@@ -581,17 +612,17 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'first_name' ? ' is-invalid' : ''; ?>">
                             <span>First name<span class="admin-required">*</span></span>
-                            <input id="invite_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Juan" value="<?php echo admin_e(admin_old_value($old, 'first_name')); ?>">
+                            <input id="invite_first_name" name="first_name" required maxlength="60" data-validate="name" data-label="First name" placeholder="Enter first name" value="<?php echo admin_e(admin_old_value($old, 'first_name')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'first_name' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                         <label class="admin-field">
                             <span>Middle name</span>
-                            <input id="invite_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Santos" value="<?php echo admin_e(admin_old_value($old, 'middle_name')); ?>">
+                            <input id="invite_middle_name" name="middle_name" maxlength="60" data-validate="name" data-label="Middle name" placeholder="Enter middle name" value="<?php echo admin_e(admin_old_value($old, 'middle_name')); ?>">
                             <span class="admin-field-message"></span>
                         </label>
                         <label class="admin-field<?php echo $formErrorField === 'last_name' ? ' is-invalid' : ''; ?>">
                             <span>Surname<span class="admin-required">*</span></span>
-                            <input id="invite_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Dela Cruz" value="<?php echo admin_e(admin_old_value($old, 'last_name')); ?>">
+                            <input id="invite_last_name" name="last_name" required maxlength="60" data-validate="name" data-label="Surname" placeholder="Enter surname" value="<?php echo admin_e(admin_old_value($old, 'last_name')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'last_name' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>
@@ -602,12 +633,12 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-field-row invite-contact-row">
                     <label class="admin-field<?php echo $formErrorField === 'email' ? ' is-invalid' : ''; ?>">
                         <span>Email address</span>
-                        <input name="email" id="invite-email-input" type="email" maxlength="150" placeholder="e.g. juan@gmail.com" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="width:100%;">
+                        <input name="email" id="invite-email-input" type="email" maxlength="150" placeholder="Enter email address" value="<?php echo admin_e(admin_old_value($old, 'email')); ?>" style="width:100%;">
                         <span class="admin-field-message"><?php echo $formErrorField === 'email' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'Enter a valid email address.') : ''; ?></span>
                     </label>
                         <label class="admin-field<?php echo $formErrorField === 'phone' ? ' is-invalid' : ''; ?>">
                             <span>Mobile number<span class="admin-required">*</span></span>
-                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="09171234567" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
+                            <input name="phone" id="invite-phone" type="tel" required maxlength="14" inputmode="tel" placeholder="Enter mobile number" data-validate="phone-ph" value="<?php echo admin_e(admin_old_value($old, 'phone')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'phone' ? admin_e($formErrorNotice) : ''; ?></span>
                         </label>
                     </div>
@@ -618,7 +649,7 @@ admin_layout_start('Staff Invitations', 'All staff invitations. Codes expire aft
                     <div class="admin-field-row">
                         <label class="admin-field<?php echo $formErrorField === 'username' ? ' is-invalid' : ''; ?>">
                             <span>Username</span>
-                            <input name="username" id="invite-username" type="text" maxlength="30" autocomplete="off" placeholder="e.g. juandelacruz" data-validate="username" data-label="Username" value="<?php echo admin_e(admin_old_value($old, 'username')); ?>">
+                            <input name="username" id="invite-username" type="text" maxlength="30" autocomplete="off" placeholder="Enter username" data-validate="username" data-label="Username" value="<?php echo admin_e(admin_old_value($old, 'username')); ?>">
                             <span class="admin-field-message"><?php echo $formErrorField === 'username' ? admin_e($formErrorNotice !== '' ? $formErrorNotice : 'This username is already taken. Use a different username.') : ''; ?></span>
                         </label>
                         <label class="admin-field<?php echo $formErrorField === 'role' ? ' is-invalid' : ''; ?>">

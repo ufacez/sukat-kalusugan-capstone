@@ -4,7 +4,7 @@
 -- Private invitation codes (panel requirement):
 --   - codes are never stored in plaintext and never shown in the web UI;
 --   - invite requires BOTH email and mobile; code is delivered via SMTP
---     email AND Semaphore SMS, and activation must present code + mobile;
+--     email AND SMS (UniSMS), and activation must present the code;
 --   - the legacy `manual` delivery method (share code in person / on screen)
 --     is removed in favor of `email` / `sms` / `both`.
 --
@@ -14,8 +14,8 @@
 --      share a code. Plaintext `code` is kept NULL-able for history only
 --      (old rows) and MUST NOT be selected/displayed by new code.
 --   2. invitations.invitee_phone_hash CHAR(64) — SHA-256 of the normalized
---      09XXXXXXXXX mobile. Needed because invitee_phone is AES-256-GCM
---      encrypted (random IV per value) and can never be matched in SQL.
+--      09XXXXXXXXX mobile. Retained for compatibility; activation is
+--      code-only and no longer compares this hash.
 --   3. Widen invitations.invitee_name/phone/address to TEXT for ciphertext
 --      envelopes (SK1: + base64(iv+tag+data)), same as 20261001. Email stays
 --      VARCHAR (login + UNIQUE lookup key, never encrypted).

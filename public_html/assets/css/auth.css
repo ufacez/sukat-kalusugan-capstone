@@ -410,6 +410,69 @@
   display: block;
 }
 
+.auth-pw-checklist {
+  list-style: none !important;
+  margin: -0.15rem 0 0.1rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.2rem 0.9rem;
+  width: 100%;
+}
+
+.auth-pw-checklist li {
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.auth-pw-checklist li::before {
+  content: "○";
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.auth-pw-checklist li.is-met {
+  color: var(--primary-strong);
+}
+
+.auth-pw-checklist li.is-met::before {
+  content: "✓";
+  color: var(--primary-strong);
+}
+
+.auth-pw-strength {
+  display: flex;
+  gap: 0.35rem;
+  margin: -0.2rem 0 0.25rem;
+  width: 100%;
+}
+
+.auth-pw-strength span {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #d8e4dd;
+  transition: background 180ms ease;
+}
+
+.auth-pw-strength span.is-on {
+  background: #0b6e4f;
+}
+
+@media (max-width: 520px) {
+  .auth-pw-checklist {
+    gap: 0.2rem 0.45rem;
+  }
+
+  .auth-pw-checklist li {
+    font-size: 0.72rem;
+  }
+}
+
 .auth-row {
   display: flex;
   justify-content: space-between;

@@ -102,11 +102,15 @@ define('SMTP_PASS', env('SMTP_PASS', ''));
 define('MAIL_FROM_ADDRESS', env('MAIL_FROM_ADDRESS', ''));
 define('MAIL_FROM_NAME', env('MAIL_FROM_NAME', 'Sukat Kalusugan'));
 
-// ── SMS / Semaphore (staff invitation codes) ───────────────────────────────
-// SMTP is email-only. Codes go out via BOTH email and Semaphore SMS.
-// Empty key = SMS disabled (invite still created, admin sees a warning).
-define('SEMAPHORE_API_KEY', env('SEMAPHORE_API_KEY', ''));
-define('SEMAPHORE_SENDER_NAME', env('SEMAPHORE_SENDER_NAME', 'SukatKalusugan'));
+// ── SMS / UniSMS (staff invitation codes) ─────────────────────────────────
+// SMTP is email-only. Codes go out via BOTH email and UniSMS SMS.
+// The default sender only reaches Globe/DITO; Smart/TNT/Sun are refused.
+// Empty secret key = SMS disabled (invite still created, admin sees a warning).
+define('UNISMS_SECRET_KEY', env('UNISMS_SECRET_KEY', ''));
+define('UNISMS_SENDER_ID', env('UNISMS_SENDER_ID', 'Unisoft'));
+// SMS_DRY_RUN=true logs the message instead of calling UniSMS (no credits
+// spent). Use it for local invite/activation testing; leave unset on live.
+define('SMS_DRY_RUN', env('SMS_DRY_RUN', ''));
 
 // ── AI Chatbot (Kali AI) ─────────────────────────────────────────────────
 define('CHATBOT_PROVIDER', env('CHATBOT_PROVIDER', 'gemini'));

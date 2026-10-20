@@ -28,7 +28,7 @@ start_secure_session();
 <h2 id="terms-title">Authorized use only</h2>
 <ul style="line-height:1.6;font-size:.92rem;margin:0 0 8px 18px;">
 <li>Sukat Kalusugan is a student capstone by Group A4Tech — not an official OLFU system.</li>
-<li>No public registration. Staff accounts require an invitation code plus the mobile number on the invitation (both sent privately by email/SMS); parent accounts are created by staff.</li>
+<li>No public registration. Staff accounts require an invitation code sent privately by email/SMS; parent accounts are created by staff.</li>
 <li>Keep your password private. Do not share activation codes or reset links.</li>
 <li>Enter only true health information you are authorized to provide.</li>
 <li>Do not test security, scrape, or access other users' records. Report issues to espirituean@gmail.com.</li>

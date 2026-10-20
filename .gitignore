@@ -4,6 +4,7 @@
 # and correct to track it in git going forward. Only .env stays ignored.
 .env
 .env.*
+!.env.example
 
 # --- OS junk ---
 .DS_Store

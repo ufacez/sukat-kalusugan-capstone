@@ -190,9 +190,8 @@ function sk_invitation_code_hash(string $plainCode): string
 /**
  * One-way hash of a normalized 09XXXXXXXXX mobile number (SHA-256 hex).
  *
- * invitee_phone is AES-encrypted (random IV, unsearchable), so this hash is
- * the SQL lookup key that lets activation match code + mobile without
- * decrypting every row. Caller must normalize first (admin_normalize_ph_mobile).
+ * Stored on invitations for compatibility; activation is code-only and no
+ * longer uses this hash. Caller must normalize first (admin_normalize_ph_mobile).
  */
 function sk_phone_hash(string $normalizedPhone): string
 {

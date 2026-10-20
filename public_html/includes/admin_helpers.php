@@ -962,6 +962,81 @@ function admin_combine_name(string $first, string $middle, string $last): string
 }
 
 /**
+ * Lowercase first, then keep only a-z/0-9. Doing the lowercase before the
+ * strip matters: the old generator stripped uppercase letters first, so
+ * "Juan Jimenez" became "uanimenez".
+ */
+function admin_staff_login_slug(string $value): string
+{
+    return (string)preg_replace('/[^a-z0-9]+/', '', strtolower(trim($value)));
+}
+
+/**
+ * Extract the numeric suffix used in auto-generated staff logins.
+ * NUT-0001 -> 001, ADM-0042 -> 042.
+ */
+function admin_staff_code_suffix(string $userCode): string
+{
+    $digits = (string)preg_replace('/\D+/', '', $userCode);
+    if ($digits === '') {
+        return '001';
+    }
+
+    return str_pad((string)(int)$digits, 3, '0', STR_PAD_LEFT);
+}
+
+/**
+ * Auto-generated staff login: first name + surname + staff-code suffix.
+ * Middle names are intentionally ignored:
+ *   "Juan Santos Jimenez" + NUT-0001 -> juanjimenez001
+ *
+ * The internal @sukat.kalusugan address is a login identifier only; it is
+ * never used as an SMTP destination.
+ *
+ * @return array{username:string,email:string}
+ */
+function admin_make_staff_login(string $firstName, string $lastName, string $userCode): array
+{
+    $base = admin_staff_login_slug($firstName) . admin_staff_login_slug($lastName);
+    if ($base === '') {
+        $base = 'staff';
+    }
+    // Keep the local part within the 30-char invitation username limit.
+    $base = substr($base, 0, 20);
+    $suffix = admin_staff_code_suffix($userCode);
+    $local = $base . $suffix;
+
+    $isTaken = static function (string $candidate): bool {
+        return admin_username_in_use($candidate)
+            || admin_email_in_use($candidate . '@sukat.kalusugan')
+            || (int)admin_scalar(
+                "SELECT COUNT(*) FROM invitations
+                 WHERE status = 'pending' AND expires_at > NOW()
+                   AND (invitee_email = ? OR invitee_username = ?)",
+                'ss',
+                [$candidate . '@sukat.kalusugan', $candidate],
+                0
+            ) > 0;
+    };
+
+    $counter = 1;
+    while ($isTaken($local)) {
+        $local = $base . $suffix . $counter;
+        $counter++;
+    }
+
+    return ['username' => $local, 'email' => $local . '@sukat.kalusugan'];
+}
+
+/**
+ * True for the internal login-only addresses generated above.
+ */
+function admin_is_internal_login_email(string $email): bool
+{
+    return str_ends_with(strtolower(trim($email)), '@sukat.kalusugan');
+}
+
+/**
  * A name part (first/middle/last) may contain letters, spaces, hyphens,
  * apostrophes, and periods (e.g. "Jr.", "Sto. Niño", "D'Angelo").
  */

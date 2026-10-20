@@ -26,7 +26,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="../assets/css/app.css">
-    <link rel="stylesheet" href="../assets/css/auth.css?v=6">
+    <link rel="stylesheet" href="../assets/css/auth.css?v=7">
     <link rel="stylesheet" href="../assets/css/admin-toast.css?v=1">
     <link rel="icon" type="image/svg+xml" href="../assets/img/logo/logo_forlight.svg?v=2">
     <script>
@@ -67,7 +67,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
             <div class="auth-card-header">
                 <p class="eyebrow">Staff Activation</p>
                 <h2 id="activate-title">Activate your account</h2>
-                <p class="muted">Enter the 6-character code from your email/SMS <strong>plus</strong> the mobile number on your invitation, then set your password.</p>
+                <p class="muted">Enter the 6-character code from your email/SMS, then set your password.</p>
             </div>
 
             <div class="flash flash-notice" role="status">Group A4Tech capstone. Codes are issued by your administrator only. Never share codes or passwords. <a class="link" href="../contact.php">Contact us</a>.</div>
@@ -87,12 +87,6 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     <span class="admin-field-message"></span>
                 </label>
 
-                <label class="field" for="activation_phone">
-                    <span>Mobile number on your invitation</span>
-                    <input id="activation_phone" name="phone" type="tel" maxlength="14" inputmode="tel" autocomplete="off" placeholder="09171234567" required>
-                    <span class="admin-field-message"></span>
-                </label>
-
                 <label class="field" for="activate_password">
                     <span>Password</span>
                     <div class="password-field">
@@ -104,16 +98,30 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                     </div>
                 </label>
 
-                <label class="field" for="activate_password_confirm">
-                    <span>Confirm password</span>
-                    <input id="activate_password_confirm" name="password_confirm" type="password" autocomplete="new-password" placeholder="Re-type the password" required>
-                </label>
-
-                <ul class="admin-pw-checklist" data-pw-checklist-for="activate_password" style="list-style:none;padding:0;margin:0 0 8px;">
+                <ul class="auth-pw-checklist" data-pw-checklist-for="activate_password">
                     <li data-pw-rule="length">At least 8 characters</li>
                     <li data-pw-rule="upper">One uppercase letter</li>
+                    <li data-pw-rule="lower">One lowercase letter</li>
                     <li data-pw-rule="number">One number</li>
+                    <li data-pw-rule="special">One special character</li>
                 </ul>
+                <div class="auth-pw-strength" aria-hidden="true">
+                    <span data-pw-strength-segment></span>
+                    <span data-pw-strength-segment></span>
+                    <span data-pw-strength-segment></span>
+                    <span data-pw-strength-segment></span>
+                </div>
+
+                <label class="field" for="activate_password_confirm">
+                    <span>Confirm password</span>
+                    <div class="password-field">
+                        <input id="activate_password_confirm" name="password_confirm" type="password" autocomplete="new-password" placeholder="Re-type the password" required>
+                        <button class="toggle-password" type="button" data-toggle-password aria-label="Show confirm password">
+                            <svg class="eye-open" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 0 1 0-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178Z"/><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z"/></svg>
+                            <svg class="eye-closed" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M3.98 8.223A10.477 10.477 0 0 0 1.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.451 10.451 0 0 1 12 4.5c4.756 0 8.773 3.162 10.065 7.498a10.522 10.522 0 0 1-4.293 5.774M6.228 6.228 3 3m3.228 3.228 3.65 3.65m7.894 7.894L21 21m-3.228-3.228-3.65-3.65m0 0a3 3 0 1 0-4.243-4.243m4.242 4.242L9.88 9.88"/></svg>
+                        </button>
+                    </div>
+                </label>
 
                 <div class="form-message" id="formMessage" aria-live="polite"></div>
 
@@ -154,30 +162,39 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
     <script>
     (function(){
         var pwInputs = document.querySelectorAll('[data-pw-checklist-for]');
-        pwInputs.forEach(function(input){
-            var list = input.closest('form, .auth-form, .admin-field, .field, div')
-                ?.querySelector('[data-pw-checklist-for="' + input.getAttribute('data-pw-checklist-for') + '"]');
+        pwInputs.forEach(function(list){
+            var input = document.getElementById(list.getAttribute('data-pw-checklist-for'));
             if (!list) return;
             input.addEventListener('input', function(){
                 var v = input.value;
+                var rules = {
+                    length: v.length >= 8,
+                    upper: /[A-Z]/.test(v),
+                    lower: /[a-z]/.test(v),
+                    number: /[0-9]/.test(v),
+                    special: /[^A-Za-z0-9]/.test(v)
+                };
                 list.querySelectorAll('[data-pw-rule]').forEach(function(li){
                     var rule = li.getAttribute('data-pw-rule');
-                    var ok = false;
-                    if (rule === 'length') ok = v.length >= 8;
-                    else if (rule === 'upper') ok = /[A-Z]/.test(v);
-                    else if (rule === 'number') ok = /[0-9]/.test(v);
-                    li.style.color = ok ? '#16a34a' : '#94a3b8';
-                    li.style.textDecoration = ok ? 'line-through' : 'none';
+                    li.classList.toggle('is-met', !!rules[rule]);
+                });
+                var segments = list.parentElement.querySelectorAll('[data-pw-strength-segment]');
+                var metCount = Object.keys(rules).filter(function(rule){ return rules[rule]; }).length;
+                segments.forEach(function(segment, index){
+                    segment.classList.toggle('is-on', index < Math.ceil(metCount * segments.length / 5));
                 });
             });
         });
 
         document.querySelectorAll('[data-toggle-password]').forEach(function(btn){
             btn.addEventListener('click', function(){
-                var input = btn.closest('.password-field')?.querySelector('input') || btn.previousElementSibling;
+                var wrapper = btn.closest('.password-field');
+                var input = wrapper ? wrapper.querySelector('input') : btn.previousElementSibling;
                 if (!input) return;
                 var isPassword = input.type === 'password';
                 input.type = isPassword ? 'text' : 'password';
+                btn.classList.toggle('is-visible', isPassword);
+                btn.setAttribute('aria-label', isPassword ? 'Hide password' : 'Show password');
             });
         });
 
@@ -194,17 +211,11 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 if (notice) notice.style.display = 'none';
 
                 var code = (document.getElementById('activation_code')?.value || '').trim().toUpperCase();
-                var phone = (document.getElementById('activation_phone')?.value || '').trim();
                 var password = document.getElementById('activate_password')?.value || '';
                 var pwConfirm = document.getElementById('activate_password_confirm')?.value || '';
 
                 if (code.length < 6) {
                     msg.textContent = 'Please enter a valid 6-character code.';
-                    msg.className = 'form-message';
-                    return;
-                }
-                if (phone === '') {
-                    msg.textContent = 'Please enter the mobile number on your invitation.';
                     msg.className = 'form-message';
                     return;
                 }
@@ -235,7 +246,7 @@ $prefillCode = trim((string)($_GET['code'] ?? ''));
                 fetch('../api/auth/activate.php', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
-                    body: JSON.stringify({code: code, phone: phone, password: password, password_confirm: pwConfirm})
+                    body: JSON.stringify({code: code, password: password, password_confirm: pwConfirm})
                 })
                 .then(function(r){ return r.json(); })
                 .then(function(data){
