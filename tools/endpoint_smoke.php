@@ -78,7 +78,6 @@ function http_get(string $url, ?string $cookieJar, ?string $deviceKey, int $time
     $errno = curl_errno($ch);
     $error = curl_error($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     if ($raw === false) {
         return ['code' => 0, 'body' => '', 'curl_error' => $error !== '' ? $error : ('cURL error ' . $errno)];
     }
@@ -133,7 +132,6 @@ if ($opt['user'] !== null) {
     ]);
     $raw = curl_exec($ch);
     $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
     $parts = preg_split("/\r\n\r\n/", (string)$raw);
     $decoded = json_decode(trim((string)end($parts)), true);
     if ($code !== 200 || !is_array($decoded) || ($decoded['success'] ?? false) !== true) {

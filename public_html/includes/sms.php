@@ -129,10 +129,8 @@ function send_sms(string $toNormalized, string $message): bool
     $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
     if ($errno !== 0) {
         error_log('[sms] cURL error ' . $errno . ': ' . (string)curl_error($ch));
-        curl_close($ch);
         return false;
     }
-    curl_close($ch);
 
     $decoded = json_decode((string)$raw, true);
     if ($httpCode < 200 || $httpCode >= 300) {

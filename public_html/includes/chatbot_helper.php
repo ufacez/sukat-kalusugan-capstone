@@ -1220,9 +1220,6 @@ function chatbot_http_post(
         );
 
 
-    curl_close($ch);
-
-
     /**
      * -------------------------------------------------------------
      * Network failure

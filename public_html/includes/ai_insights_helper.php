@@ -170,7 +170,6 @@ if (!function_exists('ai_insights_call_provider')) {
         ]);
         $response = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        curl_close($ch);
 
         if ($response === false || $httpCode >= 400) {
             throw new \RuntimeException("AI request failed: HTTP {$httpCode}");

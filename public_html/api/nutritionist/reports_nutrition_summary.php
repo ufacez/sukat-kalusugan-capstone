@@ -134,6 +134,6 @@ api_success([
 	'wfh' => $formatAxis($wfhSummary),
 	'total_population' => $totalAll,
 	'period_label' => $view === 'monthly'
-		? strftime('%B %Y', strtotime($anchorParam))
+		? date('F Y', strtotime($anchorParam))
 		: 'Q' . intdiv($checkupMonth - 1, 3) . ' ' . $year,
 ], 'Nutritional status summary loaded.');

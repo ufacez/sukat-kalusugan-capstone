@@ -2,7 +2,7 @@
     "name": "sukat-kalusugan/capstone",
     "description": "Sukat Kalusugan capstone project — server-side dependencies.",
     "require": {
-        "php": ">=7.4",
+        "php": ">=8.0",
         "phpmailer/phpmailer": "^6.9",
         "tecnickcom/tcpdf": "^6.11",
         "vlucas/phpdotenv": "^5.6"

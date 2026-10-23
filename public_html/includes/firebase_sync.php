@@ -56,7 +56,6 @@ function firebase_put(string $path, array $payload): bool
 
     $response = curl_exec($ch);
     $statusCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
-    curl_close($ch);
 
     return $statusCode >= 200 && $statusCode < 300 && $response !== false;
 }
