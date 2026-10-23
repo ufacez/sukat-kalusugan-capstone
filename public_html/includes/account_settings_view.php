@@ -13,6 +13,8 @@
  *   $settingsShowUsername (bool), $settingsParentType (string),
  *   $settingsParentTypeOptions (string[]), $settingsMustChangeBanner (bool)
  */
+require_once __DIR__ . '/admin_helpers.php';
+
 $settingsProfile = is_array($settingsProfile ?? null) ? $settingsProfile : [];
 $settingsEscaper = is_callable($settingsEscaper ?? null) ? $settingsEscaper : 'admin_e';
 $settingsShowUsername = (bool)($settingsShowUsername ?? false);
